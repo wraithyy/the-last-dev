@@ -32,6 +32,9 @@ else
   echo "wasm-opt skipped (not installed or dev build)"
 fi
 
+# Pages serves gzip, so Content-Length is the compressed size; the loader needs the real one for %.
+wc -c < web/pkg/game_client_bg.wasm | tr -d ' ' > web/pkg/game_client_bg.wasm.size
+
 if [[ -d assets ]]; then
   rm -rf web/assets
   cp -R assets web/assets

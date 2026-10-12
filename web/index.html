@@ -43,13 +43,39 @@ window.addEventListener('unhandledrejection', (e) => {
   else fail('Unhandled error: ' + (e.reason && e.reason.message || e.reason));
 });
 
+const mb = (n) => (n / 1048576).toFixed(1);
+
+// Streams the wasm ourselves so the loader can show progress; init() alone gives no feedback.
+async function download(url) {
+  const total = await fetch(url + '.size').then((r) => (r.ok ? r.text() : '0')).then(Number).catch(() => 0) || 0;
+  const resp = await fetch(url);
+  if (!resp.ok || !resp.body) throw new Error(`${url}: HTTP ${resp.status}`);
+  const reader = resp.body.getReader();
+  const chunks = [];
+  let loaded = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.length;
+    status.textContent = total > 0
+      ? `Loading ${Math.min(99, Math.floor((loaded / total) * 100))}% (${mb(loaded)} / ${mb(total)} MB)`
+      : `Loading… ${mb(loaded)} MB`;
+  }
+  status.textContent = 'Starting…';
+  const bytes = new Uint8Array(loaded);
+  let offset = 0;
+  for (const c of chunks) { bytes.set(c, offset); offset += c.length; }
+  return bytes;
+}
+
 if (!document.createElement('canvas').getContext('webgl2')) {
   fail('WebGL2 is not available in this browser. Enable hardware acceleration or use a recent Chrome, Firefox or Safari.');
 } else {
   canvas.focus();
   try {
     const { default: init } = await import('./pkg/game_client.js');
-    await init();
+    await init({ module_or_path: await download('./pkg/game_client_bg.wasm') });
     status.hidden = true;
   } catch (e) {
     if (isControlFlow(e)) status.hidden = true;
