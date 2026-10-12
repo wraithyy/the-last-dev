@@ -1,5 +1,6 @@
 //! Senior Engineer: fixed-step movement simulation plus interpolated rendering.
 
+use crate::anim::{Character, ModelKind};
 use crate::arena::Colliders;
 use crate::collision::{ground_height, slide};
 use crate::config::*;
@@ -19,6 +20,20 @@ pub struct PlayerBody {
     vy: f32,
 }
 
+impl PlayerBody {
+    /// Hard move (respawn): also drops interpolation history and vertical speed.
+    pub fn teleport(&mut self, pos: Vec3) {
+        self.pos = pos;
+        self.prev_pos = pos;
+        self.vy = 0.0;
+    }
+
+    /// Off the ground: `simulate` zeroes `vy` whenever it snaps the feet to a surface.
+    pub fn airborne(&self) -> bool {
+        self.vy != 0.0
+    }
+}
+
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
@@ -32,58 +47,25 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-fn spawn_player(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
+fn spawn_player(mut commands: Commands) {
     let pos = Vec3::from(PLAYER_SPAWN);
-    let coat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.2, 0.35, 0.8),
-        perceptual_roughness: 0.8,
-        ..default()
-    });
-    let skin = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.9, 0.7, 0.55),
-        ..default()
-    });
-    let screen = materials.add(StandardMaterial {
-        base_color: Color::BLACK,
-        emissive: LinearRgba::rgb(0.3, 2.5, 1.2),
-        ..default()
-    });
-    // Visor and laptop sit on the -Z side so facing reads clearly from behind the character.
-    commands
-        .spawn((
-            Player,
-            PlayerBody {
-                pos,
-                yaw: 0.0,
-                prev_pos: pos,
-                prev_yaw: 0.0,
-                vy: 0.0,
-            },
-            Transform::from_translation(pos),
-            Visibility::default(),
-        ))
-        .with_children(|c| {
-            c.spawn((
-                Mesh3d(meshes.add(Capsule3d::new(PLAYER_BODY_RADIUS, PLAYER_BODY_LENGTH))),
-                MeshMaterial3d(coat),
-                Transform::from_xyz(0.0, PLAYER_BODY_Y, 0.0),
-            ));
-            c.spawn((
-                Mesh3d(meshes.add(Sphere::new(PLAYER_HEAD_RADIUS))),
-                MeshMaterial3d(skin),
-                Transform::from_xyz(0.0, PLAYER_HEAD_Y, 0.0),
-            ));
-            c.spawn((
-                Mesh3d(meshes.add(Cuboid::from_size(Vec3::from(PLAYER_LAPTOP_SIZE)))),
-                MeshMaterial3d(screen),
-                Transform::from_translation(Vec3::from(PLAYER_LAPTOP_POS))
-                    .with_rotation(Quat::from_rotation_x(PLAYER_LAPTOP_TILT)),
-            ));
-        });
+    commands.spawn((
+        Player,
+        PlayerBody {
+            pos,
+            yaw: 0.0,
+            prev_pos: pos,
+            prev_yaw: 0.0,
+            vy: 0.0,
+        },
+        Character {
+            kind: ModelKind::Mage,
+            scale: PLAYER_MODEL_SCALE,
+            tint: None,
+        },
+        Transform::from_translation(pos),
+        Visibility::default(),
+    ));
 }
 
 fn simulate(

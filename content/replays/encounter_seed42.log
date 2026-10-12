@@ -1,0 +1,99 @@
+# encounter replay, seed 42, 30 Hz
+[00001] Senior Engineer failed Code Review: Invalid target.
+[00003] Senior Engineer begins Code Review (2000 ms)
+[00063] Senior Engineer casts Code Review
+[00063] Senior Engineer hits AI Evangelist with Code Review for 79 (absorbed 0)
+[00063] AI Evangelist gains code_smell
+[00063] AI Evangelist ai Chase
+[00063] Senior Engineer enters combat
+[00063] AI Evangelist enters combat
+[00064] Senior Engineer begins Refactor (2500 ms)
+[00139] Senior Engineer casts Refactor
+[00139] AI Evangelist loses code_smell (Consumed)
+[00139] Senior Engineer hits AI Evangelist with Refactor for 151 (absorbed 0) COMBO
+[00140] Senior Engineer begins Code Review (2000 ms)
+[00151] AI Evangelist ai Attack
+[00151] AI Evangelist swings at Senior Engineer
+[00151] AI Evangelist hits Senior Engineer with melee for 14 (absorbed 0)
+[00211] AI Evangelist swings at Senior Engineer
+[00211] AI Evangelist hits Senior Engineer with melee for 14 (absorbed 0)
+[00230] Senior Engineer casts Code Review
+[00230] Senior Engineer hits AI Evangelist with Code Review for 79 (absorbed 0)
+[00230] AI Evangelist gains code_smell
+[00231] Senior Engineer begins Refactor (2500 ms)
+[00271] AI Evangelist swings at Senior Engineer
+[00271] AI Evangelist hits Senior Engineer with melee for 14 (absorbed 0)
+[00321] Senior Engineer casts Refactor
+[00321] AI Evangelist loses code_smell (Consumed)
+[00321] Senior Engineer hits AI Evangelist with Refactor for 151 (absorbed 0) COMBO
+[00322] Senior Engineer begins Code Review (2000 ms)
+[00331] AI Evangelist swings at Senior Engineer
+[00331] AI Evangelist hits Senior Engineer with melee for 14 (absorbed 0)
+[00391] AI Evangelist swings at Senior Engineer
+[00391] AI Evangelist hits Senior Engineer with melee for 14 (absorbed 0)
+[00412] Senior Engineer casts Code Review
+[00412] Senior Engineer hits AI Evangelist with Code Review for 79 (absorbed 0)
+[00412] AI Evangelist gains code_smell
+[00413] Senior Engineer begins Refactor (2500 ms)
+[00418] AI Evangelist begins Hallucination Blast (2500 ms)
+[00418] AI Evangelist ai Casting
+[00419] Senior Engineer Refactor interrupted by movement/cancel (lockout 0 ms)
+[00459] Senior Engineer casts Guardrails
+[00459] Senior Engineer gains guardrails
+[00493] AI Evangelist casts Hallucination Blast
+[00493] AI Evangelist hits Senior Engineer with Hallucination Blast for 0 (absorbed 45)
+[00493] AI Evangelist ai Attack
+[00493] AI Evangelist swings at Senior Engineer
+[00493] AI Evangelist hits Senior Engineer with melee for 0 (absorbed 14)
+[00505] Senior Engineer begins Refactor (2500 ms)
+[00553] AI Evangelist swings at Senior Engineer
+[00553] AI Evangelist hits Senior Engineer with melee for 0 (absorbed 14)
+[00580] Senior Engineer casts Refactor
+[00580] AI Evangelist loses code_smell (Consumed)
+[00580] Senior Engineer hits AI Evangelist with Refactor for 151 (absorbed 0) COMBO
+[00613] AI Evangelist swings at Senior Engineer
+[00613] AI Evangelist hits Senior Engineer with melee for 0 (absorbed 14)
+[00630] Senior Engineer begins Code Review (2000 ms)
+[00673] AI Evangelist swings at Senior Engineer
+[00673] AI Evangelist hits Senior Engineer with melee for 1 (absorbed 13)
+[00673] Senior Engineer loses guardrails (Depleted)
+[00705] Senior Engineer casts Code Review
+[00705] Senior Engineer hits AI Evangelist with Code Review for 79 (absorbed 0)
+[00705] AI Evangelist gains code_smell
+[00733] AI Evangelist swings at Senior Engineer
+[00733] AI Evangelist hits Senior Engineer with melee for 14 (absorbed 0)
+[00772] AI Evangelist begins Hallucination Blast (2500 ms)
+[00772] AI Evangelist ai Casting
+[00773] Senior Engineer casts Reject PR
+[00773] AI Evangelist Hallucination Blast interrupted by Senior Engineer (lockout 4000 ms)
+[00773] AI Evangelist ai Attack
+[00793] AI Evangelist swings at Senior Engineer
+[00793] AI Evangelist hits Senior Engineer with melee for 14 (absorbed 0)
+[00840] Senior Engineer begins Code Review (2000 ms)
+[00853] AI Evangelist swings at Senior Engineer
+[00853] AI Evangelist hits Senior Engineer with melee for 14 (absorbed 0)
+[00913] AI Evangelist swings at Senior Engineer
+[00913] AI Evangelist hits Senior Engineer with melee for 14 (absorbed 0)
+[00930] Senior Engineer casts Code Review
+[00930] Senior Engineer hits AI Evangelist with Code Review for 79 (absorbed 0)
+[00930] AI Evangelist gains code_smell
+[00973] AI Evangelist swings at Senior Engineer
+[00973] AI Evangelist hits Senior Engineer with melee for 14 (absorbed 0)
+[01033] AI Evangelist swings at Senior Engineer
+[01033] AI Evangelist hits Senior Engineer with melee for 14 (absorbed 0)
+[01050] Senior Engineer begins Code Review (2000 ms)
+[01063] AI Evangelist begins Hallucination Blast (2500 ms)
+[01063] AI Evangelist ai Casting
+[01110] Senior Engineer casts Code Review
+[01110] Senior Engineer hits AI Evangelist with Code Review for 79 (absorbed 0)
+[01110] AI Evangelist loses code_smell (Death)
+[01110] AI Evangelist Hallucination Blast interrupted by movement/cancel (lockout 0 ms)
+[01110] AI Evangelist dies (killer Senior Engineer)
+[01110] AI Evangelist ai Dead
+[01110] Senior Engineer gains 120 xp
+[01110] AI Evangelist drops ["Prompt Fragment"]
+[01110] Senior Engineer leaves combat
+[01110] AI Evangelist leaves combat
+[01111] Senior Engineer loots AI Evangelist ["Prompt Fragment"]
+[01560] AI Evangelist respawns
+[01560] AI Evangelist ai Idle

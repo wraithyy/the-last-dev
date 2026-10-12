@@ -1,4 +1,6 @@
-//! Placeholder NPCs. Silhouettes differ so hostile vs friendly reads at a glance.
+//! NPCs. Models and silhouettes differ so hostile vs friendly reads at a glance.
+
+use crate::anim::{Character, ModelKind};
 
 use bevy::prelude::*;
 use std::f32::consts::PI;
@@ -13,36 +15,29 @@ pub struct Unit {
 
 pub struct UnitsPlugin;
 
+#[derive(Component)]
+struct Halo;
+
 impl Plugin for UnitsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (spawn_evangelist, spawn_intern));
+        app.add_systems(Startup, (spawn_evangelist, spawn_intern))
+            .add_systems(Update, hide_dead_halos);
     }
 }
 
-fn emissive(color: LinearRgba) -> StandardMaterial {
-    StandardMaterial {
-        base_color: Color::BLACK,
-        emissive: color,
-        ..default()
-    }
-}
+const EVANGELIST_SCALE: f32 = 1.05;
+const INTERN_SCALE: f32 = 0.75;
 
 fn spawn_evangelist(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let robe = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.45, 0.15, 0.6),
-        perceptual_roughness: 0.7,
+    let halo = materials.add(StandardMaterial {
+        base_color: Color::BLACK,
+        emissive: LinearRgba::rgb(5.0, 3.5, 0.4),
         ..default()
     });
-    let skin = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.85, 0.75, 0.7),
-        ..default()
-    });
-    let halo = materials.add(emissive(LinearRgba::rgb(5.0, 3.5, 0.4)));
-    let tablet = materials.add(emissive(LinearRgba::rgb(0.5, 2.0, 4.0)));
 
     // Turned half way round so it faces the player spawn (+Z).
     commands
@@ -53,57 +48,51 @@ fn spawn_evangelist(
                 hostile: true,
                 alive: true,
             },
+            Character {
+                kind: ModelKind::Rogue,
+                scale: EVANGELIST_SCALE,
+                // Purple glow so the silhouette reads as hostile.
+                tint: Some(LinearRgba::rgb(0.25, 0.04, 0.4)),
+            },
             Transform::from_xyz(0.0, 0.0, -8.0).with_rotation(Quat::from_rotation_y(PI)),
             Visibility::default(),
         ))
         .with_children(|c| {
             c.spawn((
-                Mesh3d(meshes.add(Cone::new(0.7, 2.0))),
-                MeshMaterial3d(robe),
-                Transform::from_xyz(0.0, 1.0, 0.0),
-            ));
-            c.spawn((
-                Mesh3d(meshes.add(Sphere::new(0.25))),
-                MeshMaterial3d(skin),
-                Transform::from_xyz(0.0, 2.2, 0.0),
-            ));
-            c.spawn((
-                Mesh3d(meshes.add(Torus::new(0.22, 0.32))),
+                Mesh3d(meshes.add(Torus::new(0.2, 0.3))),
                 MeshMaterial3d(halo),
-                Transform::from_xyz(0.0, 2.75, 0.0),
-            ));
-            c.spawn((
-                Mesh3d(meshes.add(Cuboid::new(0.55, 0.75, 0.06))),
-                MeshMaterial3d(tablet),
-                Transform::from_xyz(0.9, 1.5, -0.3).with_rotation(Quat::from_rotation_y(-0.4)),
+                Transform::from_xyz(0.0, 2.65, 0.0),
+                Halo,
             ));
         });
 }
 
-fn spawn_intern(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    commands
-        .spawn((
-            Unit {
-                name: "Intern",
-                level: 1,
-                hostile: false,
-                alive: true,
-            },
-            Transform::from_xyz(-6.0, 0.0, 8.0),
-            Visibility::default(),
-        ))
-        .with_children(|c| {
-            c.spawn((
-                Mesh3d(meshes.add(Capsule3d::new(0.3, 0.6))),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::srgb(0.3, 0.7, 0.4),
-                    ..default()
-                })),
-                Transform::from_xyz(0.0, 0.6, 0.0),
-            ));
+fn spawn_intern(mut commands: Commands) {
+    commands.spawn((
+        Unit {
+            name: "Intern",
+            level: 1,
+            hostile: false,
+            alive: true,
+        },
+        Character {
+            kind: ModelKind::Barbarian,
+            scale: INTERN_SCALE,
+            tint: None,
+        },
+        Transform::from_xyz(-6.0, 0.0, 8.0),
+        Visibility::default(),
+    ));
+}
+
+// The halo is a separate mesh, so the death animation would leave it floating.
+fn hide_dead_halos(units: Query<&Unit>, mut halos: Query<(&ChildOf, &mut Visibility), With<Halo>>) {
+    for (child_of, mut vis) in &mut halos {
+        let alive = units.get(child_of.parent()).is_ok_and(|u| u.alive);
+        vis.set_if_neq(if alive {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
         });
+    }
 }

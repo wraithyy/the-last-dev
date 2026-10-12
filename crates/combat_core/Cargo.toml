@@ -7,3 +7,10 @@ license.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+# Content (spells, units, balance) lives in a RON data file so balance is not
+# hardcoded; serde + ron is the minimal typed parser and already in the
+# workspace lockfile via Bevy. Both work on wasm.
+serde = { version = "1", features = ["derive"] }
+ron = "0.12"

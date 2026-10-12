@@ -1,0 +1,3 @@
+# Native runs load assets from the repo-root assets/ (the web build copies the same dir).
+[env]
+BEVY_ASSET_ROOT = { value = ".", relative = true }

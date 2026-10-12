@@ -2,7 +2,9 @@
 
 A satirical single-player 3D browser RPG with WotLK-style tab-target combat, set in a corporate office. It is an original game: no Blizzard assets, code, text or data.
 
-Status: **Phase 0 + Phase 1** (workspace, builds, office arena, movement, camera, targeting). Combat comes in Phase 2. See [docs/PLAN.md](docs/PLAN.md) and [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
+Play it: https://wraithyy.github.io/world-of-workcraft/
+
+Status: **Phases 0-4** are playable: office arena with animated CC0 models, WoW-style movement and camera, tab-target combat with four spells, the AI Evangelist encounter (aggro, melee, interruptible Hallucination Blast, evade, death, loot, respawn) and a WoW-style HUD. See [docs/PLAN.md](docs/PLAN.md), [docs/COMBAT_API.md](docs/COMBAT_API.md), [docs/FORMULAS.md](docs/FORMULAS.md) and [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Requirements
 
@@ -36,13 +38,20 @@ Status: **Phase 0 + Phase 1** (workspace, builds, office arena, movement, camera
 | Mouse wheel | Zoom |
 | Tab | Cycle nearby hostile targets (front arc first) |
 | Left click | Select unit |
+| 1-4 | Code Review, Refactor, Guardrails, Reject PR (or click the action bar) |
+| F / right-click corpse | Loot |
+| F3 | Debug overlay (range, facing, LoS) |
 | Escape | Clear target, or toggle the pause overlay |
+
+Rotation: Code Review applies Code Smell, and Refactor consumes it for +35% damage. Use Guardrails before Hallucination Blast lands, or interrupt it with Reject PR.
 
 ## Layout
 
 ```text
-crates/combat_core/   deterministic rules: 30 Hz integer tick clock, targeting geometry (range, facing, LoS, Tab). No engine dependency.
-crates/game_client/   Bevy 0.19 client: arena, player movement (FixedUpdate, interpolated), camera, targeting, HUD
+crates/combat_core/   deterministic rules (no engine dependency): 30 Hz integer ticks, spells, GCD, casts, spell queue, auras, absorbs, interrupts, threat, enemy AI, loot, seeded RNG; golden replay test
+crates/game_client/   Bevy 0.19 client: arena, models + animation, movement, camera, combat bridge, HUD, VFX, floating text
+content/              game.ron (all balance data), replays/ (golden event logs)
+assets/               CC0 models, icons, UI shader; see assets/CREDITS.md
 web/                  index.html shell (canvas, input capture, error display); build output in web/pkg (gitignored)
 scripts/              check.sh, build-web.sh, serve-web.sh
 docs/                 plan, version choices, known limitations
@@ -52,24 +61,30 @@ docs/                 plan, version choices, known limitations
 
 - Rust 1.96.1, Bevy 0.19.1 (features `3d`, `ui`), wasm-bindgen 0.2.129. Rationale in [docs/PLAN.md](docs/PLAN.md).
 - The web build targets **WebGL2**. WebGPU is not enabled. On WebGL2, Bevy disables SSAO, OIT, atmosphere and GPU clustering (logged as warnings at startup; the game uses none of them). Directional shadows use 1 cascade.
-- The release wasm is about 37 MB without `wasm-opt`.
+- The release wasm is about 38 MB without `wasm-opt`, plus about 11 MB of assets.
+
+## Debug hooks (native, env-gated)
+
+`WOW_SCREENSHOT=path.png` (with `WOW_SHOT_DELAY`) saves an offscreen shot and exits, `WOW_PLAYER_AT=x,z,yaw_deg` teleports the player, `WOW_AUTORUN=1` holds forward, and `WOW_AUTOFIGHT=1` targets the enemy, casts on a timer and logs sim events.
+
+## Credits
+
+3D models by Kay Lousberg (KayKit, CC0). Spell icons from game-icons.net by Lorc and Skoll (CC BY 3.0). Full list: [assets/CREDITS.md](assets/CREDITS.md).
 
 ## Verification status (2026-10-12)
 
 Verified:
-- `./scripts/check.sh` exit 0: fmt, clippy `-D warnings` (native and wasm32), 25 tests (23 `combat_core`, 2 `game_client` collision), native dev build.
+- `./scripts/check.sh` exit 0: fmt, clippy `-D warnings` (native and wasm32), 68 tests (66 `combat_core` including the seed-42 golden replay and 30 Hz invariance, 2 `game_client`).
 - `./scripts/build-web.sh` exit 0.
-- Native launch on macOS (M2 Pro, Metal): runs with no panics or errors in the log.
-- Browser (Playwright Chromium, WebGL2 via ANGLE/Metal), driven by real keyboard and mouse input:
-  - The page loads and renders the arena and HUD.
-  - Tab selects the AI Evangelist and shows distance and the range/facing/LoS chips; turning away flips the chip to "Not facing".
-  - W moves the character, and it stops on key release.
-  - Right-drag steers the camera and character.
-  - Escape clears the target, Space jumps and the wheel zooms.
-  - The page does not scroll and the canvas keeps focus.
+- Browser (Playwright Chromium, WebGL2 via ANGLE/Metal), driven by real keyboard and mouse input, played a full fight:
+  - Tab targets the enemy. Code Review hits for 79 and applies Code Smell; Refactor hits for 151 with "Combo!".
+  - Guardrails absorbs melee, and Reject PR interrupts Hallucination Blast.
+  - The enemy dies, the player gains 120 XP and the target frame shows "Dead - lootable".
+  - No 404s and no console errors.
+- Earlier Phase 1 checks still hold: movement, right-drag steering, jump, zoom, no page scroll.
 
 Not verified:
-- Manual playtest of movement and camera feel.
-- Pointer lock in a real headed browser (the automated browser rejects it; the page now logs that and continues).
-- Firefox and Safari.
+- Manual playtest of game feel (movement, camera, combat pacing).
+- The loot popup with an actual drop (the tested run rolled no Prompt Fragment), and the respawn timer in the browser. Both are covered by the replay test only.
+- Pointer lock in a real headed browser, Firefox and Safari.
 - FPS and memory profiling.

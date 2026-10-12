@@ -2,6 +2,7 @@
 
 use crate::arena::Colliders;
 use crate::collision::to_core;
+use crate::combat::CombatSim;
 use crate::config::*;
 use crate::input::{MouseState, Paused};
 use crate::player::{Player, PlayerBody};
@@ -18,8 +19,7 @@ pub struct Target(pub Option<Entity>);
 
 /// Geometry checks against the current target, recomputed every frame for the HUD.
 pub struct TargetReadout {
-    pub name: &'static str,
-    pub level: u32,
+    pub spell_range: f32,
     pub distance: f32,
     pub in_range: bool,
     pub facing: bool,
@@ -84,10 +84,11 @@ fn spawn_ring(
     ));
 }
 
-/// Explicit invalidation: a despawned or dead target is dropped, not left dangling.
+/// A despawned target is dropped, not left dangling. Dead targets stay
+/// selected on purpose: the corpse is what you loot.
 fn drop_invalid_target(mut target: ResMut<Target>, units: Query<&Unit>) {
     if let Some(e) = target.0
-        && !units.get(e).is_ok_and(|u| u.alive)
+        && !units.contains(e)
     {
         target.0 = None;
     }
@@ -132,38 +133,45 @@ fn handle_keys(
 }
 
 /// Own ray-vs-sphere picking: no render-backend dependency, so it behaves
-/// the same on native and WebGL2.
-fn click_select(
-    mouse: Res<MouseState>,
-    paused: Res<Paused>,
-    colliders: Res<Colliders>,
-    camera: Single<(&Camera, &GlobalTransform)>,
-    units: Query<(Entity, &Transform, &Unit)>,
-    mut target: ResMut<Target>,
-) {
-    let Some(cursor) = mouse.click else { return };
-    if paused.0 {
-        return;
-    }
-    let (cam, cam_tf) = *camera;
-    let Ok(ray) = cam.viewport_to_world(cam_tf, cursor) else {
-        return;
-    };
-    let hit = units
+/// the same on native and WebGL2. Corpses are pickable (for looting).
+pub fn pick_unit(
+    cursor: Vec2,
+    camera: (&Camera, &GlobalTransform),
+    colliders: &[Aabb],
+    units: &Query<(Entity, &Transform, &Unit)>,
+) -> Option<Entity> {
+    let (cam, cam_tf) = camera;
+    let ray = cam.viewport_to_world(cam_tf, cursor).ok()?;
+    let (t, e) = units
         .iter()
-        .filter(|(_, _, u)| u.alive)
         .filter_map(|(e, tf, _)| {
             let center = tf.translation + Vec3::Y * PICK_SPHERE_HEIGHT;
             ray_sphere(ray.origin, *ray.direction, center, PICK_SPHERE_RADIUS).map(|t| (t, e))
         })
-        .min_by(|a, b| a.0.total_cmp(&b.0));
-    if let Some((t, e)) = hit
-        && line_of_sight(
-            to_core(ray.origin),
-            to_core(ray.origin + *ray.direction * t),
-            &colliders.0,
-        )
-    {
+        .min_by(|a, b| a.0.total_cmp(&b.0))?;
+    line_of_sight(
+        to_core(ray.origin),
+        to_core(ray.origin + *ray.direction * t),
+        colliders,
+    )
+    .then_some(e)
+}
+
+fn click_select(
+    mouse: Res<MouseState>,
+    paused: Res<Paused>,
+    colliders: Res<Colliders>,
+    camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
+    units: Query<(Entity, &Transform, &Unit)>,
+    ui: Query<&Interaction>,
+    mut target: ResMut<Target>,
+) {
+    let Some(cursor) = mouse.click else { return };
+    // A click on a HUD button must not also pick the unit behind it.
+    if paused.0 || ui.iter().any(|i| *i != Interaction::None) {
+        return;
+    }
+    if let Some(e) = pick_unit(cursor, *camera, &colliders.0, &units) {
         target.0 = Some(e);
     }
 }
@@ -180,12 +188,20 @@ fn ray_sphere(origin: Vec3, dir: Vec3, center: Vec3, radius: f32) -> Option<f32>
 }
 
 fn update_readout(
+    sim: Option<Res<CombatSim>>,
     target: Res<Target>,
     colliders: Res<Colliders>,
     player: Single<&PlayerBody, With<Player>>,
     units: Query<(&Transform, &Unit)>,
     mut info: ResMut<TargetInfo>,
 ) {
+    // Dev overlay only: range is taken from the first action-bar spell.
+    let spell_range = sim
+        .and_then(|s| {
+            let id = *s.0.content().action_bar().first()?;
+            s.0.content().spell(id).map(|d| d.range_m)
+        })
+        .unwrap_or(0.0);
     info.0 = target.0.and_then(|e| units.get(e).ok()).map(|(tf, u)| {
         let eye = player.pos + Vec3::Y * PLAYER_EYE;
         let chest = TargetCandidate {
@@ -208,13 +224,9 @@ fn update_readout(
         };
         let failed = |err: TargetError, result: Result<(), TargetError>| result == Err(err);
         TargetReadout {
-            name: u.name,
-            level: u.level,
+            spell_range,
             distance: player.pos.distance(tf.translation),
-            in_range: !failed(
-                TargetError::OutOfRange,
-                check(PREVIEW_SPELL_RANGE, false, &[]),
-            ),
+            in_range: !failed(TargetError::OutOfRange, check(spell_range, false, &[])),
             facing: !failed(TargetError::NotFacing, check(f32::INFINITY, true, &[])),
             line_of_sight: !failed(
                 TargetError::NoLineOfSight,

@@ -1,3 +1,4 @@
 /target
 /web/pkg
 /.playwright-mcp
+/web/assets

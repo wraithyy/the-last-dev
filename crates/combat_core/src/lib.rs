@@ -3,12 +3,25 @@
 //! `combat_core` owns the rules that must behave identically on client and
 //! server, and deliberately has no engine (Bevy) dependency.
 
+mod ai;
+pub mod content;
 pub mod geom;
+mod rng;
+mod sim;
 pub mod targeting;
 pub mod time;
+pub mod types;
 
+pub use content::{
+    AiAbility, AiDef, ApplyAura, AuraDef, Config, ConsumeAura, Content, ContentError, Effect,
+    LootEntry, School, SpellDef, SpellId, UnitDef,
+};
 pub use geom::{Aabb, Vec3, distance, forward, in_range, is_facing, line_of_sight};
+pub use sim::Sim;
 pub use targeting::{
     EntityId, TAB_TARGET_RANGE, TargetCandidate, TargetError, tab_target, validate_target,
 };
 pub use time::{FixedStepper, TICK_HZ, Tick, ms_to_ticks, ticks_to_ms};
+pub use types::{
+    AiState, AuraEnd, AuraView, CastError, CastView, Command, CooldownView, Event, UnitState,
+};

@@ -10,9 +10,8 @@ pub const WALL_HEIGHT: f32 = 4.0;
 pub const WALL_THICKNESS: f32 = 0.5;
 
 // Player
-pub const PLAYER_NAME: &str = "Senior Engineer";
-pub const PLAYER_LEVEL: u32 = 3;
-pub const PLAYER_SPAWN: [f32; 3] = [0.0, 0.0, 15.0];
+// Far enough from the south wall that the default camera distance is not clipped.
+pub const PLAYER_SPAWN: [f32; 3] = [0.0, 0.0, 10.0];
 pub const PLAYER_RADIUS: f32 = 0.4;
 pub const PLAYER_HEIGHT: f32 = 1.8;
 /// Eye height used as ray origin for LoS and camera collision.
@@ -27,14 +26,8 @@ pub const STEP_HEIGHT: f32 = 0.3;
 /// Radians of yaw per pixel of mouse travel.
 pub const MOUSE_YAW_SENS: f32 = 0.005;
 
-pub const PLAYER_BODY_RADIUS: f32 = 0.35;
-pub const PLAYER_BODY_LENGTH: f32 = 0.7;
-pub const PLAYER_BODY_Y: f32 = 0.7;
-pub const PLAYER_HEAD_RADIUS: f32 = 0.25;
-pub const PLAYER_HEAD_Y: f32 = 1.55;
-pub const PLAYER_LAPTOP_SIZE: [f32; 3] = [0.5, 0.04, 0.35];
-pub const PLAYER_LAPTOP_POS: [f32; 3] = [0.0, 1.0, -0.5];
-pub const PLAYER_LAPTOP_TILT: f32 = 0.5;
+/// KayKit characters are ~2.0 units tall at scale 1; this brings the Mage to PLAYER_HEIGHT.
+pub const PLAYER_MODEL_SCALE: f32 = 0.85;
 /// Tolerance for "standing on the ground" when deciding if a jump is allowed.
 pub const GROUND_EPSILON: f32 = 1e-3;
 
@@ -70,5 +63,59 @@ pub const RING_OUTER: f32 = 1.05;
 pub const RING_HEIGHT: f32 = 0.03;
 pub const PICK_SPHERE_RADIUS: f32 = 1.1;
 pub const PICK_SPHERE_HEIGHT: f32 = 1.2;
-/// Placeholder until Phase 2 introduces real spell definitions.
-pub const PREVIEW_SPELL_RANGE: f32 = 30.0;
+
+// Combat bridge
+pub const SIM_SEED: u64 = 0x5EED_0000_C0DE;
+/// Client-side pre-check so an out-of-reach loot click gives feedback instead of silence.
+pub const LOOT_RANGE: f32 = 5.0;
+/// Display ceiling for the XP bar; the sim only exposes a running total.
+pub const XP_BAR_MAX: u32 = 400;
+
+// HUD layout (logical px)
+pub const FRAME_W: f32 = 230.0;
+pub const FRAME_BAR_H: f32 = 18.0;
+pub const PORTRAIT_SIZE: f32 = 64.0;
+pub const ACTION_SLOT: f32 = 56.0;
+pub const ACTION_GAP: f32 = 6.0;
+pub const AURA_ICON: f32 = 30.0;
+pub const AURA_SLOTS: usize = 8;
+pub const COMBAT_LOG_LINES: usize = 8;
+pub const COMBAT_LOG_W: f32 = 400.0;
+pub const CAST_BAR_W: f32 = 300.0;
+pub const CAST_BAR_H: f32 = 22.0;
+/// Seconds the "success" / "interrupted" state of the player cast bar lingers.
+pub const CAST_FLASH_SECS: f32 = 0.45;
+pub const ERROR_TEXT_SECS: f32 = 2.0;
+pub const FLOAT_TEXT_SECS: f32 = 1.4;
+pub const FLOAT_TEXT_RISE: f32 = 60.0;
+pub const FLOAT_TEXT_ANCHOR_Y: f32 = 2.3;
+pub const FLOAT_TEXT_SIZE: f32 = 22.0;
+pub const FLOAT_TEXT_CRIT_SIZE: f32 = 34.0;
+
+// VFX
+pub const PROJECTILE_SPEED: f32 = 40.0;
+pub const PROJECTILE_RADIUS: f32 = 0.22;
+pub const PROJECTILE_ORIGIN_Y: f32 = 1.3;
+pub const PROJECTILE_TARGET_Y: f32 = 1.2;
+pub const HAND_GLOW_POS: [f32; 3] = [0.0, 1.15, -0.75];
+pub const HAND_GLOW_RADIUS: f32 = 0.16;
+pub const SHIELD_RADIUS: f32 = 1.25;
+pub const SHIELD_CENTER_Y: f32 = 0.95;
+pub const IMPACT_SECS: f32 = 0.3;
+pub const BURST_SECS: f32 = 0.45;
+pub const DEATH_FADE_SECS: f32 = 1.2;
+/// Spells whose release shows a travelling orb: (icon key, linear-ish RGB).
+pub const PROJECTILE_SPELLS: [(&str, [f32; 3]); 3] = [
+    ("code_review", [0.35, 0.7, 1.0]),
+    ("refactor", [0.4, 1.0, 0.5]),
+    ("hallucination_blast", [0.8, 0.35, 1.0]),
+];
+pub const INTERRUPT_COLOR: [f32; 3] = [1.0, 0.85, 0.2];
+pub const DEATH_FADE_COLOR: [f32; 3] = [0.5, 0.25, 0.7];
+pub const SHIELD_COLOR: [f32; 3] = [1.0, 0.85, 0.4];
+pub const TELEGRAPH_COLOR: [f32; 3] = [0.7, 0.2, 1.0];
+pub const TELEGRAPH_RADIUS: f32 = 2.4;
+
+// HUD scaling
+pub const UI_REFERENCE_HEIGHT: f32 = 900.0;
+pub const UI_MAX_SCALE: f32 = 2.0;
