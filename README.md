@@ -75,7 +75,7 @@ docs/                 plan, version choices, known limitations
 
 ## Credits
 
-3D models by Kenney (Blocky Characters, Furniture Kit; CC0). Spell and attack icons from game-icons.net by Lorc, Skoll and Delapouite (CC BY 3.0). Full list: [assets/CREDITS.md](assets/CREDITS.md).
+3D models: characters by Quaternius (Ultimate Animated Character Pack, CC0); furniture by Kenney (Furniture Kit, CC0). Spell icons: Painterly Spell Icons by J. W. Bjerk (eleazzaar), CC BY 3.0. Item icons from game-icons.net by Lorc and Delapouite (CC BY 3.0). Full list: [assets/CREDITS.md](assets/CREDITS.md).
 
 ## Verification status (2026-10-12)
 

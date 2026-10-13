@@ -9,6 +9,7 @@ use crate::presentation::PresentEvent;
 use bevy::prelude::*;
 use combat_core::{EntityId, Event};
 
+const POP_SECS: f32 = 0.22;
 const TEXT_BOX_W: f32 = 240.0;
 /// Horizontal staggering (px) so back-to-back hits do not overprint each other.
 const STAGGER: [f32; 3] = [-34.0, 0.0, 34.0];
@@ -21,6 +22,9 @@ struct FloatText {
     life: f32,
     offset: Vec2,
     color: Color,
+    /// World height of the spawn point above the unit's feet.
+    anchor_y: f32,
+    pop: bool,
 }
 
 pub struct FloatingTextPlugin;
@@ -36,6 +40,7 @@ struct Spec {
     size: f32,
     color: Color,
     offset: Vec2,
+    pop: bool,
 }
 
 fn entity_of(units: &Query<(Entity, &SimUnit)>, id: EntityId) -> Option<Entity> {
@@ -92,6 +97,7 @@ fn spawn_texts(
                         },
                         color: base,
                         offset: Vec2::new(stagger, 0.0),
+                        pop: *crit,
                     });
                 }
                 if *absorbed > 0 {
@@ -105,6 +111,7 @@ fn spawn_texts(
                         size: 16.0,
                         color: Color::srgb(1.0, 0.85, 0.4),
                         offset: Vec2::new(stagger, 22.0),
+                        pop: false,
                     });
                 }
                 if *combo && !on_player {
@@ -113,6 +120,7 @@ fn spawn_texts(
                         size: 18.0,
                         color: Color::srgb(1.0, 0.4, 0.9),
                         offset: Vec2::new(stagger, -24.0),
+                        pop: true,
                     });
                 }
                 (*target, specs)
@@ -128,6 +136,7 @@ fn spawn_texts(
                     size: 22.0,
                     color: Color::srgb(1.0, 0.85, 0.2),
                     offset: Vec2::ZERO,
+                    pop: false,
                 }],
             ),
             Event::Miss { target, spell, .. } => {
@@ -137,9 +146,10 @@ fn spawn_texts(
                     *target,
                     vec![Spec {
                         text: if spell.is_some() { "Resist" } else { "Miss" }.into(),
-                        size: 20.0,
-                        color: Color::srgb(0.85, 0.85, 0.9),
+                        size: 16.0,
+                        color: Color::srgb(0.68, 0.68, 0.72),
                         offset: Vec2::new(stagger, 0.0),
+                        pop: false,
                     }],
                 )
             }
@@ -152,6 +162,11 @@ fn spawn_texts(
             .0
             .unit(target)
             .map_or(Vec3::ZERO, |u| Vec3::new(u.pos.x, u.pos.y, u.pos.z));
+        let anchor_y = sim
+            .0
+            .unit(target)
+            .map_or(PLAYER_HEIGHT, |u| head_height(&u.key))
+            + FLOAT_TEXT_HEAD_GAP;
         for spec in specs {
             commands.spawn((
                 FloatText {
@@ -161,9 +176,16 @@ fn spawn_texts(
                     life: FLOAT_TEXT_SECS,
                     offset: spec.offset,
                     color: spec.color,
+                    anchor_y,
+                    pop: spec.pop,
                 },
                 Text::new(spec.text),
                 TextFont::from_font_size(spec.size),
+                TextShadow {
+                    offset: Vec2::splat(2.0),
+                    color: Color::srgba(0.0, 0.0, 0.0, 0.9),
+                },
+                UiTransform::default(),
                 TextLayout::justify(Justify::Center),
                 TextColor(spec.color),
                 Node {
@@ -182,17 +204,22 @@ fn place_texts(
     mut commands: Commands,
     time: Res<Time>,
     camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
+    ui_scale: Res<UiScale>,
     transforms: Query<&Transform, Without<FloatText>>,
     mut texts: Query<(
         Entity,
         &mut FloatText,
         &mut Node,
         &mut TextColor,
+        &mut TextShadow,
+        &mut UiTransform,
         &mut Visibility,
     )>,
 ) {
     let (cam, cam_tf) = *camera;
-    for (entity, mut ft, mut node, mut color, mut vis) in &mut texts {
+    // Node coordinates are multiplied by UiScale, viewport coordinates are not.
+    let scale = ui_scale.0.max(0.01);
+    for (entity, mut ft, mut node, mut color, mut shadow, mut tf_ui, mut vis) in &mut texts {
         ft.age += time.delta_secs();
         let k = ft.age / ft.life;
         if k >= 1.0 {
@@ -202,15 +229,24 @@ fn place_texts(
         let world = transforms
             .get(ft.anchor)
             .map_or(ft.fallback, |t| t.translation)
-            + Vec3::Y * FLOAT_TEXT_ANCHOR_Y;
+            + Vec3::Y * ft.anchor_y;
         let Ok(screen) = cam.world_to_viewport(cam_tf, world) else {
             *vis = Visibility::Hidden;
             continue;
         };
         *vis = Visibility::Inherited;
-        node.left = px(screen.x - TEXT_BOX_W / 2.0 + ft.offset.x);
-        node.top = px(screen.y - FLOAT_TEXT_RISE * k + ft.offset.y);
+        node.left = px(screen.x / scale - TEXT_BOX_W / 2.0 + ft.offset.x);
+        node.top = px(screen.y / scale - FLOAT_TEXT_RISE * k + ft.offset.y);
         // Hold full opacity for the first half, then fade.
-        color.0 = ft.color.with_alpha((2.0 * (1.0 - k)).min(1.0));
+        let alpha = (2.0 * (1.0 - k)).min(1.0);
+        color.0 = ft.color.with_alpha(alpha);
+        shadow.color = Color::srgba(0.0, 0.0, 0.0, 0.9 * alpha);
+        // Crits and combos land big and settle: a short ease-out pop.
+        let pop = if ft.pop {
+            1.0 + 0.7 * (1.0 - (ft.age / POP_SECS).min(1.0)).powi(2)
+        } else {
+            1.0
+        };
+        tf_ui.scale = Vec2::splat(pop);
     }
 }

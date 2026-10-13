@@ -1,4 +1,4 @@
-//! WoW-style HUD. Every value shown here is read from the combat simulation
+//! Developer-flavoured HUD (keycaps, terminal log, IDE popups). Every value shown here is read from the combat simulation
 //! (`CombatSim`) or from a sim event; nothing is animated for show.
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
@@ -15,10 +15,21 @@ use std::collections::HashMap;
 
 pub use actionbar::CooldownMaterial;
 
-pub const GOLD: Color = Color::srgb(0.78, 0.62, 0.25);
-pub const BRONZE: Color = Color::srgb(0.32, 0.22, 0.1);
-pub const PANEL: Color = Color::srgba(0.05, 0.05, 0.09, 0.85);
+/// Terminal cyan: focus, hover and "active" states across the HUD.
+pub const ACCENT: Color = Color::srgb(0.36, 0.82, 0.86);
+/// Warm orange for the auto attack keycap, like an artisan Esc/Enter key.
+pub const ACCENT_WARM: Color = Color::srgb(1.0, 0.55, 0.25);
+pub const KEY_TOP: Color = Color::srgb(0.2, 0.22, 0.28);
+pub const KEY_TOP_HI: Color = Color::srgb(0.3, 0.33, 0.41);
+pub const KEY_SIDE: Color = Color::srgb(0.06, 0.07, 0.1);
+pub const KEY_RIM: Color = Color::srgb(0.4, 0.44, 0.54);
+/// Editor chrome: popups, loot window, log body.
+pub const PANEL: Color = Color::srgba(0.05, 0.06, 0.09, 0.88);
+pub const PANEL_TOP: Color = Color::srgba(0.1, 0.11, 0.15, 0.94);
+pub const PANEL_BOTTOM: Color = Color::srgba(0.04, 0.045, 0.07, 0.94);
+pub const PANEL_EDGE: Color = Color::srgb(0.26, 0.3, 0.38);
 pub const BAR_BG: Color = Color::srgb(0.07, 0.07, 0.1);
+pub const DIM: Color = Color::srgb(0.6, 0.66, 0.76);
 pub const HP_GREEN: Color = Color::srgb(0.16, 0.68, 0.22);
 pub const MANA_BLUE: Color = Color::srgb(0.18, 0.38, 0.95);
 
@@ -27,6 +38,8 @@ pub struct HudPlugin;
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<IconCache>()
+            .add_systems(PreStartup, load_font)
+            .add_systems(Update, apply_font)
             .init_resource::<DevOverlay>()
             .add_plugins((
                 UiMaterialPlugin::<CooldownMaterial>::default(),
@@ -55,8 +68,70 @@ impl IconCache {
     }
 }
 
+/// Every HUD label carries a hard drop shadow: readable over both the dark panels and the bright 3D scene.
 pub fn label(text: impl Into<String>, size: f32) -> impl Bundle {
-    (Text::new(text), TextFont::from_font_size(size))
+    (
+        Text::new(text),
+        TextFont::from_font_size(size),
+        TextShadow {
+            offset: Vec2::splat(1.0),
+            color: Color::srgba(0.0, 0.0, 0.0, 0.9),
+        },
+    )
+}
+
+#[derive(Resource)]
+struct HudFont(Handle<Font>);
+
+fn load_font(mut commands: Commands, assets: Res<AssetServer>) {
+    commands.insert_resource(HudFont(assets.load("fonts/JetBrainsMono-Bold.ttf")));
+}
+
+/// One place swaps the font for every text node (HUD, floating text, bubbles) instead of threading a handle through each spawn.
+fn apply_font(font: Res<HudFont>, mut fonts: Query<&mut TextFont, Added<TextFont>>) {
+    for mut f in &mut fonts {
+        f.font = bevy::text::FontSource::Handle(font.0.clone());
+    }
+}
+
+/// Vertical two-stop gradient background (top to bottom).
+pub fn vgrad(top: Color, bottom: Color) -> BackgroundGradient {
+    BackgroundGradient::from(LinearGradient::to_bottom(vec![
+        ColorStop::new(top, percent(0)),
+        ColorStop::new(bottom, percent(100)),
+    ]))
+}
+
+pub fn panel_bg() -> BackgroundGradient {
+    vgrad(PANEL_TOP, PANEL_BOTTOM)
+}
+
+pub fn drop_shadow() -> BoxShadow {
+    BoxShadow::new(
+        Color::srgba(0.0, 0.0, 0.0, 0.55),
+        px(0),
+        px(3),
+        px(0),
+        px(8),
+    )
+}
+
+/// Glass highlight over the upper half of a bar or slot.
+pub fn gloss(alpha: f32) -> impl Bundle {
+    (
+        Node {
+            position_type: PositionType::Absolute,
+            left: px(0),
+            right: px(0),
+            top: px(0),
+            height: percent(46),
+            ..default()
+        },
+        vgrad(
+            Color::srgba(1.0, 1.0, 1.0, alpha),
+            Color::srgba(1.0, 1.0, 1.0, 0.0),
+        ),
+    )
 }
 
 /// Writes only on change so Bevy does not re-layout unchanged text every frame.
@@ -81,23 +156,6 @@ pub fn fmt_secs(ms: u32) -> String {
     }
 }
 
-/// Thin bronze line inset inside a gold-bordered panel: the original "ornate" double border.
-pub fn inset_line(radius: f32) -> impl Bundle {
-    (
-        Node {
-            position_type: PositionType::Absolute,
-            left: px(3),
-            right: px(3),
-            top: px(3),
-            bottom: px(3),
-            border: UiRect::all(px(1)),
-            border_radius: BorderRadius::all(px((radius - 3.0).max(0.0))),
-            ..default()
-        },
-        BorderColor::all(BRONZE),
-    )
-}
-
 #[derive(Component)]
 struct PauseOverlay;
 #[derive(Component)]
@@ -116,10 +174,10 @@ fn spawn_misc(mut commands: Commands) {
         },
         children![(
             label(
-                "W/S move  A/D turn  Q/E strafe  RMB steer  LMB orbit  Wheel zoom  Space jump  Tab target  RMB-click attack  T auto attack  1-4 cast  F loot  F3 debug  Esc clear/menu",
-                12.0,
+                "WASD move | RMB steer | LMB orbit | Wheel zoom | Space jump | Tab target | T auto | 1-4 cast | F loot | F3 debug | Esc menu",
+                11.0,
             ),
-            TextColor(Color::srgba(1.0, 1.0, 1.0, 0.45)),
+            TextColor(Color::srgba(0.8, 0.9, 1.0, 0.5)),
         )],
     ));
     commands.spawn((
@@ -149,8 +207,8 @@ fn spawn_misc(mut commands: Commands) {
         GlobalZIndex(50),
         BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
         children![label(
-            "Paused - the AI is regenerating your sprint. Press Esc to resume.",
-            32.0
+            "// paused: the AI is regenerating your sprint. Esc to resume.",
+            24.0
         )],
     ));
 }
@@ -196,3 +254,7 @@ fn update_dev_overlay(
     };
     set_text(text, &line);
 }
+
+/// QA hook (`WOW_HOVER_SLOT`): forces the tooltip of one action slot so it can be screenshotted without a pointer.
+#[derive(Resource)]
+pub struct DebugHoverSlot(pub usize);

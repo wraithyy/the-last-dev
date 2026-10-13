@@ -28,8 +28,11 @@ pub const STEP_HEIGHT: f32 = 0.3;
 /// Radians of yaw per pixel of mouse travel.
 pub const MOUSE_YAW_SENS: f32 = 0.005;
 
-/// Kenney characters are 2.7 units tall at scale 1; this brings them to PLAYER_HEIGHT.
-pub const PLAYER_MODEL_SCALE: f32 = PLAYER_HEIGHT / 2.7;
+/// Quaternius characters stand about 3.2 units tall (hair included) at scale 1, measured from the mesh bounds.
+pub const MODEL_NATIVE_HEIGHT: f32 = 3.2;
+pub const CEO_HEIGHT: f32 = PLAYER_HEIGHT * 1.5;
+pub const INTERN_HEIGHT: f32 = PLAYER_HEIGHT * 0.9;
+pub const PLAYER_MODEL_SCALE: f32 = PLAYER_HEIGHT / MODEL_NATIVE_HEIGHT;
 /// Tolerance for "standing on the ground" when deciding if a jump is allowed.
 pub const GROUND_EPSILON: f32 = 1e-3;
 
@@ -75,15 +78,15 @@ pub const SIM_SEED: u64 = 0x5EED_0000_C0DE;
 pub const LOOT_RANGE: f32 = 5.0;
 
 // HUD layout (logical px)
-pub const FRAME_W: f32 = 270.0;
-pub const FRAME_BAR_H: f32 = 18.0;
-pub const PORTRAIT_SIZE: f32 = 64.0;
+pub const FRAME_W: f32 = 230.0;
+pub const FRAME_BAR_H: f32 = 13.0;
+pub const PORTRAIT_SIZE: f32 = 44.0;
 pub const ACTION_SLOT: f32 = 56.0;
 pub const ACTION_GAP: f32 = 6.0;
 pub const AURA_ICON: f32 = 30.0;
 pub const AURA_SLOTS: usize = 8;
 pub const COMBAT_LOG_LINES: usize = 8;
-pub const COMBAT_LOG_W: f32 = 400.0;
+pub const COMBAT_LOG_W: f32 = 392.0;
 pub const CAST_BAR_W: f32 = 300.0;
 pub const CAST_BAR_H: f32 = 22.0;
 /// Seconds the "success" / "interrupted" state of the player cast bar lingers.
@@ -91,17 +94,19 @@ pub const CAST_FLASH_SECS: f32 = 0.45;
 pub const ERROR_TEXT_SECS: f32 = 2.0;
 pub const FLOAT_TEXT_SECS: f32 = 1.4;
 pub const FLOAT_TEXT_RISE: f32 = 60.0;
-/// Above the 2.7 m CEO's head; the 1.8 m player gets a generous gap.
-pub const FLOAT_TEXT_ANCHOR_Y: f32 = 2.9;
-pub const FLOAT_TEXT_SIZE: f32 = 22.0;
-pub const FLOAT_TEXT_CRIT_SIZE: f32 = 34.0;
+/// Gap above a unit's head where its floating numbers start.
+pub const FLOAT_TEXT_HEAD_GAP: f32 = 0.25;
+/// Speech bubbles sit above the floating-number start so numbers do not overprint them.
+pub const BUBBLE_HEAD_GAP: f32 = 0.7;
+pub const FLOAT_TEXT_SIZE: f32 = 26.0;
+pub const FLOAT_TEXT_CRIT_SIZE: f32 = 36.0;
 
 // VFX
 pub const PROJECTILE_SPEED: f32 = 40.0;
 pub const PROJECTILE_RADIUS: f32 = 0.22;
 pub const PROJECTILE_ORIGIN_Y: f32 = 1.25;
 pub const PROJECTILE_TARGET_Y: f32 = 1.2;
-pub const HAND_GLOW_POS: [f32; 3] = [0.0, 1.2, -0.8];
+pub const HAND_GLOW_POS: [f32; 3] = [0.0, 1.0, -0.85];
 pub const HAND_GLOW_RADIUS: f32 = 0.16;
 pub const SHIELD_RADIUS: f32 = 1.25;
 pub const SHIELD_CENTER_Y: f32 = 0.95;
@@ -122,4 +127,16 @@ pub const TELEGRAPH_RADIUS: f32 = 2.4;
 
 // HUD scaling
 pub const UI_REFERENCE_HEIGHT: f32 = 900.0;
+/// Narrowest logical width where the combat log and the action bar do not overlap.
+pub const UI_REFERENCE_WIDTH: f32 = 1400.0;
+pub const UI_MIN_SCALE: f32 = 0.7;
 pub const UI_MAX_SCALE: f32 = 2.0;
+
+/// Model height in metres by sim unit key; HUD anchors (numbers, bubbles) follow the unit's real head.
+pub fn head_height(key: &str) -> f32 {
+    match key {
+        "ceo" => CEO_HEIGHT,
+        "intern" => INTERN_HEIGHT,
+        _ => PLAYER_HEIGHT,
+    }
+}

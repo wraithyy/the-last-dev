@@ -74,7 +74,10 @@ fn main() {
 
 /// HUD sizes are authored for a 900 px tall window; scale up on bigger screens.
 fn scale_ui(window: Single<&Window, Changed<Window>>, mut ui_scale: ResMut<UiScale>) {
-    let scale = (window.height() / config::UI_REFERENCE_HEIGHT).clamp(1.0, config::UI_MAX_SCALE);
+    // Width matters too: the combat log and the centred action bar collide on narrow windows.
+    let scale = (window.height() / config::UI_REFERENCE_HEIGHT)
+        .min(window.width() / config::UI_REFERENCE_WIDTH)
+        .clamp(config::UI_MIN_SCALE, config::UI_MAX_SCALE);
     if (ui_scale.0 - scale).abs() > 0.01 {
         ui_scale.0 = scale;
     }

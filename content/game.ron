@@ -13,6 +13,9 @@
         xp_per_level: 400,
         white_hit_pct: 95,
         spell_hit_pct: 96,
+        // Out-of-combat only: every interval, percent of max HP / max mana.
+        regen: (interval_ms: 2000, hp_pct: 4, mana_pct: 5),
+        player_yell_cooldown_ms: 7000,
     ),
     auras: [
         (key: "code_smell", name: "Code Smell", icon: "code_smell", harmful: true),
@@ -28,6 +31,12 @@
                 apply_aura: Some((aura: "code_smell", duration_ms: 12000)),
                 consume_aura: None,
             ),
+            yells: [
+                "Who approved this? Oh. The AI approved itself.",
+                "Line one: no. Line two: also no.",
+                "This function has forty parameters and a vibe.",
+                "Did anyone, at any point, read this?",
+            ],
         ),
         (
             id: 2, name: "Refactor", icon: "refactor", school: Arcane,
@@ -38,18 +47,36 @@
                 apply_aura: None,
                 consume_aura: Some((aura: "code_smell", bonus_pct: 35)),
             ),
+            yells: [
+                "Rewriting this before it becomes load-bearing.",
+                "Deleting three thousand lines of generated code. Feels great.",
+                "Same behavior. Half the hallucinations.",
+                "Turning slop into software.",
+            ],
         ),
         (
             id: 3, name: "Guardrails", icon: "guardrails", school: Arcane,
             range_m: 0.0, cast_ms: 0, mana: 40, gcd: true, cooldown_ms: 30000,
             description: "The thing leadership calls 'slowing down innovation'. Absorbs the next 100 damage for up to 10 sec.",
             effect: Absorb(aura: "guardrails", amount: 100, duration_ms: 10000),
+            yells: [
+                "Adding tests. Yes, real ones.",
+                "Input validation, rate limits and a little hope.",
+                "Compliance called. They want guardrails.",
+                "Somebody has to think about production.",
+            ],
         ),
         (
             id: 4, name: "Reject PR", icon: "reject_pr", school: Arcane,
             range_m: 25.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 20000,
             description: "No, the 4,000-line AI pull request is not 'basically done'. Interrupts spellcasting and locks arcane spells for 4 sec.",
             effect: Interrupt(lockout_ms: 4000),
+            yells: [
+                "Request changes.",
+                "Not merging a four thousand line diff called misc fixes.",
+                "Closed as won't fix. Like the strategy.",
+                "No. Write it again. By hand. With intent.",
+            ],
         ),
         (
             id: 5, name: "Hallucination Blast", icon: "hallucination_blast", school: Arcane,
@@ -63,7 +90,7 @@
         (
             key: "senior_engineer", name: "Senior Engineer", level: 3, hostile: false,
             max_hp: 300, max_mana: 250, spell_power: 20, crit_pct: 5, haste_pct: 0,
-            mana_regen_per_5s_ooc: 100, mana_regen_per_5s_combat: 25,
+            mana_regen_per_5s_combat: 25,
             xp_reward: 0, loot: [], ai: None,
             auto_attack: Some((
                 name: "Nitpick", range_m: 25.0, swing_ms: 1800,
@@ -73,7 +100,7 @@
         (
             key: "ceo", name: "CEO", level: 3, hostile: true,
             max_hp: 900, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
-            mana_regen_per_5s_ooc: 0, mana_regen_per_5s_combat: 0,
+            mana_regen_per_5s_combat: 0,
             xp_reward: 120,
             loot: [
                 (item: "Prompt Fragment", chance_pct: 60),
@@ -132,7 +159,7 @@
         (
             key: "intern", name: "AI-Native Intern", level: 1, hostile: false,
             max_hp: 40, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
-            mana_regen_per_5s_ooc: 0, mana_regen_per_5s_combat: 0,
+            mana_regen_per_5s_combat: 0,
             xp_reward: 0, loot: [], ai: None,
         ),
     ],

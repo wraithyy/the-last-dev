@@ -282,11 +282,13 @@ fn freeze_dead_player(
     }
 }
 
-const CAST_KEYS: [KeyCode; 4] = [
-    KeyCode::Digit1,
-    KeyCode::Digit2,
-    KeyCode::Digit3,
-    KeyCode::Digit4,
+/// Physical key positions, so the number row works on any layout (e.g. Czech "+ě" row
+/// without Shift); the numpad is an alternative for layouts where that row types letters.
+pub const CAST_KEYS: [[KeyCode; 2]; 4] = [
+    [KeyCode::Digit1, KeyCode::Numpad1],
+    [KeyCode::Digit2, KeyCode::Numpad2],
+    [KeyCode::Digit3, KeyCode::Numpad3],
+    [KeyCode::Digit4, KeyCode::Numpad4],
 ];
 
 fn cast_keys(
@@ -299,8 +301,8 @@ fn cast_keys(
     if paused.0 {
         return;
     }
-    for (slot, key) in CAST_KEYS.iter().enumerate() {
-        if keys.just_pressed(*key) {
+    for (slot, slot_keys) in CAST_KEYS.iter().enumerate() {
+        if keys.any_just_pressed(*slot_keys) {
             cast_slot(&sim.0, &mut pending, player.0, slot);
         }
     }

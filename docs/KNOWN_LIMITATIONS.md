@@ -13,7 +13,7 @@ Status after Phases 0-4. Remove an item once a test or verification covers it.
 - Chair colliders float 0.12 m above the floor so the shared blocker list (movement, camera, combat LoS) does not stop ground-level LoS rays. A dedicated movement-only list would be cleaner but needs `player.rs`/`combat.rs` changes.
 - The ceiling is not a collider; the camera is clamped below it by height (`CAM_MAX_HEIGHT`).
 
-- Kenney characters are rigid-node (unskinned) models with no hit-reaction clip: a hit leans the whole model back for 0.22 s (procedural), and there is no jump clip (the sprint pose is used in the air). Backpedal plays the walk clip reversed.
+- The cast pose is the one-handed shoot clip held on its last frame, and backpedal plays the walk clip reversed. The hand glow position is tuned by eye, not bound to the fist bone.
 - The furniture kit has no server rack, whiteboard or water cooler; those are flat-colour primitives in `arena.rs`.
 
 ## Simplifications
@@ -36,7 +36,7 @@ Status after Phases 0-4. Remove an item once a test or verification covers it.
 
 - Only a flat hit roll exists (95% white, 96% spell, no level difference): no dodge, parry, block, armor or partial resists; enemy melee has no crit. Misses generate no threat, so a missed first attack does not pull.
 - Enemies chase in a straight line on the ground plane and ignore blockers for pathing (they only use LoS to aggro and to start casts).
-- Heals and healing threat do not exist; threat is damage only.
+- Heals and healing threat do not exist; threat is damage only. Out-of-combat regeneration is a fixed percent tick (no spirit or gear scaling), and the legacy in-combat mana trickle stays flat.
 - Pushback applies to the player only; enemy casts keep a fixed 2.5 s telegraph.
 - Spell queue: one slot, static errors (cooldown, mana, range) are reported at press time instead of being deferred; a spell whose own cooldown ends inside the window is not queued.
 - Only Damage, Absorb and Interrupt effect types exist; the aura model is "one aura per key per unit" (refresh replaces).

@@ -54,6 +54,11 @@ pub(crate) struct Unit {
     pub auras: Vec<AuraRt>,
     /// Mana regen remainder, in 1/150 mana (5 s = 150 ticks).
     pub regen_acc: u32,
+    /// Next out-of-combat regen tick; re-armed whenever the unit leaves combat or spawns.
+    pub regen_next: u64,
+    /// Player spell yells: earliest tick for the next one, and a round-robin cursor per spell.
+    pub spell_yell_next: u64,
+    pub spell_yell_cursor: BTreeMap<SpellId, usize>,
     pub respawn_at: Option<u64>,
     pub loot: Vec<String>,
     /// Highest-priority yell requested this tick; flushed once at end of tick.
@@ -166,6 +171,9 @@ impl Sim {
             ability_next: 0,
             auras: Vec::new(),
             regen_acc: 0,
+            regen_next: self.now + ticks(self.content.config.regen.interval_ms),
+            spell_yell_next: 0,
+            spell_yell_cursor: BTreeMap::new(),
             respawn_at: None,
             loot: Vec::new(),
             yell_pending: None,
@@ -375,6 +383,7 @@ impl Sim {
         u.state.pos = u.spawn_pos;
         u.state.yaw = u.spawn_yaw;
         u.moving = false;
+        u.regen_next = self.now + ticks(self.content.config.regen.interval_ms);
         u.gcd_end = 0;
         u.cooldowns.clear();
         u.lockout_until = [0; 2];
@@ -603,6 +612,7 @@ impl Sim {
             spell: spell.id,
             target,
         });
+        self.spell_yell(ci, spell);
         match &spell.effect {
             Effect::Damage {
                 base,
@@ -664,6 +674,25 @@ impl Sim {
                 }
             }
         }
+    }
+
+    /// Player-only shout on spell release; gated by a global cooldown, never touches the rng.
+    fn spell_yell(&mut self, ci: usize, spell: &SpellDef) {
+        if Some(Self::id_of(ci)) != self.player || spell.yells.is_empty() {
+            return;
+        }
+        let u = &mut self.units[ci];
+        if self.now < u.spell_yell_next {
+            return;
+        }
+        let cur = u.spell_yell_cursor.entry(spell.id).or_insert(0);
+        let text = spell.yells[*cur % spell.yells.len()].clone();
+        *cur += 1;
+        u.spell_yell_next = self.now + ticks(self.content.config.player_yell_cooldown_ms);
+        self.events.push(Event::Yell {
+            unit: Self::id_of(ci),
+            text,
+        });
     }
 
     /// Cancels the active cast; `by: Some` also applies a school lockout.
@@ -866,19 +895,34 @@ impl Sim {
 
     // ---- per-tick upkeep ----
 
+    /// In combat only the legacy mana trickle runs; out of combat the discrete
+    /// percent tick below replaces it (no continuous ooc regen, no 5-second rule).
     fn update_regen(&mut self) {
+        let cfg = self.content.config.regen;
+        let step = ticks(cfg.interval_ms);
         for u in &mut self.units {
             let d = &self.content.units[u.def];
-            if !u.state.alive || u.state.mana >= u.state.max_mana {
+            if !u.state.alive {
                 u.regen_acc = 0;
                 continue;
             }
-            let rate = if u.state.in_combat {
-                d.mana_regen_per_5s_combat
-            } else {
-                d.mana_regen_per_5s_ooc
-            };
-            u.regen_acc += rate;
+            if !u.state.in_combat {
+                u.regen_acc = 0;
+                if step > 0 && self.now >= u.regen_next {
+                    u.regen_next = self.now + step;
+                    let gain = |max: u32, pct: u32| (u64::from(max) * u64::from(pct) / 100) as u32;
+                    u.state.hp =
+                        (u.state.hp + gain(u.state.max_hp, cfg.hp_pct)).min(u.state.max_hp);
+                    u.state.mana =
+                        (u.state.mana + gain(u.state.max_mana, cfg.mana_pct)).min(u.state.max_mana);
+                }
+                continue;
+            }
+            if u.state.mana >= u.state.max_mana {
+                u.regen_acc = 0;
+                continue;
+            }
+            u.regen_acc += d.mana_regen_per_5s_combat;
             u.state.mana = (u.state.mana + u.regen_acc / 150).min(u.state.max_mana);
             u.regen_acc %= 150;
         }
@@ -902,6 +946,10 @@ impl Sim {
                 };
             if now_in != u.state.in_combat {
                 self.units[i].state.in_combat = now_in;
+                if !now_in {
+                    self.units[i].regen_next =
+                        self.now + ticks(self.content.config.regen.interval_ms);
+                }
                 if now_in && Some(id) != player {
                     self.reset_periodic_yell(i);
                     self.request_yell(i, YellKind::Aggro);

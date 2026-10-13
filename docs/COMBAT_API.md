@@ -121,3 +121,14 @@ Additions to the signatures above (no names removed or renamed):
 - Triggers: entering combat; every `periodic_ms` while in combat and alive; starting its AI ability cast; hp first dropping to <= 30% (re-armed when hp is back above 30%, e.g. respawn or evade heal); killing the player; its own death; starting evade.
 - At most one yell per unit per tick. Priority: death > player_killed > low_hp > blast > aggro > evade > periodic. Any emitted yell restarts the periodic timer.
 - Lines cycle round-robin per unit and trigger; the combat rng is never consumed, so yells cannot change hit/miss/crit outcomes.
+
+### Player spell yells
+
+`SpellDef.yells: Vec<String>` (RON, serde default = silent). When the player's spell is released (`CastSucceeded`, for instants and at completion of cast-time spells) the player emits `Event::Yell { unit: player, text }` right after `CastSucceeded`. Not emitted for the Nitpick auto attack, failed or interrupted casts, or enemy casts (the CEO's own lines live in `UnitDef.yells`).
+
+- Lines cycle round-robin per spell; the rng is never consumed.
+- `config.player_yell_cooldown_ms` (7000) is a global gate between player spell yells; the first eligible cast yells, and a gated cast neither yells nor advances its cursor.
+
+## Regeneration
+
+`config.regen: (interval_ms, hp_pct, mana_pct)`: alive units out of combat regain `hp_pct`/`mana_pct` of max every `interval_ms`, first tick one interval after leaving combat (or spawn/respawn). No event; observe `UnitState.hp/mana`. No percent regen in combat and no 5-second rule. See FORMULAS.md.

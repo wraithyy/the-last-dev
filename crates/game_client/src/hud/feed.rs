@@ -1,6 +1,9 @@
 //! Event-driven HUD: combat log, error banner, death prompt, loot window, XP bar.
 
-use super::{BAR_BG, BRONZE, GOLD, IconCache, asset_key, label, set_text};
+use super::{
+    ACCENT, DIM, IconCache, KEY_RIM, KEY_TOP, KEY_TOP_HI, PANEL_EDGE, asset_key, drop_shadow,
+    label, panel_bg, set_text, vgrad,
+};
 use crate::combat::{CombatEvent, CombatSim, PendingCommands, SimReady, UiNotice};
 use crate::config::*;
 use crate::copy;
@@ -8,6 +11,8 @@ use bevy::prelude::*;
 use combat_core::{AuraEnd, Command, EntityId, Event, School};
 use std::collections::VecDeque;
 
+const XP_BAR_H: f32 = 14.0;
+const XP_TICKS: usize = 10;
 const XP_PURPLE: Color = Color::srgb(0.6, 0.25, 0.85);
 
 #[derive(Resource, Default)]
@@ -42,6 +47,8 @@ struct LootClose;
 
 #[derive(Component)]
 struct XpFill;
+#[derive(Component)]
+struct XpText;
 
 pub struct FeedPlugin;
 
@@ -75,20 +82,69 @@ fn spawn_feed(mut commands: Commands) {
                 left: px(12),
                 bottom: px(20),
                 width: px(COMBAT_LOG_W),
-                padding: UiRect::all(px(6)),
                 flex_direction: FlexDirection::Column,
-                justify_content: JustifyContent::FlexEnd,
                 border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(4)),
+                border_radius: BorderRadius::all(px(6)),
+                overflow: Overflow::clip(),
                 ..default()
             },
-            BorderColor::all(BRONZE),
-            BackgroundColor(Color::srgba(0.02, 0.02, 0.05, 0.6)),
+            BorderColor::all(PANEL_EDGE),
+            drop_shadow(),
         ))
-        .with_children(|c| {
-            for i in 0..COMBAT_LOG_LINES {
-                c.spawn((LogLine(i), label("", 13.0)));
-            }
+        .with_children(|root| {
+            // Terminal title bar: window dots plus the command that "produces" the log.
+            root.spawn((
+                Node {
+                    height: px(20),
+                    padding: UiRect::horizontal(px(8)),
+                    column_gap: px(5),
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                vgrad(Color::srgb(0.17, 0.18, 0.23), Color::srgb(0.12, 0.13, 0.17)),
+            ))
+            .with_children(|bar| {
+                for c in [
+                    Color::srgb(1.0, 0.37, 0.34),
+                    Color::srgb(1.0, 0.75, 0.2),
+                    Color::srgb(0.3, 0.8, 0.35),
+                ] {
+                    bar.spawn((
+                        Node {
+                            width: px(8),
+                            height: px(8),
+                            border_radius: BorderRadius::MAX,
+                            ..default()
+                        },
+                        BackgroundColor(c),
+                    ));
+                }
+                bar.spawn((
+                    Node {
+                        margin: UiRect::left(px(6)),
+                        ..default()
+                    },
+                    label("~/prod $ tail -f combat.log", 11.0),
+                    TextColor(DIM),
+                ));
+            });
+            root.spawn((
+                Node {
+                    padding: UiRect::axes(px(8), px(6)),
+                    flex_direction: FlexDirection::Column,
+                    justify_content: JustifyContent::FlexEnd,
+                    ..default()
+                },
+                vgrad(
+                    Color::srgba(0.03, 0.04, 0.06, 0.82),
+                    Color::srgba(0.02, 0.025, 0.04, 0.78),
+                ),
+            ))
+            .with_children(|c| {
+                for i in 0..COMBAT_LOG_LINES {
+                    c.spawn((LogLine(i), label("", 12.0)));
+                }
+            });
         });
     commands.spawn((
         ErrorText,
@@ -120,11 +176,11 @@ fn spawn_feed(mut commands: Commands) {
         ))
         .with_children(|c| {
             c.spawn((
-                label("You are dead.", 30.0),
+                label("process exited with code 137", 24.0),
                 TextColor(Color::srgb(0.9, 0.2, 0.2)),
             ));
             c.spawn((
-                label("Your role has been backfilled by an AI agent.", 16.0),
+                label("Your role has been backfilled by an AI agent.", 14.0),
                 TextColor(Color::srgb(0.75, 0.7, 0.7)),
             ));
             c.spawn((
@@ -136,9 +192,9 @@ fn spawn_feed(mut commands: Commands) {
                     border_radius: BorderRadius::all(px(6)),
                     ..default()
                 },
-                BorderColor::all(GOLD),
-                BackgroundColor(Color::srgb(0.25, 0.1, 0.1)),
-                children![label("Release / Re-onboard", 20.0)],
+                BorderColor::all(KEY_RIM),
+                vgrad(KEY_TOP_HI, KEY_TOP),
+                children![label("[ Release / Re-onboard ]", 16.0)],
             ));
         });
     commands
@@ -152,13 +208,14 @@ fn spawn_feed(mut commands: Commands) {
                 padding: UiRect::all(px(8)),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(6),
-                border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(8)),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(5)),
                 display: Display::None,
                 ..default()
             },
-            BorderColor::all(GOLD),
-            BackgroundColor(super::PANEL),
+            BorderColor::all(ACCENT.with_alpha(0.7)),
+            panel_bg(),
+            drop_shadow(),
             GlobalZIndex(30),
         ))
         .with_children(|c| {
@@ -167,8 +224,8 @@ fn spawn_feed(mut commands: Commands) {
                 ..default()
             })
             .with_children(|h| {
-                h.spawn(label("Loot", 16.0));
-                h.spawn((LootClose, Button, label("X", 16.0)));
+                h.spawn((label("// loot", 14.0), TextColor(DIM)));
+                h.spawn((LootClose, Button, label("[x]", 14.0)));
             });
         });
     commands
@@ -178,10 +235,13 @@ fn spawn_feed(mut commands: Commands) {
                 bottom: px(0),
                 left: px(0),
                 width: percent(100),
-                height: px(6),
+                height: px(XP_BAR_H),
+                border: UiRect::vertical(px(1)),
+                overflow: Overflow::clip(),
                 ..default()
             },
-            BackgroundColor(BAR_BG),
+            BorderColor::all(PANEL_EDGE),
+            vgrad(Color::srgb(0.02, 0.02, 0.04), Color::srgb(0.1, 0.09, 0.12)),
         ))
         .with_children(|c| {
             c.spawn((
@@ -191,7 +251,37 @@ fn spawn_feed(mut commands: Commands) {
                     width: percent(0),
                     ..default()
                 },
-                BackgroundColor(XP_PURPLE),
+                vgrad(
+                    XP_PURPLE.mix(&Color::WHITE, 0.35),
+                    XP_PURPLE.mix(&Color::BLACK, 0.45),
+                ),
+            ));
+            // Tick marks divide the bar into tenths, like the WoW experience bar.
+            for k in 1..XP_TICKS {
+                c.spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: percent(100.0 * k as f32 / XP_TICKS as f32),
+                        width: px(1),
+                        top: px(0),
+                        bottom: px(0),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
+                ));
+            }
+            c.spawn(super::gloss(0.2));
+            c.spawn((
+                XpText,
+                label("", 9.0),
+                Node {
+                    position_type: PositionType::Absolute,
+                    width: percent(100),
+                    justify_content: JustifyContent::Center,
+                    ..default()
+                },
+                TextLayout::justify(Justify::Center),
+                TextColor(Color::srgb(0.9, 0.92, 1.0)),
             ));
         });
 }
@@ -430,10 +520,17 @@ fn collect_events(
                 push(copy::xp_quip(*xp_gains).into(), Color::srgb(0.5, 0.4, 0.6));
                 *xp_gains += 1;
             }
-            Event::Yell { unit, text } => push(
-                format!("{} yells: {text}", who(&sim, *unit)),
-                copy::YELL_RED,
-            ),
+            Event::Yell { unit, text } => {
+                // "you" would read oddly in "<name> yells", so use the unit's own name.
+                let name = sim
+                    .0
+                    .unit(*unit)
+                    .map_or_else(|| "Someone".into(), |u| u.name.clone());
+                push(
+                    format!("{name} yells: {text}"),
+                    copy::yell_color(me == Some(*unit)),
+                );
+            }
             Event::Looted { looter, items, .. } if Some(*looter) == me => {
                 for item in items {
                     push(format!("You loot [{item}]."), Color::srgb(0.3, 0.9, 0.4));
@@ -532,7 +629,7 @@ fn update_loot(
                         }
                     ),
                     (
-                        label(item.clone(), 15.0),
+                        label(item.clone(), 13.0),
                         TextColor(Color::srgb(0.2, 0.85, 0.3))
                     ),
                 ],
@@ -553,12 +650,18 @@ fn update_loot(
     }
 }
 
-fn update_xp(sim: Res<CombatSim>, mut fill: Single<&mut Node, With<XpFill>>) {
+fn update_xp(
+    sim: Res<CombatSim>,
+    mut fill: Single<&mut Node, With<XpFill>>,
+    mut text: Single<&mut Text, With<XpText>>,
+) {
     let xp = sim
         .0
         .player()
         .and_then(|id| sim.0.unit(id))
         .map_or(0, |u| u.xp);
     let max = sim.0.content().config.xp_per_level.max(1);
-    fill.width = percent((100.0 * xp as f32 / max as f32).clamp(0.0, 100.0));
+    let pct = (100.0 * xp as f32 / max as f32).clamp(0.0, 100.0);
+    fill.width = percent(pct);
+    set_text(&mut text, &format!("sprint progress {pct:.0}%"));
 }

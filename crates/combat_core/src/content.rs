@@ -58,6 +58,19 @@ pub struct Config {
     pub white_hit_pct: u32,
     /// Chance for damaging spells to hit; self-buffs and interrupts always hit.
     pub spell_hit_pct: u32,
+    pub regen: RegenDef,
+    /// Minimum gap between two player spell yells; the first eligible cast yells.
+    pub player_yell_cooldown_ms: u32,
+}
+
+/// Out-of-combat regeneration: every `interval_ms` a living unit that is not in
+/// combat gains this percent of its max HP and max mana (rounded down).
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub struct RegenDef {
+    /// 0 disables regeneration entirely.
+    pub interval_ms: u32,
+    pub hp_pct: u32,
+    pub mana_pct: u32,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -119,6 +132,9 @@ pub struct SpellDef {
     pub effect: Effect,
     #[serde(default = "yes")]
     pub interruptible: bool,
+    /// Lines the caster shouts on release, round-robin; empty means silent.
+    #[serde(default)]
+    pub yells: Vec<String>,
 }
 
 impl SpellDef {
@@ -215,7 +231,6 @@ pub struct UnitDef {
     pub spell_power: u32,
     pub crit_pct: u32,
     pub haste_pct: u32,
-    pub mana_regen_per_5s_ooc: u32,
     pub mana_regen_per_5s_combat: u32,
     pub xp_reward: u32,
     pub loot: Vec<LootEntry>,
@@ -301,6 +316,9 @@ impl Content {
         let c = &self.config;
         if c.white_hit_pct > 100 || c.spell_hit_pct > 100 {
             return bad("hit chance above 100%".to_string());
+        }
+        if c.regen.hp_pct > 100 || c.regen.mana_pct > 100 {
+            return bad("regen above 100%".to_string());
         }
         if c.xp_per_level == 0 {
             return bad("xp_per_level must be positive".to_string());

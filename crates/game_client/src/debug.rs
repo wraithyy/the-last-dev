@@ -1,6 +1,7 @@
 //! Env-gated QA hooks, inert unless the variables are set:
 //! - `WOW_SCREENSHOT=<path.png>`: save the window after `WOW_SHOT_DELAY` seconds (default 4) and exit.
 //! - `WOW_PLAYER_AT=x,z,yaw_deg`: teleport the player at startup to inspect other parts of the arena.
+//! - `WOW_HOVER_SLOT=<0-3>`: show that action slot's tooltip without a pointer.
 //! - `WOW_AUTORUN=1`: hold "forward" so animation and camera can be checked without input.
 
 use crate::input::PlayerInput;
@@ -56,6 +57,9 @@ impl Plugin for DebugPlugin {
                 });
             }
         }
+        if let Some(slot) = env::var("WOW_HOVER_SLOT").ok().and_then(|v| v.parse().ok()) {
+            app.insert_resource(crate::hud::DebugHoverSlot(slot));
+        }
         if env::var("WOW_AUTORUN").is_ok() {
             // Fixed pre-update runs after the per-frame input snapshot and before the sim consumes it.
             app.add_systems(FixedPreUpdate, |mut input: ResMut<PlayerInput>| {
@@ -90,6 +94,10 @@ fn retarget_camera(
     for cam in &cams {
         commands
             .entity(cam)
-            .insert(RenderTarget::Image(plan.target.clone().into()));
+            // Without this marker the UI would find no camera aimed at the window and vanish from the shot.
+            .insert((
+                RenderTarget::Image(plan.target.clone().into()),
+                IsDefaultUiCamera,
+            ));
     }
 }

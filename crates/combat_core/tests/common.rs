@@ -41,6 +41,12 @@ impl H {
         // Rules tests assert exact outcomes; miss tests opt in through `tweak`.
         c.config.white_hit_pct = 100;
         c.config.spell_hit_pct = 100;
+        // Regen and player yells have dedicated tests; keep exact-HP/mana and event-count tests stable.
+        c.config.regen.hp_pct = 0;
+        c.config.regen.mana_pct = 0;
+        for s in &mut c.spells {
+            s.yells.clear();
+        }
         tweak(&mut c);
         let mut sim = Sim::new(c, seed);
         let player = sim.spawn_player(Vec3::new(0.0, 0.0, 0.0), 0.0);

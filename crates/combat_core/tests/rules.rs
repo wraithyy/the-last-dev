@@ -217,7 +217,7 @@ fn mana_is_spent_on_completion_and_insufficient_mana_fails() {
 }
 
 #[test]
-fn mana_regenerates_fast_out_of_combat_and_slow_in_combat() {
+fn mana_trickles_in_combat_and_ooc_relies_on_the_regen_tick() {
     let drain = |c: &mut Content| {
         if let Some(s) = c.spells.iter_mut().find(|s| s.id == GR) {
             s.mana = 200;
@@ -240,8 +240,8 @@ fn mana_regenerates_fast_out_of_combat_and_slow_in_combat() {
     };
     assert_eq!(
         delta(-40.0, 0),
-        (false, 100),
-        "100 mana per 5 s out of combat"
+        (false, 0),
+        "no continuous regen out of combat; the percent tick is off in H::new"
     );
     assert_eq!(delta(-2.0, 0), (true, 25), "25 mana per 5 s in combat");
 }

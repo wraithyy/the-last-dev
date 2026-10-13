@@ -1,6 +1,7 @@
 //! NPCs. Models and silhouettes differ so hostile vs friendly reads at a glance.
 
 use crate::anim::{Character, ModelKind};
+use crate::config::{CEO_HEIGHT, INTERN_HEIGHT, MODEL_NATIVE_HEIGHT};
 
 use bevy::prelude::*;
 use std::f32::consts::PI;
@@ -27,9 +28,8 @@ impl Plugin for UnitsPlugin {
     }
 }
 
-/// Kenney characters are 2.7 units tall at scale 1: the CEO towers over the 1.8 m player.
-const CEO_SCALE: f32 = 1.0;
-const INTERN_SCALE: f32 = 0.6;
+const CEO_SCALE: f32 = CEO_HEIGHT / MODEL_NATIVE_HEIGHT;
+const INTERN_SCALE: f32 = INTERN_HEIGHT / MODEL_NATIVE_HEIGHT;
 
 fn spawn_ceo(
     mut commands: Commands,
@@ -63,7 +63,7 @@ fn spawn_ceo(
             c.spawn((
                 Mesh3d(meshes.add(Torus::new(0.2, 0.3))),
                 MeshMaterial3d(halo),
-                Transform::from_xyz(0.0, 3.05, 0.0),
+                Transform::from_xyz(0.0, CEO_HEIGHT + 0.3, 0.0),
                 Halo,
             ));
         });

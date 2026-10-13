@@ -48,11 +48,16 @@ Cast-time spells fail with `Moving` if started while moving or jumping and are c
 
 ## Regeneration
 
+Out of combat (alive, not in combat), a discrete tick every `config.regen.interval_ms` (2000):
+
 ```
-per tick: acc += mana_regen_per_5s_(ooc|combat); mana += acc / 150; acc %= 150
+hp   += max_hp   * hp_pct   / 100   (4%, rounded down, capped at max_hp)
+mana += max_mana * mana_pct / 100   (5%, rounded down, capped at max_mana)
 ```
 
-Senior Engineer: 100 mana per 5 s out of combat, 25 in combat. A unit is in combat while it is in an enemy threat table (player) or has a non-empty table (enemy).
+The first tick comes one interval after spawn, respawn, or `LeaveCombat` (the phase restarts every time the unit leaves combat); `interval_ms: 0` disables it. No event is emitted; read `UnitState.hp/mana`. Hostile units use the same rule (a no-op at full HP; evade already heals).
+
+There is no continuous out-of-combat mana regen and no 5-second rule. In combat the percent tick does not run; the only regen is the legacy per-tick mana trickle: `acc += mana_regen_per_5s_combat; mana += acc / 150; acc %= 150` (Senior Engineer: 25 mana per 5 s). A unit is in combat while it is in an enemy threat table (player) or has a non-empty table (enemy).
 
 ## Threat and AI
 
@@ -60,4 +65,4 @@ Threat = full pre-absorb damage dealt (minimum 1) to the enemy; initial aggro ad
 
 Hallucination Blast: first cast `U[8000, 12000]` ms after the pull, then re-rolled `U[8000, 12000]` ms at each cast start. A school lockout blocks the attempt until it ends.
 
-Yells are presentation-only: line selection is a per-trigger round-robin cursor and never draws from the rng (see COMBAT_API.md, Yells).
+Yells (boss and player spell yells) are presentation-only: line selection is a round-robin cursor and never draws from the rng (see COMBAT_API.md, Yells).

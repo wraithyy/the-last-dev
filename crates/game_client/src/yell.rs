@@ -1,19 +1,20 @@
 //! Speech bubbles for `Event::Yell`: UI nodes pinned above the yelling unit's head.
 
-use crate::combat::{CombatEvent, SimReady, SimUnit};
-use crate::copy::YELL_RED;
+use crate::combat::{CombatEvent, CombatSim, SimReady, SimUnit};
+use crate::config::{BUBBLE_HEAD_GAP, PLAYER_HEIGHT, head_height};
+use crate::copy::yell_color;
 use bevy::prelude::*;
 use combat_core::{EntityId, Event};
 
 const BUBBLE_SECS: f32 = 5.0;
-const BUBBLE_MAX_W: f32 = 280.0;
-/// Above the floating-text anchor so numbers do not overprint the bubble.
-const BUBBLE_ANCHOR_Y: f32 = 3.1;
+const BUBBLE_MAX_W: f32 = 300.0;
 
 #[derive(Component)]
 struct YellBubble {
     sim: EntityId,
     anchor: Entity,
+    /// World height above the unit's feet, from its model height.
+    anchor_y: f32,
     age: f32,
 }
 
@@ -31,6 +32,7 @@ impl Plugin for YellPlugin {
 fn spawn_bubbles(
     mut commands: Commands,
     mut events: MessageReader<CombatEvent>,
+    sim: Res<CombatSim>,
     units: Query<(Entity, &SimUnit)>,
     old: Query<(Entity, &YellBubble)>,
 ) {
@@ -41,6 +43,9 @@ fn spawn_bubbles(
         let Some((anchor, _)) = units.iter().find(|(_, su)| su.0 == *unit) else {
             continue;
         };
+        let state = sim.0.unit(*unit);
+        let anchor_y = state.map_or(PLAYER_HEIGHT, |u| head_height(&u.key)) + BUBBLE_HEAD_GAP;
+        let trim = yell_color(sim.0.player() == Some(*unit));
         // Newer yell replaces the older bubble of the same unit (also one from this same frame).
         for (e, b) in &old {
             if b.sim == *unit {
@@ -53,6 +58,7 @@ fn spawn_bubbles(
                 YellBubble {
                     sim: *unit,
                     anchor,
+                    anchor_y,
                     age: 0.0,
                 },
                 Node {
@@ -68,17 +74,40 @@ fn spawn_bubbles(
                 Node {
                     padding: UiRect::axes(px(10), px(6)),
                     border: UiRect::all(px(2)),
-                    border_radius: BorderRadius::all(px(10)),
+                    border_radius: BorderRadius::all(px(6)),
                     ..default()
                 },
-                BackgroundColor(Color::WHITE),
-                BorderColor::all(YELL_RED),
-                children![(
-                    Text::new(text.clone()),
-                    TextFont::from_font_size(15.0),
-                    TextLayout::justify(Justify::Center),
-                    TextColor(Color::srgb(0.1, 0.1, 0.12)),
-                )],
+                BackgroundColor(Color::srgb(0.95, 0.97, 0.99)),
+                BorderColor::all(trim),
+                crate::hud::drop_shadow(),
+                children![
+                    // Speech-bubble tail: a rotated square whose two outer edges carry the border.
+                    (
+                        Node {
+                            position_type: PositionType::Absolute,
+                            bottom: px(-8),
+                            left: percent(50),
+                            margin: UiRect::left(px(-6)),
+                            width: px(12),
+                            height: px(12),
+                            border: UiRect {
+                                right: px(2),
+                                bottom: px(2),
+                                ..default()
+                            },
+                            ..default()
+                        },
+                        UiTransform::from_rotation(Rot2::degrees(45.0)),
+                        BackgroundColor(Color::srgb(0.95, 0.97, 0.99)),
+                        BorderColor::all(trim),
+                    ),
+                    (
+                        Text::new(text.clone()),
+                        TextFont::from_font_size(14.0),
+                        TextLayout::justify(Justify::Center),
+                        TextColor(Color::srgb(0.1, 0.1, 0.12)),
+                    )
+                ],
             ));
     }
 }
@@ -105,7 +134,7 @@ fn place_bubbles(
             commands.entity(entity).despawn();
             continue;
         }
-        let Ok(screen) = cam.world_to_viewport(cam_tf, tf.translation + Vec3::Y * BUBBLE_ANCHOR_Y)
+        let Ok(screen) = cam.world_to_viewport(cam_tf, tf.translation + Vec3::Y * bubble.anchor_y)
         else {
             *vis = Visibility::Hidden;
             continue;
