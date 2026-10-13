@@ -107,7 +107,7 @@ impl Sim {
         if u.despawned
             || !u.state.alive
             || u.summoner.is_some()
-            || Some(u.state.id) == self.player
+            || self.is_player(u.state.id)
             || self.has_aura_flag(i, |a| a.stun)
         {
             return None;

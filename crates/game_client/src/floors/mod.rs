@@ -6,6 +6,8 @@
 
 mod campus;
 mod datacenter;
+#[cfg(test)]
+mod export;
 mod kit;
 mod lab;
 mod layout;

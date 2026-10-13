@@ -14,19 +14,107 @@ use crate::combat_anim::CombatAnim;
 use crate::config::*;
 use crate::game::GameFlow;
 use crate::input::{Paused, PlayerInput};
+use crate::net::{NetClient, NetWorld};
 use crate::player::{Player, PlayerBody};
 use crate::targeting::{Target, pick_unit};
 use crate::units::{Unit, UnitAssets, spawn_unit};
+use bevy::ecs::system::SystemParam;
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use combat_core::{
-    AiState, CastError, Command, Content, ContentError, EntityId, Event, Sim, UnitState,
+    AiState, CastError, Command, Content, ContentError, CooldownView, EntityId, Event, ItemTotals,
+    QuestLog, QuestStatus, Sim, SpellId, Tick, UnitState, ZoneLinkView,
 };
 use std::collections::HashSet;
 
+/// The offline sim. Online it stays frozen (not stepped) and comes back on disconnect.
 #[derive(Resource)]
 pub struct CombatSim(pub Sim);
+
+/// The read side of the game state that HUD, VFX and audio need. Offline it is the local
+/// `Sim`; online it is `NetWorld`, rebuilt from server snapshots and events, so presentation
+/// systems work unchanged in both modes.
+pub trait SimRead: Send + Sync {
+    fn content(&self) -> &Content;
+    fn unit(&self, id: EntityId) -> Option<&UnitState>;
+    fn units(&self) -> Box<dyn Iterator<Item = &UnitState> + '_>;
+    /// The local player.
+    fn player(&self) -> Option<EntityId>;
+    /// Group members in join order.
+    fn players(&self) -> &[EntityId];
+    fn cooldown(&self, caster: EntityId, spell: SpellId) -> CooldownView;
+    fn quest_status(&self, quest: &str) -> QuestStatus;
+    fn quests(&self) -> &QuestLog;
+    fn inventory(&self) -> &[(String, u32)];
+    fn item_totals(&self) -> ItemTotals;
+    fn zone_cleared(&self, zone: &str) -> bool;
+    fn zone_links(&self, zone: &str) -> Vec<ZoneLinkView>;
+    fn known_spells(&self, unit: EntityId) -> Vec<SpellId>;
+    fn now(&self) -> Tick;
+}
+
+impl SimRead for Sim {
+    fn content(&self) -> &Content {
+        Sim::content(self)
+    }
+    fn unit(&self, id: EntityId) -> Option<&UnitState> {
+        Sim::unit(self, id)
+    }
+    fn units(&self) -> Box<dyn Iterator<Item = &UnitState> + '_> {
+        Box::new(Sim::units(self))
+    }
+    fn player(&self) -> Option<EntityId> {
+        Sim::player(self)
+    }
+    fn players(&self) -> &[EntityId] {
+        Sim::players(self)
+    }
+    fn cooldown(&self, caster: EntityId, spell: SpellId) -> CooldownView {
+        Sim::cooldown(self, caster, spell)
+    }
+    fn quest_status(&self, quest: &str) -> QuestStatus {
+        Sim::quest_status(self, quest)
+    }
+    fn quests(&self) -> &QuestLog {
+        Sim::quests(self)
+    }
+    fn inventory(&self) -> &[(String, u32)] {
+        Sim::inventory(self)
+    }
+    fn item_totals(&self) -> ItemTotals {
+        Sim::item_totals(self)
+    }
+    fn zone_cleared(&self, zone: &str) -> bool {
+        Sim::zone_cleared(self, zone)
+    }
+    fn zone_links(&self, zone: &str) -> Vec<ZoneLinkView> {
+        Sim::zone_links(self, zone)
+    }
+    fn known_spells(&self, unit: EntityId) -> Vec<SpellId> {
+        Sim::known_spells(self, unit)
+    }
+    fn now(&self) -> Tick {
+        Sim::now(self)
+    }
+}
+
+/// Read-only game state for systems: `NetWorld` while online, else the offline sim.
+#[derive(SystemParam)]
+pub struct SimView<'w> {
+    sim: Res<'w, CombatSim>,
+    net: Option<Res<'w, NetWorld>>,
+}
+
+impl std::ops::Deref for SimView<'_> {
+    type Target = dyn SimRead;
+    fn deref(&self) -> &Self::Target {
+        match &self.net {
+            Some(net) => &**net,
+            None => &self.sim.0,
+        }
+    }
+}
 
 /// Commands from Update-side input, flushed in `tick_sim` after `PlayerMoved`
 /// so a cast always sees this tick's movement state.
@@ -139,8 +227,16 @@ fn v3(p: combat_core::Vec3) -> Vec3 {
     Vec3::new(p.x, p.y, p.z)
 }
 
+/// Online position corrections above this distance teleport the body instead of blending.
+const CORRECTION_SNAP_M: f32 = 1.5;
+
+/// One 30 Hz step. Offline it advances the local sim; online it sends this tick's input to
+/// the server and takes the server events that arrived since the last step. Either way the
+/// resulting events and unit states drive the same presentation below.
 fn tick_sim(
     mut sim: ResMut<CombatSim>,
+    mut net: Option<ResMut<NetWorld>>,
+    client: Res<NetClient>,
     paused: Res<Paused>,
     colliders: Res<Colliders>,
     target: Res<Target>,
@@ -155,7 +251,8 @@ fn tick_sim(
     >,
     sim_units: Query<&SimUnit>,
 ) {
-    if paused.0 {
+    // The server does not pause, so online the world keeps moving under the menu.
+    if paused.0 && net.is_none() {
         return;
     }
     let (body, player_id, _) = &mut *player;
@@ -164,31 +261,58 @@ fn tick_sim(
     let moving = last_pos
         .is_some_and(|p| Vec2::new(p.x - body.pos.x, p.z - body.pos.z).length_squared() > 1e-6);
     *last_pos = Some(body.pos);
-    sim.0.push(Command::PlayerMoved {
-        pos: to_core(body.pos),
-        yaw: body.yaw,
-        moving,
-        jumping: body.airborne(),
-    });
-
     let wanted = target.0.and_then(|e| sim_units.get(e).ok()).map(|s| s.0);
-    // Compare with the sim, not with what we last sent: death clears the sim's target.
-    if sim.0.unit(player_id).is_some_and(|u| u.target != wanted) {
-        sim.0.push(Command::SetTarget {
-            unit: player_id,
-            target: wanted,
-        });
-    }
-    for cmd in pending.0.drain(..) {
-        sim.0.push(cmd);
-    }
 
-    let tick_events = sim.0.tick();
-    let coffee = sim.0.content().channel_spell().map(|s| s.id);
+    let tick_events = if let Some(net) = net.as_deref_mut() {
+        if let Some(d) = net.take_correction() {
+            let fixed = body.pos + v3(d);
+            // Small errors blend through the render interpolation; big ones are teleports.
+            if d.x * d.x + d.z * d.z > CORRECTION_SNAP_M * CORRECTION_SNAP_M {
+                body.teleport(fixed);
+            } else {
+                body.pos = fixed;
+            }
+        }
+        crate::net::online_step(
+            net,
+            &client,
+            crate::net::MoveInput {
+                pos: body.pos,
+                yaw: body.yaw,
+                moving,
+                jumping: body.airborne(),
+            },
+            wanted,
+            &mut pending.0,
+        )
+    } else {
+        sim.0.push(Command::PlayerMoved {
+            pos: to_core(body.pos),
+            yaw: body.yaw,
+            moving,
+            jumping: body.airborne(),
+        });
+        // Compare with the sim, not with what we last sent: death clears the sim's target.
+        if sim.0.unit(player_id).is_some_and(|u| u.target != wanted) {
+            sim.0.push(Command::SetTarget {
+                unit: player_id,
+                target: wanted,
+            });
+        }
+        for cmd in pending.0.drain(..) {
+            sim.0.push(cmd);
+        }
+        sim.0.tick()
+    };
+    let view: &dyn SimRead = match net.as_deref() {
+        Some(n) => n,
+        None => &sim.0,
+    };
+    let coffee = view.content().channel_spell().map(|s| s.id);
 
     // Authoritative state back into the Bevy mirror.
     for (su, mut unit, mut pose, mut anim) in &mut npcs {
-        let Some(state) = sim.0.unit(su.0) else {
+        let Some(state) = view.unit(su.0) else {
             continue;
         };
         unit.alive = state.alive;
@@ -201,7 +325,7 @@ fn tick_sim(
         anim.dead = !state.alive;
     }
     let (body, _, anim) = &mut *player;
-    if let Some(state) = sim.0.unit(player_id) {
+    if let Some(state) = view.unit(player_id) {
         let drinking = state.cast.is_some_and(|c| Some(c.spell) == coffee);
         anim.drinking = drinking;
         anim.casting = state.cast.is_some() && !drinking;
@@ -211,7 +335,7 @@ fn tick_sim(
     for ev in &tick_events {
         match ev {
             Event::Respawned { unit } if *unit == player_id => {
-                if let Some(state) = sim.0.unit(player_id) {
+                if let Some(state) = view.unit(player_id) {
                     body.teleport_facing(v3(state.pos), state.yaw);
                 }
             }
@@ -238,43 +362,54 @@ fn tick_sim(
     }
 }
 
-/// The sim's unit list is the source of truth: spawn visuals for new units
-/// (floor loads, summons) and drop the ones the sim despawned.
+/// The sim's unit list (online: the server's, via `NetWorld`) is the source of truth: spawn
+/// visuals for new units (zone loads, summons, joining players) and drop despawned ones.
 fn sync_units(
     mut commands: Commands,
     mut sim: ResMut<CombatSim>,
+    net: Option<Res<NetWorld>>,
     flow: Res<GameFlow>,
     assets: Res<UnitAssets>,
     visuals: Query<(Entity, &SimUnit), Without<Player>>,
 ) {
-    let player = sim.0.player();
+    let view: &dyn SimRead = match net.as_deref() {
+        Some(n) => n,
+        None => &sim.0,
+    };
+    let player = view.player();
     let mut shown = HashSet::new();
     for (e, su) in &visuals {
-        if sim.0.unit(su.0).is_some() {
+        if view.unit(su.0).is_some() {
             shown.insert(su.0);
         } else {
             commands.entity(e).despawn();
         }
     }
-    let fresh: Vec<UnitState> = sim
-        .0
+    let fresh: Vec<(UnitState, bool)> = view
         .units()
         .filter(|u| Some(u.id) != player && !shown.contains(&u.id))
-        .cloned()
+        .map(|u| (u.clone(), view.players().contains(&u.id)))
         .collect();
-    for state in &fresh {
+    for (state, is_player) in &fresh {
         let pos = v3(state.pos);
-        let pose = idle_pose(state, &flow);
+        let pose = if *is_player {
+            IdlePose::Standing
+        } else {
+            idle_pose(state, &flow)
+        };
         // The dressing may seat an NPC the sim thinks is standing; seated units must not stroll.
-        sim.0.set_idle_pose(
-            state.id,
-            match pose {
-                IdlePose::Sleeping => Some(combat_core::IdlePose::Sleeping),
-                IdlePose::Sitting => Some(combat_core::IdlePose::Sitting),
-                IdlePose::Chatting => Some(combat_core::IdlePose::Chatting),
-                IdlePose::Standing => None,
-            },
-        );
+        // Online the server owns the poses, so only the offline sim is told.
+        if net.is_none() {
+            sim.0.set_idle_pose(
+                state.id,
+                match pose {
+                    IdlePose::Sleeping => Some(combat_core::IdlePose::Sleeping),
+                    IdlePose::Sitting => Some(combat_core::IdlePose::Sitting),
+                    IdlePose::Chatting => Some(combat_core::IdlePose::Chatting),
+                    IdlePose::Standing => None,
+                },
+            );
+        }
         let e = spawn_unit(
             &mut commands,
             &assets,
@@ -296,6 +431,9 @@ fn sync_units(
                 yaw: state.yaw,
             },
         ));
+        if *is_player {
+            commands.entity(e).insert(crate::net::RemotePlayer);
+        }
     }
 }
 
@@ -374,18 +512,18 @@ fn interpolate_units(fixed: Res<Time<Fixed>>, mut q: Query<(&SimPose, &mut Trans
 
 /// Dead, stunned or mid-transition players must not move; movement input is the client's to gate.
 fn freeze_player(
-    sim: Res<CombatSim>,
+    sim: SimView,
     flow: Res<GameFlow>,
     player: Single<&SimUnit, With<Player>>,
     mut input: ResMut<PlayerInput>,
 ) {
-    if flow.input_locked() || sim.0.unit(player.0).is_some_and(|u| !u.alive || u.stunned) {
+    if flow.input_locked() || sim.unit(player.0).is_some_and(|u| !u.alive || u.stunned) {
         *input = PlayerInput::default();
     }
 }
 
 /// True when the player may act at all (alive, not stunned, not in a transition).
-pub fn can_act(sim: &Sim, flow: &GameFlow, player: EntityId) -> bool {
+pub fn can_act(sim: &dyn SimRead, flow: &GameFlow, player: EntityId) -> bool {
     !flow.input_locked() && sim.unit(player).is_some_and(|u| u.alive && !u.stunned)
 }
 
@@ -409,22 +547,22 @@ fn cast_keys(
     keys: Res<ButtonInput<KeyCode>>,
     paused: Res<Paused>,
     flow: Res<GameFlow>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut pending: ResMut<PendingCommands>,
     player: Single<&SimUnit, With<Player>>,
 ) {
-    if paused.0 || !can_act(&sim.0, &flow, player.0) {
+    if paused.0 || !can_act(&*sim, &flow, player.0) {
         return;
     }
     for (slot, slot_keys) in CAST_KEYS.iter().enumerate() {
         if keys.any_just_pressed(*slot_keys) {
-            cast_slot(&sim.0, &mut pending, player.0, slot);
+            cast_slot(&*sim, &mut pending, player.0, slot);
         }
     }
 }
 
 /// Shared by keys and action-button clicks.
-pub fn cast_slot(sim: &Sim, pending: &mut PendingCommands, caster: EntityId, slot: usize) {
+pub fn cast_slot(sim: &dyn SimRead, pending: &mut PendingCommands, caster: EntityId, slot: usize) {
     if let Some(&spell) = sim.content().action_bar().get(slot) {
         pending.0.push(Command::Cast { caster, spell });
     }
@@ -432,7 +570,7 @@ pub fn cast_slot(sim: &Sim, pending: &mut PendingCommands, caster: EntityId, slo
 
 /// Shared by the T key and the Attack button.
 pub fn toggle_auto_attack(
-    sim: &Sim,
+    sim: &dyn SimRead,
     pending: &mut PendingCommands,
     notices: &mut MessageWriter<UiNotice>,
     unit: EntityId,
@@ -451,7 +589,7 @@ pub fn toggle_auto_attack(
 fn auto_attack_key(
     keys: Res<ButtonInput<KeyCode>>,
     paused: Res<Paused>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     target: Res<Target>,
     mut pending: ResMut<PendingCommands>,
     mut notices: MessageWriter<UiNotice>,
@@ -459,7 +597,7 @@ fn auto_attack_key(
 ) {
     if !paused.0 && keys.just_pressed(KeyCode::KeyT) {
         toggle_auto_attack(
-            &sim.0,
+            &*sim,
             &mut pending,
             &mut notices,
             player.0,
@@ -469,7 +607,7 @@ fn auto_attack_key(
 }
 
 /// Shared by the C key and the Coffee button. The sim validates (full mana, cooldown, movement).
-pub fn cast_coffee_break(sim: &Sim, pending: &mut PendingCommands, caster: EntityId) {
+pub fn cast_coffee_break(sim: &dyn SimRead, pending: &mut PendingCommands, caster: EntityId) {
     if let Some(spell) = sim.content().channel_spell() {
         pending.0.push(Command::Cast {
             caster,
@@ -482,12 +620,12 @@ fn coffee_key(
     keys: Res<ButtonInput<KeyCode>>,
     paused: Res<Paused>,
     flow: Res<GameFlow>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut pending: ResMut<PendingCommands>,
     player: Single<&SimUnit, With<Player>>,
 ) {
-    if !paused.0 && keys.just_pressed(KeyCode::KeyC) && can_act(&sim.0, &flow, player.0) {
-        cast_coffee_break(&sim.0, &mut pending, player.0);
+    if !paused.0 && keys.just_pressed(KeyCode::KeyC) && can_act(&*sim, &flow, player.0) {
+        cast_coffee_break(&*sim, &mut pending, player.0);
     }
 }
 
@@ -504,7 +642,7 @@ fn interact_input(
     paused: Res<Paused>,
     flow: Res<GameFlow>,
     mut target: ResMut<Target>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut pending: ResMut<PendingCommands>,
     (mut notices, mut talked): (MessageWriter<UiNotice>, MessageWriter<Talked>),
     mut press: Local<Option<(Vec2, f32)>>,
@@ -516,7 +654,7 @@ fn interact_input(
         return;
     }
     let (player_tf, player_su) = *player;
-    let reach = sim.0.content().config.loot_range_m;
+    let reach = sim.content().config.loot_range_m;
     let mut picked: Option<Entity> = None;
     let mut clicked = false;
     if buttons.just_pressed(MouseButton::Right) {
@@ -552,7 +690,7 @@ fn interact_input(
     let (Ok(su), Ok((_, unit_tf, _))) = (sim_units.get(entity), units.get(entity)) else {
         return;
     };
-    let Some(state) = sim.0.unit(su.0) else {
+    let Some(state) = sim.unit(su.0) else {
         return;
     };
     let far = player_tf.translation.distance(unit_tf.translation) > reach;

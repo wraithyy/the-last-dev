@@ -91,8 +91,10 @@ fn bonuses_survive_floor_loads_respawn_and_level_ups_but_not_a_new_sim() {
         h.sim
             .load_floor(
                 1,
-                // No graveyard: the respawn point stays next to the start, away from the packs.
-                &|a| (a != "graveyard").then_some((Vec3::new(0.0, 0.0, -300.0), 0.0)),
+                // No graveyard: the respawn point stays next to the start, away from the packs;
+                // no player_spawn, so the player is not moved onto them either.
+                &|a| (a != "graveyard" && a != "player_spawn")
+                    .then_some((Vec3::new(0.0, 0.0, -300.0), 0.0)),
                 vec![]
             )
             .is_ok()

@@ -1,0 +1,33 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "the-last-dev-server"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "ws", "query"] }
+getrandom = "0.3"
+hyper = { version = "1", default-features = false, features = ["http1", "server"] }
+hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
+combat_core = { path = "../combat_core" }
+net_proto = { path = "../net_proto" }
+ron = "0.12"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "signal"] }
+tower = { version = "0.5", default-features = false, features = ["util"] }
+tower-http = { version = "0.6", default-features = false, features = ["fs"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+tokio = { version = "1", features = ["test-util"] }
+tokio-tungstenite = "0.26"

@@ -137,7 +137,7 @@ impl Sim {
                 if crit {
                     amount = amount * u64::from(self.content.config.crit_damage_pct) / 100;
                 }
-                if Some(caster) == self.player {
+                if self.is_player(caster) {
                     self.units[ti].last_player_hit = Some((amount as u32, spell.school));
                 }
                 let hit = Hit {
@@ -228,7 +228,7 @@ impl Sim {
                 } else {
                     forward(self.units[ci].state.yaw)
                 };
-                if Some(Self::id_of(ti)) != self.player {
+                if !self.is_player(Self::id_of(ti)) {
                     let p = &mut self.units[ti].state.pos;
                     p.x += dir.x * strength_m;
                     p.z += dir.z * strength_m;

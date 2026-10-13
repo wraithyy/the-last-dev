@@ -4,7 +4,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::arena::Colliders;
-use crate::combat::{CombatEvent, CombatSim, SimReady, SimUnit};
+use crate::combat::{CombatEvent, SimRead, SimReady, SimUnit, SimView};
 use crate::input::{MouseState, Paused};
 use crate::nameplates::{PlateLootTag, PlateName};
 use crate::player::{Player, PlayerBody};
@@ -80,7 +80,7 @@ fn setup(
 
 fn track_empty(
     mut events: MessageReader<CombatEvent>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut empty: ResMut<EmptyCorpses>,
 ) {
     for CombatEvent(e) in events.read() {
@@ -92,18 +92,18 @@ fn track_empty(
     }
     empty
         .0
-        .retain(|id| sim.0.unit(*id).is_some_and(|u| u.lootable));
+        .retain(|id| sim.unit(*id).is_some_and(|u| u.lootable));
 }
 
-fn has_loot(sim: &CombatSim, empty: &EmptyCorpses, id: EntityId) -> bool {
-    !empty.0.contains(&id) && sim.0.unit(id).is_some_and(|u| u.lootable)
+fn has_loot(sim: &dyn SimRead, empty: &EmptyCorpses, id: EntityId) -> bool {
+    !empty.0.contains(&id) && sim.unit(id).is_some_and(|u| u.lootable)
 }
 
 fn spawn_sparkles(
     mut commands: Commands,
     time: Res<Time>,
     assets: Res<SparkleAssets>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     empty: Res<EmptyCorpses>,
     player: Single<&PlayerBody, With<Player>>,
     corpses: Query<(&Transform, &SimUnit), With<Unit>>,
@@ -120,7 +120,7 @@ fn spawn_sparkles(
         if room == 0 {
             break;
         }
-        if !has_loot(&sim, &empty, su.0) || tf.translation.distance(player.pos) > SPARKLE_RANGE {
+        if !has_loot(&*sim, &empty, su.0) || tf.translation.distance(player.pos) > SPARKLE_RANGE {
             continue;
         }
         clock.1 = clock.1.wrapping_add(1);
@@ -144,7 +144,7 @@ fn spawn_sparkles(
 fn update_sparkles(
     mut commands: Commands,
     time: Res<Time>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     empty: Res<EmptyCorpses>,
     mut q: Query<(Entity, &mut Sparkle, &mut Transform)>,
 ) {
@@ -152,7 +152,7 @@ fn update_sparkles(
     for (e, mut s, mut tf) in &mut q {
         s.age += dt;
         let k = s.age / SPARKLE_LIFE;
-        if k >= 1.0 || !has_loot(&sim, &empty, s.corpse) {
+        if k >= 1.0 || !has_loot(&*sim, &empty, s.corpse) {
             commands.entity(e).despawn();
             continue;
         }
@@ -166,18 +166,18 @@ fn update_sparkles(
 }
 
 fn mark_plates(
-    sim: Res<CombatSim>,
+    sim: SimView,
     empty: Res<EmptyCorpses>,
     mut names: Query<(&PlateName, &mut TextColor)>,
     mut tags: Query<(&PlateLootTag, &mut Node)>,
 ) {
     for (n, mut color) in &mut names {
-        if has_loot(&sim, &empty, n.0) {
+        if has_loot(&*sim, &empty, n.0) {
             color.set_if_neq(TextColor(GOLD));
         }
     }
     for (t, mut node) in &mut tags {
-        let d = if has_loot(&sim, &empty, t.0) {
+        let d = if has_loot(&*sim, &empty, t.0) {
             Display::Flex
         } else {
             Display::None
@@ -213,7 +213,7 @@ fn hover_cursor(
     time: Res<Time>,
     mouse: Res<MouseState>,
     paused: Res<Paused>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     empty: Res<EmptyCorpses>,
     colliders: Res<Colliders>,
     window: Single<(Entity, &Window), With<PrimaryWindow>>,
@@ -250,8 +250,8 @@ fn hover_cursor(
                     } else {
                         Hover::Friendly
                     }
-                } else if has_loot(&sim, &empty, id) {
-                    let reach = sim.0.content().config.loot_range_m;
+                } else if has_loot(&*sim, &empty, id) {
+                    let reach = sim.content().config.loot_range_m;
                     Hover::Corpse {
                         in_reach: tf.translation.distance(player.pos) <= reach,
                     }

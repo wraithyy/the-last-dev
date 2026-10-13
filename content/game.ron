@@ -20,6 +20,8 @@
         player_yell_cooldown_ms: 20000,
         mob_scaling: (hp_pct_per_level: 12, damage_pct_per_level: 10, xp_pct_per_level: 10),
         xp_rules: (above_pct_per_level: 5, above_max_levels: 4, below_pct_per_level: 20, gray_level_diff: 3),
+        // Co-op: enemy max HP +60% per group member beyond the first (docs/FORMULAS.md).
+        group_hp_pct_per_player: 60,
     ),
     // Player growth; index 0 = level 1. Bonuses are cumulative on top of senior_engineer's stats.
     levels: [

@@ -3,8 +3,16 @@
 use crate::content::{IdlePose, School, SpellId};
 use crate::geom::Vec3;
 use crate::targeting::{EntityId, TargetError};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Who an event is for, see `Sim::drain_events_routed`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Audience {
+    All,
+    Player(EntityId),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CastError {
     NoTarget,
     InvalidTarget,
@@ -64,7 +72,7 @@ impl From<TargetError> for CastError {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AiState {
     Idle,
     Chase,
@@ -74,7 +82,7 @@ pub enum AiState {
     Dead,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AuraEnd {
     Expired,
     Consumed,
@@ -82,7 +90,7 @@ pub enum AuraEnd {
     Death,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Command {
     /// The client owns player movement; it reports the result every tick before `tick()`.
     PlayerMoved {
@@ -133,7 +141,7 @@ pub enum Command {
     },
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Event {
     CastStarted {
         caster: EntityId,

@@ -124,6 +124,10 @@ pub const UI_REFERENCE_HEIGHT: f32 = 900.0;
 pub const UI_REFERENCE_WIDTH: f32 = 1400.0;
 pub const UI_MIN_SCALE: f32 = 0.7;
 pub const UI_MAX_SCALE: f32 = 2.0;
+/// Touch layout: the log is hidden, so only the action bar sets the minimum width.
+pub const TOUCH_UI_REFERENCE_HEIGHT: f32 = 500.0;
+pub const TOUCH_UI_REFERENCE_WIDTH: f32 = 1000.0;
+pub const TOUCH_UI_MIN_SCALE: f32 = 0.45;
 
 /// Model height in metres by sim unit key; HUD anchors (numbers, bubbles) follow the unit's real head.
 pub fn head_height(key: &str) -> f32 {

@@ -2,7 +2,7 @@
 //! stack count; hovering a tile fills the detail pane, and the footer sums the permanent bonuses.
 
 use super::{ACCENT, DIM, IconCache, PANEL_EDGE, drop_shadow, label, panel_bg, set_text};
-use crate::combat::{CombatSim, SimReady};
+use crate::combat::{SimRead, SimReady, SimView};
 use crate::copy::{self, BONUS_GREEN};
 use crate::input::{Paused, TrophiesOpen};
 use bevy::prelude::*;
@@ -118,7 +118,7 @@ fn update_window(
     keys: Res<ButtonInput<KeyCode>>,
     paused: Res<Paused>,
     mut open: ResMut<TrophiesOpen>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     assets: Res<AssetServer>,
     mut icons: ResMut<IconCache>,
     mut window: Single<&mut Node, With<TrophyWindow>>,
@@ -140,12 +140,12 @@ fn update_window(
         return;
     }
 
-    let inventory = sim.0.inventory();
+    let inventory = sim.inventory();
     if shown.as_deref() != Some(inventory) {
         *shown = Some(inventory.to_vec());
-        rebuild_grid(&mut commands, *grid, &sim, &assets, &mut icons);
+        rebuild_grid(&mut commands, *grid, &*sim, &assets, &mut icons);
     }
-    let sums = copy::bonus_text(&sim.0.item_totals());
+    let sums = copy::bonus_text(&sim.item_totals());
     set_text(
         &mut totals,
         &if sums.is_empty() {
@@ -164,7 +164,7 @@ fn update_window(
         }
     }
     let (name, bonus, desc) = hovered
-        .and_then(|n| sim.0.content().item(n).map(|d| (d, count_of(inventory, n))))
+        .and_then(|n| sim.content().item(n).map(|d| (d, count_of(inventory, n))))
         .map_or_else(
             || (HINT.to_string(), String::new(), String::new()),
             |(d, copies)| {
@@ -201,12 +201,12 @@ fn count_of(inventory: &[(String, u32)], name: &str) -> u32 {
 fn rebuild_grid(
     commands: &mut Commands,
     grid: Entity,
-    sim: &CombatSim,
+    sim: &dyn SimRead,
     assets: &AssetServer,
     icons: &mut IconCache,
 ) {
     commands.entity(grid).despawn_related::<Children>();
-    let inventory = sim.0.inventory();
+    let inventory = sim.inventory();
     if inventory.is_empty() {
         commands.entity(grid).with_child((
             label("Empty. Kill something, loot it, expense it.", 12.0),
@@ -215,7 +215,6 @@ fn rebuild_grid(
     }
     for (name, copies) in inventory {
         let icon_key = sim
-            .0
             .content()
             .item(name)
             .map_or("unknown", |d| d.icon.as_str());

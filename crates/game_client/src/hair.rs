@@ -1,12 +1,17 @@
 //! The Senior Engineer's hair thins with HP: the player model's hair is split
 //! into `Hair_1` (crown spot) .. `Hair_5` (last remaining sides), and every part
-//! up to the current stage is hidden. HP coming back restores it.
+//! up to the current stage is hidden. HP coming back restores it. Other players
+//! in an online room wear the same model and thin the same way.
 
-use crate::combat::{CombatSim, SimReady, SimUnit};
+use crate::combat::{SimReady, SimUnit, SimView};
 use crate::hud::LogLineMsg;
+use crate::net::RemotePlayer;
 use crate::player::Player;
 use bevy::gltf::GltfMaterialName;
 use bevy::prelude::*;
+
+/// The local player and the other players of an online room wear the same model.
+type Engineer = Or<(With<Player>, With<RemotePlayer>)>;
 
 /// Hair mesh entities of the player model with their stage (1..=5).
 #[derive(Component)]
@@ -36,47 +41,50 @@ pub fn hair_stage(hp: u32, max_hp: u32) -> u8 {
 /// The glTF scene spawns asynchronously, so keep looking until the parts exist.
 fn find_hair(
     mut commands: Commands,
-    player: Single<Entity, (With<Player>, Without<HairParts>)>,
+    engineers: Query<Entity, (Engineer, Without<HairParts>)>,
     children: Query<&Children>,
     names: Query<&GltfMaterialName>,
 ) {
-    let parts: Vec<(Entity, u8)> = children
-        .iter_descendants(*player)
-        .filter_map(|e| {
-            let stage = names.get(e).ok()?.0.strip_prefix("Hair_")?.parse().ok()?;
-            Some((e, stage))
-        })
-        .collect();
-    if !parts.is_empty() {
-        commands.entity(*player).insert(HairParts(parts));
+    for engineer in &engineers {
+        let parts: Vec<(Entity, u8)> = children
+            .iter_descendants(engineer)
+            .filter_map(|e| {
+                let stage = names.get(e).ok()?.0.strip_prefix("Hair_")?.parse().ok()?;
+                Some((e, stage))
+            })
+            .collect();
+        if !parts.is_empty() {
+            commands.entity(engineer).insert(HairParts(parts));
+        }
     }
 }
 
 fn thin_hair(
-    sim: Res<CombatSim>,
-    player: Single<(&SimUnit, &HairParts), With<Player>>,
+    sim: SimView,
+    engineers: Query<(&SimUnit, &HairParts, Has<Player>)>,
     mut vis: Query<&mut Visibility>,
     mut log: MessageWriter<LogLineMsg>,
     mut joked: Local<bool>,
 ) {
-    let (su, parts) = *player;
-    let Some(u) = sim.0.unit(su.0) else { return };
-    let stage = hair_stage(u.hp, u.max_hp);
-    for (e, k) in &parts.0 {
-        if let Ok(mut v) = vis.get_mut(*e) {
-            v.set_if_neq(if *k <= stage {
-                Visibility::Hidden
-            } else {
-                Visibility::Inherited
-            });
+    for (su, parts, is_player) in &engineers {
+        let Some(u) = sim.unit(su.0) else { continue };
+        let stage = hair_stage(u.hp, u.max_hp);
+        for (e, k) in &parts.0 {
+            if let Ok(mut v) = vis.get_mut(*e) {
+                v.set_if_neq(if *k <= stage {
+                    Visibility::Hidden
+                } else {
+                    Visibility::Inherited
+                });
+            }
         }
-    }
-    if stage == 5 && u.alive && u.in_combat && !*joked {
-        *joked = true;
-        log.write(LogLineMsg(
-            "You have lost all your hair. The AI did not notice.".into(),
-            Color::srgb(0.5, 0.5, 0.56),
-        ));
+        if is_player && stage == 5 && u.alive && u.in_combat && !*joked {
+            *joked = true;
+            log.write(LogLineMsg(
+                "You have lost all your hair. The AI did not notice.".into(),
+                Color::srgb(0.5, 0.5, 0.56),
+            ));
+        }
     }
 }
 

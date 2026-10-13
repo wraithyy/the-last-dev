@@ -130,15 +130,22 @@ impl Sim {
         }
     }
 
+    /// Pulls on the nearest living group member in aggro range and sight (ties: join order).
     fn try_aggro(&mut self, i: usize, ai: &AiDef) {
-        let Some(p) = self.player.and_then(|p| self.index(p)) else {
-            return;
-        };
-        let (me, them) = (self.units[i].state.pos, self.units[p].state.pos);
-        if self.units[p].state.alive
-            && dist_xz(me, them) <= ai.aggro_m
-            && line_of_sight(me, them, &self.blockers)
-        {
+        let me = self.units[i].state.pos;
+        let mut best: Option<(usize, f32)> = None;
+        for p in self.players.iter().filter_map(|p| self.index(*p)) {
+            let them = self.units[p].state.pos;
+            let d = dist_xz(me, them);
+            if self.units[p].state.alive
+                && d <= ai.aggro_m
+                && best.is_none_or(|(_, bd)| d < bd)
+                && line_of_sight(me, them, &self.blockers)
+            {
+                best = Some((p, d));
+            }
+        }
+        if let Some((p, _)) = best {
             self.add_threat(i, Self::id_of(p), 1);
             self.set_ai(i, AiState::Chase);
         }

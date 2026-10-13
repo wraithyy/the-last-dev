@@ -4,7 +4,7 @@
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
-use crate::combat::{CombatSim, SimReady, SimUnit};
+use crate::combat::{SimReady, SimUnit, SimView};
 use crate::config::head_height;
 use crate::copy;
 use crate::hud::{ACCENT_WARM, BAR_BG, label};
@@ -53,11 +53,11 @@ impl Plugin for NameplatePlugin {
 
 fn spawn_plates(
     mut commands: Commands,
-    sim: Res<CombatSim>,
+    sim: SimView,
     added: Query<(Entity, &SimUnit), (Added<SimUnit>, With<Unit>, Without<Player>)>,
 ) {
     for (anchor, su) in &added {
-        let Some(u) = sim.0.unit(su.0) else { continue };
+        let Some(u) = sim.unit(su.0) else { continue };
         let tag = if u.boss {
             Some(("BOSS", ACCENT_WARM))
         } else if copy::is_elite(&u.key) {
@@ -66,7 +66,6 @@ fn spawn_plates(
             None
         };
         let title = sim
-            .0
             .content()
             .unit_def(&u.key)
             .map(|d| d.title.clone())
@@ -171,7 +170,7 @@ fn spawn_plates(
 
 fn place_plates(
     mut commands: Commands,
-    sim: Res<CombatSim>,
+    sim: SimView,
     target: Res<Target>,
     ui_scale: Res<UiScale>,
     window: Single<&Window>,
@@ -199,7 +198,7 @@ fn place_plates(
             continue;
         };
         // A lootable corpse keeps its plate so the gold name marks it.
-        let alive = sim.0.unit(plate.sim).is_some_and(|u| u.alive || u.lootable);
+        let alive = sim.unit(plate.sim).is_some_and(|u| u.alive || u.lootable);
         let world = tf.translation + Vec3::Y * plate.height;
         let dist = world.distance(eye);
         let in_front = (world - eye).dot(*forward) > 0.0;
@@ -221,7 +220,6 @@ fn place_plates(
     }
     for (fill, mut node) in &mut fills {
         let pct = sim
-            .0
             .unit(fill.0)
             .map_or(0.0, |u| 100.0 * u.hp as f32 / u.max_hp.max(1) as f32);
         let w = percent(pct);
@@ -232,13 +230,13 @@ fn place_plates(
 }
 
 fn update_marks(
-    sim: Res<CombatSim>,
+    sim: SimView,
     flow: Res<crate::game::GameFlow>,
     mut marks: Query<(&QuestMark, &mut Text, &mut TextColor)>,
 ) {
     for (mark, mut text, mut color) in &mut marks {
         let (glyph, c) =
-            crate::hud::giver_mark(&sim.0, &mark.0, &flow.zone).unwrap_or(("", Color::NONE));
+            crate::hud::giver_mark(&*sim, &mark.0, &flow.zone).unwrap_or(("", Color::NONE));
         crate::hud::set_text(&mut text, glyph);
         if color.0 != c {
             color.0 = c;

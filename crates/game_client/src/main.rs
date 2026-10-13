@@ -18,11 +18,13 @@ mod hud;
 mod input;
 mod loot_fx;
 mod nameplates;
+mod net;
 mod player;
 mod presentation;
 mod rigs;
 mod spell_fx;
 mod targeting;
+mod touch;
 mod units;
 mod vfx;
 mod yell;
@@ -43,6 +45,7 @@ fn window() -> Window {
         fit_canvas_to_parent: true,
         #[cfg(target_arch = "wasm32")]
         prevent_default_event_handling: true,
+        resolution: touch::initial_resolution(),
         ..default()
     }
 }
@@ -78,7 +81,6 @@ fn main() {
             spell_fx::SpellFxPlugin,
             presentation::PresentationPlugin,
             floating_text::FloatingTextPlugin,
-            yell::YellPlugin,
         ))
         .add_plugins((
             game::GamePlugin,
@@ -89,12 +91,14 @@ fn main() {
             audio::GameAudioPlugin,
             loot_fx::LootFxPlugin,
             rigs::RigsPlugin,
+            yell::YellPlugin,
         ))
+        .add_plugins((net::NetPlugin, touch::TouchPlugin))
         .run();
 }
 
 /// HUD sizes are authored for a 900 px tall window; scale up on bigger screens.
-fn scale_ui(window: Single<&Window, Changed<Window>>, mut ui_scale: ResMut<UiScale>) {
+fn scale_ui(window: Single<&Window>, touch: Res<touch::TouchMode>, mut ui_scale: ResMut<UiScale>) {
     // Width matters too: the combat log and the centred action bar collide on narrow windows.
     let (w, h) = if debug::shooting() {
         let (w, h) = debug::shot_size();
@@ -102,9 +106,22 @@ fn scale_ui(window: Single<&Window, Changed<Window>>, mut ui_scale: ResMut<UiSca
     } else {
         (window.width(), window.height())
     };
-    let scale = (h / config::UI_REFERENCE_HEIGHT)
-        .min(w / config::UI_REFERENCE_WIDTH)
-        .clamp(config::UI_MIN_SCALE, config::UI_MAX_SCALE);
+    // Phones: the combat log is hidden, so the bar is the only wide element and the HUD can be
+    // scaled for a ~500 px tall landscape viewport, which keeps keycaps near finger size.
+    let (ref_h, ref_w, min) = if touch.active {
+        (
+            config::TOUCH_UI_REFERENCE_HEIGHT,
+            config::TOUCH_UI_REFERENCE_WIDTH,
+            config::TOUCH_UI_MIN_SCALE,
+        )
+    } else {
+        (
+            config::UI_REFERENCE_HEIGHT,
+            config::UI_REFERENCE_WIDTH,
+            config::UI_MIN_SCALE,
+        )
+    };
+    let scale = (h / ref_h).min(w / ref_w).clamp(min, config::UI_MAX_SCALE);
     if (ui_scale.0 - scale).abs() > 0.01 {
         ui_scale.0 = scale;
     }

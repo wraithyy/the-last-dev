@@ -7,13 +7,13 @@ use super::{
     ACCENT, BAR_BG, Banner, DIM, IconCache, PANEL_EDGE, asset_key, drop_shadow, label, panel_bg,
     set_text,
 };
-use crate::combat::{CombatEvent, CombatSim, PendingCommands, SimReady, Talked};
+use crate::combat::{CombatEvent, PendingCommands, SimRead, SimReady, SimView, Talked};
 use crate::copy;
 use crate::game::{GameFlow, zone_label};
 use crate::input::{Paused, QuestWindows, TrophiesOpen};
 use crate::player::Player;
 use bevy::prelude::*;
-use combat_core::{Command, Content, Event, Objective, QuestStatus, Sim};
+use combat_core::{Command, Content, Event, Objective, QuestStatus};
 
 pub const GOLD: Color = Color::srgb(1.0, 0.82, 0.3);
 pub const GREY_MARK: Color = Color::srgb(0.62, 0.64, 0.7);
@@ -58,7 +58,7 @@ pub fn progress_line(content: &Content, o: &Objective, count: u32, need: u32) ->
 }
 
 /// The giver's quests the player can act on in `zone`, content order.
-pub fn giver_quests(sim: &Sim, npc_key: &str, zone: &str) -> Vec<(String, QuestStatus)> {
+pub fn giver_quests(sim: &dyn SimRead, npc_key: &str, zone: &str) -> Vec<(String, QuestStatus)> {
     sim.content()
         .quests
         .iter()
@@ -74,7 +74,7 @@ pub fn giver_quests(sim: &Sim, npc_key: &str, zone: &str) -> Vec<(String, QuestS
 }
 
 /// Yellow "?" to turn in, yellow "!" to pick up, grey "?" while work is pending.
-pub fn giver_mark(sim: &Sim, npc_key: &str, zone: &str) -> Option<(&'static str, Color)> {
+pub fn giver_mark(sim: &dyn SimRead, npc_key: &str, zone: &str) -> Option<(&'static str, Color)> {
     let qs = giver_quests(sim, npc_key, zone);
     let has = |s: QuestStatus| qs.iter().any(|(_, q)| *q == s);
     if has(QuestStatus::Ready) {
@@ -283,7 +283,7 @@ fn button(c: &mut ChildSpawnerCommands, key: &str, caption: &str, action: Action
     });
 }
 
-fn objectives(c: &mut ChildSpawnerCommands, content: &Content, sim: &Sim, id: &str) {
+fn objectives(c: &mut ChildSpawnerCommands, content: &Content, sim: &dyn SimRead, id: &str) {
     let Some(def) = content.quest(id) else { return };
     let counts = sim
         .quests()
@@ -378,14 +378,14 @@ fn reward(
 
 fn open_on_talk(
     mut talked: MessageReader<Talked>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     flow: Res<GameFlow>,
     mut windows: ResMut<QuestWindows>,
     mut state: ResMut<DialogState>,
 ) {
     for Talked(id) in talked.read() {
-        let Some(u) = sim.0.unit(*id) else { continue };
-        let list = giver_quests(&sim.0, &u.key, &flow.zone);
+        let Some(u) = sim.unit(*id) else { continue };
+        let list = giver_quests(&*sim, &u.key, &flow.zone);
         if list.is_empty() {
             continue;
         }
@@ -413,7 +413,7 @@ fn toggle_log(
 fn handle_actions(
     keys: Res<ButtonInput<KeyCode>>,
     paused: Res<Paused>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     flow: Res<GameFlow>,
     mut windows: ResMut<QuestWindows>,
     mut state: ResMut<DialogState>,
@@ -429,8 +429,8 @@ fn handle_actions(
         .map(|(_, b)| b.0.clone())
         .collect();
     // Keyboard drives the dialog only: Up/Down pick, Enter does the primary action, Backspace goes back.
-    if let Some(npc) = windows.dialog.and_then(|id| sim.0.unit(id)) {
-        let list = giver_quests(&sim.0, &npc.key, &flow.zone);
+    if let Some(npc) = windows.dialog.and_then(|id| sim.unit(id)) {
+        let list = giver_quests(&*sim, &npc.key, &flow.zone);
         match &state.selected {
             None => {
                 if keys.just_pressed(KeyCode::ArrowDown) {
@@ -447,7 +447,7 @@ fn handle_actions(
             }
             Some(id) => {
                 if keys.just_pressed(KeyCode::Enter) {
-                    match sim.0.quest_status(id) {
+                    match sim.quest_status(id) {
                         QuestStatus::Available => actions.push(Action::Accept(id.clone())),
                         QuestStatus::Ready => actions.push(Action::Complete(id.clone())),
                         _ => actions.push(Action::Close),
@@ -479,8 +479,8 @@ fn handle_actions(
                 // Back to the list when the giver has more to hand out, else done talking.
                 let more = windows
                     .dialog
-                    .and_then(|id| sim.0.unit(id))
-                    .map(|npc| giver_quests(&sim.0, &npc.key, &flow.zone))
+                    .and_then(|id| sim.unit(id))
+                    .map(|npc| giver_quests(&*sim, &npc.key, &flow.zone))
                     .is_some_and(|l| {
                         l.iter().any(|(q, s)| {
                             q != quest && matches!(s, QuestStatus::Available | QuestStatus::Ready)
@@ -499,7 +499,7 @@ fn handle_actions(
 
 fn update_dialog(
     mut commands: Commands,
-    sim: Res<CombatSim>,
+    sim: SimView,
     flow: Res<GameFlow>,
     assets: Res<AssetServer>,
     mut icons: ResMut<IconCache>,
@@ -509,8 +509,8 @@ fn update_dialog(
     mut window: Single<(Entity, &mut Node), With<DialogWindow>>,
 ) {
     let (root, node) = &mut *window;
-    let npc = windows.dialog.and_then(|id| sim.0.unit(id));
-    let reach = sim.0.content().config.loot_range_m + combat_core::GIVER_REACH_SLACK_M;
+    let npc = windows.dialog.and_then(|id| sim.unit(id));
+    let reach = sim.content().config.loot_range_m + combat_core::GIVER_REACH_SLACK_M;
     let near = npc.is_some_and(|u| {
         u.alive
             && Vec2::new(
@@ -521,7 +521,7 @@ fn update_dialog(
                 <= reach
     });
     let list = npc
-        .map(|u| giver_quests(&sim.0, &u.key, &flow.zone))
+        .map(|u| giver_quests(&*sim, &u.key, &flow.zone))
         .unwrap_or_default();
     if !near || list.is_empty() {
         windows.dialog = None;
@@ -537,9 +537,8 @@ fn update_dialog(
         state.selected = None;
     }
     node.display = Display::Flex;
-    let content = sim.0.content();
+    let content = sim.content();
     let counts: Vec<u32> = sim
-        .0
         .quests()
         .active
         .iter()
@@ -618,7 +617,7 @@ fn update_dialog(
         let Some(def) = content.quest(&id) else {
             return;
         };
-        let status = sim.0.quest_status(&id);
+        let status = sim.quest_status(&id);
         let (chip, chip_color) = status_chip(status);
         c.spawn(Node {
             justify_content: JustifyContent::SpaceBetween,
@@ -654,7 +653,7 @@ fn update_dialog(
         };
         text(c, body.clone(), 13.0, Color::srgb(0.86, 0.89, 0.95));
         section(c, "acceptance criteria");
-        objectives(c, content, &sim.0, &id);
+        objectives(c, content, &*sim, &id);
         reward(c, content, &id, &assets, &mut icons);
         c.spawn(Node {
             column_gap: px(8),
@@ -681,7 +680,7 @@ fn update_dialog(
 
 fn update_log(
     mut commands: Commands,
-    sim: Res<CombatSim>,
+    sim: SimView,
     windows: Res<QuestWindows>,
     mut shown: ResMut<Shown>,
     mut window: Single<(Entity, &mut Node), With<LogWindow>>,
@@ -693,13 +692,13 @@ fn update_log(
         return;
     }
     node.display = Display::Flex;
-    let log = sim.0.quests();
+    let log = sim.quests();
     let sig = format!("{:?}|{:?}", log.active, log.completed);
     if sig == shown.log {
         return;
     }
     shown.log = sig;
-    let content = sim.0.content();
+    let content = sim.content();
     commands.entity(*root).despawn_related::<Children>();
     commands.entity(*root).with_children(|c| {
         c.spawn(Node {
@@ -732,7 +731,7 @@ fn update_log(
             let Some(def) = content.quest(&q.id) else {
                 continue;
             };
-            let status = sim.0.quest_status(&q.id);
+            let status = sim.quest_status(&q.id);
             let (chip, color) = status_chip(status);
             c.spawn((
                 Node {
@@ -765,7 +764,7 @@ fn update_log(
                     });
                     button(h, "", "Abandon", Action::Abandon(q.id.clone()), false);
                 });
-                objectives(t, content, &sim.0, &q.id);
+                objectives(t, content, &*sim, &q.id);
                 let hint = if status == QuestStatus::Ready {
                     format!("Turn in to {}.", unit_name(content, &def.giver.npc))
                 } else {
@@ -779,14 +778,14 @@ fn update_log(
 
 fn update_tracker(
     mut commands: Commands,
-    sim: Res<CombatSim>,
+    sim: SimView,
     windows: Res<QuestWindows>,
     trophies: Res<TrophiesOpen>,
     mut shown: ResMut<Shown>,
     mut tracker: Single<(Entity, &mut Node), With<Tracker>>,
 ) {
     let (root, node) = &mut *tracker;
-    let log = sim.0.quests();
+    let log = sim.quests();
     let visible = !log.active.is_empty() && !trophies.0 && !windows.map;
     node.display = if visible {
         Display::Flex
@@ -798,7 +797,7 @@ fn update_tracker(
         return;
     }
     shown.tracker = sig;
-    let content = sim.0.content();
+    let content = sim.content();
     commands.entity(*root).despawn_related::<Children>();
     commands.entity(*root).with_children(|c| {
         c.spawn((label("~/jira - Sprint backlog", 12.0), TextColor(ACCENT)));
@@ -806,7 +805,7 @@ fn update_tracker(
             let Some(def) = content.quest(&q.id) else {
                 continue;
             };
-            let ready = sim.0.quest_status(&q.id) == QuestStatus::Ready;
+            let ready = sim.quest_status(&q.id) == QuestStatus::Ready;
             text(
                 c,
                 def.name.clone(),
@@ -854,13 +853,13 @@ fn update_tracker(
 
 fn quest_events(
     time: Res<Time>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut events: MessageReader<CombatEvent>,
     mut banners: MessageWriter<Banner>,
     mut shown: ResMut<Shown>,
     mut toast: Single<(&mut Text, &mut TextColor), With<ProgressToast>>,
 ) {
-    let content = sim.0.content();
+    let content = sim.content();
     let (toast_text, toast_color) = &mut *toast;
     for CombatEvent(ev) in events.read() {
         match ev {
@@ -932,6 +931,7 @@ fn trophy_hint(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use combat_core::Sim;
 
     fn sim() -> Sim {
         match crate::combat::new_sim() {

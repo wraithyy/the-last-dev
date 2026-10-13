@@ -29,13 +29,15 @@ pub use content::{
 };
 pub use floors::pack_offsets;
 pub use geom::{Aabb, Vec3, distance, forward, in_range, is_facing, line_of_sight};
+pub use progression::GROUP_SHARE_RANGE_M;
 pub use quests::{ActiveQuest, GIVER_REACH_SLACK_M, QuestLog, QuestStatus};
-pub use sim::Sim;
+pub use sim::{MAX_PLAYERS, Sim};
 pub use targeting::{
     EntityId, TAB_TARGET_RANGE, TargetCandidate, TargetError, tab_target, validate_target,
 };
 pub use time::{FixedStepper, TICK_HZ, Tick, ms_to_ticks, ticks_to_ms};
 pub use types::{
-    AiState, AuraEnd, AuraView, CastError, CastView, Command, CooldownView, Event, UnitState,
+    AiState, Audience, AuraEnd, AuraView, CastError, CastView, Command, CooldownView, Event,
+    UnitState,
 };
 pub use zones::{TRASH_RESPAWN_MS, ZoneLinkView};

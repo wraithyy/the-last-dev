@@ -6,8 +6,8 @@ use super::{
     PANEL_EDGE, asset_key, drop_shadow, fmt_secs, gloss, label, panel_bg, set_text, vgrad,
 };
 use crate::combat::{
-    CombatSim, PendingCommands, SimReady, SimUnit, UiNotice, can_act, cast_coffee_break, cast_slot,
-    toggle_auto_attack,
+    PendingCommands, SimRead, SimReady, SimUnit, SimView, UiNotice, can_act, cast_coffee_break,
+    cast_slot, toggle_auto_attack,
 };
 use crate::config::*;
 use crate::copy;
@@ -579,24 +579,24 @@ fn accent_key<R: Bundle, B: Bundle, I: Bundle, G: Bundle, F: Bundle>(
 fn click_slots(
     paused: Res<Paused>,
     flow: Res<GameFlow>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut pending: ResMut<PendingCommands>,
     player: Single<&SimUnit, With<Player>>,
     slots: Query<(&Slot, &Interaction), Changed<Interaction>>,
 ) {
-    if paused.0 || !can_act(&sim.0, &flow, player.0) {
+    if paused.0 || !can_act(&*sim, &flow, player.0) {
         return;
     }
     for (Slot(i), interaction) in &slots {
         if *interaction == Interaction::Pressed {
-            cast_slot(&sim.0, &mut pending, player.0, *i);
+            cast_slot(&*sim, &mut pending, player.0, *i);
         }
     }
 }
 
 fn click_attack(
     paused: Res<Paused>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     target: Res<Target>,
     mut pending: ResMut<PendingCommands>,
     mut notices: MessageWriter<UiNotice>,
@@ -605,7 +605,7 @@ fn click_attack(
 ) {
     if !paused.0 && **button == Interaction::Pressed {
         toggle_auto_attack(
-            &sim.0,
+            &*sim,
             &mut pending,
             &mut notices,
             player.0,
@@ -617,7 +617,7 @@ fn click_attack(
 /// The keycap rim flashes while auto attack is on; the thin bar shows the swing timer.
 fn update_attack(
     time: Res<Time>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     assets: Res<AssetServer>,
     mut icons: ResMut<IconCache>,
     player: Single<&SimUnit, With<Player>>,
@@ -634,7 +634,7 @@ fn update_attack(
     if icon.image != handle {
         icon.image = handle;
     }
-    let state = sim.0.unit(player.0);
+    let state = sim.unit(player.0);
     let on = state.is_some_and(|u| u.auto_attack);
     let k = 0.5 + 0.5 * (time.elapsed_secs() * 7.0).sin();
     let (interaction, border, node) = &mut *button;
@@ -660,7 +660,7 @@ fn update_attack(
         Interaction::None => Color::NONE,
     };
     let swing_ms = state
-        .and_then(|u| sim.0.content().unit_def(&u.key))
+        .and_then(|u| sim.content().unit_def(&u.key))
         .and_then(|d| d.auto_attack.as_ref())
         .map_or(0, |a| a.swing_ms);
     swing.width = match state {
@@ -675,20 +675,20 @@ fn update_attack(
 fn click_coffee(
     paused: Res<Paused>,
     flow: Res<GameFlow>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut pending: ResMut<PendingCommands>,
     player: Single<&SimUnit, With<Player>>,
     button: Single<&Interaction, (With<CoffeeButton>, Changed<Interaction>)>,
 ) {
-    if !paused.0 && **button == Interaction::Pressed && can_act(&sim.0, &flow, player.0) {
-        cast_coffee_break(&sim.0, &mut pending, player.0);
+    if !paused.0 && **button == Interaction::Pressed && can_act(&*sim, &flow, player.0) {
+        cast_coffee_break(&*sim, &mut pending, player.0);
     }
 }
 
 /// The rim glows while sipping; the icon greys out while the break cannot be taken.
 fn update_coffee(
     time: Res<Time>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     assets: Res<AssetServer>,
     mut icons: ResMut<IconCache>,
     player: Single<&SimUnit, With<Player>>,
@@ -701,16 +701,15 @@ fn update_coffee(
     mut glow: Single<&mut BackgroundColor, With<CoffeeGlow>>,
     mut gauge: Single<&mut Node, (With<CoffeeGauge>, Without<CoffeeButton>)>,
 ) {
-    let Some(spell) = sim.0.content().channel_spell() else {
+    let Some(spell) = sim.content().channel_spell() else {
         return;
     };
     let handle = icons.get(&assets, &spell.icon);
     if icon.image != handle {
         icon.image = handle;
     }
-    let view = sim.0.cooldown(player.0, spell.id);
+    let view = sim.cooldown(player.0, spell.id);
     let channel = sim
-        .0
         .unit(player.0)
         .and_then(|u| u.cast)
         .filter(|c| c.spell == spell.id);
@@ -770,7 +769,7 @@ struct SlotView {
 }
 
 fn update_slots(
-    sim: Res<CombatSim>,
+    sim: SimView,
     flow: Res<GameFlow>,
     keys: Res<ButtonInput<KeyCode>>,
     assets: Res<AssetServer>,
@@ -789,16 +788,16 @@ fn update_slots(
     mut texts: Query<(&SlotPart, &mut Text)>,
 ) {
     let me = player.0;
-    let bar = sim.0.content().action_bar();
-    let known = sim.0.known_spells(me);
-    let able = can_act(&sim.0, &flow, me);
-    let casting = sim.0.unit(me).and_then(|u| u.cast).map(|c| c.spell);
+    let bar = sim.content().action_bar();
+    let known = sim.known_spells(me);
+    let able = can_act(&*sim, &flow, me);
+    let casting = sim.unit(me).and_then(|u| u.cast).map(|c| c.spell);
     let views: Vec<SlotView> = (0..KEY_LABELS.len())
         .map(|i| {
             let Some(&id) = bar.get(i) else {
                 return SlotView::default();
             };
-            let usable = sim.0.cooldown(me, id).usable.err();
+            let usable = sim.cooldown(me, id).usable.err();
             SlotView {
                 spell: Some(id),
                 learned: known.contains(&id),
@@ -851,7 +850,7 @@ fn update_slots(
             continue;
         }
         let v = view(*i);
-        match v.spell.and_then(|id| sim.0.content().spell(id)) {
+        match v.spell.and_then(|id| sim.content().spell(id)) {
             Some(def) if v.learned => {
                 let handle = icons.get(&assets, &def.icon);
                 if img.image != handle {
@@ -895,7 +894,7 @@ fn update_slots(
             }
             Part::Sweep => {
                 let remaining = match v.spell {
-                    Some(id) if v.learned => sweep_fraction(&sim, me, id),
+                    Some(id) if v.learned => sweep_fraction(&*sim, me, id),
                     _ => 0.0,
                 };
                 node.display = if remaining > 0.0 {
@@ -921,7 +920,7 @@ fn update_slots(
         match part {
             Part::Seconds => {
                 let ms = match v.spell {
-                    Some(id) if v.learned => sim.0.cooldown(me, id).cd_remaining_ms,
+                    Some(id) if v.learned => sim.cooldown(me, id).cd_remaining_ms,
                     _ => 0,
                 };
                 set_text(
@@ -933,7 +932,7 @@ fn update_slots(
                 let lv = v
                     .spell
                     .filter(|_| !v.learned)
-                    .and_then(|id| sim.0.content().spell(id))
+                    .and_then(|id| sim.content().spell(id))
                     .map_or_else(String::new, |d| format!("Lv {}", d.learn_level));
                 set_text(&mut text, &lv);
             }
@@ -943,8 +942,8 @@ fn update_slots(
 }
 
 /// The longer of cooldown and GCD drives the sweep; GCD-only shows no number.
-fn sweep_fraction(sim: &CombatSim, me: combat_core::EntityId, spell: SpellId) -> f32 {
-    let v = sim.0.cooldown(me, spell);
+fn sweep_fraction(sim: &dyn SimRead, me: combat_core::EntityId, spell: SpellId) -> f32 {
+    let v = sim.cooldown(me, spell);
     let frac = |rem: u32, total: u32| {
         if total == 0 {
             0.0
@@ -1057,7 +1056,7 @@ fn coffee_tip(d: &SpellDef) -> TipContent {
 }
 
 fn update_tooltip(
-    sim: Res<CombatSim>,
+    sim: SimView,
     player: Single<&SimUnit, With<Player>>,
     forced: Option<Res<DebugHoverSlot>>,
     slots: Query<(&Slot, &Interaction)>,
@@ -1068,7 +1067,7 @@ fn update_tooltip(
     mut names: Query<&mut TextSpan, (With<TipName>, Without<TipSig>)>,
     mut sigs: Query<&mut TextSpan, (With<TipSig>, Without<TipName>)>,
 ) {
-    let content_db = sim.0.content();
+    let content_db = sim.content();
     let hovered_slot = slots
         .iter()
         .find(|(_, it)| **it != Interaction::None)
@@ -1079,7 +1078,7 @@ fn update_tooltip(
     let hovered_attack = **attack != Interaction::None;
     let hovered_coffee = **coffee != Interaction::None;
     let content = if let Some((id, d)) = hovered_slot {
-        if sim.0.known_spells(player.0).contains(&id) {
+        if sim.known_spells(player.0).contains(&id) {
             Some(spell_tip(d, content_db))
         } else {
             // Unlearned: show only the stub, like an unresolved symbol.
@@ -1091,8 +1090,7 @@ fn update_tooltip(
             })
         }
     } else if hovered_attack {
-        sim.0
-            .unit(player.0)
+        sim.unit(player.0)
             .and_then(|u| content_db.unit_def(&u.key))
             .and_then(|d| d.auto_attack.as_ref())
             .map(|a| TipContent {

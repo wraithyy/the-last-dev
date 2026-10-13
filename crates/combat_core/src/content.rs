@@ -1,14 +1,14 @@
 //! Data-driven content: spells, auras, units, levels, zones, quests and balance, parsed from RON.
 
 use crate::time::ms_to_ticks;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct SpellId(pub u32);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum School {
     Physical,
     #[default]
@@ -64,6 +64,13 @@ pub struct Config {
     pub player_yell_cooldown_ms: u32,
     pub mob_scaling: MobScaling,
     pub xp_rules: XpRules,
+    /// Extra enemy max HP per group member beyond the first, in percent (FORMULAS.md).
+    #[serde(default = "default_group_hp_pct")]
+    pub group_hp_pct_per_player: u32,
+}
+
+fn default_group_hp_pct() -> u32 {
+    60
 }
 
 /// Out-of-combat regeneration: every `interval_ms` a living unit that is not in

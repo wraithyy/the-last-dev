@@ -2,12 +2,32 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101216">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
+<meta name="apple-mobile-web-app-title" content="Last Dev">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>The Last Dev</title>
-<link rel="icon" href="data:,">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #101216; color: #ccd; font-family: system-ui, sans-serif; }
-  #bevy { display: block; width: 100%; height: 100%; outline: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #101216; color: #ccd; font-family: system-ui, sans-serif;
+    overscroll-behavior: none; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent; }
+  /* Padding keeps the game (and its HUD) out of notches and rounded corners. */
+  body { box-sizing: border-box; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #bevy { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+  #rotate { display: none; position: fixed; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    padding: 6px 14px; border-radius: 16px; background: rgba(16, 18, 22, .85); border: 1px solid #5cd1db; color: #5cd1db;
+    font-size: 13px; white-space: nowrap; pointer-events: none; z-index: 5; }
+  @media (orientation: portrait) and (pointer: coarse) { #rotate { display: block; } }
+  #toast { position: fixed; left: 50%; top: calc(12px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 10;
+    padding: 8px 12px; border-radius: 8px; background: #20242e; border: 1px solid #5cd1db; color: #ccd; font-size: 14px;
+    display: flex; align-items: center; gap: 12px; }
+  #toast[hidden] { display: none; }
+  #toast button { font: inherit; padding: 4px 10px; border-radius: 6px; border: 1px solid #5cd1db; background: #5cd1db; color: #101216; cursor: pointer; }
   #status { position: fixed; top: 12px; left: 12px; font-size: 14px; opacity: .8; white-space: pre-wrap; pointer-events: none; }
   #tip { position: fixed; top: 38px; left: 12px; font-size: 13px; font-style: italic; opacity: .6; max-width: 70ch; pointer-events: none; }
   #status.error { color: #ff8080; opacity: 1; font-size: 16px; max-width: 80ch; }
@@ -17,6 +37,8 @@
 <canvas id="bevy" tabindex="0"></canvas>
 <div id="status">Loading…</div>
 <div id="tip"></div>
+<div id="rotate">Rotate your phone for the best view</div>
+<div id="toast" hidden><span>New sprint available.</span><button id="reload" type="button">Reload</button></div>
 <script>
 // The wasm audio backend opens its AudioContext at startup, before any gesture, and browsers keep it
 // suspended until then. Track every context and resume them on the first gesture.
@@ -61,6 +83,9 @@ const fail = (msg) => {
   status.hidden = false;
 };
 const isControlFlow = (e) => String((e && (e.message || e)) || '').includes(CONTROL_FLOW);
+
+// iOS Safari ignores touch-action for pinch; these events are its only off switch.
+['gesturestart', 'gesturechange', 'gestureend'].forEach((n) => document.addEventListener(n, (e) => e.preventDefault()));
 
 // Right-drag camera needs the native menu off; keys/wheel must not scroll or move focus.
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -117,6 +142,36 @@ if (!document.createElement('canvas').getContext('webgl2')) {
     if (isControlFlow(e)) { status.hidden = true; hideTips(); }
     else fail('Failed to start the game: ' + (e && e.message || e) + '\nDid you run scripts/build-web.sh?');
   }
+}
+</script>
+<script>
+// Offline cache + update prompt. A new build waits until the player agrees, never swaps mid-game.
+if ('serviceWorker' in navigator) {
+  const toast = document.getElementById('toast');
+  const offerReload = (worker) => {
+    toast.hidden = false;
+    document.getElementById('reload').onclick = () => worker.postMessage('skip-waiting');
+  };
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      // First install has no controller yet; only an update (a controlled page) gets the toast.
+      if (reg.waiting && navigator.serviceWorker.controller) offerReload(reg.waiting);
+      reg.addEventListener('updatefound', () => {
+        const w = reg.installing;
+        if (!w) return;
+        w.addEventListener('statechange', () => {
+          if (w.state === 'installed' && navigator.serviceWorker.controller) offerReload(w);
+        });
+      });
+      setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
+    }).catch((e) => console.warn('Service worker unavailable (needs https or localhost):', e));
+  });
 }
 </script>
 </body>

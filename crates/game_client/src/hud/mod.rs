@@ -11,7 +11,7 @@ mod map;
 mod quests;
 mod trophies;
 
-use crate::combat::{CombatSim, SimReady};
+use crate::combat::{SimReady, SimView};
 use crate::input::Paused;
 use crate::targeting::TargetInfo;
 use bevy::prelude::*;
@@ -19,7 +19,7 @@ use std::collections::HashMap;
 
 pub use actionbar::CooldownMaterial;
 pub use banners::Banner;
-pub use feed::LogLineMsg;
+pub use feed::{CombatLogRoot, LogLineMsg};
 pub use quests::giver_mark;
 
 /// Terminal cyan: focus, hover and "active" states across the HUD.
@@ -345,8 +345,13 @@ struct DevText;
 #[derive(Resource, Default)]
 struct DevOverlay(bool);
 
+/// Keyboard cheat sheet along the top edge; hidden on touch layouts.
+#[derive(Component)]
+pub struct KeyHint;
+
 fn spawn_misc(mut commands: Commands) {
     commands.spawn((
+        KeyHint,
         Node {
             position_type: PositionType::Absolute,
             top: px(4),
@@ -412,7 +417,7 @@ fn toggle_dev(keys: Res<ButtonInput<KeyCode>>, mut dev: ResMut<DevOverlay>) {
 /// Phase-1 geometry readout (range / facing / line of sight), kept for debugging only.
 fn update_dev_overlay(
     dev: Res<DevOverlay>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     info: Res<TargetInfo>,
     mut text: Single<(&mut Node, &mut Text), With<DevText>>,
 ) {
@@ -425,14 +430,14 @@ fn update_dev_overlay(
     let line = match &info.0 {
         Some(t) => format!(
             "tick {:?}\ntarget {:.1} m (spell range {:.0} m)\nrange {}  facing {}  LoS {}",
-            sim.0.now(),
+            sim.now(),
             t.distance,
             t.spell_range,
             yn(t.in_range),
             yn(t.facing),
             yn(t.line_of_sight),
         ),
-        None => format!("tick {:?}\nno target", sim.0.now()),
+        None => format!("tick {:?}\nno target", sim.now()),
     };
     set_text(text, &line);
 }

@@ -4,7 +4,7 @@ use super::{
     ACCENT_WARM, BAR_BG, DIM, HP_GREEN, IconCache, MANA_BLUE, PANEL_BOTTOM, PANEL_EDGE, PANEL_TOP,
     fmt_secs, gloss, label, set_text, vgrad,
 };
-use crate::combat::{CombatEvent, CombatSim, SimReady, SimUnit};
+use crate::combat::{CombatEvent, SimRead, SimReady, SimUnit, SimView};
 use crate::config::*;
 use crate::copy;
 use crate::player::Player;
@@ -610,12 +610,12 @@ fn spawn_frames(mut commands: Commands, assets: Res<AssetServer>, mut icons: Res
 
 fn tracked(
     who: Who,
-    sim: &CombatSim,
+    sim: &dyn SimRead,
     target: &Target,
     units: &Query<&SimUnit>,
 ) -> Option<EntityId> {
     match who {
-        Who::Player => sim.0.player(),
+        Who::Player => sim.player(),
         Who::Target => target.0.and_then(|e| units.get(e).ok()).map(|s| s.0),
     }
 }
@@ -637,7 +637,7 @@ fn collect_phase_flash(
 }
 
 fn update_frames(
-    sim: Res<CombatSim>,
+    sim: SimView,
     target: Res<Target>,
     time: Res<Time>,
     flash: Res<PhaseFlash>,
@@ -656,7 +656,7 @@ fn update_frames(
     mut tag_texts: Query<(&BossTagText, &mut Text)>,
     mut discs: Query<(&Disc, &mut BackgroundColor, &mut BorderColor)>,
 ) {
-    let state = |who| tracked(who, &sim, &target, &units).and_then(|id| sim.0.unit(id));
+    let state = |who| tracked(who, &*sim, &target, &units).and_then(|id| sim.unit(id));
     let boss = |who| state(who).is_some_and(|u| u.boss || copy::is_elite(&u.key));
     for (BossTagText(who), mut text) in &mut tag_texts {
         let Some(u) = state(*who) else { continue };
@@ -741,8 +741,7 @@ fn update_frames(
             }
             Field::Title => set_text(
                 &mut text,
-                &sim.0
-                    .content()
+                &sim.content()
                     .unit_def(&u.key)
                     .filter(|d| !d.title.is_empty())
                     .map_or_else(String::new, |d| format!("<{}>", d.title)),
@@ -794,16 +793,16 @@ fn update_frames(
 
 fn collect_cast_flash(
     mut events: MessageReader<CombatEvent>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut flash: ResMut<CastFlash>,
     time: Res<Time>,
 ) {
     flash.left = (flash.left - time.delta_secs()).max(0.0);
-    let Some(me) = sim.0.player() else { return };
+    let Some(me) = sim.player() else { return };
     for CombatEvent(ev) in events.read() {
         match ev {
             Event::CastSucceeded { caster, spell, .. } if *caster == me => {
-                if let Some(def) = sim.0.content().spell(*spell)
+                if let Some(def) = sim.content().spell(*spell)
                     && def.cast_ms > 0
                 {
                     flash.text.clone_from(&def.name);
@@ -827,8 +826,8 @@ fn collect_cast_flash(
             _ => {}
         }
     }
-    let casting = sim.0.unit(me).and_then(|u| u.cast);
-    if let Some(def) = casting.and_then(|c| sim.0.content().spell(c.spell))
+    let casting = sim.unit(me).and_then(|u| u.cast);
+    if let Some(def) = casting.and_then(|c| sim.content().spell(c.spell))
         && flash.icon != def.icon
     {
         flash.icon.clone_from(&def.icon);
@@ -847,9 +846,8 @@ struct BarView {
     spark: bool,
 }
 
-fn cast_view(sim: &CombatSim, cast: CastView, remaining_only: bool) -> BarView {
+fn cast_view(sim: &dyn SimRead, cast: CastView, remaining_only: bool) -> BarView {
     let (name, icon) = sim
-        .0
         .content()
         .spell(cast.spell)
         .map_or_else(Default::default, |d| (d.name.clone(), d.icon.clone()));
@@ -875,7 +873,7 @@ fn cast_view(sim: &CombatSim, cast: CastView, remaining_only: bool) -> BarView {
 }
 
 fn update_cast_bars(
-    sim: Res<CombatSim>,
+    sim: SimView,
     target: Res<Target>,
     flash: Res<CastFlash>,
     units: Query<&SimUnit>,
@@ -897,11 +895,11 @@ fn update_cast_bars(
     >,
 ) {
     let view = |who: Who| -> Option<BarView> {
-        let id = tracked(who, &sim, &target, &units)?;
-        let u = sim.0.unit(id)?;
+        let id = tracked(who, &*sim, &target, &units)?;
+        let u = sim.unit(id)?;
         match (u.cast, who) {
-            (Some(c), Who::Player) => Some(cast_view(&sim, c, false)),
-            (Some(c), Who::Target) if u.alive => Some(cast_view(&sim, c, true)),
+            (Some(c), Who::Player) => Some(cast_view(&*sim, c, false)),
+            (Some(c), Who::Target) if u.alive => Some(cast_view(&*sim, c, true)),
             (None, Who::Player) if flash.left > 0.0 => flash.color.map(|color| BarView {
                 fill: 1.0,
                 color,
@@ -973,7 +971,7 @@ fn update_cast_bars(
 }
 
 fn update_auras(
-    sim: Res<CombatSim>,
+    sim: SimView,
     target: Res<Target>,
     units: Query<&SimUnit>,
     assets: Res<AssetServer>,
@@ -986,7 +984,7 @@ fn update_auras(
     let auras_of = |row: Row| -> Vec<AuraView> {
         match row {
             Row::PlayerAuras => {
-                let Some(u) = sim.0.unit(player.0) else {
+                let Some(u) = sim.unit(player.0) else {
                     return Vec::new();
                 };
                 let (mut buffs, debuffs): (Vec<_>, Vec<_>) =
@@ -997,7 +995,7 @@ fn update_auras(
             Row::TargetDebuffs => target
                 .0
                 .and_then(|e| units.get(e).ok())
-                .and_then(|s| sim.0.unit(s.0))
+                .and_then(|s| sim.unit(s.0))
                 .map(|u| u.auras.iter().filter(|a| a.harmful).cloned().collect())
                 .unwrap_or_default(),
         }

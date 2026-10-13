@@ -42,11 +42,13 @@ impl Sim {
         self.load_zone(&format!("tower/{floor}"), anchors, blockers)
     }
 
-    /// Where `RespawnPlayer` puts the player; `load_zone` sets it from the `graveyard` anchor.
+    /// Where `RespawnPlayer` puts each group member; `load_zone` sets it from the `graveyard` anchor.
     pub fn set_respawn_point(&mut self, pos: Vec3, yaw: f32) {
-        if let Some(i) = self.player.and_then(|p| self.index(p)) {
-            self.units[i].spawn_pos = pos;
-            self.units[i].spawn_yaw = yaw;
+        for k in 0..self.players.len() {
+            if let Some(i) = self.index(self.players[k]) {
+                self.units[i].spawn_pos = pos;
+                self.units[i].spawn_yaw = yaw;
+            }
         }
     }
 

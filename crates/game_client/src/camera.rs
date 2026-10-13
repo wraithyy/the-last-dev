@@ -36,6 +36,21 @@ impl OrbitCamera {
         self.pitch = pitch.clamp(-CAM_PITCH_LIMIT, CAM_PITCH_LIMIT);
     }
 
+    pub fn yaw(&self) -> f32 {
+        self.yaw
+    }
+
+    /// Touch drag: same axes as the mouse orbit, in radians.
+    pub fn orbit(&mut self, dyaw: f32, dpitch: f32) {
+        self.yaw += dyaw;
+        self.pitch = (self.pitch + dpitch).clamp(-CAM_PITCH_LIMIT, CAM_PITCH_LIMIT);
+    }
+
+    /// Pinch: `factor` > 1 moves the camera away.
+    pub fn zoom_by(&mut self, factor: f32) {
+        self.zoom = (self.zoom * factor).clamp(CAM_MIN_DIST, CAM_MAX_DIST);
+    }
+
     /// Debug close-ups (`WOW_CAM_DIST`).
     pub fn set_zoom(&mut self, dist: f32) {
         self.zoom = dist.clamp(CAM_MIN_DIST, CAM_MAX_DIST);
@@ -123,6 +138,7 @@ fn wrap_angle(a: f32) -> f32 {
 fn follow_player(
     time: Res<Time>,
     mouse: Res<MouseState>,
+    touch: Res<crate::touch::TouchState>,
     mut input: ResMut<PlayerInput>,
     player: Single<&Transform, With<Player>>,
     mut cam: Single<&mut OrbitCamera>,
@@ -135,7 +151,8 @@ fn follow_player(
     if !mouse.right {
         cam.yaw += input.turn * KEY_TURN_RATE * dt;
     }
-    if input.forward > 0.0 && !mouse.any_button() {
+    // The stick keeps the body facing the camera, so easing back would fight a drag.
+    if input.forward > 0.0 && !mouse.any_button() && !touch.move_active {
         let player_yaw = player.rotation.to_euler(EulerRot::YXZ).0;
         let diff = wrap_angle(player_yaw - cam.yaw);
         cam.yaw += diff * (1.0 - (-CAM_SNAP_BEHIND_RATE * dt).exp());

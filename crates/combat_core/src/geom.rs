@@ -1,5 +1,5 @@
 /// Bevy convention: Y up, yaw rotates about +Y, yaw 0 faces -Z.
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub struct Vec3 {
     pub x: f32,
     pub y: f32,

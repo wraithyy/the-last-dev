@@ -4,6 +4,7 @@
 use crate::content::{Objective, QuestDef};
 use crate::geom::in_range;
 use crate::sim::Sim;
+use crate::targeting::EntityId;
 use crate::types::Event;
 
 /// Quest commands are accepted a little past talk range, so a dialog the client keeps open (it closes
@@ -49,19 +50,27 @@ fn is_ready(def: &QuestDef, q: &ActiveQuest) -> bool {
 }
 
 impl Sim {
-    /// The player's quest log (empty without a player).
+    /// The first player's quest log (empty without a player).
     pub fn quests(&self) -> &QuestLog {
-        self.player
-            .and_then(|p| self.quest_logs.get(&p))
-            .unwrap_or(&EMPTY_LOG)
+        self.quests_of(self.player().unwrap_or(0))
     }
 
-    /// Where the player stands with quest `id`; `Locked` for an unknown id.
+    /// A group member's quest log (empty for anyone else).
+    pub fn quests_of(&self, player: EntityId) -> &QuestLog {
+        self.quest_logs.get(&player).unwrap_or(&EMPTY_LOG)
+    }
+
+    /// Where the first player stands with quest `id`; `Locked` for an unknown id.
     pub fn quest_status(&self, id: &str) -> QuestStatus {
+        self.quest_status_of(self.player().unwrap_or(0), id)
+    }
+
+    /// Where group member `player` stands with quest `id`; `Locked` for an unknown id.
+    pub fn quest_status_of(&self, player: EntityId, id: &str) -> QuestStatus {
         let Some(def) = self.content.quest(id) else {
             return QuestStatus::Locked;
         };
-        let log = self.quests();
+        let log = self.quests_of(player);
         if log.completed.iter().any(|c| c == id) {
             return QuestStatus::Done;
         }
@@ -72,10 +81,7 @@ impl Sim {
                 QuestStatus::Active
             };
         }
-        let level = self
-            .player
-            .and_then(|p| self.unit(p))
-            .map_or(0, |u| u.level);
+        let level = self.unit(player).map_or(0, |u| u.level);
         let chain = def
             .requires
             .as_ref()
@@ -88,8 +94,8 @@ impl Sim {
     }
 
     /// A living player within talk range of a living giver of the quest, in the giver's zone.
-    fn near_giver(&self, def: &QuestDef) -> bool {
-        let Some(p) = self.player.and_then(|p| self.unit(p)).filter(|p| p.alive) else {
+    fn near_giver(&self, player: EntityId, def: &QuestDef) -> bool {
+        let Some(p) = self.unit(player).filter(|p| p.alive) else {
             return false;
         };
         if self.zone() != Some(def.giver.zone.as_str()) {
@@ -101,12 +107,11 @@ impl Sim {
         })
     }
 
-    pub(crate) fn accept_quest(&mut self, id: &str) {
+    pub(crate) fn accept_quest(&mut self, pid: EntityId, id: &str) {
         let Some(def) = self.content.quest(id).cloned() else {
             return;
         };
-        let Some(pid) = self.player else { return };
-        if self.quest_status(id) != QuestStatus::Available || !self.near_giver(&def) {
+        if self.quest_status_of(pid, id) != QuestStatus::Available || !self.near_giver(pid, &def) {
             return;
         }
         // A zone cleared or items carried before accepting count at once (a dead boss stays dead).
@@ -116,7 +121,8 @@ impl Sim {
             .map(|o| match o {
                 Objective::ClearZone(z) if self.world.cleared.contains(z) => 1,
                 Objective::Loot(it, n) => self
-                    .inventory()
+                    .unit(pid)
+                    .map_or(&[][..], |u| &u.inventory)
                     .iter()
                     .find(|(name, _)| name == it)
                     .map_or(0, |(_, c)| (*c).min(*n)),
@@ -129,32 +135,41 @@ impl Sim {
         };
         let ready = is_ready(&def, &q);
         self.quest_logs.entry(pid).or_default().active.push(q);
-        self.events.push(Event::QuestAccepted {
-            quest: id.to_string(),
-        });
-        if ready {
-            self.events.push(Event::QuestReady {
+        self.emit_to(
+            pid,
+            Event::QuestAccepted {
                 quest: id.to_string(),
-            });
+            },
+        );
+        if ready {
+            self.emit_to(
+                pid,
+                Event::QuestReady {
+                    quest: id.to_string(),
+                },
+            );
         }
     }
 
-    pub(crate) fn turn_in_quest(&mut self, id: &str) {
+    pub(crate) fn turn_in_quest(&mut self, pid: EntityId, id: &str) {
         let Some(def) = self.content.quest(id).cloned() else {
             return;
         };
-        let (Some(pid), Some(pi)) = (self.player, self.player.and_then(|p| self.index(p))) else {
+        let Some(pi) = self.index(pid) else {
             return;
         };
-        if self.quest_status(id) != QuestStatus::Ready || !self.near_giver(&def) {
+        if self.quest_status_of(pid, id) != QuestStatus::Ready || !self.near_giver(pid, &def) {
             return;
         }
         let log = self.quest_logs.entry(pid).or_default();
         log.active.retain(|q| q.id != id);
         log.completed.push(id.to_string());
-        self.events.push(Event::QuestCompleted {
-            quest: id.to_string(),
-        });
+        self.emit_to(
+            pid,
+            Event::QuestCompleted {
+                quest: id.to_string(),
+            },
+        );
         if let Some(t) = &def.reward.trophy {
             self.add_trophies(pi, std::slice::from_ref(t));
         }
@@ -162,8 +177,8 @@ impl Sim {
         self.check_unlocks();
     }
 
-    pub(crate) fn abandon_quest(&mut self, id: &str) {
-        if let Some(log) = self.player.and_then(|p| self.quest_logs.get_mut(&p)) {
+    pub(crate) fn abandon_quest(&mut self, pid: EntityId, id: &str) {
+        if let Some(log) = self.quest_logs.get_mut(&pid) {
             log.active.retain(|q| q.id != id);
         }
     }
@@ -172,7 +187,7 @@ impl Sim {
     /// `Done` (completed without reward), ignoring givers, chains and levels; silent. `Available`
     /// or `Locked` drop it from the log. False for an unknown quest or without a player.
     pub fn debug_set_quest(&mut self, id: &str, status: QuestStatus) -> bool {
-        let (Some(def), Some(pid)) = (self.content.quest(id), self.player) else {
+        let (Some(def), Some(pid)) = (self.content.quest(id), self.player()) else {
             return false;
         };
         let full: Vec<u32> = def.objectives.iter().map(Objective::need).collect();
@@ -195,9 +210,9 @@ impl Sim {
         true
     }
 
-    /// Adds one to every matching objective of the player's active quests.
-    pub(crate) fn quest_credit(&mut self, hit: impl Fn(&Objective) -> bool) {
-        let Some(log) = self.player.and_then(|p| self.quest_logs.get_mut(&p)) else {
+    /// Adds one to every matching objective of `pid`'s active quests.
+    pub(crate) fn quest_credit(&mut self, pid: EntityId, hit: impl Fn(&Objective) -> bool) {
+        let Some(log) = self.quest_logs.get_mut(&pid) else {
             return;
         };
         for q in &mut log.active {
@@ -212,6 +227,7 @@ impl Sim {
                     && hit(o)
                 {
                     *c += 1;
+                    self.routed.push((self.events.len(), pid));
                     self.events.push(Event::QuestProgress {
                         quest: q.id.clone(),
                         objective: k,
@@ -221,6 +237,7 @@ impl Sim {
                 }
             }
             if !was_ready && is_ready(def, q) {
+                self.routed.push((self.events.len(), pid));
                 self.events.push(Event::QuestReady {
                     quest: q.id.clone(),
                 });
@@ -228,8 +245,8 @@ impl Sim {
         }
     }
 
-    /// `QuestOffered` for a giver with quests the player can accept or turn in.
-    pub(crate) fn offer_quests(&mut self, npc: usize) {
+    /// `QuestOffered` for a giver with quests `pid` can accept or turn in.
+    pub(crate) fn offer_quests(&mut self, pid: EntityId, npc: usize) {
         let key = &self.units[npc].state.key;
         let quests: Vec<String> = self
             .content
@@ -238,17 +255,15 @@ impl Sim {
             .filter(|q| q.giver.npc == *key)
             .filter(|q| {
                 matches!(
-                    self.quest_status(&q.id),
+                    self.quest_status_of(pid, &q.id),
                     QuestStatus::Available | QuestStatus::Ready
                 )
             })
             .map(|q| q.id.clone())
             .collect();
         if !quests.is_empty() {
-            self.events.push(Event::QuestOffered {
-                npc: Self::id_of(npc),
-                quests,
-            });
+            let npc = Self::id_of(npc);
+            self.emit_to(pid, Event::QuestOffered { npc, quests });
         }
     }
 }

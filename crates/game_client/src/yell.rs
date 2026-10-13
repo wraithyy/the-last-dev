@@ -1,6 +1,6 @@
 //! Speech bubbles for `Event::Yell`: UI nodes pinned above the yelling unit's head.
 
-use crate::combat::{CombatEvent, CombatSim, SimReady, SimUnit};
+use crate::combat::{CombatEvent, SimReady, SimUnit, SimView};
 use crate::config::{BUBBLE_HEAD_GAP, PLAYER_HEIGHT, head_height};
 use crate::copy::yell_color;
 use crate::player::Player;
@@ -70,7 +70,7 @@ fn spawn_bubbles(
     mut commands: Commands,
     mut events: MessageReader<CombatEvent>,
     time: Res<Time>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     units: Query<(Entity, &SimUnit)>,
     old: Query<(Entity, &YellBubble)>,
 ) {
@@ -81,10 +81,10 @@ fn spawn_bubbles(
         let Some((anchor, _)) = units.iter().find(|(_, su)| su.0 == *unit) else {
             continue;
         };
-        let state = sim.0.unit(*unit);
+        let state = sim.unit(*unit);
         let anchor_y = state.map_or(PLAYER_HEIGHT, |u| head_height(&u.key)) + BUBBLE_HEAD_GAP;
         let trim = yell_color(
-            sim.0.player() == Some(*unit),
+            sim.player() == Some(*unit),
             state.is_some_and(|u| u.hostile),
         );
         // Newer yell replaces the older bubble of the same unit (also one from this same frame).
@@ -93,7 +93,7 @@ fn spawn_bubbles(
                 commands.entity(e).despawn();
             }
         }
-        let is_player = sim.0.player() == Some(*unit);
+        let is_player = sim.player() == Some(*unit);
         let boss = state.is_some_and(|u| u.boss);
         let hostile = state.is_some_and(|u| u.hostile);
         let (priority, life) = if boss {

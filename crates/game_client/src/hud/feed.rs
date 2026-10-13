@@ -4,7 +4,7 @@ use super::{
     ACCENT, DIM, IconCache, KEY_RIM, KEY_TOP, KEY_TOP_HI, PANEL_EDGE, drop_shadow, label, panel_bg,
     set_text, vgrad,
 };
-use crate::combat::{CombatEvent, CombatSim, PendingCommands, SimReady, UiNotice};
+use crate::combat::{CombatEvent, PendingCommands, SimRead, SimReady, SimView, UiNotice};
 use crate::config::*;
 use crate::copy;
 use bevy::prelude::*;
@@ -86,9 +86,14 @@ impl Plugin for FeedPlugin {
     }
 }
 
+/// Hidden on touch layouts, where the action bar needs the width.
+#[derive(Component)]
+pub struct CombatLogRoot;
+
 fn spawn_feed(mut commands: Commands) {
     commands
         .spawn((
+            CombatLogRoot,
             Node {
                 position_type: PositionType::Absolute,
                 left: px(12),
@@ -298,24 +303,23 @@ fn spawn_feed(mut commands: Commands) {
         });
 }
 
-fn who(sim: &CombatSim, id: EntityId) -> String {
-    if sim.0.player() == Some(id) {
+fn who(sim: &dyn SimRead, id: EntityId) -> String {
+    if sim.player() == Some(id) {
         "you".into()
     } else {
-        sim.0
-            .unit(id)
+        sim.unit(id)
             .map_or_else(|| "something".into(), |u| u.name.clone())
     }
 }
 
 /// "You" / "CEO" at the start of a sentence.
-fn subject(sim: &CombatSim, id: EntityId) -> String {
+fn subject(sim: &dyn SimRead, id: EntityId) -> String {
     let w = who(sim, id);
     if w == "you" { "You".into() } else { w }
 }
 
-fn possessive(sim: &CombatSim, id: EntityId) -> String {
-    if sim.0.player() == Some(id) {
+fn possessive(sim: &dyn SimRead, id: EntityId) -> String {
+    if sim.player() == Some(id) {
         "Your".into()
     } else {
         format!("{}'s", who(sim, id))
@@ -324,25 +328,22 @@ fn possessive(sim: &CombatSim, id: EntityId) -> String {
 
 const QUEST_YELLOW: Color = Color::srgb(1.0, 0.85, 0.35);
 
-fn quest_name(sim: &CombatSim, id: &str) -> String {
-    sim.0
-        .content()
+fn quest_name(sim: &dyn SimRead, id: &str) -> String {
+    sim.content()
         .quest(id)
         .map_or_else(|| id.to_string(), |q| q.name.clone())
 }
 
-fn spell_name(sim: &CombatSim, id: combat_core::SpellId) -> String {
-    sim.0
-        .content()
+fn spell_name(sim: &dyn SimRead, id: combat_core::SpellId) -> String {
+    sim.content()
         .spell(id)
         .map_or_else(|| "a spell".into(), |d| d.name.clone())
 }
 
 /// "Nitpick" for the player; sim data is the source of truth for the name.
-fn auto_attack_name(sim: &CombatSim, id: EntityId) -> String {
-    sim.0
-        .unit(id)
-        .and_then(|u| sim.0.content().unit_def(&u.key))
+fn auto_attack_name(sim: &dyn SimRead, id: EntityId) -> String {
+    sim.unit(id)
+        .and_then(|u| sim.content().unit_def(&u.key))
         .and_then(|d| d.auto_attack.as_ref())
         .map_or_else(|| "attack".into(), |a| a.name.clone())
 }
@@ -354,9 +355,8 @@ fn school_name(s: School) -> &'static str {
     }
 }
 
-fn aura_name(sim: &CombatSim, target: EntityId, key: &str) -> String {
-    sim.0
-        .unit(target)
+fn aura_name(sim: &dyn SimRead, target: EntityId, key: &str) -> String {
+    sim.unit(target)
         .and_then(|u| {
             u.auras
                 .iter()
@@ -376,7 +376,7 @@ fn collect_events(
     mut events: MessageReader<CombatEvent>,
     mut notices: MessageReader<UiNotice>,
     mut extra: MessageReader<LogLineMsg>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut log: ResMut<CombatLog>,
     mut banner: ResMut<ErrorBanner>,
     mut loot: ResMut<LootState>,
@@ -385,8 +385,8 @@ fn collect_events(
     // Mana ticks of the running Coffee Break, reported once as a single line.
     mut coffee_mana: Local<u32>,
 ) {
-    let me = sim.0.player();
-    let coffee = sim.0.content().channel_spell().map(|s| s.id);
+    let me = sim.player();
+    let coffee = sim.content().channel_spell().map(|s| s.id);
     let mut push = |text: String, color: Color| {
         // Identical consecutive lines collapse into one with a repeat count.
         if last.1 > 0
@@ -427,20 +427,20 @@ fn collect_events(
                 let victim = if taken {
                     "you".to_string()
                 } else {
-                    who(&sim, *target)
+                    who(&*sim, *target)
                 };
                 let mut line = match spell {
                     Some(s) => format!(
                         "{} {} {verb} {victim} for {amount} {}.",
-                        possessive(&sim, *source),
-                        spell_name(&sim, *s),
+                        possessive(&*sim, *source),
+                        spell_name(&*sim, *s),
                         school_name(*school),
                     ),
                     None if Some(*source) == me => format!(
                         "Your {} {verb} {victim} for {amount}.",
-                        auto_attack_name(&sim, *source)
+                        auto_attack_name(&*sim, *source)
                     ),
-                    None => format!("{} {verb} {victim} for {amount}.", subject(&sim, *source)),
+                    None => format!("{} {verb} {victim} for {amount}.", subject(&*sim, *source)),
                 };
                 if *absorbed > 0 {
                     line.push_str(&format!(" ({absorbed} absorbed)"));
@@ -465,29 +465,29 @@ fn collect_events(
                 let line = match spell {
                     Some(s) if Some(*target) == me => format!(
                         "You resist {} {}.",
-                        possessive(&sim, *source),
-                        spell_name(&sim, *s)
+                        possessive(&*sim, *source),
+                        spell_name(&*sim, *s)
                     ),
                     Some(s) if Some(*source) == me => format!(
                         "{} resists your {}.",
-                        who(&sim, *target),
-                        spell_name(&sim, *s)
+                        who(&*sim, *target),
+                        spell_name(&*sim, *s)
                     ),
                     Some(s) => format!(
                         "{} resists {} {}.",
-                        who(&sim, *target),
-                        possessive(&sim, *source),
-                        spell_name(&sim, *s)
+                        who(&*sim, *target),
+                        possessive(&*sim, *source),
+                        spell_name(&*sim, *s)
                     ),
                     None if Some(*source) == me => format!(
                         "Your {} misses {}.",
-                        auto_attack_name(&sim, *source),
-                        who(&sim, *target)
+                        auto_attack_name(&*sim, *source),
+                        who(&*sim, *target)
                     ),
                     None => format!(
                         "{} attack misses {}.",
-                        possessive(&sim, *source),
-                        who(&sim, *target)
+                        possessive(&*sim, *source),
+                        who(&*sim, *target)
                     ),
                 };
                 push(line, Color::srgb(0.8, 0.8, 0.85));
@@ -517,20 +517,20 @@ fn collect_events(
             Event::CastStarted { caster, spell, .. } if Some(*caster) != me => push(
                 format!(
                     "{} begins to cast {}.",
-                    subject(&sim, *caster),
-                    spell_name(&sim, *spell)
+                    subject(&*sim, *caster),
+                    spell_name(&*sim, *spell)
                 ),
                 Color::srgb(0.85, 0.7, 1.0),
             ),
             Event::CastInterrupted {
                 caster, spell, by, ..
             } => {
-                let by = by.map_or(String::new(), |b| format!(" by {}", who(&sim, b)));
+                let by = by.map_or(String::new(), |b| format!(" by {}", who(&*sim, b)));
                 push(
                     format!(
                         "{} {} is interrupted{by}.",
-                        possessive(&sim, *caster),
-                        spell_name(&sim, *spell)
+                        possessive(&*sim, *caster),
+                        spell_name(&*sim, *spell)
                     ),
                     Color::srgb(1.0, 0.85, 0.2),
                 );
@@ -540,13 +540,13 @@ fn collect_events(
                 banner.left = ERROR_TEXT_SECS;
             }
             Event::AuraApplied { target, key } => {
-                let name = aura_name(&sim, *target, key);
-                let harmful = sim.0.content().aura(key).is_none_or(|a| a.harmful);
+                let name = aura_name(&*sim, *target, key);
+                let harmful = sim.content().aura(key).is_none_or(|a| a.harmful);
                 let line = match (Some(*target) == me, harmful) {
                     (true, true) => format!("You are afflicted by {name}."),
                     (true, false) => format!("You gain {name}."),
-                    (false, true) => format!("{} is afflicted by {name}.", who(&sim, *target)),
-                    (false, false) => format!("{} gains {name}.", who(&sim, *target)),
+                    (false, true) => format!("{} is afflicted by {name}.", who(&*sim, *target)),
+                    (false, false) => format!("{} gains {name}.", who(&*sim, *target)),
                 };
                 push(line, Color::srgb(0.6, 0.85, 1.0));
             }
@@ -555,7 +555,7 @@ fn collect_events(
                 key,
                 reason,
             } => {
-                let name = aura_name(&sim, *target, key);
+                let name = aura_name(&*sim, *target, key);
                 let how = match reason {
                     AuraEnd::Expired => "fades from",
                     AuraEnd::Consumed => "is consumed on",
@@ -563,7 +563,7 @@ fn collect_events(
                     AuraEnd::Death => "ends on",
                 };
                 push(
-                    format!("{name} {how} {}.", who(&sim, *target)),
+                    format!("{name} {how} {}.", who(&*sim, *target)),
                     Color::srgb(0.6, 0.7, 0.8),
                 );
             }
@@ -571,7 +571,7 @@ fn collect_events(
                 if Some(*unit) == me {
                     "You die.".to_string()
                 } else {
-                    format!("{} dies.", who(&sim, *unit))
+                    format!("{} dies.", who(&*sim, *unit))
                 },
                 Color::srgb(0.9, 0.9, 0.9),
             ),
@@ -585,7 +585,7 @@ fn collect_events(
             }
             Event::Yell { unit, text } => {
                 // "you" would read oddly in "<name> yells", so use the unit's own name.
-                let (name, hostile) = sim.0.unit(*unit).map_or_else(
+                let (name, hostile) = sim.unit(*unit).map_or_else(
                     || ("Someone".to_string(), false),
                     |u| (u.name.clone(), u.hostile),
                 );
@@ -601,11 +601,11 @@ fn collect_events(
                 amount,
             } if *amount > 0 => {
                 let by = match spell {
-                    Some(s) => format!("{} {}", possessive(&sim, *source), spell_name(&sim, *s)),
-                    None => subject(&sim, *source),
+                    Some(s) => format!("{} {}", possessive(&*sim, *source), spell_name(&*sim, *s)),
+                    None => subject(&*sim, *source),
                 };
                 push(
-                    format!("{by} heals {} for {amount}.", who(&sim, *target)),
+                    format!("{by} heals {} for {amount}.", who(&*sim, *target)),
                     Color::srgb(0.4, 1.0, 0.45),
                 );
             }
@@ -613,19 +613,23 @@ fn collect_events(
                 push(copy::level_up_line(*level), Color::srgb(1.0, 0.82, 0.3));
             }
             Event::SpellLearned { unit, spell } if Some(*unit) == me => push(
-                format!("You learned {}.", spell_name(&sim, *spell)),
+                format!("You learned {}.", spell_name(&*sim, *spell)),
                 Color::srgb(1.0, 0.9, 0.5),
             ),
             Event::PhaseChanged { unit, phase } => push(
                 if *phase > 1 {
-                    format!("{} enters phase {phase}.", subject(&sim, *unit))
+                    format!("{} enters phase {phase}.", subject(&*sim, *unit))
                 } else {
-                    format!("{} resets to phase 1.", subject(&sim, *unit))
+                    format!("{} resets to phase 1.", subject(&*sim, *unit))
                 },
                 Color::srgb(1.0, 0.55, 0.2),
             ),
             Event::Summoned { unit, summoner } => push(
-                format!("{} summons {}.", subject(&sim, *summoner), who(&sim, *unit)),
+                format!(
+                    "{} summons {}.",
+                    subject(&*sim, *summoner),
+                    who(&*sim, *unit)
+                ),
                 Color::srgb(0.85, 0.7, 1.0),
             ),
             Event::Knockback { unit, .. } if Some(*unit) == me => {
@@ -636,37 +640,34 @@ fn collect_events(
                 Color::srgb(1.0, 0.6, 0.4),
             ),
             Event::ZoneCleared { zone } => push(
-                format!(
-                    "{} cleared.",
-                    crate::game::zone_label(sim.0.content(), zone)
-                ),
+                format!("{} cleared.", crate::game::zone_label(sim.content(), zone)),
                 Color::srgb(0.4, 1.0, 0.5),
             ),
             Event::Unlocked { zone } => push(
                 format!(
                     "Access granted: {}.",
-                    crate::game::zone_label(sim.0.content(), zone)
+                    crate::game::zone_label(sim.content(), zone)
                 ),
                 Color::srgb(1.0, 0.82, 0.3),
             ),
             Event::QuestAccepted { quest } => push(
-                format!("Ticket assigned to you: {}.", quest_name(&sim, quest)),
+                format!("Ticket assigned to you: {}.", quest_name(&*sim, quest)),
                 QUEST_YELLOW,
             ),
             Event::QuestReady { quest } => push(
-                format!("{}: ready for review.", quest_name(&sim, quest)),
+                format!("{}: ready for review.", quest_name(&*sim, quest)),
                 QUEST_YELLOW,
             ),
             Event::QuestCompleted { quest } => push(
-                format!("Ticket closed: {}.", quest_name(&sim, quest)),
+                format!("Ticket closed: {}.", quest_name(&*sim, quest)),
                 QUEST_YELLOW,
             ),
             Event::Looted { looter, items, .. } if Some(*looter) == me => {
                 for item in items {
-                    let Some(def) = sim.0.content().item(item) else {
+                    let Some(def) = sim.content().item(item) else {
                         continue;
                     };
-                    let held = sim.0.inventory().iter().find(|(n, _)| n == item);
+                    let held = sim.inventory().iter().find(|(n, _)| n == item);
                     let capped = held.is_some_and(|(_, c)| *c > ITEM_STACK_CAP);
                     let bonus = if capped {
                         format!("stack cap {ITEM_STACK_CAP} reached")
@@ -721,15 +722,14 @@ fn update_error(
 }
 
 fn update_death(
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut pending: ResMut<PendingCommands>,
     mut panel: Single<&mut Node, With<DeathPanel>>,
     buttons: Query<&Interaction, (With<RespawnButton>, Changed<Interaction>)>,
 ) {
     let dead = sim
-        .0
         .player()
-        .and_then(|id| sim.0.unit(id))
+        .and_then(|id| sim.unit(id))
         .is_some_and(|u| !u.alive);
     panel.display = if dead { Display::Flex } else { Display::None };
     if dead && buttons.iter().any(|i| *i == Interaction::Pressed) {
@@ -741,7 +741,7 @@ fn update_loot(
     mut commands: Commands,
     assets: Res<AssetServer>,
     mut icons: ResMut<IconCache>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut loot: ResMut<LootState>,
     mut window: Single<(Entity, &mut Node), With<LootWindow>>,
     rows: Query<Entity, With<LootRow>>,
@@ -754,7 +754,7 @@ fn update_loot(
             commands.entity(e).despawn();
         }
         for item in &loot.items {
-            let def = sim.0.content().item(item);
+            let def = sim.content().item(item);
             let icon = icons.get(&assets, def.map_or("unknown", |d| d.icon.as_str()));
             let bonus = def.map_or_else(String::new, |d| copy::bonus_text(&d.bonus.totals(1)));
             let desc = def.map_or_else(String::new, |d| d.description.clone());
@@ -809,11 +809,11 @@ fn update_loot(
 }
 
 fn update_xp(
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut fill: Single<&mut Node, With<XpFill>>,
     mut text: Single<&mut Text, With<XpText>>,
 ) {
-    let Some(u) = sim.0.player().and_then(|id| sim.0.unit(id)) else {
+    let Some(u) = sim.player().and_then(|id| sim.unit(id)) else {
         return;
     };
     if u.xp_to_next == 0 {
@@ -852,7 +852,7 @@ fn close_loot_on_restart(
 /// QA hook (`WOW_LOOT_DEMO`): shows the loot window and the matching log lines for three sample items
 /// without a kill, so the layout can be screenshotted when no fight is available. Display only; nothing is granted.
 fn loot_demo(
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut loot: ResMut<LootState>,
     mut lines: MessageWriter<LogLineMsg>,
     mut done: Local<bool>,
@@ -865,7 +865,7 @@ fn loot_demo(
         "Expired GPU Credits",
         "Unread AI Strategy Deck",
     ] {
-        let Some(def) = sim.0.content().item(name) else {
+        let Some(def) = sim.content().item(name) else {
             continue;
         };
         lines.write(LogLineMsg(

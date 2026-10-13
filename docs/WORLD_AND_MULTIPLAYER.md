@@ -170,6 +170,51 @@ per-player:
 - **Determinism:** the server is the only sim, so lockstep is not needed. Determinism remains useful for
   replays and tests.
 
+Implemented in `combat_core` (see COMBAT_API.md, Co-op group, and FORMULAS.md, Co-op group):
+`spawn_player` / `remove_player` / `players()` / `apply_as`, routed events (`tick_routed`), group
+threat and wipe reset, per-member loot rolls, XP split with group bonus, group HP scaling
+(`config.group_hp_pct_per_player`), group zone loads.
+
+### net_proto (wire protocol)
+
+Crate `crates/net_proto`, shared by the server and the client. Dependencies: `combat_core`, `serde`,
+`postcard` (1.1, `use-std`). The combat_core wire types (`Command`, `Event`, `Audience`, `Vec3`,
+`SpellId`, `School`, `CastError`, `AiState`, `AuraEnd`) derive `Serialize`/`Deserialize`.
+
+- **Frame:** `PROTOCOL_VERSION` (u16 LE) + one postcard message, at most `MAX_FRAME_BYTES` (64 KiB),
+  one binary WebSocket message per frame. `encode(&msg) -> Result<Vec<u8>, ProtoError>`,
+  `decode::<ClientMsg | ServerMsg>(&[u8]) -> Result<_, ProtoError>`: size, version, trailing bytes,
+  then message validation. Random bytes never panic (tested).
+- **ClientMsg:** `Hello { version, name }` (must come first, within `HELLO_DEADLINE_MS` = 5 s),
+  `CreateRoom`, `JoinRoom { code }`, `LeaveRoom`, `Cmd(Command)`, `Move { pos, facing, moving,
+  jumping, seq }`, `Emote(Emote)`, `Ping { t }`. `Cmd` accepts only `is_player_command` (no
+  `PlayerMoved`, quest ids up to 64 bytes); debug hooks are `Sim` methods and unreachable. The server
+  applies commands with `Sim::apply_as`, which rebinds the actor to the sender. Non-finite floats in
+  `Move` are rejected.
+- **ServerMsg:** `Welcome { you, room, zone, seed, players }`, `RoomCreated { code }`,
+  `Error { kind, text }`, `PlayerJoined(PlayerInfo)`, `PlayerLeft { id }`, `Events { tick, events }`
+  (the events whose `Audience` includes the client), `Snapshot { tick, units, players }`,
+  `MoveCorrection { seq, pos }`, `Emoted { player, emote }`, `Pong { t }`. Decoding caps lists
+  (2048 events, 1024 snapshot units, 5 players, 64 loot items / offered quests) and texts (512 bytes)
+  and rejects non-finite floats.
+- **Errors:** `ErrorKind::message()` is the text to send. Unknown room, full room and a malformed code
+  all answer `CannotJoin` ("Cannot join that room."), so the error is not an oracle for guessing
+  codes.
+- **Snapshots:** `UnitSnap { id, key_idx, level, pos_cm: [i32; 3], facing: u8, hp, max_hp, target,
+  flags }`, built with `UnitSnap::from_state`. Centimetre integers and a one-byte facing are 1-3 bytes
+  each as postcard varints instead of 4 per f32; enough for drift correction. Auras and cast bars come
+  from `Events`. `PlayerSnap { id, mana, max_mana, xp, xp_to_next }` for party frames.
+- **Display names:** `sanitize_name(raw, n)`: trimmed, 2-16 ASCII letters, digits, space, `-`, `_`;
+  anything else becomes `Intern-<n>`.
+- **Room codes:** `FIRST-SECOND-XXXXXXXX`, e.g. `MERGE-CONFLICT-7K3M9QZA`: two satirical words
+  (flavour, 8 bits) plus 8 Crockford base32 symbols (no I/L/O/U, 40 bits).
+  `room_code_from_bytes(&[u8; 10])` takes OS randomness from the server; there is no seeded code
+  generator. `parse_room_code` is case-insensitive, ignores dashes and spaces, folds O to 0 and I/L to
+  1, and returns the canonical form.
+- **Emotes:** `Emote` (`/sync`, `/circle back`, `/per my last email`, `/lgtm`, `/+1`, `/this could
+  have been an email`, `/take this offline`, `/no bandwidth`, `/blocked`, `/ship it`) with
+  `command()`, `text()` and `from_command()`. No free text on the wire.
+
 ### Hosting and operations
 
 - **Hosting:**

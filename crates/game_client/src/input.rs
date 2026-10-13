@@ -9,6 +9,10 @@ use bevy::window::{CursorGrabMode, CursorOptions, WindowFocused};
 #[derive(Resource, Default)]
 pub struct Paused(pub bool);
 
+/// True while a text field (the `~/coop` lobby) owns the keyboard; gameplay keys must not fire.
+#[derive(Resource, Default)]
+pub struct TextFocus(pub bool);
+
 /// The `~/trophies` window (B). Lives here so Esc can close it before it opens the pause menu.
 #[derive(Resource, Default)]
 pub struct TrophiesOpen(pub bool);
@@ -81,6 +85,7 @@ pub struct InputPlugin;
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Paused>()
+            .init_resource::<TextFocus>()
             .init_resource::<TrophiesOpen>()
             .init_resource::<QuestWindows>()
             .init_resource::<PlayerInput>()
@@ -142,14 +147,15 @@ fn track_mouse(
     }
 }
 
-fn collect_input(
+pub(crate) fn collect_input(
     keys: Res<ButtonInput<KeyCode>>,
     motion: Res<AccumulatedMouseMotion>,
     mouse: Res<MouseState>,
     paused: Res<Paused>,
+    text_focus: Res<TextFocus>,
     mut input: ResMut<PlayerInput>,
 ) {
-    if paused.0 {
+    if paused.0 || text_focus.0 {
         *input = PlayerInput::default();
         return;
     }

@@ -9,7 +9,7 @@
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
-use crate::combat::{CombatEvent, CombatSim, SimReady};
+use crate::combat::{CombatEvent, SimRead, SimReady, SimView};
 use crate::game::GameFlow;
 use crate::hud::{KEY_RIM, KEY_TOP, KEY_TOP_HI, label, set_text, vgrad};
 use crate::input::{Paused, TrophiesOpen};
@@ -17,7 +17,7 @@ use crate::presentation::PresentEvent;
 use bevy::audio::Volume;
 use bevy::input::touch::Touches;
 use bevy::prelude::*;
-use combat_core::{CastError, Content, Effect, EntityId, Event, Sim, SpellId, distance};
+use combat_core::{CastError, Content, Effect, EntityId, Event, SpellId, distance};
 use std::collections::HashMap;
 
 /// Sound effects farther than this from the player are inaudible.
@@ -586,7 +586,7 @@ fn ui_sfx(
 }
 
 /// 1 at the player, fading to 0 at `HEARD_M`; quadratic so far sounds die off quickly.
-fn falloff(sim: &Sim, player: EntityId, unit: EntityId) -> f32 {
+fn falloff(sim: &dyn SimRead, player: EntityId, unit: EntityId) -> f32 {
     if unit == player {
         return 1.0;
     }
@@ -610,11 +610,11 @@ fn is_periodic(content: &Content, spell: Option<SpellId>) -> bool {
 fn combat_sfx(
     mut events: MessageReader<CombatEvent>,
     mut present: MessageReader<PresentEvent>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut out: MessageWriter<Sfx>,
     mut first_floor: Local<bool>,
 ) {
-    let sim = &sim.0;
+    let sim = &*sim;
     let Some(player) = sim.player() else {
         return;
     };
@@ -798,7 +798,7 @@ fn play_sfx(
 }
 
 /// Exploration loop on floors, boss loop while a boss is fighting, nothing on the victory screen.
-fn mood(flow: &GameFlow, sim: &Sim) -> Mood {
+fn mood(flow: &GameFlow, sim: &dyn SimRead) -> Mood {
     if flow.victory {
         Mood::Silent
     } else if sim.units().any(|u| u.boss && u.alive && u.in_combat) {
@@ -829,7 +829,7 @@ fn drive_music(
     unlocked: Res<Unlocked>,
     settings: Res<AudioSettings>,
     flow: Res<GameFlow>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     bank: Option<Res<Bank>>,
     mut voices: Query<(Entity, &mut MusicVoice, Option<&mut AudioSink>)>,
     mut commands: Commands,
@@ -837,7 +837,7 @@ fn drive_music(
     let Some(bank) = bank.filter(|_| unlocked.0) else {
         return;
     };
-    let mood = mood(&flow, &sim.0);
+    let mood = mood(&flow, &*sim);
     let step = time.delta_secs() / CROSSFADE_SECS;
     for t in TRACKS {
         let want = wants(t.track, mood);

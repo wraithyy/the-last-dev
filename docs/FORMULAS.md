@@ -132,7 +132,31 @@ M <  P : d = P - M
          else                     : xp = reward * (100 - 20 * d) / 100   // -20% per level below
 ```
 
-Only the player earns XP (kills by the player's DoTs count). Extra XP carries over; several level-ups from one kill are possible.
+Only players earn XP, and only for kills by a player (DoTs count). Extra XP carries over; several level-ups from one kill are possible.
+
+## Co-op group
+
+Group = every player in the sim (one room, at most `MAX_PLAYERS` = 5).
+
+Kill sharers: the killer plus every other living member within `GROUP_SHARE_RANGE_M` (60 m) of the corpse. XP goes to the living sharers (`n` of them); each computes the kill XP above at its own level, then:
+
+```
+bonus(n) = [100, 100, 116, 130, 140][n - 1]       // classic group bonus, percent
+xp_each  = kill_xp(P_member, M, reward) * bonus(n) / 100 / n
+```
+
+Solo: `xp_each = kill_xp`, unchanged. Same level, reward 120: 2 players 60 each, 3 players 46 each. Sharers also get the quest `Kill` credit (the killer even when dead, as before).
+
+Loot: every member rolls the unit's loot table separately, in join order, whatever their distance; each `LootDropped` and `Looted` goes to that member only. A leaver's unclaimed roll is dropped.
+
+Enemy HP scaling (`config.group_hp_pct_per_player`, default 60):
+
+```
+group_pct = 100 + group_hp_pct_per_player * (players - 1)
+max_hp    = level_scaled_max_hp * group_pct / 100      // hostile AI units only, not friendlies or players
+```
+
+Applied at spawn (zone load, `spawn_unit`, summons) and re-applied to every living enemy when a member joins or leaves, keeping its HP fraction (`hp = hp * new_max / old_max`, at least 1 while alive). Solo is 100% (no change); 5 players is 340%.
 
 Quest rewards add `reward.xp` flat on turn-in: no level-difference adjustment, nothing at the cap, same carry-over and level-up rules as kills.
 

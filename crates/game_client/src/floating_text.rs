@@ -2,7 +2,7 @@
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
-use crate::combat::{CombatEvent, CombatSim, SimReady, SimUnit};
+use crate::combat::{CombatEvent, SimReady, SimUnit, SimView};
 use crate::config::*;
 use crate::player::Player;
 use crate::presentation::PresentEvent;
@@ -82,7 +82,7 @@ fn spawn_texts(
     mut commands: Commands,
     mut raw: MessageReader<CombatEvent>,
     mut present: MessageReader<PresentEvent>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     player: Single<&SimUnit, With<Player>>,
     units: Query<(Entity, &SimUnit)>,
     mut counter: Local<usize>,
@@ -131,9 +131,9 @@ fn spawn_texts(
                 ..
             } => {
                 let on_player = *target == player.0;
-                let content = sim.0.content();
+                let content = sim.content();
                 let dot = is_periodic(content, *spell);
-                let execute = sim.0.unit(*target).is_some_and(|u| {
+                let execute = sim.unit(*target).is_some_and(|u| {
                     *amount > 0 && is_execute(content, *spell, u.hp, *amount, u.max_hp)
                 });
                 let stagger = STAGGER[*counter % STAGGER.len()];
@@ -233,11 +233,9 @@ fn spawn_texts(
             continue;
         };
         let fallback = sim
-            .0
             .unit(target)
             .map_or(Vec3::ZERO, |u| Vec3::new(u.pos.x, u.pos.y, u.pos.z));
         let anchor_y = sim
-            .0
             .unit(target)
             .map_or(PLAYER_HEIGHT, |u| head_height(&u.key))
             + FLOAT_TEXT_HEAD_GAP;

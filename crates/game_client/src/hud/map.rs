@@ -3,7 +3,7 @@
 //! graph with each zone's state. Built only while open.
 
 use super::{ACCENT, DIM, PANEL_EDGE, drop_shadow, giver_mark, label, panel_bg, set_text};
-use crate::combat::{CombatSim, SimReady};
+use crate::combat::{SimRead, SimReady, SimView};
 use crate::floors::{FloorLayout, build_zone};
 use crate::game::{GameFlow, lock_reason, zone_label};
 use crate::input::{Paused, QuestWindows};
@@ -11,7 +11,6 @@ use crate::player::Player;
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
-use combat_core::Sim;
 
 const CANVAS_W: f32 = 440.0;
 const CANVAS_H: f32 = 330.0;
@@ -216,8 +215,8 @@ fn rasterise(layout: &FloorLayout) -> (Image, Vec2, f32) {
 }
 
 /// Zone graph from the campus outward: (depth, zone id) in walk order.
-fn zone_tree(sim: &Sim) -> Vec<(usize, String)> {
-    fn walk(sim: &Sim, id: &str, depth: usize, out: &mut Vec<(usize, String)>) {
+fn zone_tree(sim: &dyn SimRead) -> Vec<(usize, String)> {
+    fn walk(sim: &dyn SimRead, id: &str, depth: usize, out: &mut Vec<(usize, String)>) {
         out.push((depth, id.to_string()));
         for l in sim.zone_links(id) {
             if !out.iter().any(|(_, z)| *z == l.to) {
@@ -232,7 +231,7 @@ fn zone_tree(sim: &Sim) -> Vec<(usize, String)> {
 
 /// Open when the player can walk there from the campus through open links; else the reason of
 /// the first gated link into it from a reachable zone (any gated link if none is reachable).
-fn zone_state(sim: &Sim, id: &str, unlock_all: bool) -> Result<(), String> {
+fn zone_state(sim: &dyn SimRead, id: &str, unlock_all: bool) -> Result<(), String> {
     let mut reach = vec!["campus".to_string()];
     let mut i = 0;
     while i < reach.len() {
@@ -289,7 +288,7 @@ fn update_map(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
     paused: Res<Paused>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     flow: Res<GameFlow>,
     mut windows: ResMut<QuestWindows>,
     mut view: ResMut<MapView>,
@@ -314,7 +313,7 @@ fn update_map(
         view.shown.clear();
         return;
     }
-    let content = sim.0.content();
+    let content = sim.content();
     if view.zone != flow.zone {
         let Some(layout) = build_zone(&flow.zone) else {
             return;
@@ -338,7 +337,6 @@ fn update_map(
 
     // Givers, boss and doors: rebuilt only when something on them changes.
     let marks: Vec<(Vec2, &str, Color)> = sim
-        .0
         .units()
         .filter(|u| u.alive)
         .filter_map(|u| {
@@ -346,14 +344,13 @@ fn update_map(
             if u.boss {
                 Some((at, "B", LOCKED))
             } else if !u.hostile {
-                giver_mark(&sim.0, &u.key, &flow.zone).map(|(g, c)| (at, g, c))
+                giver_mark(&*sim, &u.key, &flow.zone).map(|(g, c)| (at, g, c))
             } else {
                 None
             }
         })
         .collect();
     let doors: Vec<(Vec2, String, bool)> = sim
-        .0
         .zone_links(&flow.zone)
         .into_iter()
         .filter_map(|l| {
@@ -366,11 +363,11 @@ fn update_map(
         "{:?}|{:?}|{:?}",
         marks.iter().map(|m| (m.0.round(), m.1)).collect::<Vec<_>>(),
         doors.iter().map(|d| (&d.1, d.2)).collect::<Vec<_>>(),
-        zone_tree(&sim.0)
+        zone_tree(&*sim)
             .iter()
             .map(|(_, z)| (
-                sim.0.zone_cleared(z),
-                zone_state(&sim.0, z, flow.unlock_all).is_ok()
+                sim.zone_cleared(z),
+                zone_state(&*sim, z, flow.unlock_all).is_ok()
             ))
             .collect::<Vec<_>>()
     );
@@ -405,12 +402,12 @@ fn update_map(
     commands.entity(*graph).despawn_related::<Children>();
     commands.entity(*graph).with_children(|g| {
         g.spawn((label("$ tree ~/campus", 12.0), TextColor(ACCENT)));
-        for (depth, z) in zone_tree(&sim.0) {
+        for (depth, z) in zone_tree(&*sim) {
             let here = z == flow.zone;
-            let state = zone_state(&sim.0, &z, flow.unlock_all);
+            let state = zone_state(&*sim, &z, flow.unlock_all);
             let (tag, color) = if here {
                 ("you are here".to_string(), ACCENT)
-            } else if sim.0.zone_cleared(&z) {
+            } else if sim.zone_cleared(&z) {
                 ("cleared".to_string(), OPEN)
             } else {
                 match &state {

@@ -21,6 +21,8 @@ use std::collections::BTreeMap;
 
 /// Friendly ambient chatter is only emitted while the player is this close.
 const AMBIENT_RANGE_M: f32 = 15.0;
+/// Co-op group size cap; `spawn_player` refuses more.
+pub const MAX_PLAYERS: usize = 5;
 /// Minimum gap between two throttled hostile yells across all units.
 const HOSTILE_YELL_GAP_MS: u32 = 2500;
 
@@ -82,7 +84,8 @@ pub(crate) struct Unit {
     pub spell_yell_next: u64,
     pub spell_yell_cursor: BTreeMap<SpellId, usize>,
     pub respawn_at: Option<u64>,
-    pub loot: Vec<String>,
+    /// One roll per group member (`None` when the kill happened with no player in the sim).
+    pub loot: Vec<(Option<EntityId>, Vec<String>)>,
     /// Cached sum of the player's trophy bonuses; zero for everyone else.
     pub item_bonus: ItemTotals,
     /// Highest-priority yell requested this tick (with an explicit line for
@@ -137,9 +140,13 @@ pub struct Sim {
     pub(crate) units: Vec<Unit>,
     pub(crate) blockers: Vec<Aabb>,
     pub(crate) nav: Nav,
-    pub(crate) pending: Vec<Command>,
+    /// `None` acts as the first player at apply time, so `push` before `spawn_player` still works.
+    pub(crate) pending: Vec<(Option<EntityId>, Command)>,
     pub(crate) events: Vec<Event>,
-    pub(crate) player: Option<EntityId>,
+    /// Sparse audience of `events`: (index, recipient) for player-only events; the rest go to all.
+    pub(crate) routed: Vec<(usize, EntityId)>,
+    /// Join order; the first is the local player of the single-player API.
+    pub(crate) players: Vec<EntityId>,
     pub(crate) zone: Option<String>,
     pub(crate) world: World,
     /// Keyed by player id so a second player gets its own log.
@@ -163,7 +170,8 @@ impl Sim {
             nav: Nav::default(),
             pending: Vec::new(),
             events: Vec::new(),
-            player: None,
+            routed: Vec::new(),
+            players: Vec::new(),
             zone: None,
             world: World::default(),
             quest_logs: BTreeMap::new(),
@@ -179,7 +187,12 @@ impl Sim {
         self.rebuild_nav();
     }
 
+    /// Adds a group member at level 1. Returns 0 (never a valid id) once `MAX_PLAYERS` are in.
+    /// Enemy HP is rescaled for the new group size.
     pub fn spawn_player(&mut self, pos: Vec3, yaw: f32) -> EntityId {
+        if self.players.len() >= MAX_PLAYERS {
+            return 0;
+        }
         let key = self.content.config.player_unit.clone();
         let def = self
             .content
@@ -200,12 +213,50 @@ impl Sim {
                 zone_slot: None,
             },
         );
-        self.player = Some(id);
+        self.players.push(id);
         // Re-apply now that the unit is known to be the player (level table stats).
         if let Some(i) = self.index(id) {
             self.apply_level(i, 1);
         }
+        self.rescale_group_hp();
         id
+    }
+
+    /// A player leaves mid-session: the unit despawns (threat on it and targets of it are
+    /// cleared, so enemies switch or evade), its unclaimed loot shares and quest log are dropped
+    /// and enemy HP is rescaled. False for an id that is not a player.
+    pub fn remove_player(&mut self, id: EntityId) -> bool {
+        let Some(i) = self.index(id).filter(|_| self.is_player(id)) else {
+            return false;
+        };
+        self.despawn(i);
+        self.players.retain(|p| *p != id);
+        self.quest_logs.remove(&id);
+        for u in &mut self.units {
+            u.loot.retain(|(owner, _)| *owner != Some(id));
+            if u.state.lootable && u.loot.is_empty() {
+                u.state.lootable = false;
+            }
+        }
+        self.rescale_group_hp();
+        true
+    }
+
+    /// Group members in join order.
+    pub fn players(&self) -> &[EntityId] {
+        &self.players
+    }
+
+    pub(crate) fn is_player(&self, id: EntityId) -> bool {
+        self.players.contains(&id)
+    }
+
+    fn first_player(&self) -> Option<EntityId> {
+        self.players.first().copied()
+    }
+
+    pub(crate) fn first_player_index(&self) -> Option<usize> {
+        self.first_player().and_then(|p| self.index(p))
     }
 
     /// Spawns at the authored level; the unit respawns after `respawn_ms` like before floors existed.
@@ -341,17 +392,42 @@ impl Sim {
         }
     }
 
-    /// Applied at the start of the next tick.
+    /// Applied at the start of the next tick, as the first player (`apply_as`) for the
+    /// player-relative commands; actor ids inside the command are trusted as given.
     pub fn push(&mut self, cmd: Command) {
-        self.pending.push(cmd);
+        self.pending.push((None, cmd));
+    }
+
+    /// Queues `cmd` from group member `player` for the start of the next tick. The actor field
+    /// (`caster`, `unit`, `looter`) is rebound to `player`, so a client can only act as itself.
+    /// Ignored for an id that is not a player.
+    pub fn apply_as(&mut self, player: EntityId, mut cmd: Command) {
+        if !self.is_player(player) {
+            return;
+        }
+        match &mut cmd {
+            Command::SetTarget { unit, .. }
+            | Command::StartAutoAttack { unit }
+            | Command::StopAutoAttack { unit } => *unit = player,
+            Command::Cast { caster, .. } | Command::StopCasting { caster } => *caster = player,
+            Command::Loot { looter, .. } => *looter = player,
+            Command::PlayerMoved { .. }
+            | Command::RespawnPlayer
+            | Command::Talk { .. }
+            | Command::AcceptQuest { .. }
+            | Command::TurnInQuest { .. }
+            | Command::AbandonQuest { .. } => {}
+        }
+        self.pending.push((Some(player), cmd));
     }
 
     pub fn now(&self) -> Tick {
         Tick(self.now)
     }
 
+    /// The first group member (the local player in single-player).
     pub fn player(&self) -> Option<EntityId> {
-        self.player
+        self.first_player()
     }
 
     /// `None` for unknown or despawned units.
@@ -406,10 +482,51 @@ impl Sim {
 
     /// Advance exactly one 1/30 s tick.
     pub fn tick(&mut self) -> Vec<Event> {
+        self.step();
+        self.routed.clear();
+        std::mem::take(&mut self.events)
+    }
+
+    /// `tick` for a server: every event with the group member(s) it is meant for.
+    pub fn tick_routed(&mut self) -> Vec<(Audience, Event)> {
+        self.step();
+        self.drain_events_routed()
+    }
+
+    /// Takes the pending events (also those `load_zone` queued outside a tick) with their
+    /// audience: quest, loot, XP gain, spell learned and own cast failures go to one player.
+    pub fn drain_events_routed(&mut self) -> Vec<(Audience, Event)> {
+        let mut routed = std::mem::take(&mut self.routed).into_iter().peekable();
+        std::mem::take(&mut self.events)
+            .into_iter()
+            .enumerate()
+            .map(|(k, e)| match routed.next_if(|(at, _)| *at == k) {
+                Some((_, p)) => (Audience::Player(p), e),
+                None => (Audience::All, e),
+            })
+            .collect()
+    }
+
+    /// Queues an event for one group member only (see `drain_events_routed`).
+    pub(crate) fn emit_to(&mut self, player: EntityId, e: Event) {
+        self.routed.push((self.events.len(), player));
+        self.events.push(e);
+    }
+
+    /// Player-only when the actor is a group member, broadcast otherwise.
+    pub(crate) fn emit_for(&mut self, unit: EntityId, e: Event) {
+        if self.is_player(unit) {
+            self.emit_to(unit, e);
+        } else {
+            self.events.push(e);
+        }
+    }
+
+    fn step(&mut self) {
         self.now += 1;
         let cmds = std::mem::take(&mut self.pending);
-        for c in cmds {
-            self.apply(c);
+        for (actor, c) in cmds {
+            self.apply(actor, c);
         }
         self.update_channels();
         self.update_casts();
@@ -422,7 +539,6 @@ impl Sim {
         self.update_combat_flags();
         self.flush_yells();
         self.sync_views();
-        std::mem::take(&mut self.events)
     }
 
     // ---- helpers ----
@@ -451,23 +567,39 @@ impl Sim {
     }
 
     fn fail(&mut self, caster: EntityId, spell: SpellId, reason: CastError) {
-        self.events.push(Event::CastFailed {
+        let e = Event::CastFailed {
             caster,
             spell,
             reason,
-        });
+        };
+        self.emit_for(caster, e);
     }
 
     // ---- commands ----
 
-    fn apply(&mut self, cmd: Command) {
+    fn apply(&mut self, actor: Option<EntityId>, cmd: Command) {
+        let Some(actor) = actor.or_else(|| self.first_player()) else {
+            // No player yet: only the commands that name their actor can run.
+            return self.apply_named(cmd);
+        };
         match cmd {
             Command::PlayerMoved {
                 pos,
                 yaw,
                 moving,
                 jumping,
-            } => self.on_player_moved(pos, yaw, moving || jumping),
+            } => self.on_player_moved(actor, pos, yaw, moving || jumping),
+            Command::RespawnPlayer => self.respawn_player(actor),
+            Command::Talk { unit } => self.talk(actor, unit),
+            Command::AcceptQuest { quest } => self.accept_quest(actor, &quest),
+            Command::TurnInQuest { quest } => self.turn_in_quest(actor, &quest),
+            Command::AbandonQuest { quest } => self.abandon_quest(actor, &quest),
+            other => self.apply_named(other),
+        }
+    }
+
+    fn apply_named(&mut self, cmd: Command) {
+        match cmd {
             Command::SetTarget { unit, target } => {
                 let valid = target.is_none_or(|t| self.unit(t).is_some());
                 if let (Some(i), true) = (self.index(unit), valid) {
@@ -491,16 +623,17 @@ impl Sim {
                 }
             }
             Command::Loot { looter, corpse } => self.handle_loot(looter, corpse),
-            Command::RespawnPlayer => self.respawn_player(),
-            Command::Talk { unit } => self.talk(unit),
-            Command::AcceptQuest { quest } => self.accept_quest(&quest),
-            Command::TurnInQuest { quest } => self.turn_in_quest(&quest),
-            Command::AbandonQuest { quest } => self.abandon_quest(&quest),
+            Command::PlayerMoved { .. }
+            | Command::RespawnPlayer
+            | Command::Talk { .. }
+            | Command::AcceptQuest { .. }
+            | Command::TurnInQuest { .. }
+            | Command::AbandonQuest { .. } => {}
         }
     }
 
-    fn on_player_moved(&mut self, pos: Vec3, yaw: f32, moving: bool) {
-        let Some(i) = self.player.and_then(|p| self.index(p)) else {
+    fn on_player_moved(&mut self, player: EntityId, pos: Vec3, yaw: f32, moving: bool) {
+        let Some(i) = self.index(player) else {
             return;
         };
         if !self.units[i].state.alive {
@@ -527,19 +660,30 @@ impl Sim {
         if !self.units[li].state.alive || !self.units[ci].state.lootable || !near {
             return;
         }
-        let items = std::mem::take(&mut self.units[ci].loot);
-        self.units[ci].state.lootable = false;
-        if Some(looter) == self.player {
+        // Own roll first; an ownerless roll (killed before anyone joined) is anyone's.
+        let shares = &mut self.units[ci].loot;
+        let Some(k) = shares
+            .iter()
+            .position(|(o, _)| *o == Some(looter))
+            .or_else(|| shares.iter().position(|(o, _)| o.is_none()))
+        else {
+            return;
+        };
+        let (_, items) = shares.remove(k);
+        self.units[ci].state.lootable = !self.units[ci].loot.is_empty();
+        let player = self.is_player(looter);
+        if player {
             self.add_trophies(li, &items);
         }
-        self.events.push(Event::Looted {
+        let e = Event::Looted {
             looter,
             corpse,
             items: items.clone(),
-        });
-        if Some(looter) == self.player {
+        };
+        self.emit_for(looter, e);
+        if player {
             for it in &items {
-                self.quest_credit(|o| matches!(o, Objective::Loot(n, _) if n == it));
+                self.quest_credit(looter, |o| matches!(o, Objective::Loot(n, _) if n == it));
             }
         }
     }
@@ -587,10 +731,7 @@ impl Sim {
     /// Debug/test: puts one copy of a trophy into the player's inventory as if looted.
     /// False for an unknown item or without a player; no event is emitted.
     pub fn grant_trophy(&mut self, name: &str) -> bool {
-        let (Some(i), true) = (
-            self.player.and_then(|p| self.index(p)),
-            self.content.item(name).is_some(),
-        ) else {
+        let (Some(i), true) = (self.first_player_index(), self.content.item(name).is_some()) else {
             return false;
         };
         self.add_trophies(i, &[name.to_string()]);
@@ -607,28 +748,25 @@ impl Sim {
         else {
             return false;
         };
-        self.die(ti, self.player);
+        self.die(ti, self.first_player());
         true
     }
 
     /// The player's trophies as (name, copies), first pickup first.
     pub fn inventory(&self) -> &[(String, u32)] {
-        self.player
-            .and_then(|p| self.index(p))
+        self.first_player_index()
             .map_or(&[][..], |i| &self.units[i].state.inventory)
     }
 
     /// Player bonus granted by the trophies right now (stack cap applied).
     pub fn item_totals(&self) -> ItemTotals {
-        self.player
-            .and_then(|p| self.index(p))
+        self.first_player_index()
             .map_or_else(ItemTotals::default, |i| self.units[i].item_bonus)
     }
 
     /// Friendly units with `talk` lines answer the player when close enough; anything else is ignored.
-    fn talk(&mut self, unit: EntityId) {
-        let (Some(pi), Some(ti)) = (self.player.and_then(|p| self.index(p)), self.index(unit))
-        else {
+    fn talk(&mut self, player: EntityId, unit: EntityId) {
+        let (Some(pi), Some(ti)) = (self.index(player), self.index(unit)) else {
             return;
         };
         let (p, t) = (&self.units[pi], &self.units[ti]);
@@ -636,13 +774,13 @@ impl Sim {
         if p.state.alive && t.state.alive && !t.despawned && !t.state.hostile && near {
             let key = t.state.key.clone();
             self.request_yell(ti, YellKind::Talk);
-            self.quest_credit(|o| matches!(o, Objective::Talk(k) if *k == key));
-            self.offer_quests(ti);
+            self.quest_credit(player, |o| matches!(o, Objective::Talk(k) if *k == key));
+            self.offer_quests(player, ti);
         }
     }
 
-    fn respawn_player(&mut self) {
-        let Some(i) = self.player.and_then(|p| self.index(p)) else {
+    fn respawn_player(&mut self, player: EntityId) {
+        let Some(i) = self.index(player) else {
             return;
         };
         if self.units[i].state.alive {
@@ -773,10 +911,11 @@ impl Sim {
             Some((_, remaining)) if remaining <= ticks(self.content.config.queue_window_ms) => {
                 // A newer press replaces an older queued one, as in WoW.
                 self.units[ci].queued = Some(spell_id);
-                self.events.push(Event::CastQueued {
+                let e = Event::CastQueued {
                     caster,
                     spell: spell_id,
-                });
+                };
+                self.emit_for(caster, e);
             }
             Some((reason, _)) => self.fail(caster, spell_id, reason),
         }
@@ -981,7 +1120,7 @@ impl Sim {
 
     /// Player-only shout on spell release; gated by a global cooldown, never touches the rng.
     fn spell_yell(&mut self, ci: usize, spell: &SpellDef) {
-        if Some(Self::id_of(ci)) != self.player || spell.yells.is_empty() {
+        if !self.is_player(Self::id_of(ci)) || spell.yells.is_empty() {
             return;
         }
         let u = &mut self.units[ci];
@@ -1145,7 +1284,7 @@ impl Sim {
         self.events.push(Event::Death { unit: id, killer });
         self.kill_adds_of(id);
         self.request_yell(ti, YellKind::Death);
-        if self.player == Some(id)
+        if self.is_player(id)
             && let Some(k) = killer.and_then(|k| self.index(k))
         {
             self.request_yell(k, YellKind::PlayerKilled);
@@ -1166,20 +1305,35 @@ impl Sim {
             unit: id,
             state: AiState::Dead,
         });
-        let items: Vec<String> = loot_table
-            .into_iter()
-            .filter(|e| self.rng.chance_pct(e.chance_pct))
-            .map(|e| e.item)
-            .collect();
-        self.units[ti].loot = items.clone();
+        // Every group member rolls on their own, in join order, so nobody fights over loot.
+        let owners: Vec<Option<EntityId>> = match self.players.is_empty() {
+            true => vec![None],
+            false => self.players.iter().copied().map(Some).collect(),
+        };
+        let mut shares = Vec::with_capacity(owners.len());
+        for owner in owners {
+            let items: Vec<String> = loot_table
+                .iter()
+                .filter(|e| self.rng.chance_pct(e.chance_pct))
+                .map(|e| e.item.clone())
+                .collect();
+            shares.push((owner, items));
+        }
+        self.units[ti].loot = shares.clone();
         self.units[ti].state.lootable = true;
         self.units[ti].respawn_at = self.units[ti]
             .respawns
             .then(|| self.now + ticks(respawn_ms));
-        if let Some(k) = killer.and_then(|k| self.index(k)) {
+        if let Some(k) = killer {
             self.award_kill_xp(k, ti);
         }
-        self.events.push(Event::LootDropped { corpse: id, items });
+        for (owner, items) in shares {
+            let e = Event::LootDropped { corpse: id, items };
+            match owner {
+                Some(p) => self.emit_to(p, e),
+                None => self.events.push(e),
+            }
+        }
         self.on_hostile_death(ti, killer);
     }
 
@@ -1219,18 +1373,15 @@ impl Sim {
     }
 
     fn update_combat_flags(&mut self) {
-        let player = self.player;
-        let player_engaged = player.is_some_and(|p| {
-            self.units
-                .iter()
-                .any(|u| u.state.alive && u.threat.contains_key(&p))
-        });
         for i in 0..self.units.len() {
             let u = &self.units[i];
             let id = u.state.id;
+            let is_player = self.is_player(id);
             let now_in = u.state.alive
-                && if Some(id) == player {
-                    player_engaged
+                && if is_player {
+                    self.units
+                        .iter()
+                        .any(|o| o.state.alive && o.threat.contains_key(&id))
                 } else {
                     !u.threat.is_empty()
                 };
@@ -1240,7 +1391,7 @@ impl Sim {
                     self.units[i].regen_next =
                         self.now + ticks(self.content.config.regen.interval_ms);
                 }
-                if now_in && Some(id) != player {
+                if now_in && !is_player {
                     self.reset_periodic_yell(i);
                     // Only the first unit of a pack shouts; in_combat is updated in-loop so
                     // later members of the same pull see it.
@@ -1340,9 +1491,10 @@ impl Sim {
     }
 
     fn player_within(&self, i: usize, range_m: f32) -> bool {
-        self.player
-            .and_then(|p| self.index(p))
-            .is_some_and(|p| in_range(self.units[p].state.pos, self.units[i].state.pos, range_m))
+        self.players
+            .iter()
+            .filter_map(|p| self.index(*p))
+            .any(|p| in_range(self.units[p].state.pos, self.units[i].state.pos, range_m))
     }
 
     /// Boss phase/aggro/death yells always go through; every other hostile yell shares one
@@ -1364,11 +1516,10 @@ impl Sim {
 
     fn sync_views(&mut self) {
         let now = self.now;
-        let player = self.player;
         for idx in 0..self.units.len() {
             let stunned = self.has_aura_flag(idx, |a| a.stun);
             let silenced = self.has_aura_flag(idx, |a| a.silence);
-            let xp_to_next = if Some(Self::id_of(idx)) == player {
+            let xp_to_next = if self.is_player(Self::id_of(idx)) {
                 self.content.xp_to_next(self.units[idx].state.level)
             } else {
                 0

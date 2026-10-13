@@ -57,8 +57,9 @@ impl Sim {
     /// the zone. Pack units alternate between the zone's level range (first half of the packs
     /// low, the rest high); boss and friendlies keep their authored level. Zone spawns never
     /// respawn on their own; see `TRASH_RESPAWN_MS` for re-entry. A cleared zone's boss is not
-    /// spawned again. The optional `graveyard` anchor becomes the player's respawn point.
-    /// All anchors are resolved first, so an error leaves the sim untouched.
+    /// spawned again. The optional `graveyard` anchor becomes every player's respawn point; with
+    /// the optional `player_spawn` anchor the whole group is moved there (member `k` at
+    /// `pack_offsets` slot `k`). All anchors are resolved first, so an error leaves the sim untouched.
     pub fn load_zone(
         &mut self,
         id: &str,
@@ -134,18 +135,26 @@ impl Sim {
             });
         }
         let graveyard = anchors("graveyard");
+        let arrival = anchors("player_spawn");
 
-        let player = self.player.and_then(|p| self.index(p));
+        let players: Vec<usize> = self.players.iter().filter_map(|p| self.index(*p)).collect();
         // A cast started in the old zone would land on a unit that no longer exists.
-        if let Some(pi) = player {
+        for &pi in &players {
             if self.units[pi].state.cast.is_some() {
                 self.cancel_cast(pi, None, 0);
             }
             self.units[pi].queued = None;
         }
         for i in 0..self.units.len() {
-            if Some(i) != player && !self.units[i].despawned {
+            if !players.contains(&i) && !self.units[i].despawned {
                 self.despawn(i);
+            }
+        }
+        if let Some((at, yaw)) = arrival {
+            for (&pi, (dx, dz)) in players.iter().zip(pack_offsets(players.len())) {
+                let s = &mut self.units[pi].state;
+                s.pos = Vec3::new(at.x + dx, at.y, at.z + dz);
+                s.yaw = yaw;
             }
         }
         self.blockers = blockers;
@@ -213,7 +222,11 @@ impl Sim {
         match r {
             Unlock::ZoneCleared(z) => self.world.cleared.contains(z),
             Unlock::BossKilled(k) => self.world.bosses_killed.contains(k),
-            Unlock::QuestDone(q) => self.quests().completed.iter().any(|c| c == q),
+            // The zone is shared, so one member's turn-in opens it for the whole group.
+            Unlock::QuestDone(q) => self
+                .quest_logs
+                .values()
+                .any(|l| l.completed.iter().any(|c| c == q)),
         }
     }
 
@@ -258,10 +271,14 @@ impl Sim {
             if let Some(floor) = floor_number(&z) {
                 self.events.push(Event::FloorCleared { floor });
             }
-            self.quest_credit(|o| matches!(o, Objective::ClearZone(c) if *c == z));
+            for p in self.players.clone() {
+                self.quest_credit(p, |o| matches!(o, Objective::ClearZone(c) if *c == z));
+            }
         }
-        if killer.is_some() && killer == self.player {
-            self.quest_credit(|o| matches!(o, Objective::Kill(k, _) if *k == key));
+        // Classic: every group member near the kill gets the credit, not just the killer.
+        for p in self.kill_sharers(killer, ti) {
+            let p = Self::id_of(p);
+            self.quest_credit(p, |o| matches!(o, Objective::Kill(k, _) if *k == key));
         }
         self.check_unlocks();
     }

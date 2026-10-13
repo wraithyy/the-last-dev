@@ -3,7 +3,7 @@
 
 use super::actionbar::spell_signature;
 use super::{ACCENT, DIM, PANEL_EDGE, drop_shadow, label, panel_bg, set_text};
-use crate::combat::{CombatEvent, CombatSim, SimReady};
+use crate::combat::{CombatEvent, SimReady, SimView};
 use crate::floors::LoadZone;
 use bevy::prelude::*;
 use combat_core::Event;
@@ -120,14 +120,14 @@ fn progress_events(
     mut banners: MessageReader<Banner>,
     mut zones: MessageReader<LoadZone>,
     mut queue: ResMut<BannerQueue>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     stack: Single<Entity, With<ToastStack>>,
 ) {
     // The banner on screen belongs to the zone just left (its name would print over the new one).
     if zones.read().count() > 0 {
         queue.current = None;
     }
-    let me = sim.0.player();
+    let me = sim.player();
     for b in banners.read() {
         queue.queue.push_back(b.clone());
     }
@@ -141,10 +141,10 @@ fn progress_events(
                 });
             }
             Event::SpellLearned { unit, spell } if Some(*unit) == me => {
-                let Some(def) = sim.0.content().spell(*spell) else {
+                let Some(def) = sim.content().spell(*spell) else {
                     continue;
                 };
-                let (name, sig) = spell_signature(def, sim.0.content());
+                let (name, sig) = spell_signature(def, sim.content());
                 commands
                     .entity(*stack)
                     .with_child(toast(&def.name, &name, &sig));

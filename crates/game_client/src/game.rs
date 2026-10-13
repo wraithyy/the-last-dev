@@ -14,13 +14,14 @@ use crate::camera::OrbitCamera;
 use crate::catalog::{self, IdlePose};
 use crate::collision::{nearest_free, to_core};
 use crate::combat::{
-    CombatEvent, CombatSim, PendingCommands, SimReady, SimUnit, UiNotice, new_sim,
+    CombatEvent, CombatSim, PendingCommands, SimRead, SimReady, SimUnit, SimView, UiNotice, new_sim,
 };
 use crate::copy;
 use crate::floors::{
     BareStage, FloorLayout, LoadZone, build_zone, door_trigger, elevator_exit_trigger,
 };
 use crate::hud::{ACCENT, Banner, DIM, label, set_text};
+use crate::net::{GameMode, NetWorld};
 use crate::player::{Player, PlayerBody};
 use crate::targeting::Target;
 use crate::units::spawn_visual;
@@ -309,6 +310,7 @@ fn enter_zone(
     mut commands: Commands,
     mut requests: MessageReader<EnterZone>,
     mut sim: ResMut<CombatSim>,
+    net: Option<Res<NetWorld>>,
     mut flow: ResMut<GameFlow>,
     mut target: ResMut<Target>,
     mut doors: ResMut<DoorAssets>,
@@ -328,13 +330,19 @@ fn enter_zone(
         return;
     };
     let anchors = |name: &str| layout.anchor(name).map(|(p, yaw)| (to_core(p), yaw));
-    if let Err(err) = sim
-        .0
-        .load_zone(&req.zone, &anchors, layout.blockers.clone())
+    // Online the server has already loaded the zone; only the client side follows.
+    if net.is_none()
+        && let Err(err) = sim
+            .0
+            .load_zone(&req.zone, &anchors, layout.blockers.clone())
     {
         error!("cannot load zone {}: {err:?}", req.zone);
         return;
     }
+    let view: &dyn SimRead = match net.as_deref() {
+        Some(n) => n,
+        None => &sim.0,
+    };
     load.write(LoadZone(req.zone.clone()));
 
     let first_load = !std::mem::replace(&mut *first, true);
@@ -347,7 +355,7 @@ fn enter_zone(
     cam.set_yaw(yaw + cam_offset);
     target.0 = None;
 
-    let content = sim.0.content();
+    let content = view.content();
     flow.zone.clone_from(&req.zone);
     flow.floor = if layout.zone.starts_with("tower/") {
         layout.id
@@ -356,8 +364,7 @@ fn enter_zone(
     };
     flow.outdoor = layout.outdoor;
     flow.anchors.clone_from(&layout.anchors);
-    flow.exits = sim
-        .0
+    flow.exits = view
         .zone_links(&req.zone)
         .into_iter()
         .filter(|l| layout.anchor(&l.anchor).is_some())
@@ -528,11 +535,12 @@ fn zone_events(
     mut commands: Commands,
     mut events: MessageReader<CombatEvent>,
     mut flow: ResMut<GameFlow>,
-    sim: Res<CombatSim>,
+    sim: SimView,
+    mode: Res<GameMode>,
     mut banners: MessageWriter<Banner>,
     units: Query<(&SimUnit, &Transform)>,
 ) {
-    let content = sim.0.content();
+    let content = sim.content();
     for CombatEvent(ev) in events.read() {
         match ev {
             Event::ZoneCleared { zone } => {
@@ -567,10 +575,20 @@ fn zone_events(
                     color: Color::srgb(1.0, 0.82, 0.3),
                 });
             }
-            Event::Death { unit, .. } if Some(*unit) == sim.0.player() => flow.deaths += 1,
+            // Online the server moves the group; the client fades and follows.
+            Event::ZoneLoaded { zone }
+                if mode.is_online() && *zone != flow.zone && matches!(flow.fade, Fade::Idle) =>
+            {
+                flow.fade = Fade::Out {
+                    t: 0.0,
+                    to: zone.clone(),
+                };
+                flow.tip = flow.tip.wrapping_add(1);
+            }
+            Event::Death { unit, .. } if Some(*unit) == sim.player() => flow.deaths += 1,
             // The AGI's shell opens on death (rigs.rs); this is who was inside.
             Event::Death { unit, .. }
-                if sim.0.unit(*unit).is_some_and(|u| u.key == "agi_prototype") =>
+                if sim.unit(*unit).is_some_and(|u| u.key == "agi_prototype") =>
             {
                 if let Some((_, tf)) = units.iter().find(|(su, _)| su.0 == *unit) {
                     let (yaw, ..) = tf.rotation.to_euler(EulerRot::YXZ);
@@ -592,20 +610,20 @@ fn zone_events(
 fn check_exits(
     time: Res<Time>,
     mut flow: ResMut<GameFlow>,
-    sim: Res<CombatSim>,
+    sim: SimView,
+    mode: Res<GameMode>,
     mut notices: MessageWriter<UiNotice>,
     body: Single<&PlayerBody, With<Player>>,
 ) {
     flow.locked_cooldown -= time.delta_secs();
-    flow.cleared = sim.0.zone_cleared(&flow.zone);
-    let links = sim.0.zone_links(&flow.zone);
+    flow.cleared = sim.zone_cleared(&flow.zone);
+    let links = sim.zone_links(&flow.zone);
     let all = flow.unlock_all;
     let open = |anchor: &str| all || links.iter().any(|l| l.anchor == anchor && l.unlocked);
     flow.elevator_open = open("elevator_exit");
     let alive = sim
-        .0
         .player()
-        .and_then(|p| sim.0.unit(p))
+        .and_then(|p| sim.unit(p))
         .is_some_and(|u| u.alive);
     // Dying mid fade-out cancels the trip, so the corpse is not teleported into the next zone.
     if let Fade::Out { t, .. } = flow.fade
@@ -615,7 +633,8 @@ fn check_exits(
             t: FADE_SECS - t.min(FADE_SECS),
         };
     }
-    if !matches!(flow.fade, Fade::Idle) || flow.victory || !alive {
+    // Online the server decides when the group travels (see `zone_events`).
+    if !matches!(flow.fade, Fade::Idle) || flow.victory || !alive || mode.is_online() {
         return;
     }
     let p = body.pos;
@@ -633,8 +652,8 @@ fn check_exits(
         flow.tip = flow.tip.wrapping_add(1);
     } else if flow.locked_cooldown <= 0.0 {
         let reason = lock_reason(
-            sim.0.content(),
-            link_requires(sim.0.content(), &flow.zone, &exit.anchor),
+            sim.content(),
+            link_requires(sim.content(), &flow.zone, &exit.anchor),
         );
         notices.write(UiNotice(reason));
         flow.locked_cooldown = LOCKED_NOTICE_SECS;
@@ -828,7 +847,7 @@ fn spawn_overlays(mut commands: Commands) {
 
 fn update_victory(
     time: Res<Time>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut flow: ResMut<GameFlow>,
     mut screen: Single<&mut Node, With<VictoryScreen>>,
     mut prompt: Single<&mut TextColor, With<VictoryPrompt>>,
@@ -839,13 +858,13 @@ fn update_victory(
         if *left <= 0.0 {
             flow.victory_in = None;
             flow.victory = true;
-            let me = sim.0.player().and_then(|p| sim.0.unit(p));
+            let me = sim.player().and_then(|p| sim.unit(p));
             let mins = ((time.elapsed_secs() - flow.started) / 60.0).max(0.0) as u32;
-            let trophies: u32 = sim.0.inventory().iter().map(|(_, n)| n).sum();
+            let trophies: u32 = sim.inventory().iter().map(|(_, n)| n).sum();
             let text = format!(
                 "level {:>2}   tickets closed {:>2}   trophies {:>3}   deaths {:>2}   time {}h {:02}m",
                 me.map_or(1, |u| u.level),
-                sim.0.quests().completed.len(),
+                sim.quests().completed.len(),
                 trophies,
                 flow.deaths,
                 mins / 60,
@@ -875,10 +894,12 @@ fn restart_on_r(
     mut target: ResMut<Target>,
     mut enter: MessageWriter<EnterZone>,
     mut restarted: MessageWriter<GameRestarted>,
+    mode: Res<GameMode>,
     player: Single<(Entity, &PlayerBody), With<Player>>,
     visuals: Query<Entity, (With<SimUnit>, Without<Player>)>,
 ) {
-    if !flow.victory || !keys.just_pressed(KeyCode::KeyR) {
+    // The server owns an online run; R only restarts the solo game.
+    if !flow.victory || !keys.just_pressed(KeyCode::KeyR) || mode.is_online() {
         return;
     }
     let fresh = match new_sim() {

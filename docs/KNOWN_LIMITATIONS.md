@@ -77,3 +77,10 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - `Command::Loot` failures (too far, not lootable) are silent: `CastError` has no loot variants. Corpses are always lootable, possibly with an empty loot list.
 - Auto attack is a single ranged "Nitpick" on the player; the swing timer is not hasted and there is no melee auto attack for the player.
 - Evade speed equals chase speed, and the leash is measured from the spawn point only.
+
+## Touch and PWA
+
+- Touch layout is verified only with Chrome touch emulation; real iOS Safari (fullscreen on Add to Home Screen, audio unlock, safe-area insets) is untested.
+- A keycap tap casts on press, so a long press shows the tooltip while the spell has already fired.
+- Touch taps on HUD panels without a `Button`/`Interaction` (windows, dialogs) can still reach target picking, same as mouse clicks.
+- The service worker precaches everything; if the browser refuses the shell (low disk/quota) the install fails and the game keeps running online without offline support. Asset-only quota errors are logged and skipped.

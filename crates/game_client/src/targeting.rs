@@ -2,7 +2,7 @@
 
 use crate::arena::Colliders;
 use crate::collision::to_core;
-use crate::combat::{CombatSim, SimUnit};
+use crate::combat::{CombatSim, SimUnit, SimView};
 use crate::config::*;
 use crate::input::{MouseState, Paused, QuestWindows, TrophiesOpen};
 use crate::player::{Player, PlayerBody};
@@ -105,7 +105,7 @@ fn handle_keys(
     mut target: ResMut<Target>,
     player: Single<&PlayerBody, With<Player>>,
     units: Query<(Entity, &Transform, &Unit, Option<&SimUnit>)>,
-    sim: Res<CombatSim>,
+    sim: SimView,
 ) {
     if keys.just_pressed(KeyCode::Escape) {
         if windows.close_one() || std::mem::take(&mut trophies.0) {
@@ -119,7 +119,7 @@ fn handle_keys(
         return;
     }
     let fighting = |s: Option<&SimUnit>| {
-        s.and_then(|s| sim.0.unit(s.0))
+        s.and_then(|s| sim.unit(s.0))
             .is_some_and(|u| u.alive && u.hostile && u.in_combat)
     };
     // Mid-fight, Tab cycles only the enemies already fighting you, so it never pulls the next pack.

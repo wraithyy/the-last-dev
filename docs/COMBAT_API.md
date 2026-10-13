@@ -35,7 +35,10 @@ pub struct Sim { /* ... */ }
 impl Sim {
     pub fn new(content: Content, seed: u64) -> Sim;
     pub fn set_blockers(&mut self, blockers: Vec<Aabb>);
-    pub fn spawn_player(&mut self, pos: Vec3, yaw: f32) -> EntityId;      // level 1, 0 XP
+    pub fn spawn_player(&mut self, pos: Vec3, yaw: f32) -> EntityId;      // level 1, 0 XP; adds a group member, 0 once MAX_PLAYERS (5) are in
+    pub fn remove_player(&mut self, id: EntityId) -> bool;                // leave mid-session, see Co-op group
+    pub fn players(&self) -> &[EntityId];                                 // join order
+    pub fn apply_as(&mut self, player: EntityId, cmd: Command);           // queued like push, as that player
     pub fn spawn_unit(&mut self, unit_key: &str, pos: Vec3, yaw: f32) -> Result<EntityId, ContentError>; // authored level, respawns
     pub fn load_zone(&mut self, zone: &str, anchors: &dyn Fn(&str) -> Option<(Vec3, f32)>, blockers: Vec<Aabb>) -> Result<(), ContentError>;
     pub fn zone(&self) -> Option<&str>;
@@ -52,10 +55,14 @@ impl Sim {
     pub fn set_player_mana(&mut self, mana: u32);                         // debug/test: silent, clamped to max
     pub fn set_player_level(&mut self, level: u8);                        // debug/test: silent, clamps to 1..=max, 0 XP, full HP/mana
     pub fn known_spells(&self, unit: EntityId) -> Vec<SpellId>;           // learned action-bar spells, bar order
-    pub fn push(&mut self, cmd: Command);    // applied at the start of the next tick
-    pub fn tick(&mut self) -> Vec<Event>;    // advance exactly one 1/30 s tick
+    pub fn push(&mut self, cmd: Command);    // applied at the start of the next tick, as the first player
+    pub fn tick(&mut self) -> Vec<Event>;    // advance exactly one 1/30 s tick; every event
+    pub fn tick_routed(&mut self) -> Vec<(Audience, Event)>;    // the same tick, with recipients
+    pub fn drain_events_routed(&mut self) -> Vec<(Audience, Event)>; // pending events (e.g. queued by load_zone) with recipients
     pub fn now(&self) -> Tick;
-    pub fn player(&self) -> Option<EntityId>;
+    pub fn player(&self) -> Option<EntityId>;                 // the first group member
+    pub fn quests_of(&self, player: EntityId) -> &QuestLog;
+    pub fn quest_status_of(&self, player: EntityId, quest: &str) -> QuestStatus;
     pub fn unit(&self, id: EntityId) -> Option<&UnitState>;   // None for unknown or despawned ids
     pub fn units(&self) -> impl Iterator<Item = &UnitState>;  // every non-despawned unit, corpses included
     pub fn content(&self) -> &Content;
@@ -104,6 +111,8 @@ pub struct UnitState {
 pub enum CastError { NoTarget, InvalidTarget, Dead, OutOfRange, NotFacing, NoLineOfSight, NotEnoughMana, OnCooldown, OnGcd, AlreadyCasting, SchoolLocked, Moving, NotInterruptible, NothingToInterrupt, Stunned, Silenced, NotLearned, FullMana }
 // CastError::message() -> &'static str: "Out of range.", "Can't do that while stunned.", "Can't do that while silenced.", "You haven't learned that spell yet.", ...
 
+pub enum Audience { All, Player(EntityId) }    // see Co-op group
+
 pub enum Event {
     CastStarted { caster, spell, total_ms }, CastSucceeded { caster, spell, target: Option<EntityId> },
     CastFailed { caster, spell, reason: CastError },
@@ -140,6 +149,20 @@ pub enum Event {
 
 `EntityId` here is a sim id (u64), not a Bevy `Entity`. The client keeps a mapping through the `SimUnit(EntityId)` component. Ids are never reused.
 
+## Co-op group
+
+One `Sim` per room; every player in it is one group (`MAX_PLAYERS` = 5). The single-player API (`player()`, `push`, `quests()`, `quest_status`, `inventory`, `item_totals`, `set_player_*`, `grant_trophy`, `debug_*`) acts on the first player, so single-player behaviour and the golden replays are unchanged.
+
+- Per-player state lives on the player's unit: level, XP, HP/mana, trophies (`UnitState.inventory`), known spells, cooldowns, GCD, cast, school lockouts, spell-yell cooldown, Coffee Break channel, respawn point. Quest logs are keyed by player id (`quests_of`).
+- Commands: `apply_as(player, cmd)` queues `cmd` for the next tick as `player`. The actor field (`SetTarget.unit`, `Cast.caster`, `StopCasting.caster`, `Loot.looter`, `Start/StopAutoAttack.unit`) is overwritten with `player`, so a client can only act as itself; `PlayerMoved`, `RespawnPlayer`, `Talk` and the quest commands act for `player`. An id that is not a player is ignored. `push(cmd)` keeps the actor ids as given and runs the player-relative commands for the first player.
+- Routed events: `tick_routed` / `drain_events_routed` return `(Audience, Event)` with `Audience::All | Player(id)`. `Player(id)`: `LootDropped` and `Looted` (one per member's roll), `XpGained`, `SpellLearned`, every quest event (`QuestOffered`, `QuestAccepted`, `QuestProgress`, `QuestReady`, `QuestCompleted`), and `CastFailed` / `CastQueued` of a player caster. Everything else (including `LevelUp`, `Death`, `Respawned`, player `Yell`s, `Knockback` and `Teleported` of a player) is `All`. `tick()` returns the same events in the same order without the audience.
+- Threat and AI: an idle enemy pulls the nearest living member within `aggro_m` and sight. It attacks its top-threat target; dead and removed players leave every threat table, so it switches to the next. When every member is dead (wipe) or gone, threat tables empty and enemies evade and reset as in single-player.
+- Kills, loot, XP: see FORMULAS.md, Co-op group. Every member rolls own loot; XP is split among living members near the kill with a group bonus; quest `Kill` credit goes to the killer and every living member within 60 m. `ClearZone` credit goes to everyone; `Loot` and `Talk` credit only to the acting player. A `QuestDone` unlock opens when any member has turned the quest in.
+- Scaling: enemy max HP is multiplied by `100 + group_hp_pct_per_player * (players - 1)` percent at spawn and rescaled (HP fraction kept) on every join and leave.
+- `remove_player(id)`: the unit despawns (`Despawned`, `unit(id)` becomes `None`, its threat and every target on it are cleared), its unclaimed loot rolls and quest log are dropped, enemy HP is rescaled. False for a non-player.
+- Zones: one shared zone per room. `load_zone` keeps every player, cancels their casts, sets every member's respawn point to `graveyard` and, when the layout provides `player_spawn`, moves member `k` to `player_spawn + pack_offsets(n)[k]` facing its yaw. The server decides when the group travels (for example the leader entering a door) and can pass the arrival point as `player_spawn`. In single-player the client still owns the body and overrides the position with its next `PlayerMoved`.
+- Death: `RespawnPlayer` via `apply_as` revives only that member, at its own respawn point.
+
 ## Contract with the client: unit keys and zones
 
 - Player `senior_engineer`. Friendly: `intern`, `it_support`, `facilities_guy`, `barista`, `smoking_corner_dev` (quest givers: `intern`, `facilities_guy`, `barista`, `smoking_corner_dev`).
@@ -170,7 +193,7 @@ pub enum Event {
 1. Resolves every anchor through the callback first (packs, the boss even if it is dead, friendlies); an unknown zone or a missing anchor returns `ContentError::Invalid` and changes nothing. `graveyard` is optional.
 2. Despawns every non-player unit (`Despawned` each; `unit(id)` becomes `None`; the player's target is cleared if it pointed at one) and replaces the blockers.
 3. Spawns the packs: unit `k` of a pack stands at `anchor + pack_offsets(n)[k]` (world XZ offsets, not rotated by the anchor yaw; slot 0 is the anchor itself) facing the anchor yaw. Packs in the first half of the list (`index * 2 < pack count`) get the low level of `level_range`, the rest the high level. Each pack gets its own `pack` id. The boss (own pack id) and friendlies keep their authored level. Zone spawns never respawn on their own.
-4. Sets the player's respawn point to `graveyard` when the layout has one (otherwise it stays where `set_respawn_point` put it).
+4. Sets every player's respawn point to `graveyard` when the layout has one (otherwise it stays where `set_respawn_point` put it) and moves the group to `player_spawn` when the layout has one (see Co-op group).
 5. Emits `ZoneLoaded { zone }`, then `FloorLoaded { floor: n }` for `tower/<n>`. These events come out of the next `tick()`.
 
 Per-session world state (kept in the `Sim`, survives zone loads and player deaths, gone with a new `Sim`):
@@ -200,7 +223,7 @@ Event order on a zone boss kill: `Death`, `AiState Dead`, `XpGained`/`LevelUp`/`
 ## Levels and spells
 
 - `spawn_player` starts at level 1. Stats = the `senior_engineer` def plus the cumulative `levels[level-1]` bonus (HP, mana, spell power). Level-ups refill HP and mana.
-- Kill XP goes to the player only (see FORMULAS.md). The player's `UnitState.xp` is progress inside the current level; `xp_to_next` is the bar maximum (`config.xp_per_level` is kept as the level-1 value). Overflow carries into the next level; at the cap XP stays 0 and kills emit no `XpGained`.
+- Kill XP goes to players only, split across the group (see FORMULAS.md). The player's `UnitState.xp` is progress inside the current level; `xp_to_next` is the bar maximum (`config.xp_per_level` is kept as the level-1 value). Overflow carries into the next level; at the cap XP stays 0 and kills emit no `XpGained`.
 - Event order on a kill: `Death`, `AiState Dead`, `XpGained`, then per level gained `LevelUp { level }` followed by one `SpellLearned` per bar spell whose `learn_level` equals the new level, then `LootDropped`, then `FloorCleared` (boss only).
 - `SpellDef.learn_level`; the bar is `[Code Review 1, Refactor 1, Guardrails 3, Reject PR 2, git blame 4, Rollback 5, On-Call Caffeine 6, Rubber Duck 7, Postmortem 8, Write It By Hand 9]`. Reject PR unlocks at 2 and Guardrails at 3 (swapped versus GAME_DESIGN.md) so the floor-1 boss's 4,000-Line Diff can be interrupted at the floor's levels. `Sim::known_spells(player)` lists the learned subset; casting an unlearned spell fails with `NotLearned`, and `CooldownView.usable` says so too, so the HUD can grey the slot.
 - Other units: monsters spawned above or below their authored `level` scale HP, every damage/heal they deal, and XP reward by `config.mob_scaling` (FORMULAS.md). Summons take their summoner's level.

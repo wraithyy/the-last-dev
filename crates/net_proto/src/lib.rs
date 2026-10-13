@@ -1,0 +1,1061 @@
+//! Wire protocol shared by the co-op server and the game client.
+//!
+//! A frame is `PROTOCOL_VERSION` (u16, little endian) followed by one postcard-encoded
+//! `ClientMsg` or `ServerMsg`, at most `MAX_FRAME_BYTES` in total. Frames travel as binary
+//! WebSocket messages, so no length prefix is needed. `decode` checks size, version and
+//! trailing bytes, then validates the message: a peer's bytes are untrusted.
+
+use combat_core::{AiState, Command, Content, EntityId, Event, MAX_PLAYERS, UnitState, Vec3};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use std::fmt;
+
+/// Bumped on any incompatible change to the messages or to the combat_core types they carry.
+pub const PROTOCOL_VERSION: u16 = 1;
+/// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
+pub const MAX_FRAME_BYTES: usize = 64 * 1024;
+/// Quest ids are short content keys; anything longer is not a real quest.
+pub const MAX_QUEST_ID_BYTES: usize = 64;
+/// Raw display names longer than this are rejected before sanitising.
+pub const MAX_RAW_NAME_BYTES: usize = 64;
+/// The server drops a connection whose first message is not `Hello` or that sends none in time.
+pub const HELLO_DEADLINE_MS: u64 = 5_000;
+/// Collection caps checked by `decode`, well above what one room produces.
+pub const MAX_EVENTS_PER_FRAME: usize = 2_048;
+pub const MAX_SNAPSHOT_UNITS: usize = 1_024;
+/// Items of one loot roll, quests of one offer.
+pub const MAX_LIST_LEN: usize = 64;
+/// Error, yell and other free-form server strings (yells are content lines, not user text).
+pub const MAX_TEXT_BYTES: usize = 512;
+
+const HEADER: usize = 2;
+
+// ---- messages ----
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum ClientMsg {
+    /// Must be the first message, within `HELLO_DEADLINE_MS`; `name` is raw and goes
+    /// through `sanitize_name`.
+    Hello {
+        version: u16,
+        name: String,
+    },
+    CreateRoom,
+    /// `code` is normalised by `decode` (`parse_room_code`); a bad code fails the decode,
+    /// which the server must answer with `ErrorKind::CannotJoin` like any other join failure.
+    JoinRoom {
+        code: String,
+    },
+    LeaveRoom,
+    /// Player-legal commands only (`is_player_command`); the server applies them with
+    /// `Sim::apply_as`, which also rebinds the actor id to the sender.
+    Cmd(Command),
+    /// Client-predicted movement; `seq` increases per report and is echoed by `MoveCorrection`.
+    Move {
+        pos: Vec3,
+        facing: f32,
+        moving: bool,
+        jumping: bool,
+        seq: u32,
+    },
+    Emote(Emote),
+    /// Echoed as `Pong { t }`; `t` is the client's own clock.
+    Ping {
+        t: u64,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum ServerMsg {
+    Welcome {
+        you: EntityId,
+        room: String,
+        zone: Option<String>,
+        seed: u64,
+        players: Vec<PlayerInfo>,
+    },
+    RoomCreated {
+        code: String,
+    },
+    Error {
+        kind: ErrorKind,
+        text: String,
+    },
+    PlayerJoined(PlayerInfo),
+    PlayerLeft {
+        id: EntityId,
+    },
+    /// The events of one sim tick that are meant for this client (see `Sim::tick_routed`).
+    Events {
+        tick: u64,
+        events: Vec<Event>,
+    },
+    /// Late join and periodic drift correction.
+    Snapshot {
+        tick: u64,
+        units: Vec<UnitSnap>,
+        players: Vec<PlayerSnap>,
+    },
+    /// The server rejected the move with this `seq`; the client snaps to `pos` and replays
+    /// its later inputs.
+    MoveCorrection {
+        seq: u32,
+        pos: Vec3,
+    },
+    Emoted {
+        player: EntityId,
+        emote: Emote,
+    },
+    Pong {
+        t: u64,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlayerInfo {
+    pub id: EntityId,
+    /// Already sanitised by the server.
+    pub name: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ErrorKind {
+    BadVersion,
+    BadMessage,
+    /// Unknown room, full room and malformed code all look the same, so the error is no
+    /// oracle for guessing codes.
+    CannotJoin,
+    ServerFull,
+    NotInRoom,
+    RateLimited,
+    /// Something other than `Hello` came first, or `Hello` missed `HELLO_DEADLINE_MS`.
+    HelloRequired,
+}
+
+impl ErrorKind {
+    /// Canonical player-facing text; servers send this rather than details.
+    pub fn message(self) -> &'static str {
+        match self {
+            ErrorKind::BadVersion => "Client and server versions differ. Refresh the page.",
+            ErrorKind::BadMessage => "The server did not understand that.",
+            ErrorKind::CannotJoin => "Cannot join that room.",
+            ErrorKind::ServerFull => "The server is full. Try again later.",
+            ErrorKind::NotInRoom => "You are not in a room.",
+            ErrorKind::RateLimited => "Slow down.",
+            ErrorKind::HelloRequired => "Handshake missing.",
+        }
+    }
+}
+
+// ---- emotes ----
+
+/// Predefined emotes and quick phrases. There is no free text on the wire, so there is
+/// nothing to moderate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Emote {
+    Sync,
+    CircleBack,
+    PerMyLastEmail,
+    Lgtm,
+    PlusOne,
+    CouldHaveBeenAnEmail,
+    TakeOffline,
+    NoBandwidth,
+    Blocked,
+    ShipIt,
+}
+
+impl Emote {
+    pub const ALL: [Emote; 10] = [
+        Emote::Sync,
+        Emote::CircleBack,
+        Emote::PerMyLastEmail,
+        Emote::Lgtm,
+        Emote::PlusOne,
+        Emote::CouldHaveBeenAnEmail,
+        Emote::TakeOffline,
+        Emote::NoBandwidth,
+        Emote::Blocked,
+        Emote::ShipIt,
+    ];
+
+    /// The slash command a player types or picks.
+    pub fn command(self) -> &'static str {
+        self.entry().0
+    }
+
+    /// What the character says.
+    pub fn text(self) -> &'static str {
+        self.entry().1
+    }
+
+    pub fn from_command(cmd: &str) -> Option<Emote> {
+        let cmd = cmd.trim();
+        Emote::ALL
+            .into_iter()
+            .find(|e| e.command().eq_ignore_ascii_case(cmd))
+    }
+
+    fn entry(self) -> (&'static str, &'static str) {
+        match self {
+            Emote::Sync => ("/sync", "Let's sync on this."),
+            Emote::CircleBack => ("/circle back", "Let's circle back on that."),
+            Emote::PerMyLastEmail => ("/per my last email", "Per my last email..."),
+            Emote::Lgtm => ("/lgtm", "LGTM. Did not read it."),
+            Emote::PlusOne => ("/+1", "+1"),
+            Emote::CouldHaveBeenAnEmail => (
+                "/this could have been an email",
+                "This could have been an email.",
+            ),
+            Emote::TakeOffline => ("/take this offline", "Let's take this offline."),
+            Emote::NoBandwidth => ("/no bandwidth", "I don't have the bandwidth for this."),
+            Emote::Blocked => ("/blocked", "I'm blocked."),
+            Emote::ShipIt => ("/ship it", "Ship it. We'll fix it in prod."),
+        }
+    }
+}
+
+// ---- snapshots ----
+
+/// One unit in a `Snapshot`. Compact because a snapshot carries every unit of the zone:
+/// positions are integer centimetres and the facing is one byte (1.4 degree steps), which
+/// postcard's varints shrink to 1-3 bytes each, against 4 for every f32. That precision is
+/// plenty for drift correction; the full `UnitState` (auras, cast bar) is rebuilt by the
+/// client from `Events`. Names and models come from `key_idx` into the shared content.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnitSnap {
+    pub id: EntityId,
+    /// Index into `Content::units`; client and server embed the same content file.
+    pub key_idx: u16,
+    pub level: u8,
+    /// x, y, z in centimetres.
+    pub pos_cm: [i32; 3],
+    /// Yaw in 1/256 turns.
+    pub facing: u8,
+    pub hp: u32,
+    pub max_hp: u32,
+    pub target: Option<EntityId>,
+    /// `UnitSnap::ALIVE` etc.
+    pub flags: u8,
+}
+
+impl UnitSnap {
+    pub const ALIVE: u8 = 1;
+    pub const IN_COMBAT: u8 = 1 << 1;
+    pub const CASTING: u8 = 1 << 2;
+    pub const STUNNED: u8 = 1 << 3;
+    pub const LOOTABLE: u8 = 1 << 4;
+    pub const EVADING: u8 = 1 << 5;
+    pub const AUTO_ATTACK: u8 = 1 << 6;
+
+    /// `None` for a unit whose key is not in `content` (cannot happen for sim units).
+    pub fn from_state(u: &UnitState, content: &Content) -> Option<UnitSnap> {
+        let key_idx = content.units.iter().position(|d| d.key == u.key)?;
+        let flag = |on: bool, f: u8| if on { f } else { 0 };
+        Some(UnitSnap {
+            id: u.id,
+            key_idx: u16::try_from(key_idx).ok()?,
+            level: u.level,
+            pos_cm: [cm(u.pos.x), cm(u.pos.y), cm(u.pos.z)],
+            facing: quantize_yaw(u.yaw),
+            hp: u.hp,
+            max_hp: u.max_hp,
+            target: u.target,
+            flags: flag(u.alive, Self::ALIVE)
+                | flag(u.in_combat, Self::IN_COMBAT)
+                | flag(u.cast.is_some(), Self::CASTING)
+                | flag(u.stunned, Self::STUNNED)
+                | flag(u.lootable, Self::LOOTABLE)
+                | flag(u.ai == Some(AiState::Evade), Self::EVADING)
+                | flag(u.auto_attack, Self::AUTO_ATTACK),
+        })
+    }
+
+    pub fn pos(&self) -> Vec3 {
+        let [x, y, z] = self.pos_cm;
+        Vec3::new(x as f32 / 100.0, y as f32 / 100.0, z as f32 / 100.0)
+    }
+
+    /// Yaw in radians, in `[0, 2*pi)`.
+    pub fn yaw(&self) -> f32 {
+        f32::from(self.facing) * std::f32::consts::TAU / 256.0
+    }
+
+    pub fn has(&self, flag: u8) -> bool {
+        self.flags & flag != 0
+    }
+}
+
+/// Per-player numbers a remote party frame needs on top of its `UnitSnap`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlayerSnap {
+    pub id: EntityId,
+    pub mana: u32,
+    pub max_mana: u32,
+    pub xp: u32,
+    pub xp_to_next: u32,
+}
+
+impl PlayerSnap {
+    pub fn from_state(u: &UnitState) -> PlayerSnap {
+        PlayerSnap {
+            id: u.id,
+            mana: u.mana,
+            max_mana: u.max_mana,
+            xp: u.xp,
+            xp_to_next: u.xp_to_next,
+        }
+    }
+}
+
+fn cm(m: f32) -> i32 {
+    // `as` saturates and maps NaN to 0, which is what a corrupt position deserves.
+    (m * 100.0).round() as i32
+}
+
+fn quantize_yaw(yaw: f32) -> u8 {
+    let turns = (yaw / std::f32::consts::TAU).rem_euclid(1.0);
+    ((turns * 256.0).round() as u32 % 256) as u8
+}
+
+// ---- command filter ----
+
+/// The commands a client may send through `ClientMsg::Cmd`. Movement has its own message
+/// (with a sequence number for corrections). Debug and admin hooks are `Sim` methods, not
+/// commands, so they cannot be reached from the wire; the match has no wildcard, so a new
+/// `Command` variant must be classified here before it compiles.
+pub fn is_player_command(cmd: &Command) -> bool {
+    match cmd {
+        Command::PlayerMoved { .. } => false,
+        Command::AcceptQuest { quest }
+        | Command::TurnInQuest { quest }
+        | Command::AbandonQuest { quest } => quest.len() <= MAX_QUEST_ID_BYTES,
+        Command::SetTarget { .. }
+        | Command::Cast { .. }
+        | Command::StopCasting { .. }
+        | Command::Loot { .. }
+        | Command::StartAutoAttack { .. }
+        | Command::StopAutoAttack { .. }
+        | Command::RespawnPlayer
+        | Command::Talk { .. } => true,
+    }
+}
+
+// ---- encoding ----
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ProtoError {
+    TooLarge(usize),
+    BadVersion(u16),
+    /// Truncated, trailing bytes or not a valid message.
+    Malformed,
+    IllegalCommand,
+    BadName,
+    BadRoomCode,
+    BadNumber,
+    /// A collection or text over its cap.
+    TooMany,
+}
+
+impl fmt::Display for ProtoError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ProtoError::TooLarge(n) => write!(f, "frame of {n} bytes exceeds {MAX_FRAME_BYTES}"),
+            ProtoError::BadVersion(v) => {
+                write!(f, "protocol version {v}, expected {PROTOCOL_VERSION}")
+            }
+            ProtoError::Malformed => f.write_str("malformed frame"),
+            ProtoError::IllegalCommand => f.write_str("command not allowed from a client"),
+            ProtoError::BadName => f.write_str("display name too long"),
+            ProtoError::BadRoomCode => f.write_str("not a room code"),
+            ProtoError::BadNumber => f.write_str("non-finite number"),
+            ProtoError::TooMany => f.write_str("collection or text over its cap"),
+        }
+    }
+}
+
+impl std::error::Error for ProtoError {}
+
+/// A top-level message. Sealed: only `ClientMsg` and `ServerMsg` travel.
+pub trait Msg: Serialize + DeserializeOwned + sealed::Sealed {
+    /// Checks a decoded message and normalises it (room code case).
+    fn validate(self) -> Result<Self, ProtoError>;
+}
+
+mod sealed {
+    pub trait Sealed {}
+    impl Sealed for super::ClientMsg {}
+    impl Sealed for super::ServerMsg {}
+}
+
+impl Msg for ClientMsg {
+    fn validate(self) -> Result<Self, ProtoError> {
+        match self {
+            ClientMsg::Hello { name, .. } if name.len() > MAX_RAW_NAME_BYTES => {
+                Err(ProtoError::BadName)
+            }
+            ClientMsg::JoinRoom { code } => Ok(ClientMsg::JoinRoom {
+                code: parse_room_code(&code)?,
+            }),
+            ClientMsg::Cmd(c) if !is_player_command(&c) => Err(ProtoError::IllegalCommand),
+            ClientMsg::Move { pos, facing, .. }
+                if ![pos.x, pos.y, pos.z, facing].iter().all(|v| v.is_finite()) =>
+            {
+                Err(ProtoError::BadNumber)
+            }
+            m => Ok(m),
+        }
+    }
+}
+
+impl Msg for ServerMsg {
+    fn validate(self) -> Result<Self, ProtoError> {
+        let short = |t: &str| t.len() <= MAX_TEXT_BYTES;
+        let ok = match &self {
+            ServerMsg::Welcome {
+                room,
+                zone,
+                players,
+                ..
+            } => {
+                short(room)
+                    && zone.as_deref().is_none_or(short)
+                    && players.len() <= MAX_PLAYERS
+                    && players.iter().all(|p| short(&p.name))
+            }
+            ServerMsg::RoomCreated { code } => short(code),
+            ServerMsg::Error { text, .. } => short(text),
+            ServerMsg::PlayerJoined(p) => short(&p.name),
+            ServerMsg::Events { events, .. } => {
+                if events.len() > MAX_EVENTS_PER_FRAME {
+                    return Err(ProtoError::TooMany);
+                }
+                return events.iter().try_for_each(check_event).map(|_| self);
+            }
+            ServerMsg::Snapshot { units, players, .. } => {
+                if units.len() > MAX_SNAPSHOT_UNITS || players.len() > MAX_PLAYERS {
+                    return Err(ProtoError::TooMany);
+                }
+                true
+            }
+            ServerMsg::MoveCorrection { pos, .. } => {
+                return finite(&[pos.x, pos.y, pos.z]).map(|_| self);
+            }
+            ServerMsg::PlayerLeft { .. } | ServerMsg::Emoted { .. } | ServerMsg::Pong { .. } => {
+                true
+            }
+        };
+        if ok {
+            Ok(self)
+        } else {
+            Err(ProtoError::TooMany)
+        }
+    }
+}
+
+fn finite(v: &[f32]) -> Result<(), ProtoError> {
+    if v.iter().all(|x| x.is_finite()) {
+        Ok(())
+    } else {
+        Err(ProtoError::BadNumber)
+    }
+}
+
+/// Floats must be finite (a NaN position would poison the client's transforms) and lists
+/// and texts bounded.
+fn check_event(e: &Event) -> Result<(), ProtoError> {
+    let list = |n: usize| {
+        if n <= MAX_LIST_LEN {
+            Ok(())
+        } else {
+            Err(ProtoError::TooMany)
+        }
+    };
+    match e {
+        Event::Knockback { dir, strength, .. } => finite(&[dir.x, dir.y, dir.z, *strength]),
+        Event::Teleported { pos, .. } => finite(&[pos.x, pos.y, pos.z]),
+        Event::LootDropped { items, .. } | Event::Looted { items, .. } => list(items.len()),
+        Event::QuestOffered { quests, .. } => list(quests.len()),
+        Event::Yell { text, .. } if text.len() > MAX_TEXT_BYTES => Err(ProtoError::TooMany),
+        _ => Ok(()),
+    }
+}
+
+/// Header plus postcard body. Fails only on a frame over `MAX_FRAME_BYTES` (the caller
+/// should split or drop it) or a serializer error.
+pub fn encode<M: Msg>(msg: &M) -> Result<Vec<u8>, ProtoError> {
+    let out = postcard::to_extend(msg, PROTOCOL_VERSION.to_le_bytes().to_vec())
+        .map_err(|_| ProtoError::Malformed)?;
+    if out.len() > MAX_FRAME_BYTES {
+        return Err(ProtoError::TooLarge(out.len()));
+    }
+    Ok(out)
+}
+
+/// Size and version first, so an oversize or foreign frame costs no parsing.
+pub fn decode<M: Msg>(bytes: &[u8]) -> Result<M, ProtoError> {
+    if bytes.len() > MAX_FRAME_BYTES {
+        return Err(ProtoError::TooLarge(bytes.len()));
+    }
+    let (Some(head), Some(body)) = (bytes.get(..HEADER), bytes.get(HEADER..)) else {
+        return Err(ProtoError::Malformed);
+    };
+    let version = u16::from_le_bytes([head[0], head[1]]);
+    if version != PROTOCOL_VERSION {
+        return Err(ProtoError::BadVersion(version));
+    }
+    match postcard::take_from_bytes::<M>(body) {
+        Ok((msg, [])) => msg.validate(),
+        _ => Err(ProtoError::Malformed),
+    }
+}
+
+// ---- display names ----
+
+/// Trimmed, 2-16 characters of ASCII letters, digits, space, `-` or `_`; anything else
+/// becomes `Intern-<n>` (the server passes a per-room counter).
+pub fn sanitize_name(raw: &str, n: u32) -> String {
+    let name = raw.trim();
+    let ok = (2..=16).contains(&name.len())
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b' ' | b'-' | b'_'));
+    if ok {
+        name.to_string()
+    } else {
+        format!("Intern-{n}")
+    }
+}
+
+// ---- room codes ----
+
+/// Flavour halves of a room code (`FIRST-SECOND-XXXXXXXX`). Neither list has a word that
+/// is a prefix of another concatenation, so a code typed without dashes still parses
+/// unambiguously. The words carry 8 bits; the secret is the suffix.
+pub const ROOM_FIRST_WORDS: [&str; 16] = [
+    "MERGE",
+    "SCOPE",
+    "TECH",
+    "LEGACY",
+    "SPRINT",
+    "STANDUP",
+    "SYNERGY",
+    "PIVOT",
+    "BLOCKER",
+    "DEADLINE",
+    "RUBBER",
+    "YAML",
+    "NULL",
+    "CACHE",
+    "BURNDOWN",
+    "QUARTERLY",
+];
+pub const ROOM_SECOND_WORDS: [&str; 16] = [
+    "CONFLICT", "CREEP", "DEBT", "CODE", "ZERO", "OVERRUN", "PARADIGM", "TABLE", "BUG", "PANIC",
+    "DUCK", "HELL", "POINTER", "MISS", "CHART", "REVIEW",
+];
+/// Crockford base32: no I, L, O or U, so codes survive being read aloud.
+pub const ROOM_ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+/// Suffix length: 8 symbols of 5 bits, 40 bits of entropy that cannot be guessed online.
+pub const ROOM_SUFFIX_LEN: usize = 8;
+/// Longest input `parse_room_code` looks at.
+pub const MAX_ROOM_CODE_BYTES: usize = 64;
+
+/// A code like `MERGE-CONFLICT-7K3M9QZA` from caller-supplied randomness: the server passes
+/// 10 bytes from the OS rng (`getrandom`), never a seeded generator. Bytes 0-1 pick the
+/// words, bytes 2-9 the suffix (256 is a multiple of 32, so `% 32` is unbiased).
+pub fn room_code_from_bytes(bytes: &[u8; 10]) -> String {
+    let first = ROOM_FIRST_WORDS[usize::from(bytes[0]) % ROOM_FIRST_WORDS.len()];
+    let second = ROOM_SECOND_WORDS[usize::from(bytes[1]) % ROOM_SECOND_WORDS.len()];
+    let suffix: String = bytes[2..]
+        .iter()
+        .map(|b| char::from(ROOM_ALPHABET[usize::from(*b) % ROOM_ALPHABET.len()]))
+        .collect();
+    format!("{first}-{second}-{suffix}")
+}
+
+/// Case-insensitive; dashes and spaces anywhere are optional; Crockford look-alikes
+/// (`O` -> `0`, `I`/`L` -> `1`) are folded. Returns the canonical `FIRST-SECOND-XXXXXXXX`.
+pub fn parse_room_code(s: &str) -> Result<String, ProtoError> {
+    if s.len() > MAX_ROOM_CODE_BYTES {
+        return Err(ProtoError::BadRoomCode);
+    }
+    let compact: String = s
+        .chars()
+        .filter(|c| !matches!(c, ' ' | '-' | '\t'))
+        .map(|c| c.to_ascii_uppercase())
+        .collect();
+    for first in ROOM_FIRST_WORDS {
+        let Some(rest) = compact.strip_prefix(first) else {
+            continue;
+        };
+        for second in ROOM_SECOND_WORDS {
+            let Some(tail) = rest.strip_prefix(second) else {
+                continue;
+            };
+            let suffix: Option<String> = tail
+                .chars()
+                .map(|c| match c {
+                    'O' => Some('0'),
+                    'I' | 'L' => Some('1'),
+                    c if c.is_ascii() && ROOM_ALPHABET.contains(&(c as u8)) => Some(c),
+                    _ => None,
+                })
+                .collect();
+            if let Some(suffix) = suffix.filter(|x| x.len() == ROOM_SUFFIX_LEN) {
+                return Ok(format!("{first}-{second}-{suffix}"));
+            }
+        }
+    }
+    Err(ProtoError::BadRoomCode)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use combat_core::{AuraEnd, CastError, School, SpellId};
+
+    fn client_msgs() -> Vec<ClientMsg> {
+        let mut v = vec![
+            ClientMsg::Hello {
+                version: PROTOCOL_VERSION,
+                name: "Dana".into(),
+            },
+            ClientMsg::CreateRoom,
+            ClientMsg::JoinRoom {
+                code: "SCOPE-CREEP-7K3M9QZA".into(),
+            },
+            ClientMsg::LeaveRoom,
+            ClientMsg::Move {
+                pos: Vec3::new(1.5, 0.0, -3.25),
+                facing: 1.0,
+                moving: true,
+                jumping: false,
+                seq: 9,
+            },
+            ClientMsg::Ping { t: 123_456 },
+        ];
+        v.extend(Emote::ALL.into_iter().map(ClientMsg::Emote));
+        v.extend(
+            [
+                Command::SetTarget {
+                    unit: 1,
+                    target: Some(7),
+                },
+                Command::SetTarget {
+                    unit: 1,
+                    target: None,
+                },
+                Command::Cast {
+                    caster: 1,
+                    spell: SpellId(2),
+                },
+                Command::StopCasting { caster: 1 },
+                Command::Loot {
+                    looter: 1,
+                    corpse: 3,
+                },
+                Command::StartAutoAttack { unit: 1 },
+                Command::StopAutoAttack { unit: 1 },
+                Command::RespawnPlayer,
+                Command::Talk { unit: 4 },
+                Command::AcceptQuest {
+                    quest: "q_intro".into(),
+                },
+                Command::TurnInQuest {
+                    quest: "q_intro".into(),
+                },
+                Command::AbandonQuest {
+                    quest: "q_intro".into(),
+                },
+            ]
+            .into_iter()
+            .map(ClientMsg::Cmd),
+        );
+        v
+    }
+
+    fn server_msgs() -> Vec<ServerMsg> {
+        let p = PlayerInfo {
+            id: 1,
+            name: "Dana".into(),
+        };
+        let unit = UnitSnap {
+            id: 5,
+            key_idx: 3,
+            level: 4,
+            pos_cm: [150, 0, -32_500],
+            facing: 200,
+            hp: 900,
+            max_hp: 1440,
+            target: Some(1),
+            flags: UnitSnap::ALIVE | UnitSnap::IN_COMBAT,
+        };
+        vec![
+            ServerMsg::Welcome {
+                you: 1,
+                room: "MERGE-CONFLICT-42".into(),
+                zone: Some("campus".into()),
+                seed: 42,
+                players: vec![p.clone()],
+            },
+            ServerMsg::RoomCreated {
+                code: "MERGE-CONFLICT-42".into(),
+            },
+            ServerMsg::Error {
+                kind: ErrorKind::CannotJoin,
+                text: "Room is full.".into(),
+            },
+            ServerMsg::PlayerJoined(p),
+            ServerMsg::PlayerLeft { id: 2 },
+            ServerMsg::Events {
+                tick: 99,
+                events: vec![
+                    Event::Damage {
+                        source: 1,
+                        target: 5,
+                        spell: Some(SpellId(1)),
+                        amount: 80,
+                        absorbed: 0,
+                        crit: true,
+                        combo: false,
+                        school: School::Arcane,
+                    },
+                    Event::CastFailed {
+                        caster: 1,
+                        spell: SpellId(3),
+                        reason: CastError::OutOfRange,
+                    },
+                    Event::AuraRemoved {
+                        target: 5,
+                        key: "code_smell".into(),
+                        reason: AuraEnd::Expired,
+                    },
+                    Event::AiState {
+                        unit: 5,
+                        state: AiState::Evade,
+                    },
+                    Event::Knockback {
+                        unit: 1,
+                        dir: Vec3::new(0.0, 0.0, -1.0),
+                        strength: 4.0,
+                    },
+                    Event::QuestOffered {
+                        npc: 4,
+                        quests: vec!["q_intro".into()],
+                    },
+                ],
+            },
+            ServerMsg::Snapshot {
+                tick: 100,
+                units: vec![unit],
+                players: vec![PlayerSnap {
+                    id: 1,
+                    mana: 50,
+                    max_mana: 200,
+                    xp: 10,
+                    xp_to_next: 400,
+                }],
+            },
+            ServerMsg::MoveCorrection {
+                seq: 9,
+                pos: Vec3::new(1.0, 0.0, 2.0),
+            },
+            ServerMsg::Emoted {
+                player: 2,
+                emote: Emote::Lgtm,
+            },
+            ServerMsg::Pong { t: 123_456 },
+        ]
+    }
+
+    fn roundtrip<M: Msg + PartialEq + fmt::Debug>(m: &M) -> Result<M, ProtoError> {
+        decode::<M>(&encode(m)?)
+    }
+
+    #[test]
+    fn every_message_roundtrips() {
+        for m in client_msgs() {
+            assert_eq!(roundtrip(&m), Ok(m.clone()));
+        }
+        for m in server_msgs() {
+            assert_eq!(roundtrip(&m), Ok(m.clone()));
+        }
+    }
+
+    #[test]
+    fn oversize_frames_are_rejected_both_ways() {
+        let huge = ServerMsg::Error {
+            kind: ErrorKind::BadMessage,
+            text: "x".repeat(MAX_FRAME_BYTES),
+        };
+        assert!(matches!(encode(&huge), Err(ProtoError::TooLarge(_))));
+        let mut bytes = PROTOCOL_VERSION.to_le_bytes().to_vec();
+        bytes.resize(MAX_FRAME_BYTES + 1, 0);
+        assert!(matches!(
+            decode::<ClientMsg>(&bytes),
+            Err(ProtoError::TooLarge(_))
+        ));
+    }
+
+    #[test]
+    fn wrong_version_truncation_and_trailing_bytes_are_rejected() {
+        let Ok(mut bytes) = encode(&ClientMsg::Ping { t: 1 }) else {
+            panic!("encode")
+        };
+        let mut old = bytes.clone();
+        old[0] = old[0].wrapping_add(1);
+        assert!(matches!(
+            decode::<ClientMsg>(&old),
+            Err(ProtoError::BadVersion(_))
+        ));
+        assert_eq!(decode::<ClientMsg>(&bytes[..1]), Err(ProtoError::Malformed));
+        assert_eq!(decode::<ClientMsg>(&[]), Err(ProtoError::Malformed));
+        bytes.push(0);
+        assert_eq!(decode::<ClientMsg>(&bytes), Err(ProtoError::Malformed));
+    }
+
+    #[test]
+    fn client_validation_blocks_illegal_input() {
+        let moved = ClientMsg::Cmd(Command::PlayerMoved {
+            pos: Vec3::default(),
+            yaw: 0.0,
+            moving: false,
+            jumping: false,
+        });
+        assert_eq!(roundtrip(&moved), Err(ProtoError::IllegalCommand));
+        let long_quest = ClientMsg::Cmd(Command::AcceptQuest {
+            quest: "q".repeat(MAX_QUEST_ID_BYTES + 1),
+        });
+        assert_eq!(roundtrip(&long_quest), Err(ProtoError::IllegalCommand));
+        let nan = ClientMsg::Move {
+            pos: Vec3::new(f32::NAN, 0.0, 0.0),
+            facing: 0.0,
+            moving: false,
+            jumping: false,
+            seq: 1,
+        };
+        assert_eq!(roundtrip(&nan), Err(ProtoError::BadNumber));
+        let bad_room = ClientMsg::JoinRoom {
+            code: "DROP-TABLE-7K3M9QZA".into(),
+        };
+        assert_eq!(roundtrip(&bad_room), Err(ProtoError::BadRoomCode));
+        let lower = ClientMsg::JoinRoom {
+            code: " tech debt 7k3m9qza ".into(),
+        };
+        assert_eq!(
+            roundtrip(&lower),
+            Ok(ClientMsg::JoinRoom {
+                code: "TECH-DEBT-7K3M9QZA".into()
+            })
+        );
+        let long_name = ClientMsg::Hello {
+            version: PROTOCOL_VERSION,
+            name: "n".repeat(MAX_RAW_NAME_BYTES + 1),
+        };
+        assert_eq!(roundtrip(&long_name), Err(ProtoError::BadName));
+    }
+
+    #[test]
+    fn random_bytes_never_panic() {
+        let mut state: u64 = 0x2545_F491_4F6C_DD1D;
+        let mut next = move || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (state >> 33) as u32
+        };
+        let valid: Vec<Vec<u8>> = client_msgs()
+            .iter()
+            .filter_map(|m| encode(m).ok())
+            .chain(server_msgs().iter().filter_map(|m| encode(m).ok()))
+            .collect();
+        for round in 0..20_000 {
+            let mut bytes: Vec<u8> = match round % 3 {
+                // Pure noise, mostly rejected by the version check.
+                0 => (0..next() % 64).map(|_| next() as u8).collect(),
+                // Valid header, noise body: exercises the postcard decoder.
+                1 => {
+                    let mut b = PROTOCOL_VERSION.to_le_bytes().to_vec();
+                    b.extend((0..next() % 96).map(|_| next() as u8));
+                    b
+                }
+                // A real frame with a few flipped bytes.
+                _ => valid[next() as usize % valid.len()].clone(),
+            };
+            if round % 3 == 2 {
+                for _ in 0..1 + next() % 3 {
+                    let k = HEADER + next() as usize % (bytes.len() - HEADER).max(1);
+                    if let Some(b) = bytes.get_mut(k) {
+                        *b ^= next() as u8;
+                    }
+                }
+            }
+            let _ = decode::<ClientMsg>(&bytes);
+            let _ = decode::<ServerMsg>(&bytes);
+        }
+    }
+
+    #[test]
+    fn names_are_sanitised() {
+        assert_eq!(sanitize_name("  Dana_K-9 ", 1), "Dana_K-9");
+        assert_eq!(sanitize_name("Al", 1), "Al");
+        assert_eq!(sanitize_name("A", 3), "Intern-3");
+        assert_eq!(sanitize_name("Seventeen chars!!", 4), "Intern-4");
+        assert_eq!(sanitize_name("abcdefghijklmnopq", 5), "Intern-5");
+        assert_eq!(sanitize_name("<script>", 6), "Intern-6");
+        assert_eq!(sanitize_name("Zoë", 7), "Intern-7");
+        assert_eq!(sanitize_name("   ", 8), "Intern-8");
+    }
+
+    #[test]
+    fn room_codes_generate_from_bytes_and_parse_leniently() {
+        let mut b = [0u8; 10];
+        for k in 0..=255u8 {
+            b.iter_mut()
+                .enumerate()
+                .for_each(|(i, x)| *x = k.wrapping_mul(31).wrapping_add(i as u8 * 7));
+            let code = room_code_from_bytes(&b);
+            assert_eq!(code.rsplit('-').next().map(str::len), Some(ROOM_SUFFIX_LEN));
+            assert_eq!(parse_room_code(&code), Ok(code.clone()));
+            assert_eq!(parse_room_code(&code.to_lowercase()), Ok(code.clone()));
+            assert_eq!(parse_room_code(&code.replace('-', "")), Ok(code.clone()));
+        }
+        assert_eq!(
+            room_code_from_bytes(&[0, 0, 0, 1, 2, 31, 32, 255, 10, 20]),
+            "MERGE-CONFLICT-012Z0ZAM"
+        );
+        let canon = Ok("MERGE-CONFLICT-7K3M9QZA".to_string());
+        for ok in [
+            "merge-conflict-7k3m9qza",
+            " MERGE CONFLICT 7K3M9QZA ",
+            "MERGE-CONFLICT7K3M9QZA",
+            "mergeconflict7k3m9qza",
+        ] {
+            assert_eq!(parse_room_code(ok), canon, "{ok}");
+        }
+        // Crockford look-alikes fold to digits.
+        assert_eq!(
+            parse_room_code("TECH-DEBT-OIL00000"),
+            Ok("TECH-DEBT-01100000".into())
+        );
+        for bad in [
+            "",
+            "MERGE-CONFLICT",
+            "MERGE-CONFLICT-7K3M9QZ",
+            "MERGE-CONFLICT-7K3M9QZAB",
+            "MERGE-CONFLICT-7K3M9QZU",
+            "MERGE-CONFLICT-7K3M9QZ!",
+            "MERGE-7K3M9QZA",
+            "FOO-BAR-7K3M9QZA",
+            "MERGE-CONFLICT-42",
+        ] {
+            assert_eq!(parse_room_code(bad), Err(ProtoError::BadRoomCode), "{bad}");
+        }
+        assert_eq!(
+            parse_room_code(&"A".repeat(MAX_ROOM_CODE_BYTES + 1)),
+            Err(ProtoError::BadRoomCode)
+        );
+    }
+
+    #[test]
+    fn room_words_concatenate_without_prefix_ambiguity() {
+        let mut all = Vec::new();
+        for f in ROOM_FIRST_WORDS {
+            for s in ROOM_SECOND_WORDS {
+                all.push(format!("{f}{s}"));
+            }
+        }
+        for (i, a) in all.iter().enumerate() {
+            for (j, b) in all.iter().enumerate() {
+                assert!(i == j || !b.starts_with(a.as_str()), "{a} / {b}");
+            }
+        }
+        let letters = ROOM_FIRST_WORDS.iter().chain(&ROOM_SECOND_WORDS);
+        assert!(
+            letters
+                .flat_map(|w| w.bytes())
+                .all(|b| b.is_ascii_uppercase())
+        );
+    }
+
+    #[test]
+    fn server_validation_rejects_bad_floats_and_oversized_lists() {
+        let knock = ServerMsg::Events {
+            tick: 1,
+            events: vec![Event::Knockback {
+                unit: 1,
+                dir: Vec3::new(f32::INFINITY, 0.0, 0.0),
+                strength: 1.0,
+            }],
+        };
+        assert_eq!(roundtrip(&knock), Err(ProtoError::BadNumber));
+        let corr = ServerMsg::MoveCorrection {
+            seq: 1,
+            pos: Vec3::new(0.0, f32::NAN, 0.0),
+        };
+        assert_eq!(roundtrip(&corr), Err(ProtoError::BadNumber));
+        let many = ServerMsg::Events {
+            tick: 1,
+            events: vec![Event::Despawned { unit: 1 }; MAX_EVENTS_PER_FRAME + 1],
+        };
+        assert_eq!(roundtrip(&many), Err(ProtoError::TooMany));
+        let loot = ServerMsg::Events {
+            tick: 1,
+            events: vec![Event::LootDropped {
+                corpse: 1,
+                items: vec!["x".into(); MAX_LIST_LEN + 1],
+            }],
+        };
+        assert_eq!(roundtrip(&loot), Err(ProtoError::TooMany));
+        let crowd = ServerMsg::Welcome {
+            you: 1,
+            room: "r".into(),
+            zone: None,
+            seed: 1,
+            players: vec![
+                PlayerInfo {
+                    id: 1,
+                    name: "a".into()
+                };
+                MAX_PLAYERS + 1
+            ],
+        };
+        assert_eq!(roundtrip(&crowd), Err(ProtoError::TooMany));
+        assert_eq!(ErrorKind::CannotJoin.message(), "Cannot join that room.");
+    }
+
+    #[test]
+    fn emotes_have_unique_commands_and_parse_back() {
+        for e in Emote::ALL {
+            assert_eq!(Emote::from_command(e.command()), Some(e));
+            assert!(e.command().starts_with('/') && !e.text().is_empty());
+        }
+        assert_eq!(Emote::from_command(" /LGTM "), Some(Emote::Lgtm));
+        assert_eq!(Emote::from_command("/rm -rf"), None);
+    }
+
+    #[test]
+    fn unit_snap_quantises_position_and_facing() {
+        let Ok(content) = Content::from_ron(include_str!("../../../content/game.ron")) else {
+            panic!("content")
+        };
+        let mut sim = combat_core::Sim::new(content, 1);
+        let p = sim.spawn_player(Vec3::new(12.345, 0.0, -630.004), 1.0);
+        let Some(u) = sim.unit(p).cloned() else {
+            panic!("no player")
+        };
+        let Some(s) = UnitSnap::from_state(&u, sim.content()) else {
+            panic!("no snap")
+        };
+        assert_eq!(s.pos_cm, [1235, 0, -63000]);
+        assert!((s.pos().x - 12.35).abs() < 1e-4);
+        assert!((s.yaw() - 1.0).abs() < std::f32::consts::TAU / 256.0);
+        assert!(s.has(UnitSnap::ALIVE) && !s.has(UnitSnap::IN_COMBAT));
+        assert_eq!(
+            sim.content().units[usize::from(s.key_idx)].key,
+            sim.content().config.player_unit
+        );
+        assert_eq!(quantize_yaw(-std::f32::consts::FRAC_PI_2), 192);
+    }
+}

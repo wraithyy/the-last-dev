@@ -4,7 +4,7 @@
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
-use crate::combat::{CombatEvent, CombatSim, SimReady, SimUnit};
+use crate::combat::{CombatEvent, SimReady, SimUnit, SimView};
 use crate::combat_anim::CombatAnim;
 use crate::config::*;
 use crate::player::Player;
@@ -104,7 +104,7 @@ fn attach_vfx(
     assets: Res<VfxAssets>,
     fx: Option<Res<Fx>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     q: Query<(Entity, &SimUnit, Option<&Unit>, Has<Player>), Without<VfxAttached>>,
 ) {
     let Some(fx) = fx else { return };
@@ -112,7 +112,6 @@ fn attach_vfx(
         let mut e = commands.entity(entity);
         e.insert(VfxAttached);
         let head = sim
-            .0
             .unit(sim_unit.0)
             .map_or(PLAYER_HEIGHT, |u| head_height(&u.key));
         e.with_children(|c| {
@@ -224,11 +223,11 @@ fn spawn_ring(
 
 fn update_stun_stars(
     time: Res<Time>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     mut stars: Query<(&StunStars, &mut Visibility, &mut Transform)>,
 ) {
     for (s, mut vis, mut tf) in &mut stars {
-        let stunned = sim.0.unit(s.0).is_some_and(|u| u.stunned && u.alive);
+        let stunned = sim.unit(s.0).is_some_and(|u| u.stunned && u.alive);
         vis.set_if_neq(if stunned {
             Visibility::Inherited
         } else {
@@ -243,7 +242,7 @@ fn update_stun_stars(
 fn spawn_from_events(
     mut commands: Commands,
     mut events: MessageReader<CombatEvent>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     assets: Res<VfxAssets>,
     fx: Option<Res<Fx>>,
     mut budget: ResMut<FxBudget>,
@@ -257,11 +256,7 @@ fn spawn_from_events(
     units: Query<(&SimUnit, &Transform)>,
 ) {
     let Some(fx) = fx else { return };
-    let head_of = |id: EntityId| {
-        sim.0
-            .unit(id)
-            .map_or(PLAYER_HEIGHT, |u| head_height(&u.key))
-    };
+    let head_of = |id: EntityId| sim.unit(id).map_or(PLAYER_HEIGHT, |u| head_height(&u.key));
     for CombatEvent(ev) in events.read() {
         match ev {
             Event::CastSucceeded {
@@ -339,7 +334,7 @@ fn spawn_from_events(
                 match launch.take().filter(|_| held) {
                     Some(l) => {
                         // The sim state is post-hit: undo the damage to see if this was an execute.
-                        let execute = sim.0.unit(*target).is_some_and(|u| {
+                        let execute = sim.unit(*target).is_some_and(|u| {
                             (u.hp + amount + absorbed) as f32 / (u.max_hp.max(1) as f32) < 0.25
                         });
                         spell_fx::note_hit(&mut tickets, l.ticket, *combo, execute);
@@ -381,7 +376,7 @@ fn spawn_from_events(
                 }
             }
             Event::Summoned { unit, .. } => {
-                if let Some(u) = sim.0.unit(*unit) {
+                if let Some(u) = sim.unit(*unit) {
                     spell_fx::summon_puff(
                         &mut commands,
                         &fx,
@@ -467,12 +462,9 @@ fn update_hand_glow(
 }
 
 /// The ring tightens as the enemy cast progresses, so it doubles as a second cast indicator.
-fn update_telegraph(
-    sim: Res<CombatSim>,
-    mut rings: Query<(&Telegraph, &mut Visibility, &mut Transform)>,
-) {
+fn update_telegraph(sim: SimView, mut rings: Query<(&Telegraph, &mut Visibility, &mut Transform)>) {
     for (ring, mut vis, mut tf) in &mut rings {
-        let cast = sim.0.unit(ring.0).and_then(|u| u.cast);
+        let cast = sim.unit(ring.0).and_then(|u| u.cast);
         match cast {
             Some(c) if c.total_ms > 0 => {
                 *vis = Visibility::Inherited;

@@ -7,8 +7,22 @@ license.workspace = true
 
 [dependencies]
 combat_core = { path = "../combat_core" }
+net_proto = { path = "../net_proto" }
 # 3d + ui + OGG audio only (no 2d, no other codecs); default_platform already enables webgl2.
 bevy = { version = "=0.19.1", default-features = false, features = ["3d", "ui", "bevy_audio", "vorbis"] }
+
+# Native co-op transport: sync websocket on its own thread; ws:// only (LAN target), no TLS stack.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tungstenite = { version = "0.29", default-features = false, features = ["handshake"] }
+
+# Browser transport and soft keyboard; versions follow Cargo.lock (wasm-bindgen must match the CLI).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = [
+    "BinaryType", "CloseEvent", "Document", "Element", "ErrorEvent", "Event", "EventTarget",
+    "HtmlElement", "HtmlInputElement", "Location", "MediaQueryList", "MessageEvent", "MouseEvent", "Node", "PointerEvent", "Storage", "WebSocket", "Window",
+] }
 
 [lints]
 workspace = true

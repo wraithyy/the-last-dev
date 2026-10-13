@@ -5,7 +5,7 @@
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
-use crate::combat::{CombatSim, SimReady, SimUnit};
+use crate::combat::{SimReady, SimUnit, SimView};
 use crate::config::{PROJECTILE_ORIGIN_Y, PROJECTILE_TARGET_Y};
 use crate::player::Player;
 use crate::presentation::{PresentEvent, PresentQueue};
@@ -779,7 +779,7 @@ fn move_projectiles(
     mut queue: ResMut<PresentQueue>,
     mut info: ResMut<TicketInfo>,
     mut present: MessageWriter<PresentEvent>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     units: Query<(&SimUnit, &Transform), Without<Projectile>>,
     mut shots: Query<(Entity, &mut Projectile, &mut Transform)>,
 ) {
@@ -809,7 +809,6 @@ fn move_projectiles(
             }
             let flags = info.0.remove(&s.ticket).unwrap_or_default();
             let head = sim
-                .0
                 .units()
                 .find(|u| u.id == s.target)
                 .map_or(1.8, |u| crate::config::head_height(&u.key));
@@ -1484,10 +1483,9 @@ fn update_wobble(time: Res<Time>, mut q: Query<(&Wobble, &mut Transform)>) {
     }
 }
 
-fn update_aura_fx(sim: Res<CombatSim>, mut q: Query<(&AuraFx, &mut Visibility)>) {
+fn update_aura_fx(sim: SimView, mut q: Query<(&AuraFx, &mut Visibility)>) {
     for (a, mut vis) in &mut q {
         let on = sim
-            .0
             .unit(a.id)
             .is_some_and(|u| u.alive && u.auras.iter().any(|x| x.key == a.key));
         vis.set_if_neq(if on {
@@ -1501,7 +1499,7 @@ fn update_aura_fx(sim: Res<CombatSim>, mut q: Query<(&AuraFx, &mut Visibility)>)
 fn update_cage(
     time: Res<Time>,
     fx: Option<Res<Fx>>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     player: Single<&SimUnit, With<Player>>,
     mut peak: Local<u32>,
     mut cage: Query<(&mut Visibility, &mut Transform), With<Cage>>,
@@ -1515,7 +1513,7 @@ fn update_cage(
     >,
 ) {
     let Some(fx) = fx else { return };
-    let rem = sim.0.unit(player.0).and_then(|u| {
+    let rem = sim.unit(player.0).and_then(|u| {
         u.auras
             .iter()
             .find(|a| a.key == GUARDRAILS_AURA)
@@ -1558,13 +1556,12 @@ fn update_cage(
 
 fn update_keycap_ring(
     time: Res<Time>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     player: Single<&SimUnit, With<Player>>,
     mut angle: Local<f32>,
     mut ring: Query<(&mut Visibility, &mut Transform), With<KeycapRing>>,
 ) {
     let cast = sim
-        .0
         .unit(player.0)
         .and_then(|u| u.cast)
         .filter(|c| c.spell.0 == KEYCAP_SPELL);
@@ -1583,13 +1580,12 @@ fn update_keycap_ring(
 
 fn update_speed_lines(
     time: Res<Time>,
-    sim: Res<CombatSim>,
+    sim: SimView,
     player: Single<&SimUnit, With<Player>>,
     mut root: Query<&mut Visibility, With<SpeedLines>>,
     mut streaks: Query<(&Streak, &mut Transform)>,
 ) {
     let on = sim
-        .0
         .unit(player.0)
         .is_some_and(|u| u.auras.iter().any(|a| a.key == CAFFEINE_AURA));
     for mut v in &mut root {
