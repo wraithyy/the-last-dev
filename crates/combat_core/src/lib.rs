@@ -1,4 +1,4 @@
-//! Deterministic combat rules for World of Workcraft.
+//! Deterministic combat rules for The Last Dev.
 //!
 //! `combat_core` owns the rules that must behave identically on client and
 //! server, and deliberately has no engine (Bevy) dependency.

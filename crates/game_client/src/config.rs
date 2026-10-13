@@ -2,7 +2,7 @@
 
 use std::f32::consts::PI;
 
-pub const WINDOW_TITLE: &str = "World of Workcraft";
+pub const WINDOW_TITLE: &str = "The Last Dev";
 
 // Arena (metres). The floor spans [-ARENA_HALF, ARENA_HALF] on X and Z.
 pub const ARENA_HALF: f32 = 20.0;

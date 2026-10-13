@@ -1,14 +1,14 @@
-# World of Workcraft
+# The Last Dev
 
-A satirical single-player 3D browser RPG with WotLK-style tab-target combat, set in a corporate office. It is an original game: no Blizzard assets, code, text or data.
+A satirical single-player 3D browser RPG with classic-MMO tab-target combat, set in a corporate office. It is an original game: no Blizzard assets, code, text or data.
 
-Play it: https://wraithyy.github.io/world-of-workcraft/
+Play it: https://wraithyy.github.io/the-last-dev/
 
 ## The satire
 
-The whole game is a long, loving roast of corporations that push AI onto every task for no reason. You play a Senior Engineer ("Legacy Cost Center") who is sent to fight the **CEO** ("Chief AI Visionary"), a boss who yells AI buzzwords at you in WoW monster-yell style (red chat line plus a speech bubble over his head), casts Hallucination Blast, and drops loot such as the Unread AI Strategy Deck, Expired GPU Credits and the Mandatory Prompt Training Certificate. The **AI-Native Intern** ("Prompt Engineer") stands in the corner. When you die your role is backfilled by an AI agent; the loading screen, pause overlay and XP messages keep the joke going. All text is original; no real companies or people are named.
+The whole game is a long, loving roast of corporations that push AI onto every task for no reason. You play a Senior Engineer ("Legacy Cost Center") who is sent to fight the **CEO** ("Chief AI Visionary"), a boss who yells AI buzzwords at you in classic MMO boss-yell style (red chat line plus a speech bubble over his head), casts Hallucination Blast, and drops loot such as the Unread AI Strategy Deck, Expired GPU Credits and the Mandatory Prompt Training Certificate. The **AI-Native Intern** ("Prompt Engineer") stands in the corner. When you die your role is backfilled by an AI agent; the loading screen, pause overlay and XP messages keep the joke going. All text is original; no real companies or people are named.
 
-Status: **Phases 0-4** are playable: office arena with animated CC0 models, WoW-style movement and camera, tab-target combat with four spells, the CEO encounter (aggro, melee, interruptible Hallucination Blast, evade, death, loot, respawn, monster yells with speech bubbles), a WoW-style HUD, a ranged auto attack (Nitpick) with miss/resist feedback, and damage numbers that land with the projectile. See [docs/PLAN.md](docs/PLAN.md), [docs/COMBAT_API.md](docs/COMBAT_API.md), [docs/FORMULAS.md](docs/FORMULAS.md) and [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
+Status: **Phases 0-4** are playable: office arena with animated CC0 models, MMO-style movement and camera, tab-target combat with four spells, the CEO encounter (aggro, melee, interruptible Hallucination Blast, evade, death, loot, respawn, monster yells with speech bubbles), a developer-themed HUD, a ranged auto attack (Nitpick) with miss/resist feedback, and damage numbers that land with the projectile. See [docs/PLAN.md](docs/PLAN.md), [docs/COMBAT_API.md](docs/COMBAT_API.md), [docs/FORMULAS.md](docs/FORMULAS.md) and [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Requirements
 
