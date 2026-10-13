@@ -93,7 +93,9 @@ impl Sim {
             return;
         }
         let crit_pct = self.content.units[self.units[i].def].crit_pct;
-        let crit = self.rng.chance_pct(crit_pct);
+        let crit = self
+            .rng
+            .chance_crit(crit_pct, self.units[i].item_bonus.crit_tenths);
         let mut amount = u64::from(self.rng.range_inclusive(def.damage_min, def.damage_max));
         if crit {
             amount = amount * u64::from(self.content.config.crit_damage_pct) / 100;

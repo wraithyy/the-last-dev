@@ -28,12 +28,6 @@ fn blocks(pos: Vec3, b: &Aabb) -> bool {
     overlaps_xz(pos, b) && b.max.y > pos.y + STEP_HEIGHT && b.min.y < pos.y + PLAYER_HEIGHT
 }
 
-/// Public twin of `blocks` for layout validation (is this standing point free?).
-#[cfg(test)]
-pub fn blocks_at(pos: Vec3, b: &Aabb) -> bool {
-    blocks(pos, b)
-}
-
 /// Height of the walkable surface under the feet (floor or a prop top).
 pub fn ground_height(pos: Vec3, colliders: &[Aabb]) -> f32 {
     colliders

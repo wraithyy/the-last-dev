@@ -318,6 +318,8 @@ pub struct UnitState {
     /// Boss phase, starting at 1.
     pub phase: u8,
     pub idle_pose: Option<IdlePose>,
+    /// Player trophies as (item name, copies) in first-pickup order; empty for other units.
+    pub inventory: Vec<(String, u32)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

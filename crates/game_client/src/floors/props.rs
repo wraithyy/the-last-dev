@@ -116,11 +116,6 @@ pub fn lounge(p: &mut Plan, x: f32, z: f32, yaw: f32, plant: bool) {
     });
 }
 
-/// Wall-mounted whiteboard with a procedural drawing.
-pub fn whiteboard(p: &mut Plan, x: f32, z: f32, face: Face, tex: Tex) {
-    p.poster(x, z, 2.2, face, Vec2::new(3.0, 1.5), tex);
-}
-
 pub fn water_cooler(p: &mut Plan, x: f32, z: f32) {
     p.boxed(v(x, 0.45, z), v(0.4, 0.9, 0.4), Mat::Board, true);
     p.boxed(v(x, 1.12, z), v(0.3, 0.45, 0.3), Mat::Water, false);
@@ -308,11 +303,6 @@ pub fn long_table(p: &mut Plan, x: f32, z: f32, n: usize, mat_glass: bool) {
     }
 }
 
-/// Neon sign (emissive texture) on a wall.
-pub fn neon(p: &mut Plan, x: f32, y: f32, z: f32, face: Face, size: Vec2, tex: Tex) {
-    p.wall_panel(v(x, y, z), face, size, tex);
-}
-
 /// Stacked old monitors, a MISC box and cable spaghetti.
 pub fn it_clutter(p: &mut Plan, x: f32, z: f32) {
     for k in 0..4 {
@@ -358,37 +348,6 @@ pub fn mini_fridge(p: &mut Plan, x: f32, z: f32, face: Face) {
             );
         }
     });
-}
-
-/// Room walls with one door; `side` +1 north / -1 south of the corridor.
-pub fn room_walls(p: &mut Plan, x0: f32, x1: f32, side: f32, door: (f32, f32), mat: Mat, h: f32) {
-    let z_in = side * 8.0;
-    p.wall_z(z_in, x0, x1, &[door], mat, h);
-    let (a, b) = if side > 0.0 {
-        (8.0, 20.0)
-    } else {
-        (-20.0, -8.0)
-    };
-    p.wall_x(x0, a, b, &[], mat, h);
-    p.wall_x(x1, a, b, &[], mat, h);
-}
-
-/// Skyline "window" on a long wall with gold-ish mullions.
-pub fn window_wall(p: &mut Plan, z: f32, face: Face, xs: &[f32], mullion: Mat) {
-    for &x in xs {
-        p.wall_panel(v(x, 2.4, z), face, Vec2::new(6.0, 3.2), Tex::Skyline);
-        for dx in [-3.0, 0.0, 3.0] {
-            let d = face.dir();
-            p.boxed(
-                v(x + dx, 2.4, z + d.z * 0.06),
-                v(0.12, 3.4, 0.1),
-                mullion,
-                false,
-            );
-        }
-        p.boxed(v(x, 4.05, z), v(6.1, 0.12, 0.12), mullion, false);
-        p.boxed(v(x, 0.75, z), v(6.1, 0.12, 0.12), mullion, false);
-    }
 }
 
 /// Executive desk with a chair, facing +Z (local); the chair sits at +Z.

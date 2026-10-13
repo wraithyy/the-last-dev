@@ -39,7 +39,6 @@
 [00259] CEO yells: Behold: our new AI strategy deck!
 [00260] Senior Engineer Refactor interrupted by movement/cancel (lockout 0 ms)
 [00292] Senior Engineer casts Guardrails
-[00292] Senior Engineer yells: Adding tests. Yes, real ones.
 [00292] Senior Engineer gains guardrails
 [00299] Senior Engineer swings at CEO
 [00299] Senior Engineer hits CEO with melee for 10 (absorbed 0)
@@ -70,9 +69,7 @@
 [00514] CEO hits Senior Engineer with melee for 0 (absorbed 14)
 [00542] CEO begins Hallucination Blast (2500 ms)
 [00542] CEO ai Casting
-[00542] CEO yells: Mandatory all-hands! Attendance is tracked!
 [00543] Senior Engineer casts Reject PR
-[00543] Senior Engineer yells: Request changes.
 [00543] CEO Hallucination Blast interrupted by Senior Engineer (lockout 4000 ms)
 [00543] CEO ai Attack
 [00550] Senior Engineer casts Refactor

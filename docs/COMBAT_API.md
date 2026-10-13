@@ -10,12 +10,13 @@ Content is data-driven: `content/game.ron` (spells, auras, units, levels, floors
 pub struct SpellId(pub u32);              // Copy, Eq, Hash, Ord, Debug
 pub enum School { Physical, Arcane }      // only two; a school lockout locks one of them
 
-pub struct Content { pub config, pub auras, pub spells, pub units, pub action_bar, pub levels, pub floors }
+pub struct Content { pub config, pub auras, pub spells, pub units, pub items, pub action_bar, pub levels, pub floors }
 impl Content {
     pub fn from_ron(src: &str) -> Result<Content, ContentError>;
     pub fn spell(&self, id: SpellId) -> Option<&SpellDef>;
     pub fn action_bar(&self) -> &[SpellId];          // full bar, keys 1..=0 in order (10 slots); see Sim::known_spells
     pub fn unit_def(&self, key: &str) -> Option<&UnitDef>;
+    pub fn item(&self, name: &str) -> Option<&ItemDef>;   // trophy table entry by loot item name
     pub fn aura(&self, key: &str) -> Option<&AuraDef>;
     pub fn floor(&self, id: u8) -> Option<&FloorDef>;
     pub fn max_level(&self) -> u8;                   // 10
@@ -36,6 +37,9 @@ impl Sim {
     pub fn load_floor(&mut self, floor: u8, anchors: &dyn Fn(&str) -> Option<(Vec3, f32)>, blockers: Vec<Aabb>) -> Result<(), ContentError>;
     pub fn floor(&self) -> Option<u8>;
     pub fn set_respawn_point(&mut self, pos: Vec3, yaw: f32);             // where RespawnPlayer puts the player
+    pub fn inventory(&self) -> &[(String, u32)];                           // player trophies (name, copies), first pickup first
+    pub fn item_totals(&self) -> ItemTotals;                              // current trophy bonus, stack cap applied
+    pub fn grant_trophy(&mut self, name: &str) -> bool;                    // debug/test: as if looted, no event; false for unknown items
     pub fn set_player_level(&mut self, level: u8);                        // debug/test: silent, clamps to 1..=max, 0 XP, full HP/mana
     pub fn known_spells(&self, unit: EntityId) -> Vec<SpellId>;           // learned action-bar spells, bar order
     pub fn push(&mut self, cmd: Command);    // applied at the start of the next tick
@@ -72,6 +76,7 @@ pub struct UnitState {
     pub auras: Vec<AuraView>,                        // AuraView { key, name, icon, harmful, remaining_ms, total_ms, absorb_remaining: Option<u32>, stacks: u8 }
     pub ai: Option<AiState>,                         // Idle | Chase | Attack | Casting | Evade | Dead
     pub lootable: bool, pub respawn_in_ms: Option<u32>,
+    pub inventory: Vec<(String, u32)>,   // player trophies (name, copies); empty for everyone else
     pub xp: u32,                                     // player: XP into the current level; hostile: XP reward at its level
     pub auto_attack: bool, pub swing_remaining_ms: u32,
     pub xp_to_next: u32,                             // player: XP bar maximum (0 at level cap); others 0
@@ -184,7 +189,9 @@ The player keeps level, XP, HP and cooldowns across floors. `set_respawn_point(p
 - `AiDef.phases: [(below_hp_pct, spell?, target, yells)]`, strictly descending. When HP drops to `below_hp_pct` or less the unit enters the next phase (`PhaseChanged`, phases numbered from 2), yells one of the phase lines and resolves `spell` instantly (no cast time).
 - Social aggro: when a unit with a `pack` id gets its first threat, every idle living member of the same pack gets 1 threat on the same source and starts chasing. Summons join their summoner's pack and immediately attack the summoner's target.
 - Self-inflicted damage (Phishing Test) never adds the unit to its own threat table.
-- Evade (empty threat table or beyond `leash_m`) cancels the cast, removes all auras (Scope Creep stacks too), resets the phase to 1 (`PhaseChanged { phase: 1 }` if it had changed), walks home and heals; a summoned unit despawns instead of healing.
+- Evade (empty threat table or beyond `leash_m`) cancels the cast, removes all auras (Scope Creep stacks too), resets the phase to 1 (`PhaseChanged { phase: 1 }` if it had changed), walks home and heals; a summoned unit despawns instead of healing. Evading a summoner also despawns its living adds at once (`Despawned`), so no stragglers are left behind.
+- Adds follow their summoner: when a unit dies, every living unit whose `summoner` is that unit dies in the same tick (`Death { killer: None }`, then `AiState Dead`), so no XP, loot, death spell or yell. A floor boss's adds are additionally despawned (`Despawned`) before `FloorCleared`.
+- Idle wandering (`Sim::set_wandering(false)` turns it off; tests that pin fight timing do): hostile units with `ai == Idle` and no threat, alive and not stunned, pick a point 1.5-4 m from their spawn (bosses: 1-2 m), walk there at 1.4 m/s (bosses 1.0), idle 3-8 s and repeat. Targets keep 1 m clearance to blockers (padded segment test), pack members stay within 4 m of the pack anchor (slot 0), summons never wander. Friendly NPCs without `idle_pose` Sleeping/Sitting stroll up to 6 m away and walk back (6-15 s pauses). The client may override a unit's pose with `Sim::set_idle_pose` (floor dressing seats the sleeping IT Support). Aggro checks run every tick, so a wanderer still pulls; evade and leash walk home at chase speed. `UnitState.pos`/`yaw` carry the motion (yaw turns at 6 rad/s before walking), the client derives Walk vs Run from speed. Each unit has its own SplitMix64 stream (seed ^ id), so wandering never changes combat rolls.
 
 ## game_client: combat to animation contract
 
@@ -199,6 +206,8 @@ The player keeps level, XP, HP and cooldowns across floors. `set_respawn_point(p
 - Pushback has no event: the `CastView.total_ms` of the unit grows (by `pushback_ms`, at most `pushback_max` times). Player (and other non-AI units) only.
 - Off-GCD instants (`gcd: false`, `cast_ms: 0`: Reject PR, On-Call Caffeine) are usable during the GCD and during an own cast without cancelling it.
 - `CooldownView.usable` is the complete verdict now (learned, stun, silence, lockout, cooldown, target, range, facing, LoS, mana, GCD/cast busy), so the HUD can grey buttons from it. `gcd_*` fields are zero for off-GCD spells.
+- Trophies: every loot item has an `items` entry `(name, icon, description, bonus)` in `content/game.ron`; `Content::from_ron` rejects a unit that drops an item without one, duplicate names, an empty bonus, `crit_pct` outside 0..=5 and a description over `ITEM_DESC_MAX` (110) chars. `bonus` is any of `max_hp`, `max_mana`, `spell_power`, `crit_pct` (tenths allowed), `haste_pct`, `mana_regen` (extra mana per 5 s in combat). `ItemTotals` carries the sums with crit in tenths (`crit_tenths`).
+- `Looted { looter, corpse, items }` is also the pickup: when the looter is the player, each item is appended to `UnitState.inventory` (copies are counted per name, first pickup order) and the bonuses apply in the same tick, before the event is observable. `max_hp`/`max_mana` grow and the current HP/mana scale up by the same ratio (`max(cur, cur * new_max / old_max)`), never down. Only the first `ITEM_STACK_CAP` (3) copies of an item add bonus; further copies are kept and counted but add nothing. Bonuses live in the player's unit, so they persist across `load_floor`, `RespawnPlayer` and level-ups; a new `Sim` (restart) starts empty. Looting never touches the RNG, so replays only change when a bonus changes a later roll.
 - A corpse is always `lootable` after death; `LootDropped.items` / `Looted.items` may be empty. `Command::Loot` outside `loot_range_m` or on a non-corpse is silently ignored.
 - Hostile units die with `ai: Some(AiState::Dead)`; the player has `ai: None`. `Command::RespawnPlayer` on a living player is ignored.
 - Damage to a unit in `AiState::Evade` is dropped entirely (no `Damage` event, no threat, no aura).
@@ -212,8 +221,10 @@ The player keeps level, XP, HP and cooldowns across floors. `set_respawn_point(p
 
 `UnitDef.yells` (RON, serde default = silent): `periodic_ms` plus line lists `aggro`, `periodic`, `blast`, `low_hp`, `player_killed`, `death`, `evade`, `talk`, and `ambient_ms` + `ambient`. Ability and phase lines live on `AiAbility.yells` and `PhaseDef.yells`. A unit yells via `Event::Yell { unit, text }`, emitted at the end of the tick (after `Death`/`EnterCombat`/`CastStarted` of that tick).
 
-- Triggers: entering combat; every `periodic_ms` while in combat and alive; starting an AI ability cast; entering a phase; hp first dropping to <= 30% (re-armed when hp is back above 30%); killing the player; its own death; starting evade; `Command::Talk`; every `ambient_ms` while alive and out of combat (first one staggered by unit id; same-kind NPCs start at different lines so neighbours banter).
+- Triggers: entering combat; every `periodic_ms` while in combat and alive; starting an AI ability cast; entering a phase; hp first dropping to <= 30% (re-armed when hp is back above 30%); killing the player; its own death; starting evade; `Command::Talk`; every `ambient_ms` while alive and out of combat, emitted only while the player is within 15 m (the timer keeps running out of range; first one staggered by unit id; same-kind NPCs start at different lines so neighbours banter).
 - At most one yell per unit per tick. Priority: death > player_killed > phase > low_hp > ability (blast) > aggro > evade > talk > periodic > ambient. Any emitted yell restarts the periodic timer.
+- Pack aggro: only the first unit of a pack to enter combat yells `aggro`; later members of the same pull stay silent (units without a pack always yell).
+- Global hostile throttle: all hostile yells share a 2500 ms gap. Boss phase, aggro and death yells bypass it (as does any `Phase` yell); every other hostile yell inside the gap is dropped, not queued, and does not advance its line cursor. Friendly and player yells are not throttled. Units are flushed in index order, so ties on one tick go to the lowest id.
 - Lines cycle round-robin per unit and trigger (per rule for ability lines); the combat rng is never consumed, so yells cannot change hit/miss/crit outcomes.
 
 ### Player spell yells
@@ -221,7 +232,7 @@ The player keeps level, XP, HP and cooldowns across floors. `set_respawn_point(p
 `SpellDef.yells: Vec<String>` (RON, serde default = silent). When the player's spell is released (`CastSucceeded`) the player emits `Event::Yell { unit: player, text }` right after `CastSucceeded`. Not emitted for the Nitpick auto attack, failed or interrupted casts, or enemy casts.
 
 - Lines cycle round-robin per spell; the rng is never consumed.
-- `config.player_yell_cooldown_ms` (7000) is a global gate between player spell yells; the first eligible cast yells, and a gated cast neither yells nor advances its cursor.
+- `config.player_yell_cooldown_ms` (20000) is a global gate between player spell yells; the first eligible cast yells, and a gated cast neither yells nor advances its cursor.
 
 ## Regeneration
 

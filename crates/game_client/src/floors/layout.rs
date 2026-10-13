@@ -2,11 +2,11 @@
 //! the palette. `build_floor` has no ECS or asset dependencies.
 
 use super::kit::{Anchor, Piece, Plan};
+use super::shape::Footprint;
 use super::themes;
 use crate::collision::aabb;
 use bevy::prelude::*;
 use combat_core::Aabb;
-use std::f32::consts::FRAC_PI_2;
 
 pub const FLOOR_COUNT: u8 = 5;
 
@@ -54,6 +54,10 @@ pub struct FloorLayout {
     pub anchors: Vec<(&'static str, Vec3, f32)>,
     pub pieces: Vec<Piece>,
     pub theme: Theme,
+    pub footprint: Footprint,
+    /// Intended walking line from the spawn to the boss pod.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub route: Vec<Vec2>,
 }
 
 impl FloorLayout {
@@ -83,7 +87,11 @@ pub fn build_floor(id: u8) -> FloorLayout {
     let mut plan = Plan::default();
     let theme = themes::build(id, &mut plan);
     let Plan {
-        pieces, anchors, ..
+        pieces,
+        anchors,
+        fp,
+        route,
+        ..
     } = plan;
     let blockers = pieces
         .iter()
@@ -121,6 +129,8 @@ pub fn build_floor(id: u8) -> FloorLayout {
             .collect(),
         pieces,
         theme,
+        footprint: fp,
+        route,
     }
 }
 
@@ -136,72 +146,115 @@ pub fn elevator_exit_trigger(layout: &FloorLayout) -> Aabb {
     )
 }
 
-/// Player yaw facing along +X (towards the boss at the far end of every floor).
-pub const FACE_EAST: f32 = -FRAC_PI_2;
-/// Unit yaw facing -X (towards the player spawn).
-pub const FACE_WEST: f32 = FRAC_PI_2;
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::collision::blocks_at;
-    use crate::config::{FLOOR_HALF_X, FLOOR_HALF_Z};
+    use crate::config::{FLOOR_HALF_X, FLOOR_HALF_Z, PLAYER_RADIUS};
+    use combat_core::{Vec3 as CVec3, line_of_sight, pack_offsets};
     use std::collections::VecDeque;
 
     const CELL: f32 = 0.5;
+    const NAMES: [&str; 6] = ["pack_1", "pack_2", "pack_3", "pack_4", "pack_5", "pack_6"];
 
-    fn free(layout: &FloorLayout, x: f32, z: f32) -> bool {
-        let p = Vec3::new(x, 0.0, z);
-        !layout.blockers.iter().any(|b| blocks_at(p, b))
+    /// Player-sized walkability grid over the whole clamp area with BFS path lengths from a point.
+    struct Grid {
+        w: usize,
+        h: usize,
+        blocked: Vec<bool>,
+        dist: Vec<f32>,
     }
 
-    /// Coarse 0.5 m BFS (4-neighbour) from `from`; returns path length per cell.
-    fn distances(layout: &FloorLayout, from: Vec3) -> (Vec<f32>, usize, usize) {
-        let w = (FLOOR_HALF_X * 2.0 / CELL) as usize;
-        let h = (FLOOR_HALF_Z * 2.0 / CELL) as usize;
-        let cell = |x: f32, z: f32| {
-            (
-                ((x + FLOOR_HALF_X) / CELL) as usize,
-                ((z + FLOOR_HALF_Z) / CELL) as usize,
-            )
-        };
-        let center = |i: usize, j: usize| {
-            (
-                i as f32 * CELL - FLOOR_HALF_X + CELL / 2.0,
-                j as f32 * CELL - FLOOR_HALF_Z + CELL / 2.0,
-            )
-        };
-        let blocked: Vec<bool> = (0..w * h)
-            .map(|k| {
-                let (x, z) = center(k % w, k / w);
-                !free(layout, x, z)
-            })
-            .collect();
-        let mut dist = vec![f32::INFINITY; w * h];
-        let (si, sj) = cell(from.x, from.z);
-        dist[sj * w + si] = 0.0;
-        let mut q = VecDeque::from([(si, sj)]);
-        while let Some((i, j)) = q.pop_front() {
-            let d = dist[j * w + i];
-            for (di, dj) in [(1i32, 0i32), (-1, 0), (0, 1), (0, -1)] {
-                let (ni, nj) = (i as i32 + di, j as i32 + dj);
-                if ni < 0 || nj < 0 || ni as usize >= w || nj as usize >= h {
-                    continue;
-                }
-                let k = nj as usize * w + ni as usize;
-                if !blocked[k] && dist[k].is_infinite() {
-                    dist[k] = d + CELL;
-                    q.push_back((ni as usize, nj as usize));
+    impl Grid {
+        fn new(layout: &FloorLayout) -> Self {
+            let w = (FLOOR_HALF_X * 2.0 / CELL) as usize;
+            let h = (FLOOR_HALF_Z * 2.0 / CELL) as usize;
+            let mut blocked = vec![false; w * h];
+            for b in layout
+                .blockers
+                .iter()
+                .filter(|b| b.max.y > 0.3 && b.min.y < 1.8)
+            {
+                let lo = |v: f32, half: f32| {
+                    (((v - PLAYER_RADIUS + half) / CELL).floor().max(0.0)) as usize
+                };
+                let hi = |v: f32, half: f32, n: usize| {
+                    (((v + PLAYER_RADIUS + half) / CELL).ceil().max(0.0) as usize).min(n - 1)
+                };
+                for j in lo(b.min.z, FLOOR_HALF_Z)..=hi(b.max.z, FLOOR_HALF_Z, h) {
+                    for i in lo(b.min.x, FLOOR_HALF_X)..=hi(b.max.x, FLOOR_HALF_X, w) {
+                        let (x, z) = (
+                            i as f32 * CELL - FLOOR_HALF_X + CELL / 2.0,
+                            j as f32 * CELL - FLOOR_HALF_Z + CELL / 2.0,
+                        );
+                        if x + PLAYER_RADIUS > b.min.x
+                            && x - PLAYER_RADIUS < b.max.x
+                            && z + PLAYER_RADIUS > b.min.z
+                            && z - PLAYER_RADIUS < b.max.z
+                        {
+                            blocked[j * w + i] = true;
+                        }
+                    }
                 }
             }
+            Self {
+                w,
+                h,
+                blocked,
+                dist: Vec::new(),
+            }
         }
-        (dist, w, h)
+
+        fn cell(&self, p: Vec3) -> usize {
+            let i = (((p.x + FLOOR_HALF_X) / CELL) as usize).min(self.w - 1);
+            let j = (((p.z + FLOOR_HALF_Z) / CELL) as usize).min(self.h - 1);
+            j * self.w + i
+        }
+
+        fn from(layout: &FloorLayout, from: Vec3) -> Self {
+            let mut g = Self::new(layout);
+            let mut dist = vec![f32::INFINITY; g.w * g.h];
+            let s = g.cell(from);
+            dist[s] = 0.0;
+            let mut q = VecDeque::from([s]);
+            while let Some(k) = q.pop_front() {
+                let (i, j) = ((k % g.w) as i32, (k / g.w) as i32);
+                for (di, dj) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                    let (ni, nj) = (i + di, j + dj);
+                    if ni < 0 || nj < 0 || ni as usize >= g.w || nj as usize >= g.h {
+                        continue;
+                    }
+                    let n = nj as usize * g.w + ni as usize;
+                    if !g.blocked[n] && dist[n].is_infinite() {
+                        dist[n] = dist[k] + CELL;
+                        q.push_back(n);
+                    }
+                }
+            }
+            g.dist = dist;
+            g
+        }
+
+        fn at(&self, p: Vec3) -> f32 {
+            self.dist[self.cell(p)]
+        }
+
+        fn free(&self, p: Vec3) -> bool {
+            !self.blocked[self.cell(p)]
+        }
     }
 
-    fn at(dist: &(Vec<f32>, usize, usize), p: Vec3) -> f32 {
-        let i = ((p.x + FLOOR_HALF_X) / CELL) as usize;
-        let j = ((p.z + FLOOR_HALF_Z) / CELL) as usize;
-        dist.0[j * dist.1 + i]
+    fn seg_dist(p: Vec2, a: Vec2, b: Vec2) -> f32 {
+        let d = b - a;
+        let t = ((p - a).dot(d) / d.length_squared().max(1e-6)).clamp(0.0, 1.0);
+        p.distance(a + d * t)
+    }
+
+    fn route_dist(l: &FloorLayout, p: Vec3) -> f32 {
+        let q = Vec2::new(p.x, p.z);
+        l.route
+            .windows(2)
+            .map(|w| seg_dist(q, w[0], w[1]))
+            .fold(f32::INFINITY, f32::min)
     }
 
     const REQUIRED: [&str; 11] = [
@@ -247,16 +300,17 @@ mod tests {
     fn anchors_exist_and_are_walkable() {
         for id in 1..=FLOOR_COUNT {
             let l = build_floor(id);
+            let g = Grid::new(&l);
             for name in REQUIRED {
                 assert!(l.anchor(name).is_some(), "floor {id}: missing {name}");
             }
             for (name, pos, _) in &l.anchors {
                 assert!(
-                    pos.x.abs() < FLOOR_HALF_X && pos.z.abs() < FLOOR_HALF_Z,
-                    "floor {id}: {name} outside the floor"
+                    l.footprint.contains(Vec2::new(pos.x, pos.z)),
+                    "floor {id}: {name} at {pos} is outside the outline"
                 );
                 assert!(
-                    free(&l, pos.x, pos.z),
+                    g.free(*pos),
                     "floor {id}: anchor {name} at {pos} is inside a blocker"
                 );
             }
@@ -267,6 +321,7 @@ mod tests {
     fn floor_one_has_it_support_anchors() {
         let l = build_floor(1);
         assert!(l.anchor("npc_2").is_some() && l.anchor("npc_3").is_some());
+        assert!(build_floor(4).anchor("npc_2").is_some());
     }
 
     #[test]
@@ -291,10 +346,10 @@ mod tests {
     fn route_is_connected_and_progressive() {
         for id in 1..=FLOOR_COUNT {
             let l = build_floor(id);
-            let d = distances(&l, l.pos("player_spawn"));
+            let g = Grid::from(&l, l.pos("player_spawn"));
             let route: Vec<f32> = ["pack_1", "pack_2", "pack_3", "pack_4", "pack_5", "boss"]
                 .iter()
-                .map(|n| at(&d, l.pos(n)))
+                .map(|n| g.at(l.pos(n)))
                 .collect();
             assert!(
                 route.iter().all(|v| v.is_finite()),
@@ -304,14 +359,119 @@ mod tests {
                 route.windows(2).all(|w| w[0] < w[1]),
                 "floor {id}: route not progressive {route:?}"
             );
-            for n in ["pack_6", "npc_1", "elevator", "elevator_exit"] {
-                assert!(at(&d, l.pos(n)).is_finite(), "floor {id}: {n} unreachable");
+            for (name, pos, _) in &l.anchors {
+                assert!(g.at(*pos).is_finite(), "floor {id}: {name} unreachable");
             }
-            // Floors 1 and 5 keep pack_6 on the main route, before the boss.
-            if id == 1 || id == 5 {
-                assert!(at(&d, l.pos("pack_6")) > route[4] && at(&d, l.pos("pack_6")) < route[5]);
+            let trig = elevator_exit_trigger(&l);
+            let centre = Vec3::new(
+                (trig.min.x + trig.max.x) / 2.0,
+                0.0,
+                (trig.min.z + trig.max.z) / 2.0,
+            );
+            assert!(
+                g.at(centre).is_finite(),
+                "floor {id}: exit trigger unreachable"
+            );
+        }
+    }
+
+    /// Every layout rule that is about placement rather than mechanics, as readable messages.
+    fn problems(l: &FloorLayout) -> Vec<String> {
+        let mut out = Vec::new();
+        let id = l.id;
+        let g = Grid::from(l, l.pos("player_spawn"));
+        let edge = (0..g.w * g.h).filter(|k| {
+            let (i, j) = (k % g.w, k / g.w);
+            (i == 0 || j == 0 || i == g.w - 1 || j == g.h - 1) && g.dist[*k].is_finite()
+        });
+        if edge.count() > 0 {
+            out.push(format!("floor {id}: the walls leak"));
+        }
+        if l.blockers.len() >= 600 {
+            out.push(format!("floor {id}: {} blockers", l.blockers.len()));
+        }
+        let pod = |n: &str| l.footprint.pod_of(Vec2::new(l.pos(n).x, l.pos(n).z));
+        let boss = pod("boss");
+        if boss.is_none() {
+            out.push(format!("floor {id}: boss outside every pod"));
+        }
+        for n in NAMES.into_iter().chain(["player_spawn", "npc_1"]) {
+            if pod(n) == boss {
+                out.push(format!("floor {id}: {n} shares the boss pod"));
             }
         }
+        for n in [
+            "pack_1",
+            "pack_2",
+            "pack_3",
+            "pack_4",
+            "pack_5",
+            "boss",
+            "player_spawn",
+        ] {
+            if pod(n).is_some() && pod(n) == pod("pack_6") {
+                out.push(format!("floor {id}: pack_6 pod is shared with {n}"));
+            }
+        }
+        for n in NAMES.into_iter().chain(["boss"]) {
+            let d = route_dist(l, l.pos(n));
+            if d < 8.0 {
+                out.push(format!("floor {id}: {n} only {d:.1} m from the route"));
+            }
+        }
+        for n in NAMES {
+            let at = l.pos(n);
+            for (dx, dz) in pack_offsets(6) {
+                if !g.free(at + Vec3::new(dx, 0.0, dz)) {
+                    out.push(format!(
+                        "floor {id}: {n} formation slot ({dx},{dz}) is blocked"
+                    ));
+                }
+            }
+            // Units chase in straight lines: the line to the closest route point must be open.
+            // pack_6 sits in an offshoot pod the player enters on purpose.
+            if n == "pack_6" {
+                continue;
+            }
+            let q = Vec2::new(at.x, at.z);
+            let nearest = l
+                .route
+                .windows(2)
+                .map(|w| {
+                    let d = w[1] - w[0];
+                    w[0] + d * ((q - w[0]).dot(d) / d.length_squared().max(1e-6)).clamp(0.0, 1.0)
+                })
+                .min_by(|a, b| a.distance(q).total_cmp(&b.distance(q)))
+                .unwrap_or(q);
+            if !line_of_sight(
+                CVec3::new(at.x, 1.0, at.z),
+                CVec3::new(nearest.x, 1.0, nearest.y),
+                &l.blockers,
+            ) {
+                out.push(format!("floor {id}: {n} has no straight line to the route"));
+            }
+        }
+        let order: Vec<f32> = ["pack_1", "pack_2", "pack_3", "pack_4", "pack_5", "boss"]
+            .iter()
+            .map(|n| g.at(l.pos(n)))
+            .collect();
+        if !order.windows(2).all(|w| w[0] < w[1]) {
+            out.push(format!("floor {id}: route not progressive {order:?}"));
+        }
+        for (name, pos, _) in &l.anchors {
+            if !g.at(*pos).is_finite() {
+                out.push(format!("floor {id}: {name} unreachable"));
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn placement_rules_hold_on_every_floor() {
+        let all: Vec<String> = (1..=FLOOR_COUNT)
+            .flat_map(|id| problems(&build_floor(id)))
+            .collect();
+        assert!(all.is_empty(), "{}", all.join("\n"));
     }
 
     #[test]
@@ -332,6 +492,99 @@ mod tests {
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/models/furniture");
         for m in super::super::kit::ALL_MODELS {
             assert!(dir.join(format!("{}.glb", m.file)).exists(), "{}", m.file);
+        }
+    }
+
+    /// `cargo test -p game_client dump_maps -- --ignored --nocapture`: ASCII plan per floor.
+    #[test]
+    #[ignore]
+    fn dump_maps() {
+        let only: Option<u8> = std::env::var("DUMP_FLOOR")
+            .ok()
+            .and_then(|v| v.parse().ok());
+        for id in 1..=FLOOR_COUNT {
+            if only.is_some_and(|o| o != id) {
+                continue;
+            }
+            let l = build_floor(id);
+            let g = Grid::from(&l, l.pos("player_spawn"));
+            println!("== floor {id} {} blockers={}", l.name, l.blockers.len());
+            for (n, p, _) in &l.anchors {
+                println!("  {n} ({:.1},{:.1})", p.x, p.z);
+            }
+            let mut marks: Vec<(f32, f32, char)> = Vec::new();
+            for w in l.route.windows(2) {
+                let n = (w[0].distance(w[1]) / 1.0).ceil() as usize;
+                for k in 0..n {
+                    let p = w[0].lerp(w[1], k as f32 / n as f32);
+                    marks.push((p.x, p.y, '*'));
+                }
+            }
+            for (name, p, _) in &l.anchors {
+                let c = match *name {
+                    "player_spawn" => 'S',
+                    "boss" => 'B',
+                    "elevator" => 'E',
+                    "elevator_exit" => 'X',
+                    n if n.starts_with("pack_") => n.chars().last().unwrap_or('p'),
+                    _ => 'n',
+                };
+                marks.push((p.x, p.z, c));
+            }
+            let (nx, nz) = (FLOOR_HALF_X as i32 * 2, FLOOR_HALF_Z as i32 * 2);
+            for j in 0..nz {
+                let z = -FLOOR_HALF_Z + j as f32 + 0.5;
+                let mut row = String::new();
+                for i in 0..nx {
+                    let x = -FLOOR_HALF_X + i as f32 + 0.5;
+                    let m = marks
+                        .iter()
+                        .rev()
+                        .find(|(mx, mz, _)| (mx - x).abs() <= 0.5 && (mz - z).abs() <= 0.5);
+                    let solid = l.blockers.iter().any(|b| {
+                        b.max.y > 0.3
+                            && x >= b.min.x
+                            && x <= b.max.x
+                            && z >= b.min.z
+                            && z <= b.max.z
+                    });
+                    row.push(match (m, solid) {
+                        (Some(m), _) => m.2,
+                        (None, true) => '#',
+                        _ if l.footprint.covered(Vec2::new(x, z)) => {
+                            if g.at(Vec3::new(x, 0.0, z)).is_finite() {
+                                '.'
+                            } else {
+                                ','
+                            }
+                        }
+                        _ => ' ',
+                    });
+                }
+                println!("{:>4} {}", z as i32, row.trim_end());
+            }
+            let t = std::time::Instant::now();
+            let mut hits = 0;
+            for i in 0..20_000 {
+                let a = i as f32 * 0.37;
+                hits += usize::from(line_of_sight(
+                    CVec3::new(a.sin() * 30.0, 1.2, a.cos() * 20.0),
+                    CVec3::new(a.cos() * 25.0, 1.2, a.sin() * 18.0),
+                    &l.blockers,
+                ));
+            }
+            println!(
+                "LoS: {:.2} us/query ({hits} clear)",
+                t.elapsed().as_secs_f64() * 1e6 / 20_000.0
+            );
+            for m in problems(&l) {
+                println!("PROBLEM {m}");
+            }
+            let d = |n: &str| g.at(l.pos(n));
+            println!("bfs: {:?} boss {:?}", NAMES.map(d), d("boss"));
+            for n in NAMES.into_iter().chain(["boss"]) {
+                println!("{n}: route {:.1}", route_dist(&l, l.pos(n)));
+            }
         }
     }
 }

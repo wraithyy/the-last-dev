@@ -114,7 +114,8 @@ found at http://opengameart.org. Used under CC BY 3.0
 
 Glyphs are from https://github.com/game-icons/icons, licensed CC BY 3.0
 (https://creativecommons.org/licenses/by/3.0/). Each glyph was rasterized to 64x64
-and composited onto a coloured gradient with a bevel frame (original styling).
+and composited onto a coloured gradient with a bevel frame (original styling). Trophy icons are coloured by the
+bonus they grant (red HP, blue mana, violet spell power, gold crit, teal haste, green mana regen).
 
 | File | Source glyph | Author folder | Licence | Link |
 |---|---|---|---|---|
@@ -123,6 +124,48 @@ and composited onto a coloured gradient with a bevel frame (original styling).
 | assets/icons/unread_ai_strategy_deck.png | scroll-unfurled | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/scroll-unfurled.svg |
 | assets/icons/expired_gpu_credits.png | processor | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/processor.svg |
 | assets/icons/mandatory_prompt_training_certificate.png | diploma | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/diploma.svg |
+| assets/icons/chat_bubble.png | chat-bubble | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/chat-bubble.svg |
+| assets/icons/wrong_thread.png | conversation | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/conversation.svg |
+| assets/icons/regen.png | rolling-energy | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/rolling-energy.svg |
+| assets/icons/pull_request.png | cog | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/cog.svg |
+| assets/icons/zip_file.png | archive-register | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/archive-register.svg |
+| assets/icons/accepted.png | check-mark | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/check-mark.svg |
+| assets/icons/keyboard.png | laptop | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/laptop.svg |
+| assets/icons/tests_off.png | pencil | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/pencil.svg |
+| assets/icons/chart.png | chart | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/chart.svg |
+| assets/icons/sticky.png | notebook | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/notebook.svg |
+| assets/icons/manifesto.png | papers | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/papers.svg |
+| assets/icons/calendar.png | calendar | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/calendar.svg |
+| assets/icons/badge.png | id-card | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/id-card.svg |
+| assets/icons/pizza.png | pizza-slice | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/pizza-slice.svg |
+| assets/icons/pto.png | ticket | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/ticket.svg |
+| assets/icons/wellness.png | chained-heart | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/chained-heart.svg |
+| assets/icons/brain.png | brain | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/brain.svg |
+| assets/icons/chart_up.png | progression | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/progression.svg |
+| assets/icons/spiral.png | spiral-bloom | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/spiral-bloom.svg |
+| assets/icons/contract.png | trade | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/trade.svg |
+| assets/icons/box.png | cardboard-box | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/cardboard-box.svg |
+| assets/icons/megaphone.png | megaphone | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/megaphone.svg |
+| assets/icons/hook.png | fishing-hook | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/fishing-hook.svg |
+| assets/icons/brand.png | star-swirl | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/star-swirl.svg |
+| assets/icons/webinar.png | radar-dish | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/radar-dish.svg |
+| assets/icons/logo.png | compass | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/compass.svg |
+| assets/icons/mailbox.png | mailbox | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/mailbox.svg |
+| assets/icons/thumb_down.png | thumb-down | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/thumb-down.svg |
+| assets/icons/cash.png | cash | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/cash.svg |
+| assets/icons/hourglass.png | hourglass | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/hourglass.svg |
+| assets/icons/backlog.png | stairs-goal | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/stairs-goal.svg |
+| assets/icons/coins.png | coins-pile | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/coins-pile.svg |
+| assets/icons/matrix.png | tic-tac-toe | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/tic-tac-toe.svg |
+| assets/icons/key.png | key | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/key.svg |
+| assets/icons/robot_audit.png | robot-golem | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/robot-golem.svg |
+| assets/icons/padlock.png | padlock | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/padlock.svg |
+| assets/icons/medal.png | medal | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/medal.svg |
+| assets/icons/org_chart.png | organigram | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/organigram.svg |
+| assets/icons/vibes.png | satellite-communication | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/satellite-communication.svg |
+| assets/icons/parachute.png | parachute | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/parachute.svg |
+| assets/icons/robot.png | robot-grab | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/robot-grab.svg |
+| assets/icons/rss.png | rss | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/rss.svg |
 
 Authors: Lorc (https://lorcblog.blogspot.com), Delapouite (https://delapouite.com).
 

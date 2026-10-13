@@ -5,6 +5,7 @@
 // The furniture and texture catalogue is larger than what the five floors place today.
 #![allow(dead_code)]
 
+use super::shape::{Footprint, Seg, WALL_T as COLLIDER_T, colliders};
 use crate::collision::aabb;
 use crate::config::WALL_HEIGHT;
 use bevy::prelude::*;
@@ -260,6 +261,23 @@ pub enum Piece {
     },
     /// Invisible blocker (floating chair colliders and the like).
     Block(Aabb),
+    /// Box turned by any yaw; visual only (colliders are separate `Block`s).
+    Slab {
+        center: Vec3,
+        yaw: f32,
+        size: Vec3,
+        mat: Mat,
+    },
+    /// Vertical band along curved walls, `inset` metres in front of the wall face.
+    Run {
+        segs: Vec<Seg>,
+        mat: Mat,
+        y0: f32,
+        y1: f32,
+        inset: f32,
+    },
+    /// Wall-top strip, only seen from above (debug overview).
+    Cap { segs: Vec<Seg> },
 }
 
 /// Direction a wall-mounted item faces (into the room).
@@ -308,6 +326,10 @@ pub struct Anchor {
 pub struct Plan {
     pub pieces: Vec<Piece>,
     pub anchors: Vec<Anchor>,
+    pub fp: Footprint,
+    pub walls: Vec<Seg>,
+    /// Centreline of the intended walk from the spawn to the boss pod (tests and pack placement).
+    pub route: Vec<Vec2>,
     frame: Vec<(Vec3, f32)>,
 }
 
@@ -393,6 +415,163 @@ impl Plan {
 
     pub fn anchor(&mut self, name: &'static str, pos: Vec3, yaw: f32) {
         self.anchors.push(Anchor { name, pos, yaw });
+    }
+
+    pub fn slab(&mut self, center: Vec3, yaw: f32, size: Vec3, mat: Mat) {
+        self.pieces.push(Piece::Slab {
+            center,
+            yaw,
+            size,
+            mat,
+        });
+    }
+
+    /// Turns the footprint into wall strips plus the AABB collider chain. Call once the
+    /// outline is final; the `*_near` helpers below snap decor to these walls.
+    pub fn build_walls(&mut self) {
+        self.walls = self.fp.walls();
+        let mats: Vec<Mat> = self.walls.iter().fold(Vec::new(), |mut m, s| {
+            if !m.contains(&s.mat) {
+                m.push(s.mat);
+            }
+            m
+        });
+        for mat in mats {
+            let segs: Vec<Seg> = self
+                .walls
+                .iter()
+                .filter(|s| s.mat == mat)
+                .copied()
+                .collect();
+            let mut run = |mat, y0, y1, inset| {
+                self.pieces.push(Piece::Run {
+                    segs: segs.clone(),
+                    mat,
+                    y0,
+                    y1,
+                    inset,
+                });
+            };
+            run(mat, 0.0, H, 0.0);
+            if mat == Mat::Glass {
+                run(Mat::Trim, 0.0, 0.12, 0.02);
+                run(Mat::Trim, H - 0.12, H, 0.02);
+            } else {
+                run(Mat::Trim, 0.0, 0.2, 0.02);
+                run(Mat::Accent, 2.87, 2.93, 0.02);
+                self.pieces.push(Piece::Cap { segs });
+            }
+        }
+        let mut boxes = colliders(&self.walls, COLLIDER_T);
+        boxes.extend(self.fp.thin_colliders());
+        self.pieces.extend(boxes.into_iter().map(Piece::Block));
+    }
+
+    /// Nearest opaque wall point and its inward normal.
+    pub fn wall_near(&self, x: f32, z: f32) -> Option<(Vec2, Vec2)> {
+        let q = Vec2::new(x, z);
+        self.walls
+            .iter()
+            .filter(|s| s.mat != Mat::Glass)
+            .map(|s| {
+                let d = s.b - s.a;
+                let t = ((q - s.a).dot(d) / d.length_squared().max(1e-6)).clamp(0.0, 1.0);
+                let pt = s.a + d * t;
+                (pt.distance(q), pt, s.n)
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, pt, n)| (pt, n))
+    }
+
+    /// Panel hung on the nearest wall at height `y`, facing into the room.
+    pub fn panel_near(&mut self, x: f32, z: f32, y: f32, size: Vec2, tex: Tex) {
+        if let Some((pt, n)) = self.wall_near(x, z) {
+            let c = pt + n * 0.03;
+            self.panel(Vec3::new(c.x, y, c.y), n.x.atan2(n.y), size, tex);
+        }
+    }
+
+    /// Framed poster on the nearest wall.
+    pub fn poster_near(&mut self, x: f32, z: f32, y: f32, size: Vec2, tex: Tex) {
+        if let Some((pt, n)) = self.wall_near(x, z) {
+            let yaw = n.x.atan2(n.y);
+            let f = pt + n * 0.025;
+            self.slab(
+                Vec3::new(f.x, y, f.y),
+                yaw,
+                Vec3::new(size.x + 0.1, size.y + 0.1, 0.05),
+                Mat::Trim,
+            );
+            let c = pt + n * 0.055;
+            self.panel(Vec3::new(c.x, y, c.y), yaw, size, tex);
+        }
+    }
+
+    /// Skyline window with mullions on the nearest wall.
+    pub fn window_near(&mut self, x: f32, z: f32, size: Vec2, tex: Tex, mullion: Mat) {
+        let Some((pt, n)) = self.wall_near(x, z) else {
+            return;
+        };
+        let yaw = n.x.atan2(n.y);
+        let lat = Vec2::new(yaw.cos(), -yaw.sin());
+        let at = |depth: f32, l: f32, y: f32| {
+            let c = pt + n * depth + lat * l;
+            Vec3::new(c.x, y, c.y)
+        };
+        self.panel(at(0.03, 0.0, 2.4), yaw, size, tex);
+        for l in [-size.x / 2.0, 0.0, size.x / 2.0] {
+            self.slab(
+                at(0.06, l, 2.4),
+                yaw,
+                Vec3::new(0.12, size.y + 0.2, 0.1),
+                mullion,
+            );
+        }
+        for y in [2.4 + size.y / 2.0 + 0.05, 2.4 - size.y / 2.0 - 0.05] {
+            self.slab(
+                at(0.06, 0.0, y),
+                yaw,
+                Vec3::new(size.x + 0.1, 0.12, 0.12),
+                mullion,
+            );
+        }
+    }
+
+    /// Elevator set into the nearest wall. Returns the arrival point 1.8 m in front and the
+    /// unit yaw that faces into the room.
+    pub fn elevator_near(&mut self, x: f32, z: f32, door: Mat) -> (Vec3, f32) {
+        let (pt, n) = self.wall_near(x, z).unwrap_or((Vec2::new(x, z), Vec2::X));
+        let yaw = n.x.atan2(n.y);
+        // Local x along the wall, local z along the normal.
+        let lat = Vec2::new(yaw.cos(), -yaw.sin());
+        let at = |depth: f32, l: f32, y: f32| {
+            let c = pt + n * depth + lat * l;
+            Vec3::new(c.x, y, c.y)
+        };
+        self.slab(at(0.1, 0.0, 1.55), yaw, Vec3::new(2.8, 3.1, 0.2), Mat::Dark);
+        for l in [-0.5, 0.5] {
+            self.slab(at(0.24, l, 1.2), yaw, Vec3::new(0.98, 2.4, 0.06), door);
+        }
+        self.slab(
+            at(0.22, 1.9, 1.2),
+            yaw,
+            Vec3::new(0.2, 0.3, 0.08),
+            Mat::Dark,
+        );
+        self.slab(
+            at(0.27, 1.9, 1.25),
+            yaw,
+            Vec3::new(0.08, 0.08, 0.04),
+            Mat::LedGreen,
+        );
+        self.slab(
+            at(0.24, 0.0, 2.75),
+            yaw,
+            Vec3::new(1.2, 0.1, 0.06),
+            Mat::LedBlue,
+        );
+        let arrive = pt + n * 1.8;
+        (Vec3::new(arrive.x, 0.0, arrive.y), (-n.x).atan2(-n.y))
     }
 
     /// Framed panel on a wall: `face` is the direction the picture looks.
@@ -499,7 +678,7 @@ impl Plan {
     }
 }
 
-pub const WALL_T: f32 = 0.3;
+pub const WALL_T: f32 = COLLIDER_T;
 pub const DOOR_H: f32 = 2.5;
 pub const H: f32 = WALL_HEIGHT;
 

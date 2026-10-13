@@ -15,6 +15,7 @@ The whole game is a long, loving roast of corporations that push AI onto every t
 - Ten action-bar spells on keys 1-9, 0 (number row by physical key, so Czech and other layouts work; numpad too). Unlearned spells show a locked keycap with "Lv N"; level-ups play a golden ring, a "LEVEL UP" banner and an IDE-style "New spell" notification.
 - Nameplates over every NPC within 40 m (red + HP bar for hostiles, green + title for friendlies, BOSS / ELITE tags); the target frame shows the boss phase ("PROD P2"), aura stacks and generated letter-badge icons for auras without art.
 - Stuns freeze movement and casting (spinning stars, grey keycaps); silence and school lockouts lock keycaps with a padlock. Knockbacks shake the camera and push you (walls clamp it), teleports land on the nearest free spot.
+- Loot is trophies: every drop is an item with a satirical description and a small permanent bonus (HP, mana, spell power, crit, haste, mana regen; up to 3 copies count). The loot window shows icon, bonus and description, the combat log says "You receive trophy: [..] (+1% crit)", and B opens `~/trophies` with every trophy, its count and the total bonus. Bonuses persist across floors and respawns; a new sprint (R) resets them.
 - Floating numbers: heals in green, DoT ticks smaller, crits and executes pop.
 
 See [docs/PLAN.md](docs/PLAN.md), [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md), [docs/COMBAT_API.md](docs/COMBAT_API.md), [docs/FORMULAS.md](docs/FORMULAS.md) and [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
@@ -56,9 +57,10 @@ See [docs/PLAN.md](docs/PLAN.md), [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md), [d
 | T / Attack button | Toggle auto attack on the current target |
 | 1-9, 0 (or numpad) | Action bar: Code Review, Refactor, Guardrails, Reject PR, git blame, Rollback, On-Call Caffeine, Rubber Duck, Postmortem, Write It By Hand (unlocked by level) |
 | F / right-click corpse | Loot (F on a friendly target talks) |
+| B | Toggle the `~/trophies` inventory window (B, `[x]` or Esc closes it) |
 | R (victory screen) | Start a new sprint |
 | F3 | Debug overlay (range, facing, LoS) |
-| Escape | Clear target, or toggle the pause overlay |
+| Escape | Close the trophies window, else clear target, else toggle the pause overlay |
 
 Rotation: Code Review applies Code Smell, and Refactor consumes it for +35% damage. Interrupt the big casts with Reject PR (level 2), shield with Guardrails, keep git blame ticking, finish with Postmortem below 25%.
 
@@ -90,8 +92,9 @@ docs/                 plan, version choices, known limitations
 | `WOW_PLAYER_AT=x,z,yaw_deg[,cam_deg]` | Start position after the first floor load; optional camera yaw offset (180 = front view) |
 | `WOW_CAM_DIST=m` | Start zoom |
 | `WOW_CLEARED=1` | Open the first floor's exit elevator without killing the boss |
-| `WOW_AUTOFIGHT=1` | Bot: walks to the nearest hostile (adds first), interrupts, heals/shields, runs the rotation, respawns, takes the elevator; logs every sim event |
+| `WOW_AUTOFIGHT=1` | Bot: walks to the nearest hostile (adds first), interrupts, heals/shields, runs the rotation, loots corpses, respawns, takes the elevator; logs every sim event |
 | `WOW_TALK=1` | Talk to the nearest friendly NPC two seconds in |
+| `WOW_GIVE_ITEMS=1`, `WOW_TROPHIES=1` | Grant a sample set of trophies at start, open the `~/trophies` window at start |
 | `WOW_HOVER_SLOT=0..9`, `WOW_AUTORUN=1`, `WOW_LINEUP=1\|2` | Force a tooltip, hold forward, show the cast lineup |
 
 ## Credits

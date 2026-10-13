@@ -344,6 +344,80 @@ pub struct LootEntry {
     pub chance_pct: u32,
 }
 
+/// Copies of one trophy beyond this add nothing; the extra copies are still kept and shown.
+pub const ITEM_STACK_CAP: u32 = 3;
+
+/// Longest allowed trophy description; the HUD tooltip is sized for it.
+pub const ITEM_DESC_MAX: usize = 110;
+
+/// Permanent player bonus of one trophy copy, as authored.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize)]
+#[serde(default)]
+pub struct ItemBonus {
+    pub max_hp: u32,
+    pub max_mana: u32,
+    pub spell_power: u32,
+    /// Percent, authored in tenths (0.5).
+    pub crit_pct: f32,
+    pub haste_pct: u32,
+    /// Extra mana per 5 s while in combat, on top of the unit's own trickle.
+    pub mana_regen: u32,
+}
+
+/// Summed trophy bonuses. Crit is kept in tenths of a percent so sums stay exact integers.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ItemTotals {
+    pub max_hp: u32,
+    pub max_mana: u32,
+    pub spell_power: u32,
+    pub crit_tenths: u32,
+    pub haste_pct: u32,
+    pub mana_regen: u32,
+}
+
+impl ItemBonus {
+    fn crit_tenths(&self) -> u32 {
+        (self.crit_pct.max(0.0) * 10.0).round() as u32
+    }
+
+    /// The bonus of `copies` copies, honouring `ITEM_STACK_CAP`.
+    pub fn totals(&self, copies: u32) -> ItemTotals {
+        let n = copies.min(ITEM_STACK_CAP);
+        ItemTotals {
+            max_hp: self.max_hp * n,
+            max_mana: self.max_mana * n,
+            spell_power: self.spell_power * n,
+            crit_tenths: self.crit_tenths() * n,
+            haste_pct: self.haste_pct * n,
+            mana_regen: self.mana_regen * n,
+        }
+    }
+}
+
+impl ItemTotals {
+    pub fn is_empty(&self) -> bool {
+        *self == ItemTotals::default()
+    }
+
+    pub fn add(&mut self, o: &ItemTotals) {
+        self.max_hp += o.max_hp;
+        self.max_mana += o.max_mana;
+        self.spell_power += o.spell_power;
+        self.crit_tenths += o.crit_tenths;
+        self.haste_pct += o.haste_pct;
+        self.mana_regen += o.mana_regen;
+    }
+}
+
+/// A loot item: a trophy with a small permanent bonus.
+#[derive(Clone, Debug, Deserialize)]
+pub struct ItemDef {
+    pub name: String,
+    pub icon: String,
+    pub description: String,
+    pub bonus: ItemBonus,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Deserialize)]
 pub enum AiTarget {
     /// The current (highest-threat) target.
@@ -549,6 +623,7 @@ pub struct Content {
     pub auras: Vec<AuraDef>,
     pub spells: Vec<SpellDef>,
     pub units: Vec<UnitDef>,
+    pub items: Vec<ItemDef>,
     pub action_bar: Vec<SpellId>,
     pub levels: Vec<LevelDef>,
     pub floors: Vec<FloorDef>,
@@ -573,6 +648,10 @@ impl Content {
 
     pub fn unit_def(&self, key: &str) -> Option<&UnitDef> {
         self.units.iter().find(|u| u.key == key)
+    }
+
+    pub fn item(&self, name: &str) -> Option<&ItemDef> {
+        self.items.iter().find(|i| i.name == name)
     }
 
     pub fn aura(&self, key: &str) -> Option<&AuraDef> {
@@ -615,6 +694,20 @@ impl Content {
             }
             if a.max_stacks == 0 || a.periodic.as_ref().is_some_and(|p| p.interval_ms == 0) {
                 return bad(format!("aura {} has zero stacks or interval", a.key));
+            }
+        }
+        for (i, it) in self.items.iter().enumerate() {
+            if self.items[..i].iter().any(|o| o.name == it.name) {
+                return bad(format!("duplicate item {}", it.name));
+            }
+            if it.description.chars().count() > ITEM_DESC_MAX
+                || it.bonus.totals(1).is_empty()
+                || !(0.0..=5.0).contains(&it.bonus.crit_pct)
+            {
+                return bad(format!(
+                    "item {} needs a bonus, crit 0..=5 and a description of at most {ITEM_DESC_MAX} chars",
+                    it.name
+                ));
             }
         }
         for (i, s) in self.spells.iter().enumerate() {
@@ -685,6 +778,12 @@ impl Content {
                 && self.spell(id).is_none()
             {
                 return bad(format!("unit {} death spell {} unknown", u.key, id.0));
+            }
+            if let Some(l) = u.loot.iter().find(|l| self.item(&l.item).is_none()) {
+                return bad(format!(
+                    "unit {} drops item {} with no items entry",
+                    u.key, l.item
+                ));
             }
             let Some(ai) = &u.ai else { continue };
             for ab in &ai.abilities {

@@ -18,6 +18,7 @@ mod input;
 mod nameplates;
 mod player;
 mod presentation;
+mod spell_fx;
 mod targeting;
 mod units;
 mod vfx;
@@ -71,6 +72,7 @@ fn main() {
             anim::AnimPlugin,
             combat::CombatPlugin,
             vfx::VfxPlugin,
+            spell_fx::SpellFxPlugin,
             presentation::PresentationPlugin,
             floating_text::FloatingTextPlugin,
             yell::YellPlugin,

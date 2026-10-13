@@ -39,7 +39,8 @@ impl Sim {
 
     pub(crate) fn haste(&self, i: usize) -> u32 {
         let base = self.content.units[self.units[i].def].haste_pct;
-        base + self.aura_sum(i, |a| a.haste_pct as i32).max(0) as u32
+        base + self.units[i].item_bonus.haste_pct
+            + self.aura_sum(i, |a| a.haste_pct as i32).max(0) as u32
     }
 
     /// Haste first, then cast-time auras (Review Fatigue, Pivot to AGI).
@@ -130,7 +131,9 @@ impl Sim {
                     }
                 }
                 // Rolled for every hit so the RNG stream does not depend on crit chance.
-                let crit = self.rng.chance_pct(crit_pct);
+                let crit = self
+                    .rng
+                    .chance_crit(crit_pct, self.units[ci].item_bonus.crit_tenths);
                 if crit {
                     amount = amount * u64::from(self.content.config.crit_damage_pct) / 100;
                 }

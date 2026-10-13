@@ -31,6 +31,15 @@ impl Rng {
         lo + self.below(hi - lo + 1)
     }
 
+    /// Crit roll: `base_pct` percent plus `extra_tenths` tenths of a percent. Both paths draw exactly
+    /// one value, and without a bonus the roll equals `chance_pct`, so unequipped runs stay byte-identical.
+    pub fn chance_crit(&mut self, base_pct: u32, extra_tenths: u32) -> bool {
+        if extra_tenths == 0 {
+            return self.chance_pct(base_pct);
+        }
+        self.below(1000) < base_pct * 10 + extra_tenths
+    }
+
     /// True with probability `pct` percent.
     pub fn chance_pct(&mut self, pct: u32) -> bool {
         self.below(100) < pct

@@ -26,6 +26,16 @@ impl OrbitCamera {
         self.yaw = yaw;
     }
 
+    /// Debug close-ups (`WOW_CAM_YAW_OFFSET`, radians from the current heading).
+    pub fn add_yaw(&mut self, delta: f32) {
+        self.yaw += delta;
+    }
+
+    /// Debug close-ups (`WOW_CAM_PITCH`, radians).
+    pub fn set_pitch(&mut self, pitch: f32) {
+        self.pitch = pitch.clamp(-CAM_PITCH_LIMIT, CAM_PITCH_LIMIT);
+    }
+
     /// Debug close-ups (`WOW_CAM_DIST`).
     pub fn set_zoom(&mut self, dist: f32) {
         self.zoom = dist.clamp(CAM_MIN_DIST, CAM_MAX_DIST);
@@ -39,6 +49,11 @@ pub struct CameraShake {
     pub trauma: f32,
 }
 
+/// `WOW_TOPDOWN=<height m>` (1 = default 110): straight-down overview of the whole floor for
+/// layout screenshots; below 100 m it follows the player for close-up plan checks. The ceiling is single-sided, so it does not hide the plan.
+#[derive(Resource)]
+struct TopDown(f32);
+
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
@@ -46,7 +61,43 @@ impl Plugin for CameraPlugin {
         app.init_resource::<CameraShake>()
             .add_systems(Startup, spawn_camera)
             .add_systems(Update, (follow_player, orbit_input, place_camera).chain());
+        if let Some(v) = std::env::var("WOW_TOPDOWN")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+        {
+            app.insert_resource(TopDown(if v > 5.0 { v } else { 110.0 }))
+                .add_systems(Update, topdown.after(place_camera));
+        }
     }
+}
+
+fn topdown(
+    mut commands: Commands,
+    height: Res<TopDown>,
+    player: Single<&Transform, (With<Player>, Without<OrbitCamera>)>,
+    cam: Single<(Entity, &mut Transform), With<OrbitCamera>>,
+) {
+    let (entity, mut tf) = cam.into_inner();
+    // Whole floor by default; WOW_PLAYER_AT pans the view for close-up plan checks.
+    let centre = if height.0 >= 100.0 {
+        Vec3::ZERO
+    } else {
+        Vec3::new(player.translation.x, 0.0, player.translation.z)
+    };
+    *tf = Transform::from_translation(centre + Vec3::Y * height.0).looking_at(centre, Vec3::NEG_Z);
+    // Fog would swallow a 100 m view.
+    commands.entity(entity).remove::<bevy::pbr::DistanceFog>();
+}
+
+/// `WOW_CAM_FOCUS=<m>` lowers the look-at point for close-ups of the hands (QA only).
+fn focus_height() -> f32 {
+    static FOCUS: std::sync::OnceLock<f32> = std::sync::OnceLock::new();
+    *FOCUS.get_or_init(|| {
+        std::env::var("WOW_CAM_FOCUS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(CAM_FOCUS_HEIGHT)
+    })
 }
 
 fn spawn_camera(mut commands: Commands) {
@@ -148,7 +199,7 @@ fn place_camera(
     cam: Single<(&mut OrbitCamera, &mut Transform)>,
 ) {
     let (mut cam, mut tf) = cam.into_inner();
-    let focus = player.translation + Vec3::Y * CAM_FOCUS_HEIGHT;
+    let focus = player.translation + Vec3::Y * focus_height();
     let dir = Quat::from_rotation_y(cam.yaw) * Vec3::new(0.0, cam.pitch.sin(), cam.pitch.cos());
 
     // Inflating the boxes by the camera radius keeps the near plane out of walls.
@@ -165,9 +216,14 @@ fn place_camera(
         free = free.min((CAM_MAX_HEIGHT - focus.y) / dir.y);
     }
     let target = free.max(CAM_MIN_CLIP_DIST);
-    // Snap in when clipped (never show the wall), ease out when it clears.
-    cam.dist = if target < cam.dist {
+    // Snap in when a wall closes in fast (never show it), ease out when it clears.
+    // Curved walls are AABB staircases whose steps move the clip point by a few tens of
+    // centimetres; those small bites are eased in quickly (the 0.3 m inflation keeps the near
+    // plane out of the wall meanwhile) so the camera does not pop while strafing along a curve.
+    cam.dist = if target < cam.dist - CAM_CLIP_SOFT {
         target
+    } else if target < cam.dist {
+        cam.dist + (target - cam.dist) * (1.0 - (-CAM_CLIP_RATE * time.delta_secs()).exp())
     } else {
         cam.dist + (target - cam.dist) * (1.0 - (-CAM_FOLLOW_RATE * time.delta_secs()).exp())
     };
@@ -187,5 +243,45 @@ fn inflate(b: &Aabb, r: f32) -> Aabb {
     Aabb {
         min: CVec3::new(b.min.x - r, b.min.y - r, b.min.z - r),
         max: CVec3::new(b.max.x + r, b.max.y + r, b.max.z + r),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Walks round the stage drum of floor 3 (a curved wall made of AABBs) with the camera arm
+    /// pointing at the wall, and reports how far the clipped distance jumps per 10 cm step.
+    #[test]
+    fn camera_distance_does_not_pop_along_a_curved_wall() {
+        let layout = crate::floors::build_floor(3);
+        let boxes: Vec<Aabb> = layout
+            .blockers
+            .iter()
+            .map(|b| inflate(b, CAM_RADIUS))
+            .collect();
+        let (r, step) = (14.5_f32, 0.1_f32);
+        let n = (PI * r / step) as usize;
+        let mut prev: Option<f32> = None;
+        let mut worst = 0.0_f32;
+        for i in 0..n {
+            // The middle of the hall's arc, away from its open ends.
+            let a = (90.0 + 180.0 * i as f32 / n as f32).to_radians();
+            let p = Vec3::new(r * a.cos(), CAM_FOCUS_HEIGHT, r * a.sin());
+            // Arm points at the drum centre, the wall the camera would be pushed against.
+            let dir = Vec3::new(-a.cos(), 0.3, -a.sin()).normalize();
+            let d = clear_distance(p, dir, CAM_START_DIST, &boxes);
+            // Only the stretches where the drum, not the outer wall, clips the arm.
+            if d < CAM_START_DIST - 0.5 {
+                if let Some(q) = prev {
+                    worst = worst.max((d - q).abs());
+                }
+                prev = Some(d);
+            } else {
+                prev = None;
+            }
+        }
+        println!("worst camera pop per 10 cm step: {worst:.3} m");
+        assert!(worst < 0.4, "camera pops {worst:.2} m per step");
     }
 }

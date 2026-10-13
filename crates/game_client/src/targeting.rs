@@ -4,7 +4,7 @@ use crate::arena::Colliders;
 use crate::collision::to_core;
 use crate::combat::{CombatSim, SimUnit};
 use crate::config::*;
-use crate::input::{MouseState, Paused};
+use crate::input::{MouseState, Paused, TrophiesOpen};
 use crate::player::{Player, PlayerBody};
 use crate::units::Unit;
 use bevy::prelude::*;
@@ -97,13 +97,16 @@ fn drop_invalid_target(mut target: ResMut<Target>, units: Query<&Unit>) {
 fn handle_keys(
     keys: Res<ButtonInput<KeyCode>>,
     mut paused: ResMut<Paused>,
+    mut trophies: ResMut<TrophiesOpen>,
     mut target: ResMut<Target>,
     player: Single<&PlayerBody, With<Player>>,
     units: Query<(Entity, &Transform, &Unit, Option<&SimUnit>)>,
     sim: Res<CombatSim>,
 ) {
     if keys.just_pressed(KeyCode::Escape) {
-        if target.0.take().is_none() {
+        if std::mem::take(&mut trophies.0) {
+            // The window closes first; the next Esc clears the target or pauses.
+        } else if target.0.take().is_none() {
             paused.0 = !paused.0;
         }
         return;

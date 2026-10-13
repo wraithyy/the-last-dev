@@ -5,14 +5,21 @@
 //! reused (despawned units stay in the vector, hidden from the public views).
 
 use crate::content::{
-    AuraDef, Content, ContentError, School, SpellDef, SpellId, YELL_KINDS, YellKind, ticks,
+    AuraDef, Content, ContentError, ItemTotals, School, SpellDef, SpellId, YELL_KINDS, YellKind,
+    ticks,
 };
 use crate::geom::{Aabb, Vec3, in_range};
 use crate::rng::Rng;
 use crate::targeting::{EntityId, TargetCandidate, validate_target};
 use crate::time::{Tick, ticks_to_ms};
 use crate::types::*;
+use crate::wander::Wander;
 use std::collections::BTreeMap;
+
+/// Friendly ambient chatter is only emitted while the player is this close.
+const AMBIENT_RANGE_M: f32 = 15.0;
+/// Minimum gap between two throttled hostile yells across all units.
+const HOSTILE_YELL_GAP_MS: u32 = 2500;
 
 /// A cast in progress. `end` moves later when pushback hits.
 pub(crate) struct ActiveCast {
@@ -71,6 +78,8 @@ pub(crate) struct Unit {
     pub spell_yell_cursor: BTreeMap<SpellId, usize>,
     pub respawn_at: Option<u64>,
     pub loot: Vec<String>,
+    /// Cached sum of the player's trophy bonuses; zero for everyone else.
+    pub item_bonus: ItemTotals,
     /// Highest-priority yell requested this tick (with an explicit line for
     /// ability and phase yells); flushed once at end of tick.
     pub yell_pending: Option<(YellKind, Option<String>)>,
@@ -91,6 +100,7 @@ pub(crate) struct Unit {
     pub last_cast: Option<SpellId>,
     /// Last damaging player spell that landed on this unit: (pre-absorb amount, school).
     pub last_player_hit: Option<(u32, School)>,
+    pub wander: Wander,
 }
 
 /// One resolved damage instance, before modifiers and absorbs.
@@ -122,6 +132,11 @@ pub struct Sim {
     pub(crate) player: Option<EntityId>,
     pub(crate) floor: Option<u8>,
     pub(crate) next_pack: u32,
+    /// Earliest tick for the next throttled hostile yell, shared by all units.
+    pub(crate) hostile_yell_next: u64,
+    /// Root of every unit's private wander stream.
+    seed: u64,
+    pub(crate) wandering: bool,
 }
 
 impl Sim {
@@ -137,6 +152,9 @@ impl Sim {
             player: None,
             floor: None,
             next_pack: 1,
+            hostile_yell_next: 0,
+            seed,
+            wandering: true,
         }
     }
 
@@ -237,6 +255,7 @@ impl Sim {
             pack: o.pack,
             phase: 1,
             idle_pose: d.idle_pose,
+            inventory: Vec::new(),
         };
         self.units.push(Unit {
             state,
@@ -262,6 +281,7 @@ impl Sim {
             spell_yell_cursor: BTreeMap::new(),
             respawn_at: None,
             loot: Vec::new(),
+            item_bonus: ItemTotals::default(),
             yell_pending: None,
             yell_cursor: [0; YELL_KINDS],
             yell_periodic_next: 0,
@@ -276,6 +296,7 @@ impl Sim {
             floor_boss: o.floor_boss,
             last_cast: None,
             last_player_hit: None,
+            wander: Wander::new(self.seed, id),
         });
         let i = self.units.len() - 1;
         // Neighbouring NPCs of the same kind start at different lines, so they banter.
@@ -283,6 +304,20 @@ impl Sim {
         let level = o.level.unwrap_or(self.content.units[def].level);
         self.apply_level(i, level);
         id
+    }
+
+    /// Idle wandering is on by default; balance harnesses switch it off so fight timing
+    /// depends on the authored positions only.
+    pub fn set_wandering(&mut self, on: bool) {
+        self.wandering = on;
+    }
+
+    /// Lets the presentation layer override a unit's authored pose (e.g. a desk the sim knows
+    /// nothing about); seated and sleeping units do not wander.
+    pub fn set_idle_pose(&mut self, id: EntityId, pose: Option<crate::content::IdlePose>) {
+        if let Some(i) = self.index(id) {
+            self.units[i].state.idle_pose = pose;
+        }
     }
 
     /// Applied at the start of the next tick.
@@ -359,6 +394,7 @@ impl Sim {
         self.run_queue();
         self.update_auto_attack();
         self.update_ai();
+        self.update_wander();
         self.update_auras();
         self.update_regen();
         self.update_combat_flags();
@@ -468,11 +504,81 @@ impl Sim {
         }
         let items = std::mem::take(&mut self.units[ci].loot);
         self.units[ci].state.lootable = false;
+        if Some(looter) == self.player {
+            self.add_trophies(li, &items);
+        }
         self.events.push(Event::Looted {
             looter,
             corpse,
             items,
         });
+    }
+
+    /// Stores the items and applies their bonuses at once. Current HP and mana scale up
+    /// with the new maximum and never drop.
+    fn add_trophies(&mut self, i: usize, items: &[String]) {
+        for name in items {
+            let inv = &mut self.units[i].state.inventory;
+            match inv.iter_mut().find(|(n, _)| n == name) {
+                Some((_, c)) => *c += 1,
+                None => inv.push((name.clone(), 1)),
+            }
+        }
+        let (old_hp, old_mana) = (self.units[i].state.max_hp, self.units[i].state.max_mana);
+        self.refresh_item_bonus(i);
+        let u = &mut self.units[i].state;
+        let scale = |cur: u32, old: u32, new: u32| {
+            if old == 0 {
+                return cur;
+            }
+            cur.max((u64::from(cur) * u64::from(new) / u64::from(old)) as u32)
+                .min(new)
+        };
+        u.hp = scale(u.hp, old_hp, u.max_hp);
+        u.mana = scale(u.mana, old_mana, u.max_mana);
+    }
+
+    /// Re-sums the inventory, then rebuilds the level-derived stats (which include the bonus).
+    fn refresh_item_bonus(&mut self, i: usize) {
+        let mut total = ItemTotals::default();
+        for (name, copies) in &self.units[i].state.inventory {
+            if let Some(it) = self.content.item(name) {
+                total.add(&it.bonus.totals(*copies));
+            }
+        }
+        self.units[i].item_bonus = total;
+        let (hp, mana) = (self.units[i].state.hp, self.units[i].state.mana);
+        let level = self.units[i].state.level;
+        self.apply_level(i, level);
+        self.units[i].state.hp = hp;
+        self.units[i].state.mana = mana;
+    }
+
+    /// Debug/test: puts one copy of a trophy into the player's inventory as if looted.
+    /// False for an unknown item or without a player; no event is emitted.
+    pub fn grant_trophy(&mut self, name: &str) -> bool {
+        let (Some(i), true) = (
+            self.player.and_then(|p| self.index(p)),
+            self.content.item(name).is_some(),
+        ) else {
+            return false;
+        };
+        self.add_trophies(i, &[name.to_string()]);
+        true
+    }
+
+    /// The player's trophies as (name, copies), first pickup first.
+    pub fn inventory(&self) -> &[(String, u32)] {
+        self.player
+            .and_then(|p| self.index(p))
+            .map_or(&[][..], |i| &self.units[i].state.inventory)
+    }
+
+    /// Player bonus granted by the trophies right now (stack cap applied).
+    pub fn item_totals(&self) -> ItemTotals {
+        self.player
+            .and_then(|p| self.index(p))
+            .map_or_else(ItemTotals::default, |i| self.units[i].item_bonus)
     }
 
     /// Friendly units with `talk` lines answer the player when close enough; anything else is ignored.
@@ -894,6 +1000,7 @@ impl Sim {
         u.threat.clear();
         u.state.target = None;
         self.events.push(Event::Death { unit: id, killer });
+        self.kill_adds_of(id);
         self.request_yell(ti, YellKind::Death);
         if self.player == Some(id)
             && let Some(k) = killer.and_then(|k| self.index(k))
@@ -966,7 +1073,7 @@ impl Sim {
                 u.regen_acc = 0;
                 continue;
             }
-            u.regen_acc += d.mana_regen_per_5s_combat;
+            u.regen_acc += d.mana_regen_per_5s_combat + u.item_bonus.mana_regen;
             u.state.mana = (u.state.mana + u.regen_acc / 150).min(u.state.max_mana);
             u.regen_acc %= 150;
         }
@@ -996,7 +1103,16 @@ impl Sim {
                 }
                 if now_in && Some(id) != player {
                     self.reset_periodic_yell(i);
-                    self.request_yell(i, YellKind::Aggro);
+                    // Only the first unit of a pack shouts; in_combat is updated in-loop so
+                    // later members of the same pull see it.
+                    let pack = self.units[i].state.pack;
+                    let pack_already = pack.is_some()
+                        && self.units.iter().enumerate().any(|(o, x)| {
+                            o != i && x.state.alive && x.state.in_combat && x.state.pack == pack
+                        });
+                    if !pack_already {
+                        self.request_yell(i, YellKind::Aggro);
+                    }
                 }
                 self.events.push(if now_in {
                     Event::EnterCombat { unit: id }
@@ -1053,12 +1169,19 @@ impl Sim {
                 let u = &self.units[i];
                 if ambient_ms > 0 && !u.state.in_combat && self.now >= u.ambient_next {
                     self.units[i].ambient_next = self.now + ticks(ambient_ms);
-                    self.request_yell(i, YellKind::Ambient);
+                    // The timer still advances out of range so a late arrival does not
+                    // trigger an instant line.
+                    if self.player_within(i, AMBIENT_RANGE_M) {
+                        self.request_yell(i, YellKind::Ambient);
+                    }
                 }
             }
             let Some((kind, line)) = self.units[i].yell_pending.take() else {
                 continue;
             };
+            if !self.yell_allowed(i, kind) {
+                continue;
+            }
             let text = match line {
                 Some(t) => t,
                 None => {
@@ -1075,6 +1198,29 @@ impl Sim {
                 text,
             });
         }
+    }
+
+    fn player_within(&self, i: usize, range_m: f32) -> bool {
+        self.player
+            .and_then(|p| self.index(p))
+            .is_some_and(|p| in_range(self.units[p].state.pos, self.units[i].state.pos, range_m))
+    }
+
+    /// Boss phase/aggro/death yells always go through; every other hostile yell shares one
+    /// global gap so a pack does not flood the log. Suppressed yells are dropped, not queued.
+    fn yell_allowed(&mut self, i: usize, kind: YellKind) -> bool {
+        let u = &self.units[i].state;
+        if !u.hostile || kind == YellKind::Phase {
+            return true;
+        }
+        if u.boss && matches!(kind, YellKind::Aggro | YellKind::Death) {
+            return true;
+        }
+        if self.now < self.hostile_yell_next {
+            return false;
+        }
+        self.hostile_yell_next = self.now + ticks(HOSTILE_YELL_GAP_MS);
+        true
     }
 
     fn sync_views(&mut self) {

@@ -7,6 +7,7 @@
 mod kit;
 mod layout;
 mod props;
+mod shape;
 mod textures;
 mod themes;
 
@@ -14,12 +15,15 @@ pub use layout::{FLOOR_COUNT, build_floor, elevator_exit_trigger};
 pub use textures::{icon_image, z_image};
 
 use crate::arena::Colliders;
-use crate::config::{FLOOR_HALF_X, FLOOR_HALF_Z, WALL_HEIGHT};
+use crate::config::WALL_HEIGHT;
+use bevy::asset::RenderAssetUsages;
 use bevy::light::{CascadeShadowConfigBuilder, NotShadowCaster};
 use bevy::math::Affine2;
+use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::pbr::DistanceFog;
 use bevy::prelude::*;
 use kit::{FURNITURE_SCALE, Mat, Piece, Tex};
+use shape::Seg;
 use std::collections::HashMap;
 
 /// Ask the floors module to swap to floor `id` (1..=5) on the next frame.
@@ -128,10 +132,10 @@ fn load_floor(
         layout.blockers.clone()
     };
 
-    let (span_x, span_z) = (FLOOR_HALF_X * 2.0, FLOOR_HALF_Z * 2.0);
+    let runs = layout.footprint.floor_runs();
     let floor = materials.add(StandardMaterial {
         base_color_texture: Some(images.add(textures::floor_image(t.floor))),
-        uv_transform: Affine2::from_scale(Vec2::new(span_x / 4.0, span_z / 4.0)),
+        uv_transform: Affine2::from_scale(Vec2::splat(0.25)),
         perceptual_roughness: if matches!(t.floor, layout::FloorKind::Marble) {
             0.3
         } else {
@@ -142,16 +146,16 @@ fn load_floor(
     // Own meshes (not the shared unit cube) so the floor and ceiling UVs tile in metres.
     commands.spawn((
         FloorEntity,
-        Mesh3d(meshes.add(Cuboid::new(span_x, 0.2, span_z))),
+        Mesh3d(meshes.add(flat_mesh(&runs, 0.0, true))),
         MeshMaterial3d(floor),
-        Transform::from_xyz(0.0, -0.1, 0.0),
     ));
-    // Ceiling slab on top of the walls. It casts no shadow (it would black out the
-    // directional light) and is not a collider: camera.rs clamps height instead.
+    // Ceiling is single-sided (culled from above, so the overview camera sees through it).
+    // It casts no shadow (it would black out the directional light) and is not a collider:
+    // camera.rs clamps height instead.
     let ceiling = materials.add(StandardMaterial {
         base_color_texture: Some(images.add(textures::ceiling_image())),
         // 4 tiles per repeat: ~0.6 m panels.
-        uv_transform: Affine2::from_scale(Vec2::new(span_x * 0.4, span_z * 0.4)),
+        uv_transform: Affine2::from_scale(Vec2::splat(0.4)),
         perceptual_roughness: 0.95,
         // The slab is only lit from below by point lights; a faint floor keeps it readable.
         emissive: LinearRgba::rgb(0.05, 0.05, 0.06),
@@ -159,9 +163,8 @@ fn load_floor(
     });
     commands.spawn((
         FloorEntity,
-        Mesh3d(meshes.add(Cuboid::new(span_x + 1.0, 0.1, span_z + 1.0))),
+        Mesh3d(meshes.add(flat_mesh(&runs, WALL_HEIGHT, false))),
         MeshMaterial3d(ceiling),
-        Transform::from_xyz(0.0, WALL_HEIGHT + 0.05, 0.0),
         NotShadowCaster,
     ));
 
@@ -258,7 +261,116 @@ fn load_floor(
                     Transform::from_translation(*pos),
                 ));
             }
+            Piece::Slab {
+                center,
+                yaw,
+                size,
+                mat,
+            } => {
+                let mut e = commands.spawn((
+                    FloorEntity,
+                    Mesh3d(unit_cube.clone()),
+                    MeshMaterial3d(get_mat(&mut mats, &mut materials, t, *mat)),
+                    Transform::from_translation(*center)
+                        .with_rotation(Quat::from_rotation_y(*yaw))
+                        .with_scale(*size),
+                ));
+                if matches!(mat, Mat::Glass | Mat::LightPanel) {
+                    e.insert(NotShadowCaster);
+                }
+            }
+            Piece::Run {
+                segs,
+                mat,
+                y0,
+                y1,
+                inset,
+            } => {
+                let mut e = commands.spawn((
+                    FloorEntity,
+                    Mesh3d(meshes.add(strip_mesh(segs, *y0, *y1, *inset))),
+                    MeshMaterial3d(get_mat(&mut mats, &mut materials, t, *mat)),
+                ));
+                if matches!(mat, Mat::Glass | Mat::Accent) {
+                    e.insert(NotShadowCaster);
+                }
+            }
+            Piece::Cap { segs } => {
+                commands.spawn((
+                    FloorEntity,
+                    Mesh3d(meshes.add(cap_mesh(segs))),
+                    MeshMaterial3d(get_mat(&mut mats, &mut materials, t, Mat::Trim)),
+                    NotShadowCaster,
+                ));
+            }
             Piece::Block(_) => {}
         }
     }
+}
+
+fn mesh_from(pos: Vec<[f32; 3]>, normals: Vec<[f32; 3]>, uv: Vec<[f32; 2]>, idx: Vec<u32>) -> Mesh {
+    Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, pos)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uv)
+    .with_inserted_indices(Indices::U32(idx))
+}
+
+/// Horizontal quads at height `y`; UVs are world metres.
+fn flat_mesh(runs: &[(f32, f32, f32, f32)], y: f32, up: bool) -> Mesh {
+    let (mut pos, mut uv, mut idx) = (Vec::new(), Vec::new(), Vec::new());
+    for &(x0, x1, z0, z1) in runs {
+        let b = pos.len() as u32;
+        for (x, z) in [(x0, z0), (x0, z1), (x1, z1), (x1, z0)] {
+            pos.push([x, y, z]);
+            uv.push([x, z]);
+        }
+        let quad = if up {
+            [0, 1, 2, 0, 2, 3]
+        } else {
+            [0, 2, 1, 0, 3, 2]
+        };
+        idx.extend(quad.map(|i| b + i));
+    }
+    let n = if up {
+        [0.0, 1.0, 0.0]
+    } else {
+        [0.0, -1.0, 0.0]
+    };
+    let normals = vec![n; pos.len()];
+    mesh_from(pos, normals, uv, idx)
+}
+
+/// Vertical band along wall segments, facing the walkable side.
+fn strip_mesh(segs: &[Seg], y0: f32, y1: f32, inset: f32) -> Mesh {
+    let (mut pos, mut normals, mut uv, mut idx) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    for s in segs {
+        let (a, b) = (s.a + s.n * inset, s.b + s.n * inset);
+        let b0 = pos.len() as u32;
+        for (p, y) in [(a, y0), (b, y0), (b, y1), (a, y1)] {
+            pos.push([p.x, y, p.y]);
+            normals.push([s.n.x, 0.0, s.n.y]);
+            uv.push([p.x, y]);
+        }
+        idx.extend([0, 1, 2, 0, 2, 3].map(|i| b0 + i));
+    }
+    mesh_from(pos, normals, uv, idx)
+}
+
+fn cap_mesh(segs: &[Seg]) -> Mesh {
+    let (mut pos, mut uv, mut idx) = (Vec::new(), Vec::new(), Vec::new());
+    for s in segs {
+        let out = s.n * -shape::WALL_T;
+        let b0 = pos.len() as u32;
+        for p in [s.a, s.b, s.b + out, s.a + out] {
+            pos.push([p.x, WALL_HEIGHT + 0.02, p.y]);
+            uv.push([p.x, p.y]);
+        }
+        idx.extend([0, 1, 2, 0, 2, 3].map(|i| b0 + i));
+    }
+    let normals = vec![[0.0, 1.0, 0.0]; pos.len()];
+    mesh_from(pos, normals, uv, idx)
 }

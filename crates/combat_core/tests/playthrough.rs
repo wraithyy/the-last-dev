@@ -66,6 +66,8 @@ fn yaw_to(from: Vec3, to: Vec3) -> f32 {
 impl Bot {
     fn new(floor: u8, level: u8, seed: u64) -> Bot {
         let mut sim = Sim::new(content(), seed);
+        // The balance gate and golden pin fight timing, which wandering would shift.
+        sim.set_wandering(false);
         let start = Vec3::new(0.0, 0.0, 20.0);
         let player = sim.spawn_player(start, 0.0);
         sim.set_player_level(level);

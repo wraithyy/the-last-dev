@@ -12,12 +12,12 @@ use crate::time::TICK_HZ;
 use crate::types::{AiState, AuraEnd, Event};
 
 /// Inverse of `geom::forward` (yaw 0 faces -Z).
-fn yaw_toward(from: Vec3, to: Vec3) -> f32 {
+pub(crate) fn yaw_toward(from: Vec3, to: Vec3) -> f32 {
     (-(to.x - from.x)).atan2(-(to.z - from.z))
 }
 
 /// Moves `pos` toward `to` by at most `step`, never closer than `stop`.
-fn step_toward(pos: Vec3, to: Vec3, step: f32, stop: f32) -> Vec3 {
+pub(crate) fn step_toward(pos: Vec3, to: Vec3, step: f32, stop: f32) -> Vec3 {
     let d = dist_xz(pos, to);
     if d <= stop || d < 1e-6 {
         return pos;
@@ -364,6 +364,8 @@ impl Sim {
                 phase: 1,
             });
         }
+        // Adds belong to this encounter; leaving them behind would strand them mid-room.
+        self.despawn_adds_of(Self::id_of(i));
         self.set_ai(i, AiState::Evade);
         self.request_yell(i, YellKind::Evade);
     }

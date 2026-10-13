@@ -672,6 +672,7 @@ fn talk_answers_in_range_and_npcs_chat_on_their_own() {
     let mut w = world(1, |_| {});
     let near = w.spawn("it_support", 2.0, -2.0);
     let far = w.spawn("it_support", 0.0, -50.0);
+    let mid = w.spawn("it_support", 0.0, -10.0);
     w.sim.push(Command::Talk { unit: near });
     w.sim.push(Command::Talk { unit: far });
     w.tick();
@@ -688,13 +689,79 @@ fn talk_answers_in_range_and_npcs_chat_on_their_own() {
         })
         .collect();
     assert_eq!(yells, [(near, talk[0].clone())]);
-    w.run(26 * 30);
-    let ambient = w
+    w.run(41 * 30);
+    let count = |w: &W, id: u64| {
+        w.log
+            .iter()
+            .filter(|(_, e)| matches!(e, Event::Yell { unit, .. } if *unit == id))
+            .count()
+    };
+    assert!(count(&w, mid) >= 1, "idle NPCs in earshot chat unprompted");
+    assert_eq!(
+        count(&w, far),
+        0,
+        "ambient banter stays silent out of range"
+    );
+}
+
+#[test]
+fn pack_pull_yields_a_single_aggro_yell() {
+    let mut w = world(3, |_| {});
+    assert!(w.sim.load_floor(1, &anchor, Vec::new()).is_ok());
+    w.sim.push(Command::PlayerMoved {
+        pos: Vec3::new(0.0, 0.0, -50.0),
+        yaw: 0.0,
+        moving: false,
+        jumping: false,
+    });
+    w.tick();
+    let Some((at, _)) = anchor("pack_1") else {
+        panic!("no pack_2 anchor")
+    };
+    let pack: Vec<u64> = w
+        .sim
+        .units()
+        .filter(|u| u.hostile && combat_core::distance(u.pos, at) < 5.0)
+        .map(|u| u.id)
+        .collect();
+    assert_eq!(pack.len(), 2);
+    w.attack(pack[0], CR);
+    w.run(65);
+    assert!(pack.iter().all(|id| w.u(*id).in_combat));
+    let yells = w
         .log
         .iter()
-        .filter(|(_, e)| matches!(e, Event::Yell { unit, .. } if *unit == far))
+        .filter(|(_, e)| matches!(e, Event::Yell { unit, .. } if pack.contains(unit)))
         .count();
-    assert!(ambient >= 1, "idle NPCs chat without being talked to");
+    assert_eq!(yells, 1, "only the first pack member shouts on aggro");
+}
+
+#[test]
+fn hostile_yells_share_a_global_gap() {
+    let mut w = world(3, |c| {
+        for k in ["meatproxy", "vibe_junior", "copilot_drone"] {
+            def_mut(c, k).yells.aggro = vec!["Hey!".into()];
+        }
+    });
+    let ids = [
+        w.spawn("meatproxy", 0.0, -5.0),
+        w.spawn("vibe_junior", 3.0, -5.0),
+        w.spawn("copilot_drone", -3.0, -5.0),
+    ];
+    w.run(40);
+    let ticks: Vec<u64> = w
+        .log
+        .iter()
+        .filter_map(|(t, e)| match e {
+            Event::Yell { unit, .. } if ids.contains(unit) => Some(*t),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        ticks.len(),
+        1,
+        "same-tick aggro yells collapse to one: {ticks:?}"
+    );
 }
 
 #[test]
@@ -732,4 +799,186 @@ fn loading_a_floor_cancels_the_players_cast() {
         w.has(|e| matches!(e, Event::CastInterrupted { caster, by: None, .. } if *caster == p))
     );
     assert!(!w.has(|e| matches!(e, Event::CastSucceeded { caster, .. } if *caster == p)));
+}
+
+// ---- adds follow their summoner ----
+
+/// Vibe Coder that summons after one second and is soft enough to kill with spells.
+fn quick_summoner(c: &mut Content) {
+    let vc = def_mut(c, "vibe_coder");
+    vc.max_hp = 400;
+    if let Some(ai) = vc.ai.as_mut() {
+        ai.abilities[0].initial_ms = Some((1000, 1000));
+    }
+    def_mut(c, "senior_engineer").max_hp = 100_000;
+}
+
+fn summoned_by(w: &W, summoner: u64) -> Vec<u64> {
+    w.log
+        .iter()
+        .filter_map(|(_, e)| match e {
+            Event::Summoned { unit, summoner: s } if *s == summoner => Some(*unit),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn adds_die_with_their_summoner_without_xp_or_loot() {
+    let mut w = world(10, quick_summoner);
+    let vc = w.spawn("vibe_coder", 0.0, -10.0);
+    assert!(w.run_until(300, |e| matches!(e, Event::Summoned { .. })));
+    w.tick();
+    let adds = summoned_by(&w, vc);
+    assert_eq!(adds.len(), 2);
+    assert!(adds.iter().all(|a| w.u(*a).alive));
+    for _ in 0..40 {
+        w.attack(vc, CR);
+        w.run(75);
+        if !w.u(vc).alive {
+            break;
+        }
+    }
+    assert!(!w.u(vc).alive, "boss should be dead");
+    for a in adds {
+        let u = w.u(a);
+        assert!(
+            !u.alive && !u.lootable,
+            "add {a} must be dead and unlootable"
+        );
+        assert!(w.has(|e| matches!(e, Event::Death { unit, killer: None } if *unit == a)));
+    }
+}
+
+#[test]
+fn floor_boss_adds_despawn_when_the_floor_clears() {
+    let mut w = world(10, quick_summoner);
+    assert!(w.sim.load_floor(1, &anchor, Vec::new()).is_ok());
+    let boss = w.sim.units().find(|u| u.key == "vibe_coder").map(|u| u.id);
+    let Some(boss) = boss else {
+        panic!("no floor boss");
+    };
+    w.sim.push(Command::PlayerMoved {
+        pos: Vec3::new(0.0, 0.0, -480.0),
+        yaw: 0.0,
+        moving: false,
+        jumping: false,
+    });
+    assert!(w.run_until(300, |e| matches!(e, Event::Summoned { .. })));
+    w.tick();
+    let adds = summoned_by(&w, boss);
+    assert_eq!(adds.len(), 2);
+    for _ in 0..40 {
+        w.attack(boss, CR);
+        w.run(75);
+        if !w.u(boss).alive {
+            break;
+        }
+    }
+    assert!(w.has(|e| matches!(e, Event::FloorCleared { .. })));
+    for a in adds {
+        assert!(w.sim.unit(a).is_none(), "add {a} should be despawned");
+        assert!(w.has(|e| matches!(e, Event::Despawned { unit } if *unit == a)));
+    }
+}
+
+#[test]
+fn adds_despawn_when_their_summoner_evades() {
+    let mut w = world(10, quick_summoner);
+    let vc = w.spawn("vibe_coder", 0.0, -10.0);
+    assert!(w.run_until(300, |e| matches!(e, Event::Summoned { .. })));
+    w.tick();
+    let adds = summoned_by(&w, vc);
+    assert_eq!(adds.len(), 2);
+    // Out of leash range the boss gives up and resets.
+    w.sim.push(Command::PlayerMoved {
+        pos: Vec3::new(0.0, 0.0, 200.0),
+        yaw: 0.0,
+        moving: false,
+        jumping: false,
+    });
+    assert!(w.run_until(900, |e| matches!(e, Event::Despawned { .. })));
+    for a in adds {
+        assert!(w.sim.unit(a).is_none(), "add {a} should be gone");
+    }
+    assert!(w.u(vc).alive);
+}
+
+// ---- idle wandering ----
+
+#[test]
+fn idle_hostiles_wander_near_spawn_and_keep_clear_of_walls() {
+    let wall = combat_core::Aabb {
+        min: Vec3::new(2.0, -1.0, -60.0),
+        max: Vec3::new(3.0, 5.0, -20.0),
+    };
+    let mut w = world(1, |_| {});
+    w.sim.set_blockers(vec![wall]);
+    let mp = w.spawn("meatproxy", 0.0, -40.0);
+    let spawn = w.u(mp).pos;
+    let (mut far, mut min_wall) = (0.0_f32, f32::MAX);
+    for _ in 0..30 * 90 {
+        w.tick();
+        let p = w.u(mp).pos;
+        far = far.max(((p.x - spawn.x).powi(2) + (p.z - spawn.z).powi(2)).sqrt());
+        min_wall = min_wall.min(wall.min.x - p.x);
+    }
+    assert!(far > 1.0, "never wandered (max {far} m)");
+    assert!(far <= 4.01, "left its radius ({far} m)");
+    assert!(min_wall >= 0.99, "walked within {min_wall} m of the wall");
+    assert_eq!(w.u(mp).ai, Some(combat_core::AiState::Idle));
+}
+
+#[test]
+fn wandering_never_touches_the_combat_rng() {
+    let run = |wander: bool| {
+        let mut w = world(10, |c| {
+            c.config.white_hit_pct = 85;
+            c.config.spell_hit_pct = 85;
+        });
+        w.sim.set_wandering(wander);
+        w.spawn("meatproxy", 30.0, -40.0);
+        let ceo = w.spawn("ceo", 0.0, -8.0);
+        w.attack(ceo, CR);
+        w.run(30 * 40);
+        w.log
+    };
+    assert_eq!(run(true), run(false));
+}
+
+#[test]
+fn pack_members_stay_within_four_metres_of_the_anchor() {
+    let mut w = world(1, |_| {});
+    assert!(w.sim.load_floor(1, &anchor, Vec::new()).is_ok());
+    let start: Vec<_> = w.sim.units().map(|u| (u.id, u.pos)).collect();
+    let mut moved = false;
+    for _ in 0..30 * 120 {
+        w.tick();
+        for u in w.sim.units().filter(|u| u.pack.is_some() && u.hostile) {
+            let n = (-u.pos.z / 70.0).round();
+            let at = Vec3::new(0.0, 0.0, -70.0 * n);
+            let d = ((u.pos.x - at.x).powi(2) + (u.pos.z - at.z).powi(2)).sqrt();
+            assert!(d <= 4.01, "{} strayed {d} m from its anchor", u.name);
+            let from = start.iter().find(|(id, _)| *id == u.id).map(|(_, p)| *p);
+            moved |= from.is_some_and(|f| combat_core::distance(f, u.pos) > 0.5);
+        }
+    }
+    assert!(moved, "nobody in any pack moved");
+}
+
+#[test]
+fn seated_npcs_stay_put_and_standing_ones_stroll_home() {
+    let mut w = world(1, |_| {});
+    let sleeper = w.spawn("it_support", 10.0, -10.0);
+    let stroller = w.spawn("it_support", -10.0, -10.0);
+    w.sim.set_idle_pose(sleeper, Some(IdlePose::Sleeping));
+    w.sim.set_idle_pose(stroller, None);
+    let home = w.u(stroller).pos;
+    let mut far = 0.0_f32;
+    for _ in 0..30 * 150 {
+        w.tick();
+        far = far.max(combat_core::distance(home, w.u(stroller).pos));
+    }
+    assert_eq!(w.u(sleeper).pos, Vec3::new(10.0, 0.0, -10.0));
+    assert!(far > 1.0 && far <= 6.01, "stroll reached {far} m");
 }

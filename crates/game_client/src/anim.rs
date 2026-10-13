@@ -71,6 +71,14 @@ enum Clip {
     Hit,
     /// Seated idle: plays once and holds the last frame.
     Sit,
+    /// Per-spell release poses (see `release_pose`); full-body one-shots.
+    Victory,
+    Roll,
+    Hop,
+    /// Per-spell cast loops (see `cast_clip`).
+    CastInspect,
+    CastHack,
+    CastType,
 }
 
 struct Spec {
@@ -98,7 +106,7 @@ const fn overlay(clip: &'static str, speed: f32) -> Spec {
 }
 
 /// Indexed by `Clip as usize`.
-const SPECS: [Spec; 14] = [
+const SPECS: [Spec; 20] = [
     spec("Idle", 1.0),
     spec("Walk", 1.0),
     spec("Run", 1.0),
@@ -113,6 +121,12 @@ const SPECS: [Spec; 14] = [
     overlay("Shoot_OneHanded", 1.0),
     overlay("RecieveHit", 1.3),
     spec("SitDown", 1.0),
+    spec("Victory", 1.0),
+    spec("Roll", 1.0),
+    spec("Jump", 1.4),
+    spec("PickUp", 0.7),
+    spec("SwordSlash", 0.45),
+    spec("PickUp", 2.2),
 ];
 const CLIP_COUNT: usize = SPECS.len();
 
@@ -128,6 +142,9 @@ impl Clip {
                 | Clip::ReleaseUpper
                 | Clip::Hit
                 | Clip::Sit
+                | Clip::Victory
+                | Clip::Roll
+                | Clip::Hop
         )
     }
 }
@@ -180,6 +197,8 @@ pub struct AnimState {
     seen_release: u32,
     seen_attack: u32,
     seen_hit: u32,
+    /// Speed multiplier of the running one-shot (per-spell release pose); 0 = unset.
+    mul: f32,
     /// Masked clip layered over locomotion (release while moving, hit reaction).
     overlay: Option<Clip>,
     moving: bool,
@@ -395,12 +414,15 @@ fn drive(
             if st.moving && !ca.dead {
                 overlay_start = Some(Clip::ReleaseUpper);
             } else {
-                trigger = Some(Clip::Release);
+                let (clip, mul) = release_pose(ca.release_spell);
+                trigger = Some(clip);
+                st.mul = mul;
             }
         }
         if ca.attack_seq != st.seen_attack {
             st.seen_attack = ca.attack_seq;
             trigger = Some(Clip::Attack);
+            st.mul = 1.0;
         }
         // Not restarted while it still plays: damage-over-time ticks would stutter it.
         if ca.hit_seq != st.seen_hit {
@@ -467,12 +489,40 @@ fn drive(
                 link.nodes[want as usize],
                 Duration::from_millis(fade),
             );
-            anim.set_speed(SPECS[want as usize].speed);
+            let mul = if force && st.mul > 0.0 { st.mul } else { 1.0 };
+            anim.set_speed(SPECS[want as usize].speed * mul);
             if want.looping() {
                 anim.repeat();
             }
             st.current = Some(want);
         }
+    }
+}
+
+/// Cast loop per player spell id: Code Review inspects, Refactor hacks away, Write It By Hand types.
+fn cast_clip(spell: u32) -> Clip {
+    match spell {
+        1 => Clip::CastInspect,
+        2 => Clip::CastHack,
+        11 => Clip::CastType,
+        _ => Clip::Cast,
+    }
+}
+
+/// Release pose and speed multiplier per player spell id (0 = Nitpick auto attack).
+fn release_pose(spell: u32) -> (Clip, f32) {
+    match spell {
+        0 => (Clip::Release, 1.8),
+        2 => (Clip::Attack, 1.0),
+        3 => (Clip::Victory, 1.3),
+        4 => (Clip::Release, 2.2),
+        6 => (Clip::Release, 1.4),
+        7 => (Clip::Roll, 1.5),
+        8 => (Clip::Hop, 1.3),
+        9 => (Clip::Attack, 0.9),
+        10 => (Clip::Attack, 0.7),
+        11 => (Clip::Victory, 1.0),
+        _ => (Clip::Release, 1.0),
     }
 }
 
@@ -493,7 +543,7 @@ fn base_clip(
     // Hysteresis: easier to keep moving than to start, so noisy speed doesn't flicker.
     st.moving = speed > if st.moving { 0.3 } else { 0.7 };
     if ca.casting {
-        return Clip::Cast;
+        return cast_clip(ca.cast_spell);
     }
     if !st.moving {
         return Clip::Idle;

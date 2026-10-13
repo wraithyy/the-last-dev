@@ -1,14 +1,14 @@
 //! Event-driven HUD: combat log, error banner, death prompt, loot window, XP bar.
 
 use super::{
-    ACCENT, DIM, IconCache, KEY_RIM, KEY_TOP, KEY_TOP_HI, PANEL_EDGE, asset_key, drop_shadow,
-    label, panel_bg, set_text, vgrad,
+    ACCENT, DIM, IconCache, KEY_RIM, KEY_TOP, KEY_TOP_HI, PANEL_EDGE, drop_shadow, label, panel_bg,
+    set_text, vgrad,
 };
 use crate::combat::{CombatEvent, CombatSim, PendingCommands, SimReady, UiNotice};
 use crate::config::*;
 use crate::copy;
 use bevy::prelude::*;
-use combat_core::{AuraEnd, Command, EntityId, Event, School};
+use combat_core::{AuraEnd, Command, EntityId, Event, ITEM_STACK_CAP, School};
 use std::collections::VecDeque;
 
 const XP_BAR_H: f32 = 14.0;
@@ -64,6 +64,12 @@ impl Plugin for FeedPlugin {
             .init_resource::<LootState>()
             .add_systems(Startup, spawn_feed)
             .add_systems(Update, close_loot_on_restart)
+            .add_systems(
+                Update,
+                loot_demo
+                    .in_set(SimReady)
+                    .run_if(|| std::env::var_os("WOW_LOOT_DEMO").is_some()),
+            )
             .add_systems(
                 Update,
                 (
@@ -210,7 +216,7 @@ fn spawn_feed(mut commands: Commands) {
                 position_type: PositionType::Absolute,
                 right: percent(24),
                 top: percent(30),
-                width: px(230),
+                width: px(300),
                 padding: UiRect::all(px(8)),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(6),
@@ -366,9 +372,20 @@ fn collect_events(
     mut banner: ResMut<ErrorBanner>,
     mut loot: ResMut<LootState>,
     mut xp_gains: Local<usize>,
+    mut last: Local<(String, u32)>,
 ) {
     let me = sim.0.player();
     let mut push = |text: String, color: Color| {
+        // Identical consecutive lines collapse into one with a repeat count.
+        if last.1 > 0
+            && last.0 == text
+            && let Some(back) = log.0.back_mut()
+        {
+            last.1 += 1;
+            back.0 = format!("{text} x{}", last.1);
+            return;
+        }
+        *last = (text.clone(), 1);
         log.0.push_back((text, color));
         while log.0.len() > COMBAT_LOG_LINES {
             log.0.pop_front();
@@ -594,7 +611,20 @@ fn collect_events(
             ),
             Event::Looted { looter, items, .. } if Some(*looter) == me => {
                 for item in items {
-                    push(format!("You loot [{item}]."), Color::srgb(0.3, 0.9, 0.4));
+                    let Some(def) = sim.0.content().item(item) else {
+                        continue;
+                    };
+                    let held = sim.0.inventory().iter().find(|(n, _)| n == item);
+                    let capped = held.is_some_and(|(_, c)| *c > ITEM_STACK_CAP);
+                    let bonus = if capped {
+                        format!("stack cap {ITEM_STACK_CAP} reached")
+                    } else {
+                        copy::bonus_text(&def.bonus.totals(1))
+                    };
+                    push(
+                        format!("You receive trophy: [{item}] ({bonus})"),
+                        copy::BONUS_GREEN,
+                    );
                 }
                 if items.is_empty() {
                     push(
@@ -659,6 +689,7 @@ fn update_loot(
     mut commands: Commands,
     assets: Res<AssetServer>,
     mut icons: ResMut<IconCache>,
+    sim: Res<CombatSim>,
     mut loot: ResMut<LootState>,
     mut window: Single<(Entity, &mut Node), With<LootWindow>>,
     rows: Query<Entity, With<LootRow>>,
@@ -671,7 +702,10 @@ fn update_loot(
             commands.entity(e).despawn();
         }
         for item in &loot.items {
-            let icon = icons.get(&assets, &asset_key(item));
+            let def = sim.0.content().item(item);
+            let icon = icons.get(&assets, def.map_or("unknown", |d| d.icon.as_str()));
+            let bonus = def.map_or_else(String::new, |d| copy::bonus_text(&d.bonus.totals(1)));
+            let desc = def.map_or_else(String::new, |d| d.description.clone());
             commands.entity(*window_entity).with_child((
                 LootRow,
                 Button,
@@ -686,12 +720,23 @@ fn update_loot(
                         Node {
                             width: px(36),
                             height: px(36),
+                            flex_shrink: 0.0,
                             ..default()
                         }
                     ),
                     (
-                        label(item.clone(), 13.0),
-                        TextColor(Color::srgb(0.2, 0.85, 0.3))
+                        Node {
+                            flex_direction: FlexDirection::Column,
+                            flex_shrink: 1.0,
+                            flex_basis: px(0),
+                            flex_grow: 1.0,
+                            ..default()
+                        },
+                        children![
+                            (label(item.clone(), 13.0), TextColor(Color::WHITE)),
+                            (label(bonus, 12.0), TextColor(copy::BONUS_GREEN)),
+                            (label(desc, 11.0), TextColor(DIM)),
+                        ]
                     ),
                 ],
             ));
@@ -750,4 +795,35 @@ fn close_loot_on_restart(
         loot.items.clear();
         loot.dirty = true;
     }
+}
+
+/// QA hook (`WOW_LOOT_DEMO`): shows the loot window and the matching log lines for three sample items
+/// without a kill, so the layout can be screenshotted when no fight is available. Display only; nothing is granted.
+fn loot_demo(
+    sim: Res<CombatSim>,
+    mut loot: ResMut<LootState>,
+    mut lines: MessageWriter<LogLineMsg>,
+    mut done: Local<bool>,
+) {
+    if std::mem::replace(&mut *done, true) {
+        return;
+    }
+    for name in [
+        "Prompt Fragment",
+        "Expired GPU Credits",
+        "Unread AI Strategy Deck",
+    ] {
+        let Some(def) = sim.0.content().item(name) else {
+            continue;
+        };
+        lines.write(LogLineMsg(
+            format!(
+                "You receive trophy: [{name}] ({})",
+                copy::bonus_text(&def.bonus.totals(1))
+            ),
+            copy::BONUS_GREEN,
+        ));
+        loot.items.push(name.to_string());
+    }
+    loot.dirty = true;
 }

@@ -94,5 +94,6 @@ combat_core side (client presentation is tracked separately):
 - [x] Effects: DoT, HoT, heal, stun, silence, school lock, cast-time and damage-taken/-done modifiers with stacks, haste, knockback event, dispel, execute, summon, timed explosion, copy-last-spell, do-nothing cast, threat swap, on-death explosion, phases by HP %.
 - [x] Player levels 1-10, XP table, level-difference XP with gray mobs, stat growth, spell unlocks, 10-slot bar (`known_spells`). Deviation: Reject PR unlocks at level 2 and Guardrails at 3.
 - [x] Headless playthrough test: every floor cleared at its max level on three seeds; golden replay of a floor-1 clear from level 1.
+- [x] Trophies: all 46 loot items are permanent bonus items (`items` table: HP, mana, spell power, crit, haste, mana regen; 3-copy stack cap). Looting fills `UnitState.inventory` and applies the bonus at once; the client shows them in the loot window, the combat log and the B window (`~/trophies`).
 - [ ] Channels, mini-boss optionality, per-room elevator logic (client).
 

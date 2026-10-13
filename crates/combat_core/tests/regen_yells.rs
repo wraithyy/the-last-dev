@@ -120,19 +120,19 @@ fn give_yells(c: &mut Content, spell: combat_core::SpellId, lines: &[&str]) {
 #[test]
 fn instant_yells_on_release_and_cooldown_gates_the_next() {
     let mut h = H::new(1, -40.0, |c| give_yells(c, GR, &["a", "b"]));
-    // 50-tick spacing clears the GCD; casts land on ticks 1, 51, ... 501.
-    for _ in 0..11 {
+    // 50-tick spacing clears the GCD; casts land on ticks 1, 51, ... 1201.
+    for _ in 0..25 {
         h.cast(GR);
         h.run(50);
     }
-    // 7000 ms = 210 ticks: yells at 1, 251 and 501, round-robin.
+    // 20000 ms = 600 ticks: yells at 1, 601 and 1201, round-robin.
     assert_eq!(yells_of(&h, h.player), ["a", "b", "a"]);
     let ticks: Vec<u64> = h
         .events()
         .filter(|(_, e)| matches!(e, Event::Yell { unit, .. } if *unit == h.player))
         .map(|(t, _)| *t)
         .collect();
-    assert_eq!(ticks, [1, 251, 501]);
+    assert_eq!(ticks, [1, 601, 1201]);
 }
 
 #[test]

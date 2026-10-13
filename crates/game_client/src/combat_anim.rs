@@ -8,6 +8,10 @@ use bevy::prelude::*;
 pub struct CombatAnim {
     /// Currently casting a spell with a cast time (loop the cast pose).
     pub casting: bool,
+    /// Spell id of the cast in progress (0 = none); picks the cast-loop pose.
+    pub cast_spell: u32,
+    /// Spell id behind the latest release; 0 is the auto attack.
+    pub release_spell: u32,
     pub dead: bool,
     /// Incremented when a spell is released (cast finished or instant cast).
     pub cast_release_seq: u32,

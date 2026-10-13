@@ -1,6 +1,7 @@
 //! Satirical copy that is pure data: chat colours, quips and the victory credits.
 
 use bevy::prelude::Color;
+use combat_core::ItemTotals;
 
 /// WoW monster-yell red, shared by the chat line and the speech bubble border.
 pub const YELL_RED: Color = Color::srgb(1.0, 0.25, 0.25);
@@ -32,6 +33,42 @@ pub fn speech_verb(hostile: bool) -> &'static str {
 /// Mini-bosses are ordinary (stunnable) units in the sim; the HUD still marks them.
 pub fn is_elite(key: &str) -> bool {
     matches!(key, "hr_partner" | "marketing_lead" | "ciso")
+}
+
+/// Green used for trophy bonuses everywhere (loot window, log, inventory).
+pub const BONUS_GREEN: Color = Color::srgb(0.3, 0.9, 0.4);
+
+/// "+8 HP, +1 SP, +1.5% crit": only the non-zero parts, empty when there are none.
+pub fn bonus_text(t: &ItemTotals) -> String {
+    let mut parts = Vec::new();
+    if t.max_hp > 0 {
+        parts.push(format!("+{} HP", t.max_hp));
+    }
+    if t.max_mana > 0 {
+        parts.push(format!("+{} mana", t.max_mana));
+    }
+    if t.spell_power > 0 {
+        parts.push(format!("+{} SP", t.spell_power));
+    }
+    if t.crit_tenths > 0 {
+        parts.push(format!("+{}% crit", tenths(t.crit_tenths)));
+    }
+    if t.haste_pct > 0 {
+        parts.push(format!("+{}% haste", t.haste_pct));
+    }
+    if t.mana_regen > 0 {
+        parts.push(format!("+{} mp5", t.mana_regen));
+    }
+    parts.join(", ")
+}
+
+/// 15 -> "1.5", 10 -> "1": crit is authored in tenths of a percent.
+fn tenths(v: u32) -> String {
+    if v.is_multiple_of(10) {
+        (v / 10).to_string()
+    } else {
+        format!("{}.{}", v / 10, v % 10)
+    }
 }
 
 const XP_QUIPS: [&str; 3] = [
@@ -75,6 +112,24 @@ mod tests {
         assert_eq!(speech_verb(true), "yells");
         assert_eq!(speech_verb(false), "says");
         assert!(is_elite("ciso") && !is_elite("ceo"));
+    }
+
+    #[test]
+    fn bonus_text_lists_only_set_parts_and_keeps_tenths() {
+        let t = ItemTotals {
+            max_hp: 18,
+            spell_power: 2,
+            crit_tenths: 15,
+            ..ItemTotals::default()
+        };
+        assert_eq!(bonus_text(&t), "+18 HP, +2 SP, +1.5% crit");
+        let t = ItemTotals {
+            crit_tenths: 10,
+            mana_regen: 3,
+            ..ItemTotals::default()
+        };
+        assert_eq!(bonus_text(&t), "+1% crit, +3 mp5");
+        assert_eq!(bonus_text(&ItemTotals::default()), "");
     }
 
     #[test]

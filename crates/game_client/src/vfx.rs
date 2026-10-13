@@ -8,7 +8,8 @@ use crate::combat::{CombatEvent, CombatSim, SimReady, SimUnit};
 use crate::combat_anim::CombatAnim;
 use crate::config::*;
 use crate::player::Player;
-use crate::presentation::{AUTO_ATTACK_COLOR, PresentEvent, PresentQueue};
+use crate::presentation::{PresentEvent, PresentQueue};
+use crate::spell_fx::{self, Fx, FxBudget, ProjKind, TicketInfo};
 use crate::units::Unit;
 use bevy::prelude::*;
 use combat_core::{EntityId, Event, SpellId};
@@ -24,10 +25,8 @@ impl Plugin for VfxPlugin {
                 attach_vfx,
                 spawn_from_events,
                 update_hand_glow,
-                update_shield,
                 update_telegraph,
                 update_stun_stars,
-                move_projectiles,
                 fade_transients,
             )
                 .chain()
@@ -48,20 +47,10 @@ struct VfxAttached;
 #[derive(Component)]
 struct HandGlow;
 #[derive(Component)]
-struct ShieldBubble;
-#[derive(Component)]
 struct Telegraph(EntityId);
 /// Spinning stars over a stunned unit's head.
 #[derive(Component)]
 struct StunStars(EntityId);
-
-#[derive(Component)]
-struct Projectile {
-    target: EntityId,
-    color: Color,
-    /// Presentation events held until this projectile lands.
-    ticket: u64,
-}
 
 /// The projectile launched by the latest swing/cast, so its Damage/Miss can be held for impact.
 struct Launch {
@@ -113,10 +102,12 @@ fn setup_assets(
 fn attach_vfx(
     mut commands: Commands,
     assets: Res<VfxAssets>,
+    fx: Option<Res<Fx>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     sim: Res<CombatSim>,
     q: Query<(Entity, &SimUnit, Option<&Unit>, Has<Player>), Without<VfxAttached>>,
 ) {
+    let Some(fx) = fx else { return };
     for (entity, sim_unit, unit, is_player) in &q {
         let mut e = commands.entity(entity);
         e.insert(VfxAttached);
@@ -141,10 +132,10 @@ fn attach_vfx(
                     ));
                 }
             });
+            spell_fx::attach_unit_fx(c, &fx, sim_unit.0, head, is_player);
         });
         if is_player {
             let glow_mat = materials.add(glow(Color::srgba(0.5, 0.8, 1.0, 0.9)));
-            let shield_mat = materials.add(glow(rgb(SHIELD_COLOR).with_alpha(0.22)));
             e.with_children(|c| {
                 c.spawn((
                     HandGlow,
@@ -152,14 +143,6 @@ fn attach_vfx(
                     MeshMaterial3d(glow_mat),
                     Transform::from_translation(Vec3::from(HAND_GLOW_POS))
                         .with_scale(Vec3::splat(HAND_GLOW_RADIUS)),
-                    Visibility::Hidden,
-                ));
-                c.spawn((
-                    ShieldBubble,
-                    Mesh3d(assets.sphere.clone()),
-                    MeshMaterial3d(shield_mat),
-                    Transform::from_xyz(0.0, SHIELD_CENTER_Y, 0.0)
-                        .with_scale(Vec3::splat(SHIELD_RADIUS)),
                     Visibility::Hidden,
                 ));
             });
@@ -262,57 +245,112 @@ fn spawn_from_events(
     mut events: MessageReader<CombatEvent>,
     sim: Res<CombatSim>,
     assets: Res<VfxAssets>,
+    fx: Option<Res<Fx>>,
+    mut budget: ResMut<FxBudget>,
+    mut tickets: ResMut<TicketInfo>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     player: Single<&SimUnit, With<Player>>,
     mut queue: ResMut<PresentQueue>,
     mut present: MessageWriter<PresentEvent>,
     mut launch: Local<Option<Launch>>,
+    mut blame: Local<BlameTrack>,
     units: Query<(&SimUnit, &Transform)>,
 ) {
+    let Some(fx) = fx else { return };
+    let head_of = |id: EntityId| {
+        sim.0
+            .unit(id)
+            .map_or(PLAYER_HEIGHT, |u| head_height(&u.key))
+    };
     for CombatEvent(ev) in events.read() {
         match ev {
             Event::CastSucceeded {
                 caster,
                 spell,
-                target: Some(target),
+                target,
             } => {
-                let Some(def) = sim.0.content().spell(*spell) else {
+                let Some(from) = unit_pos(units.iter(), *caster) else {
                     continue;
                 };
-                let Some((_, rgb3)) = PROJECTILE_SPELLS.iter().find(|(k, _)| *k == def.icon) else {
-                    continue;
-                };
-                launch_projectile(
-                    &mut commands,
-                    &assets,
-                    &mut materials,
-                    &mut queue,
-                    &mut launch,
-                    &units,
-                    (*caster, *target, Some(*spell)),
-                    rgb(*rgb3),
-                );
+                let tgt = target.and_then(|t| Some((t, unit_pos(units.iter(), t)?)));
+                if let Some(kind) = spell_fx::proj_kind(spell.0)
+                    && let Some((t, tpos)) = tgt
+                {
+                    let ticket = spell_fx::launch(
+                        &mut commands,
+                        &fx,
+                        &mut budget,
+                        &mut queue,
+                        kind,
+                        from,
+                        (t, tpos),
+                    );
+                    *launch = Some(Launch {
+                        source: *caster,
+                        target: t,
+                        spell: Some(*spell),
+                        ticket,
+                    });
+                }
+                if *caster == player.0 {
+                    let tinfo = tgt.map(|(t, p)| (p, head_of(t)));
+                    spell_fx::cast_instant(&mut commands, &fx, &mut budget, spell.0, from, tinfo);
+                    if spell.0 == BLAME_SPELL {
+                        blame.cast_pending = true;
+                    }
+                }
             }
             // Only the player's auto attack is ranged; enemy melee needs no projectile.
             Event::MeleeSwing { attacker, target } if *attacker == player.0 => {
-                launch_projectile(
+                let (Some(from), Some(tpos)) = (
+                    unit_pos(units.iter(), *attacker),
+                    unit_pos(units.iter(), *target),
+                ) else {
+                    continue;
+                };
+                let ticket = spell_fx::launch(
                     &mut commands,
-                    &assets,
-                    &mut materials,
+                    &fx,
+                    &mut budget,
                     &mut queue,
-                    &mut launch,
-                    &units,
-                    (*attacker, *target, None),
-                    rgb(AUTO_ATTACK_COLOR),
+                    ProjKind::Quill,
+                    from,
+                    (*target, tpos),
                 );
+                *launch = Some(Launch {
+                    source: *attacker,
+                    target: *target,
+                    spell: None,
+                    ticket,
+                });
             }
             Event::Damage {
                 source,
                 target,
                 spell,
+                combo,
+                amount,
+                absorbed,
                 ..
+            } => {
+                let held = launch.as_ref().is_some_and(|l| {
+                    l.source == *source && l.target == *target && l.spell == *spell
+                });
+                match launch.take().filter(|_| held) {
+                    Some(l) => {
+                        // The sim state is post-hit: undo the damage to see if this was an execute.
+                        let execute = sim.0.unit(*target).is_some_and(|u| {
+                            (u.hp + amount + absorbed) as f32 / (u.max_hp.max(1) as f32) < 0.25
+                        });
+                        spell_fx::note_hit(&mut tickets, l.ticket, *combo, execute);
+                        queue.hold(l.ticket, ev.clone());
+                    }
+                    None => {
+                        present.write(PresentEvent(ev.clone()));
+                    }
+                }
             }
-            | Event::Miss {
+            Event::Miss {
                 source,
                 target,
                 spell,
@@ -327,7 +365,7 @@ fn spawn_from_events(
                     }
                 }
             }
-            Event::CastInterrupted { caster, .. } => {
+            Event::CastInterrupted { caster, by, .. } => {
                 if let Some(at) = unit_pos(units.iter(), *caster) {
                     spawn_transient(
                         &mut commands,
@@ -337,18 +375,29 @@ fn spawn_from_events(
                         (0.3, 1.6, BURST_SECS),
                         rgb(INTERRUPT_COLOR).with_alpha(0.8),
                     );
+                    if *by == Some(player.0) {
+                        spell_fx::interrupt_ring(&mut commands, &fx, &mut budget, at);
+                    }
                 }
             }
             Event::Summoned { unit, .. } => {
                 if let Some(u) = sim.0.unit(*unit) {
-                    spawn_transient(
+                    spell_fx::summon_puff(
                         &mut commands,
-                        &assets,
-                        &mut materials,
-                        Vec3::new(u.pos.x, u.pos.y + 1.0, u.pos.z),
-                        (0.3, 1.7, 0.6),
-                        Color::srgba(0.85, 0.85, 0.9, 0.6),
+                        &fx,
+                        &mut budget,
+                        Vec3::new(u.pos.x, u.pos.y, u.pos.z),
                     );
+                }
+            }
+            Event::AuraApplied { target, key } if key == "git_blame" => {
+                // A blame without a cast of ours is the spread: jump from where the last unit died.
+                if std::mem::take(&mut blame.cast_pending) {
+                    continue;
+                }
+                if let (Some(from), Some(to)) = (blame.last_death, unit_pos(units.iter(), *target))
+                {
+                    spell_fx::spread_arc(&mut commands, &fx, &mut budget, from, to);
                 }
             }
             Event::LevelUp { unit, .. } if *unit == player.0 => {
@@ -376,6 +425,7 @@ fn spawn_from_events(
             }
             Event::Death { unit, .. } => {
                 if let Some(at) = unit_pos(units.iter(), *unit) {
+                    blame.last_death = Some(at);
                     spawn_transient(
                         &mut commands,
                         &assets,
@@ -391,80 +441,13 @@ fn spawn_from_events(
     }
 }
 
-/// Spawns the orb and remembers it, so the Damage/Miss that follows is held until impact.
-fn launch_projectile(
-    commands: &mut Commands,
-    assets: &VfxAssets,
-    materials: &mut Assets<StandardMaterial>,
-    queue: &mut PresentQueue,
-    launch: &mut Option<Launch>,
-    units: &Query<(&SimUnit, &Transform)>,
-    (source, target, spell): (EntityId, EntityId, Option<SpellId>),
-    color: Color,
-) {
-    let Some(from) = unit_pos(units.iter(), source) else {
-        return;
-    };
-    let ticket = queue.ticket();
-    let material = materials.add(glow(color.with_alpha(0.95)));
-    commands.spawn((
-        Projectile {
-            target,
-            color,
-            ticket,
-        },
-        Mesh3d(assets.sphere.clone()),
-        MeshMaterial3d(material),
-        Transform::from_translation(from + Vec3::Y * PROJECTILE_ORIGIN_Y)
-            .with_scale(Vec3::splat(PROJECTILE_RADIUS)),
-    ));
-    *launch = Some(Launch {
-        source,
-        target,
-        spell,
-        ticket,
-    });
-}
+/// Player's git blame spell id (content/game.ron); spread detection keys off it.
+const BLAME_SPELL: u32 = 6;
 
-fn move_projectiles(
-    mut commands: Commands,
-    time: Res<Time>,
-    assets: Res<VfxAssets>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut queue: ResMut<PresentQueue>,
-    mut present: MessageWriter<PresentEvent>,
-    units: Query<(&SimUnit, &Transform), Without<Projectile>>,
-    mut orbs: Query<(Entity, &Projectile, &mut Transform)>,
-) {
-    let mut land = |orb: &Projectile| {
-        for ev in queue.release(orb.ticket) {
-            present.write(PresentEvent(ev));
-        }
-    };
-    for (entity, orb, mut tf) in &mut orbs {
-        let Some(dest) = unit_pos(units.iter(), orb.target) else {
-            commands.entity(entity).despawn();
-            land(orb);
-            continue;
-        };
-        let dest = dest + Vec3::Y * PROJECTILE_TARGET_Y;
-        let step = PROJECTILE_SPEED * time.delta_secs();
-        let to = dest - tf.translation;
-        if to.length() <= step.max(0.05) {
-            commands.entity(entity).despawn();
-            land(orb);
-            spawn_transient(
-                &mut commands,
-                &assets,
-                &mut materials,
-                dest,
-                (0.2, 0.9, IMPACT_SECS),
-                orb.color.with_alpha(0.9),
-            );
-        } else {
-            tf.translation += to.normalize() * step;
-        }
-    }
+#[derive(Default)]
+struct BlameTrack {
+    cast_pending: bool,
+    last_death: Option<Vec3>,
 }
 
 fn update_hand_glow(
@@ -480,27 +463,6 @@ fn update_hand_glow(
         };
         let pulse = 1.0 + 0.35 * (time.elapsed_secs() * 14.0).sin();
         tf.scale = Vec3::splat(HAND_GLOW_RADIUS * pulse);
-    }
-}
-
-fn update_shield(
-    time: Res<Time>,
-    sim: Res<CombatSim>,
-    player: Single<&SimUnit, With<Player>>,
-    mut bubbles: Query<(&mut Visibility, &mut Transform), With<ShieldBubble>>,
-) {
-    let active = sim.0.unit(player.0).is_some_and(|u| {
-        u.auras
-            .iter()
-            .any(|a| a.absorb_remaining.is_some_and(|n| n > 0))
-    });
-    for (mut vis, mut tf) in &mut bubbles {
-        *vis = if active {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        };
-        tf.scale = Vec3::splat(SHIELD_RADIUS * (1.0 + 0.03 * (time.elapsed_secs() * 3.0).sin()));
     }
 }
 

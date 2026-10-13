@@ -7,6 +7,7 @@ mod actionbar;
 mod banners;
 mod feed;
 mod frames;
+mod trophies;
 
 use crate::combat::{CombatSim, SimReady};
 use crate::input::Paused;
@@ -50,6 +51,7 @@ impl Plugin for HudPlugin {
                 actionbar::ActionBarPlugin,
                 feed::FeedPlugin,
                 banners::BannersPlugin,
+                trophies::TrophiesPlugin,
             ))
             .add_systems(Startup, spawn_misc)
             .add_systems(
@@ -61,19 +63,32 @@ impl Plugin for HudPlugin {
 
 /// Icon files shipped in `assets/icons` (see CREDITS.md). Any other key gets a
 /// generated letter badge, so content can name icons before art exists.
-pub const ICON_FILES: [&str; 63] = [
+pub const ICON_FILES: [&str; 105] = [
     "ab_loser",
     "ab_test",
     "ab_winner",
+    "accepted",
     "agi_pivot",
     "analysis",
+    "backlog",
+    "badge",
     "big_diff",
     "billable_hours",
     "block_all",
+    "box",
+    "brain",
+    "brand",
     "caffeine",
+    "calendar",
+    "cash",
+    "chart",
+    "chart_up",
+    "chat_bubble",
     "chatbot_rollout",
     "code_review",
     "code_smell",
+    "coins",
+    "contract",
     "culture_fit",
     "deadline",
     "ethics_review",
@@ -85,22 +100,39 @@ pub const ICON_FILES: [&str; 63] = [
     "guardrails",
     "hallucinated_hotfix",
     "hallucination_blast",
+    "hook",
+    "hourglass",
     "influencer_collab",
+    "key",
+    "keyboard",
     "locked_out",
+    "logo",
+    "mailbox",
     "mandatory_prompt_training_certificate",
+    "manifesto",
+    "matrix",
+    "medal",
+    "megaphone",
     "melee",
     "nitpick",
+    "org_chart",
     "overpromise",
+    "padlock",
+    "parachute",
     "password_rotation",
     "phished",
     "phishing",
+    "pizza",
     "postmortem",
     "press_release",
     "prompt_fragment",
+    "pto",
+    "pull_request",
     "quick_sync",
     "rebrand",
     "rebranded",
     "refactor",
+    "regen",
     "reject_pr",
     "relationship_building",
     "reorg",
@@ -109,22 +141,34 @@ pub const ICON_FILES: [&str; 63] = [
     "retrospective",
     "review_fatigue",
     "review_request",
+    "robot",
+    "robot_audit",
     "rollback",
+    "rss",
     "rubber_duck",
     "rug_pull",
     "scope_creep",
     "soc",
+    "spiral",
     "stakeholders",
     "standup",
+    "sticky",
     "synergy_storm",
+    "tests_off",
     "thought_leadership",
+    "thumb_down",
     "unread_ai_strategy_deck",
     "unread_spec",
+    "vibes",
     "viral_loop",
+    "webinar",
+    "wellness",
     "wellness_survey",
     "write_by_hand",
+    "wrong_thread",
     "yesterday",
     "zero_trust",
+    "zip_file",
 ];
 
 /// Icon handles by asset key, so per-frame UI updates never reload files.
@@ -252,7 +296,7 @@ fn spawn_misc(mut commands: Commands) {
         },
         children![(
             label(
-                "WASD move | RMB steer | LMB orbit | Wheel zoom | Space jump | Tab target | T auto | 1-0 cast | F / right-click talk, loot | F3 debug | Esc menu",
+                "WASD move | RMB steer | LMB orbit | Wheel zoom | Space jump | Tab target | T auto | 1-0 cast | F / right-click talk, loot | B trophies | F3 debug | Esc menu",
                 11.0,
             ),
             TextColor(Color::srgba(0.8, 0.9, 1.0, 0.5)),
@@ -336,6 +380,21 @@ fn update_dev_overlay(
 #[cfg(test)]
 mod tests {
     use super::ICON_FILES;
+
+    #[test]
+    fn every_trophy_has_a_shipped_icon_file() {
+        let Ok(sim) = crate::combat::new_sim() else {
+            panic!("embedded content invalid");
+        };
+        for it in &sim.content().items {
+            assert!(
+                ICON_FILES.contains(&it.icon.as_str()),
+                "{}: {}",
+                it.name,
+                it.icon
+            );
+        }
+    }
 
     #[test]
     fn listed_icon_files_exist() {

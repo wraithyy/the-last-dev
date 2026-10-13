@@ -9,6 +9,10 @@ use bevy::window::{CursorGrabMode, CursorOptions, WindowFocused};
 #[derive(Resource, Default)]
 pub struct Paused(pub bool);
 
+/// The `~/trophies` window (B). Lives here so Esc can close it before it opens the pause menu.
+#[derive(Resource, Default)]
+pub struct TrophiesOpen(pub bool);
+
 /// Held-key state is overwritten every frame; `jump` and `mouse_yaw` are
 /// latched until a fixed tick consumes them, so no input is lost when a frame
 /// produces zero ticks.
@@ -51,6 +55,7 @@ pub struct InputPlugin;
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Paused>()
+            .init_resource::<TrophiesOpen>()
             .init_resource::<PlayerInput>()
             .init_resource::<MouseState>()
             .add_systems(

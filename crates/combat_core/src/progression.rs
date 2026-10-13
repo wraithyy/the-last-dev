@@ -46,9 +46,10 @@ impl Sim {
             let (hp, mana, sp) = b.map_or((0, 0, 0), |b| {
                 (b.hp_bonus, b.mana_bonus, b.spell_power_bonus)
             });
-            u.state.max_hp = d.max_hp + hp;
-            u.state.max_mana = d.max_mana + mana;
-            u.sp = d.spell_power + sp;
+            let t = u.item_bonus;
+            u.state.max_hp = d.max_hp + hp + t.max_hp;
+            u.state.max_mana = d.max_mana + mana + t.max_mana;
+            u.sp = d.spell_power + sp + t.spell_power;
             u.dmg_pct = 100;
         } else {
             let s = &self.content.config.mob_scaling;

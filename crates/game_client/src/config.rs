@@ -4,12 +4,13 @@ use std::f32::consts::PI;
 
 pub const WINDOW_TITLE: &str = "The Last Dev";
 
-// Floors (metres). Every floor spans [-FLOOR_HALF_X, FLOOR_HALF_X] x [-FLOOR_HALF_Z, FLOOR_HALF_Z].
-pub const FLOOR_HALF_X: f32 = 40.0;
-pub const FLOOR_HALF_Z: f32 = 20.0;
+// Floors (metres). Outlines are free-form (see floors/shape.rs); every floor fits inside
+// [-FLOOR_HALF_X, FLOOR_HALF_X] x [-FLOOR_HALF_Z, FLOOR_HALF_Z], which is also the generous
+// outer clamp that collision keeps as a safety net behind the walls.
+pub const FLOOR_HALF_X: f32 = 60.0;
+pub const FLOOR_HALF_Z: f32 = 44.0;
 /// Also the ceiling height: the ceiling slab sits on top of the walls.
 pub const WALL_HEIGHT: f32 = 4.5;
-pub const WALL_THICKNESS: f32 = 0.5;
 
 // Player
 /// Knockback speed decay rate (1/s); also scales the initial speed so the push covers `strength` m.
@@ -41,6 +42,9 @@ pub const CAM_BISECT_STEPS: u32 = 10;
 /// Clearance kept between the camera and any wall (near-plane safety).
 pub const CAM_RADIUS: f32 = 0.3;
 /// Never pull the camera closer than this, so it stays out of the head mesh.
+/// Clip-distance drops up to this size ease in at `CAM_CLIP_RATE` instead of snapping.
+pub const CAM_CLIP_SOFT: f32 = 0.35;
+pub const CAM_CLIP_RATE: f32 = 40.0;
 pub const CAM_MIN_CLIP_DIST: f32 = 0.8;
 pub const CAM_MIN_DIST: f32 = 2.0;
 pub const CAM_MAX_DIST: f32 = 20.0;
@@ -101,26 +105,14 @@ pub const FLOAT_TEXT_SIZE: f32 = 26.0;
 pub const FLOAT_TEXT_CRIT_SIZE: f32 = 36.0;
 
 // VFX
-pub const PROJECTILE_SPEED: f32 = 40.0;
-pub const PROJECTILE_RADIUS: f32 = 0.22;
 pub const PROJECTILE_ORIGIN_Y: f32 = 1.25;
 pub const PROJECTILE_TARGET_Y: f32 = 1.2;
 pub const HAND_GLOW_POS: [f32; 3] = [0.0, 1.0, -0.85];
 pub const HAND_GLOW_RADIUS: f32 = 0.16;
-pub const SHIELD_RADIUS: f32 = 1.25;
-pub const SHIELD_CENTER_Y: f32 = 0.95;
-pub const IMPACT_SECS: f32 = 0.3;
 pub const BURST_SECS: f32 = 0.45;
 pub const DEATH_FADE_SECS: f32 = 1.2;
-/// Spells whose release shows a travelling orb: (icon key, linear-ish RGB).
-pub const PROJECTILE_SPELLS: [(&str, [f32; 3]); 3] = [
-    ("code_review", [0.35, 0.7, 1.0]),
-    ("refactor", [0.4, 1.0, 0.5]),
-    ("hallucination_blast", [0.8, 0.35, 1.0]),
-];
 pub const INTERRUPT_COLOR: [f32; 3] = [1.0, 0.85, 0.2];
 pub const DEATH_FADE_COLOR: [f32; 3] = [0.5, 0.25, 0.7];
-pub const SHIELD_COLOR: [f32; 3] = [1.0, 0.85, 0.4];
 pub const TELEGRAPH_COLOR: [f32; 3] = [0.7, 0.2, 1.0];
 pub const TELEGRAPH_RADIUS: f32 = 2.4;
 pub const STUN_COLOR: [f32; 3] = [1.0, 0.9, 0.3];

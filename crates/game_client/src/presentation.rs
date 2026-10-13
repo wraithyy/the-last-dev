@@ -12,8 +12,6 @@ use combat_core::Event;
 
 /// Safety net: a held event is shown after this long even if its projectile never reports back.
 pub const MAX_HOLD_SECS: f32 = 1.5;
-/// Neutral projectile colour for auto attacks (linear-ish RGB).
-pub const AUTO_ATTACK_COLOR: [f32; 3] = [0.92, 0.92, 0.95];
 
 /// A Damage or Miss event whose visual moment has come (immediately, or at impact).
 #[derive(Message, Clone)]

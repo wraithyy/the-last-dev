@@ -234,7 +234,7 @@ fn tick_sim(
 /// (floor loads, summons) and drop the ones the sim despawned.
 fn sync_units(
     mut commands: Commands,
-    sim: Res<CombatSim>,
+    mut sim: ResMut<CombatSim>,
     flow: Res<GameFlow>,
     assets: Res<UnitAssets>,
     visuals: Query<(Entity, &SimUnit), Without<Player>>,
@@ -248,17 +248,31 @@ fn sync_units(
             commands.entity(e).despawn();
         }
     }
-    for state in sim.0.units() {
-        if Some(state.id) == player || shown.contains(&state.id) {
-            continue;
-        }
+    let fresh: Vec<UnitState> = sim
+        .0
+        .units()
+        .filter(|u| Some(u.id) != player && !shown.contains(&u.id))
+        .cloned()
+        .collect();
+    for state in &fresh {
         let pos = v3(state.pos);
+        let pose = idle_pose(state, &flow);
+        // The dressing may seat an NPC the sim thinks is standing; seated units must not stroll.
+        sim.0.set_idle_pose(
+            state.id,
+            match pose {
+                IdlePose::Sleeping => Some(combat_core::IdlePose::Sleeping),
+                IdlePose::Sitting => Some(combat_core::IdlePose::Sitting),
+                IdlePose::Chatting => Some(combat_core::IdlePose::Chatting),
+                IdlePose::Standing => None,
+            },
+        );
         let e = spawn_unit(
             &mut commands,
             &assets,
             &state.key,
             (pos, state.yaw),
-            idle_pose(state, &flow),
+            pose,
             state.hostile,
         );
         commands.entity(e).insert((
@@ -309,7 +323,7 @@ fn apply_anim_events(
     >,
     events: &[Event],
 ) {
-    let mut bump = |id: EntityId, f: fn(&mut CombatAnim)| {
+    let mut bump = |id: EntityId, f: &dyn Fn(&mut CombatAnim)| {
         if id == player_id {
             f(player_anim);
         } else if let Some((.., mut anim)) = npcs.iter_mut().find(|(su, ..)| su.0 == id) {
@@ -318,12 +332,19 @@ fn apply_anim_events(
     };
     for ev in events {
         match ev {
-            Event::CastSucceeded { caster, .. } => bump(*caster, |a| a.cast_release_seq += 1),
+            Event::CastStarted { caster, spell, .. } => bump(*caster, &|a| a.cast_spell = spell.0),
+            Event::CastSucceeded { caster, spell, .. } => bump(*caster, &|a| {
+                a.cast_release_seq += 1;
+                a.release_spell = spell.0;
+            }),
             // The player's auto attack is a ranged spell-style gesture, not a melee chop.
             Event::MeleeSwing { attacker, .. } if *attacker == player_id => {
-                bump(*attacker, |a| a.cast_release_seq += 1);
+                bump(*attacker, &|a| {
+                    a.cast_release_seq += 1;
+                    a.release_spell = 0;
+                });
             }
-            Event::MeleeSwing { attacker, .. } => bump(*attacker, |a| a.attack_seq += 1),
+            Event::MeleeSwing { attacker, .. } => bump(*attacker, &|a| a.attack_seq += 1),
             _ => {}
         }
     }
@@ -543,6 +564,19 @@ const BY_HAND: u32 = 11;
 /// Stand this close before casting, inside every 20-30 m spell range.
 const AUTOFIGHT_RANGE: f32 = 18.0;
 
+/// `WOW_RANGE=<m>` shortens the stand-off so close-up VFX shots fit the frame.
+fn autofight_range() -> f32 {
+    static RANGE: std::sync::OnceLock<f32> = std::sync::OnceLock::new();
+    *RANGE.get_or_init(|| {
+        std::env::var("WOW_RANGE")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(AUTOFIGHT_RANGE)
+    })
+}
+/// Corpses farther away than this are left alone (they never block the way to the next pull).
+const AUTOFIGHT_LOOT_WALK: f32 = 24.0;
+
 #[derive(Resource, Default)]
 struct AutoFight {
     /// Where to walk this frame (yaw), or stand still.
@@ -618,6 +652,26 @@ fn autofight(
         return;
     }
     let engaged = |u: &&UnitState| u.in_combat && u.target == Some(me);
+    // Pick up the trophies of the last kill once nothing is fighting us.
+    let reach = sim.0.content().config.loot_range_m;
+    let corpse_dist = |u: &UnitState| v3(u.pos).distance(body.pos);
+    if !sim.0.units().any(|u| u.hostile && u.alive && engaged(&u))
+        && let Some(corpse) = sim
+            .0
+            .units()
+            .filter(|u| u.lootable && corpse_dist(u) < AUTOFIGHT_LOOT_WALK)
+            .min_by(|a, b| corpse_dist(a).total_cmp(&corpse_dist(b)))
+    {
+        if corpse_dist(corpse) < reach - 0.5 {
+            pending.0.push(Command::Loot {
+                looter: me,
+                corpse: corpse.id,
+            });
+        } else {
+            state.steer = Some(yaw_to(body.pos, v3(corpse.pos)));
+        }
+        return;
+    }
     let enemy = pick_enemy(&sim.0, me, body.pos);
     // Boss down and nothing on us: skip leftover trash and take the exit elevator.
     let Some(enemy) = enemy.filter(|u| !flow.cleared || engaged(u)) else {
@@ -641,7 +695,7 @@ fn autofight(
         sim.0.cooldown(me, combat_core::SpellId(CODE_REVIEW)).usable,
         Err(CastError::NoLineOfSight | CastError::OutOfRange)
     );
-    if (blocked || body.pos.distance(enemy_pos) > AUTOFIGHT_RANGE) && my.cast.is_none() {
+    if (blocked || body.pos.distance(enemy_pos) > autofight_range()) && my.cast.is_none() {
         state.steer = Some(yaw);
         return;
     }
@@ -680,6 +734,11 @@ fn autofight(
         Some(CODE_REVIEW)
     } else {
         None
+    };
+    // QA hook: `WOW_CAST=<spell id>` casts only that spell, whenever it is ready.
+    let spell = match std::env::var("WOW_CAST").ok().and_then(|v| v.parse().ok()) {
+        Some(id) => ready(id).then_some(id).filter(|_| my.cast.is_none()),
+        None => spell,
     };
     if let Some(id) = spell {
         pending.0.push(Command::Cast {
