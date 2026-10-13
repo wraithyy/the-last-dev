@@ -15,7 +15,7 @@ Status after Phases 0-4 plus the playable five-floor tower (sim and client wired
 
 - The cast pose is the one-handed shoot clip held on its last frame, and backpedal plays the walk clip reversed. The hand glow position is tuned by eye, not bound to the fist bone.
 - Nameplates and floating numbers are screen-space UI nodes: they are culled by distance (40 m) and camera direction, not occluded by walls, and can overlap in tight packs.
-- About fifty spell and aura icon keys in `content/game.ron` have no art yet; they render as generated letter badges (initials on a hashed colour), see `hud::ICON_FILES`.
+- Item loot keys without a dedicated file fall back to generated letter badges (see `hud::ICON_FILES`); every spell and aura has painted art.
 - The exit elevator doors and lamp are client-only overlays in front of the static dressing; they are not colliders.
 - Floor 1's sleeping IT Support comes from the catalog pose for that anchor (`catalog::npc_at`); the sim only knows one pose per unit kind. Mini-boss "ELITE" tags are a client list (`copy::is_elite`).
 - DoT-tick numbers are detected by a heuristic (damage from a spell without a direct-damage effect); the "EXECUTE!" pop is judged from the target's HP after the hit.
