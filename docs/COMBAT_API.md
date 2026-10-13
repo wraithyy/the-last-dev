@@ -15,6 +15,7 @@ impl Content {
     pub fn from_ron(src: &str) -> Result<Content, ContentError>;
     pub fn spell(&self, id: SpellId) -> Option<&SpellDef>;
     pub fn action_bar(&self) -> &[SpellId];          // full bar, keys 1..=0 in order (10 slots); see Sim::known_spells
+    pub fn channel_spell(&self) -> Option<&SpellDef>;  // Coffee Break (first spell with a `channel`), off the bar
     pub fn unit_def(&self, key: &str) -> Option<&UnitDef>;
     pub fn item(&self, name: &str) -> Option<&ItemDef>;   // trophy table entry by loot item name
     pub fn aura(&self, key: &str) -> Option<&AuraDef>;
@@ -40,6 +41,7 @@ impl Sim {
     pub fn inventory(&self) -> &[(String, u32)];                           // player trophies (name, copies), first pickup first
     pub fn item_totals(&self) -> ItemTotals;                              // current trophy bonus, stack cap applied
     pub fn grant_trophy(&mut self, name: &str) -> bool;                    // debug/test: as if looted, no event; false for unknown items
+    pub fn set_player_mana(&mut self, mana: u32);                         // debug/test: silent, clamped to max
     pub fn set_player_level(&mut self, level: u8);                        // debug/test: silent, clamps to 1..=max, 0 XP, full HP/mana
     pub fn known_spells(&self, unit: EntityId) -> Vec<SpellId>;           // learned action-bar spells, bar order
     pub fn push(&mut self, cmd: Command);    // applied at the start of the next tick
@@ -88,7 +90,7 @@ pub struct UnitState {
     pub idle_pose: Option<IdlePose>,                 // Sleeping | Chatting | Sitting (friendly NPC pose hint)
 }
 
-pub enum CastError { NoTarget, InvalidTarget, Dead, OutOfRange, NotFacing, NoLineOfSight, NotEnoughMana, OnCooldown, OnGcd, AlreadyCasting, SchoolLocked, Moving, NotInterruptible, NothingToInterrupt, Stunned, Silenced, NotLearned }
+pub enum CastError { NoTarget, InvalidTarget, Dead, OutOfRange, NotFacing, NoLineOfSight, NotEnoughMana, OnCooldown, OnGcd, AlreadyCasting, SchoolLocked, Moving, NotInterruptible, NothingToInterrupt, Stunned, Silenced, NotLearned, FullMana }
 // CastError::message() -> &'static str: "Out of range.", "Can't do that while stunned.", "Can't do that while silenced.", "You haven't learned that spell yet.", ...
 
 pub enum Event {
@@ -98,6 +100,7 @@ pub enum Event {
     CastQueued { caster, spell },
     Damage { source, target, spell: Option<SpellId>, amount, absorbed, crit, combo, school },
     Heal { source, target, spell: Option<SpellId>, amount },          // effective amount (overheal dropped)
+    ManaGain { unit, spell, amount },                                  // one channel tick, effective amount (clamped to max mana)
     MeleeSwing { attacker, target },
     Miss { source, target, spell: Option<SpellId> },                 // None = white attack ("Miss"), Some = spell ("Resist")
     AutoAttackToggled { unit, on },
@@ -217,6 +220,17 @@ The player keeps level, XP, HP and cooldowns across floors. `set_respawn_point(p
 - `Miss` replaces `Damage` for that attack. A missed spell still emits `CastSucceeded` first and spends mana, GCD and cooldown, but applies no aura, consumes no Code Smell (no combo) and generates no threat. Roll order: hit, then crit; absorb applies after a hit.
 - `Command::Talk` on a living friendly unit within `loot_range_m` makes it yell its next `talk` line at the end of the tick; anything else is ignored silently.
 
+## Channels (Coffee Break)
+
+`SpellDef.channel: Option<(interval_ms, mana_pct)>` makes a spell a drink-style channel (spell 12, "Coffee Break", off the action bar, learned at level 1; the client binds it to C). `cast_ms` is the full duration (6000), every `interval_ms` (1000) the caster regains `mana_pct` (8) percent of max mana. HP is untouched. Content validation: `0 < interval_ms <= cast_ms`, `mana_pct` 1..=100, `target: Caster`.
+
+- Start: `CastStarted { total_ms: 6000 }` (the GCD starts, no mana cost), then the spell yell (at the start, since a channel has no release; the usual 20 s player yell gap applies). Not haste- or aura-scaled.
+- Each tick: `ManaGain { unit, spell, amount }`. The tick that lands on the final tick still counts. Reaching full mana ends the channel early with `CastSucceeded`; so does the full duration.
+- Cancelled with `CastInterrupted { by: None, lockout_ms: 0 }` by moving or jumping, stun/death, casting another spell (including off-GCD instants; the new spell starts normally, only the GCD gates it), or taking damage (`dealt > 0`; fully absorbed hits do not break it). A channel is never pushed back. Pressing the same spell again fails with `AlreadyCasting`.
+- Cooldown (8000 ms) starts when the channel ends, by completion or by any cancel.
+- Unusable at full mana: `CastError::FullMana` ("You are already at full mana."). Also `Moving` while moving, `OnCooldown`, `OnGcd` as usual. Usable in combat; damage then cancels it.
+- `CooldownView.usable` is `Err(AlreadyCasting)` for Coffee Break while it channels. Auto attack swings pause during the channel like during any cast.
+
 ## Yells
 
 `UnitDef.yells` (RON, serde default = silent): `periodic_ms` plus line lists `aggro`, `periodic`, `blast`, `low_hp`, `player_killed`, `death`, `evade`, `talk`, and `ambient_ms` + `ambient`. Ability and phase lines live on `AiAbility.yells` and `PhaseDef.yells`. A unit yells via `Event::Yell { unit, text }`, emitted at the end of the tick (after `Death`/`EnterCombat`/`CastStarted` of that tick).
@@ -237,3 +251,7 @@ The player keeps level, XP, HP and cooldowns across floors. `set_respawn_point(p
 ## Regeneration
 
 `config.regen: (interval_ms, hp_pct, mana_pct)`: alive units out of combat regain `hp_pct`/`mana_pct` of max every `interval_ms`, first tick one interval after leaving combat (or spawn/respawn). No event; observe `UnitState.hp/mana`. In combat only `mana_regen_per_5s_combat` trickles. See FORMULAS.md.
+
+## Pathfinding
+
+`set_blockers` / `load_floor` rebuild a 0.5 m navigation grid (blockers grown by the 0.45 m unit radius). Chasing, evading and wandering units walk straight while the line is clear and otherwise follow a cached A* route (re-planned every 0.5 s or when the goal moves more than 1.5 m, 6000 expansions max). A chaser or evader with no route gives up after 5 s: a chaser evades, an evader resets at its spawn. `Sim::find_path(from, to) -> Option<Vec<Vec3>>` returns the smoothed waypoints after `from`, ending at `to`; it allocates, so call it from tools, not per tick.

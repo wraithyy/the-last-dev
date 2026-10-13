@@ -188,8 +188,18 @@ impl Sim {
         let (me, them) = (self.units[i].state.pos, self.units[ti].state.pos);
         if dist_xz(me, them) > ai.melee_range_m {
             let step = ai.chase_speed_mps / TICK_HZ as f32;
-            // Stop slightly inside melee range so float jitter cannot flap Chase/Attack.
-            self.units[i].state.pos = step_toward(me, them, step, ai.melee_range_m * 0.9);
+            match self.nav_target(i, them) {
+                Some((wp, last)) => {
+                    // Stop slightly inside melee range so float jitter cannot flap Chase/Attack.
+                    let stop = if last { ai.melee_range_m * 0.9 } else { 0.0 };
+                    if !last {
+                        self.units[i].state.yaw = yaw_toward(me, wp);
+                    }
+                    self.units[i].state.pos = step_toward(me, wp, step, stop);
+                }
+                None if self.nav_gave_up(i) => return self.begin_evade(i),
+                None => {}
+            }
             return self.set_ai(i, AiState::Chase);
         }
         self.set_ai(i, AiState::Attack);
@@ -357,6 +367,7 @@ impl Sim {
         let u = &mut self.units[i];
         u.threat.clear();
         u.state.target = None;
+        u.nav.reset();
         if u.state.phase != 1 {
             u.state.phase = 1;
             self.events.push(Event::PhaseChanged {
@@ -385,9 +396,17 @@ impl Sim {
             u.state.mana = u.state.max_mana;
             return self.set_ai(i, AiState::Idle);
         }
+        let Some((wp, _)) = self.nav_target(i, home) else {
+            // Walled off from home for good: reset in place, like an MMO evade teleport.
+            if self.nav_gave_up(i) {
+                self.units[i].state.pos = home;
+                self.units[i].nav.reset();
+            }
+            return;
+        };
         let u = &mut self.units[i];
-        u.state.yaw = yaw_toward(pos, home);
-        u.state.pos = step_toward(pos, home, step, 0.0);
+        u.state.yaw = yaw_toward(pos, wp);
+        u.state.pos = step_toward(pos, wp, step, 0.0);
     }
 
     fn respawn_unit(&mut self, i: usize) {

@@ -17,6 +17,7 @@ The whole game is a long, loving roast of corporations that push AI onto every t
 - Stuns freeze movement and casting (spinning stars, grey keycaps); silence and school lockouts lock keycaps with a padlock. Knockbacks shake the camera and push you (walls clamp it), teleports land on the nearest free spot.
 - Loot is trophies: every drop is an item with a satirical description and a small permanent bonus (HP, mana, spell power, crit, haste, mana regen; up to 3 copies count). The loot window shows icon, bonus and description, the combat log says "You receive trophy: [..] (+1% crit)", and B opens `~/trophies` with every trophy, its count and the total bonus. Bonuses persist across floors and respawns; a new sprint (R) resets them.
 - Floating numbers: heals in green, DoT ticks smaller, crits and executes pop.
+- Audio: office elevator-muzak on the floors that crossfades (1.5 s) to a boss loop while a boss fights, a faint air-con bed, keycap clacks, per-spell cast sounds, hit / miss / heal / stun sounds that fade with distance, level-up, loot and elevator cues and a victory jingle. Browsers start audio only after your first key press or click. M mutes; Esc shows master / music / effects volume. Credits in assets/CREDITS.md.
 
 See [docs/PLAN.md](docs/PLAN.md), [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md), [docs/COMBAT_API.md](docs/COMBAT_API.md), [docs/FORMULAS.md](docs/FORMULAS.md) and [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
@@ -55,12 +56,14 @@ See [docs/PLAN.md](docs/PLAN.md), [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md), [d
 | Right-click (no drag) on a hostile | Target it and start auto attack (Nitpick) |
 | Right-click (no drag) on a friendly / F near one | Talk to the NPC (within 6 m) |
 | T / Attack button | Toggle auto attack on the current target |
+| C / Coffee button | Coffee Break: channel up to 6 s, +8% max mana per second, 8 s cooldown; moving, jumping, casting or taking damage ends it |
 | 1-9, 0 (or numpad) | Action bar: Code Review, Refactor, Guardrails, Reject PR, git blame, Rollback, On-Call Caffeine, Rubber Duck, Postmortem, Write It By Hand (unlocked by level) |
 | F / right-click corpse | Loot (F on a friendly target talks) |
 | B | Toggle the `~/trophies` inventory window (B, `[x]` or Esc closes it) |
 | R (victory screen) | Start a new sprint |
+| M | Mute / unmute all audio |
 | F3 | Debug overlay (range, facing, LoS) |
-| Escape | Close the trophies window, else clear target, else toggle the pause overlay |
+| Escape | Close the trophies window, else clear target, else toggle the pause overlay (also holds the master / music / effects volume keycaps) |
 
 Rotation: Code Review applies Code Smell, and Refactor consumes it for +35% damage. Interrupt the big casts with Reject PR (level 2), shield with Guardrails, keep git blame ticking, finish with Postmortem below 25%.
 
@@ -93,6 +96,7 @@ docs/                 plan, version choices, known limitations
 | `WOW_CAM_DIST=m` | Start zoom |
 | `WOW_CLEARED=1` | Open the first floor's exit elevator without killing the boss |
 | `WOW_AUTOFIGHT=1` | Bot: walks to the nearest hostile (adds first), interrupts, heals/shields, runs the rotation, loots corpses, respawns, takes the elevator; logs every sim event |
+| `WOW_COFFEE=secs`, `WOW_LINEUP=0` | Drain mana and start a Coffee Break after that many seconds; empty bare stage for pose close-ups |
 | `WOW_TALK=1` | Talk to the nearest friendly NPC two seconds in |
 | `WOW_GIVE_ITEMS=1`, `WOW_TROPHIES=1` | Grant a sample set of trophies at start, open the `~/trophies` window at start |
 | `WOW_HOVER_SLOT=0..9`, `WOW_AUTORUN=1`, `WOW_LINEUP=1\|2` | Force a tooltip, hold forward, show the cast lineup |

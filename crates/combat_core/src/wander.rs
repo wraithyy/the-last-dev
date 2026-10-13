@@ -136,7 +136,16 @@ impl Sim {
 
     fn walk_to(&mut self, i: usize, goal: Vec3, speed: f32, pause: (u32, u32)) {
         let pos = self.units[i].state.pos;
-        let heading = yaw_toward(pos, goal);
+        let Some((target, _)) = self.nav_target(i, goal) else {
+            // The route vanished (blockers changed): give up this stroll and pause.
+            let ms = self.units[i].wander.rng.range_inclusive(pause.0, pause.1);
+            self.units[i].nav.reset();
+            let w = &mut self.units[i].wander;
+            w.goal = None;
+            w.next_at = self.now + ticks(ms);
+            return;
+        };
+        let heading = yaw_toward(pos, target);
         let turn = wrap_pi(heading - self.units[i].state.yaw);
         let max_turn = TURN_RATE_RAD_S / TICK_HZ as f32;
         self.units[i].state.yaw =
@@ -152,7 +161,7 @@ impl Sim {
             w.next_at = self.now + ticks(ms);
             self.units[i].state.pos = Vec3::new(goal.x, pos.y, goal.z);
         } else {
-            self.units[i].state.pos = step_toward(pos, goal, step, 0.0);
+            self.units[i].state.pos = step_toward(pos, target, step, 0.0);
         }
     }
 

@@ -14,6 +14,15 @@ pub const SAY_FRIENDLY: Color = Color::srgb(0.85, 1.0, 0.85);
 
 pub const AUTO_ATTACK_FLAVOUR: &str = "Passive-aggressive review comments, delivered on a timer.";
 
+pub const COFFEE_START: &str = "You take a coffee break.";
+pub const COFFEE_INTERRUPTED: &str = "Coffee break interrupted.";
+/// Mana blue, shared by the log line and the floating "+N" ticks.
+pub const COFFEE_COLOR: Color = Color::srgb(0.45, 0.65, 1.0);
+
+pub fn coffee_restored(mana: u32) -> String {
+    format!("You restored {mana} mana.")
+}
+
 /// Speaker colour for chat lines and bubble borders.
 pub fn yell_color(is_player: bool, hostile: bool) -> Color {
     if is_player {
@@ -130,6 +139,11 @@ mod tests {
         };
         assert_eq!(bonus_text(&t), "+1% crit, +3 mp5");
         assert_eq!(bonus_text(&ItemTotals::default()), "");
+    }
+
+    #[test]
+    fn coffee_log_lines() {
+        assert_eq!(coffee_restored(120), "You restored 120 mana.");
     }
 
     #[test]

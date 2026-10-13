@@ -17,6 +17,25 @@
 <canvas id="bevy" tabindex="0"></canvas>
 <div id="status">Loading…</div>
 <div id="tip"></div>
+<script>
+// The wasm audio backend opens its AudioContext at startup, before any gesture, and browsers keep it
+// suspended until then. Track every context and resume them on the first gesture.
+(() => {
+  const Native = window.AudioContext || window.webkitAudioContext;
+  if (!Native) return;
+  const contexts = [];
+  window.AudioContext = class extends Native {
+    constructor(...args) { super(...args); contexts.push(this); }
+  };
+  const events = ['pointerdown', 'keydown', 'touchend'];
+  const unlock = () => {
+    if (!contexts.length) return; // game not started yet; keep waiting
+    contexts.forEach((c) => c.resume().catch(() => {}));
+    events.forEach((e) => window.removeEventListener(e, unlock, true));
+  };
+  events.forEach((e) => window.addEventListener(e, unlock, true));
+})();
+</script>
 <script type="module">
 const canvas = document.getElementById('bevy');
 const status = document.getElementById('status');

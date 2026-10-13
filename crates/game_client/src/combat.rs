@@ -91,7 +91,7 @@ impl Plugin for CombatPlugin {
             )
             .add_systems(
                 Update,
-                (cast_keys, auto_attack_key, interact_input).in_set(SimReady),
+                (cast_keys, auto_attack_key, coffee_key, interact_input).in_set(SimReady),
             );
         if std::env::var_os("WOW_AUTOFIGHT").is_some() {
             app.init_resource::<AutoFight>()
@@ -179,6 +179,7 @@ fn tick_sim(
     }
 
     let tick_events = sim.0.tick();
+    let coffee = sim.0.content().channel_spell().map(|s| s.id);
 
     // Authoritative state back into the Bevy mirror.
     for (su, mut unit, mut pose, mut anim) in &mut npcs {
@@ -196,7 +197,9 @@ fn tick_sim(
     }
     let (body, _, anim) = &mut *player;
     if let Some(state) = sim.0.unit(player_id) {
-        anim.casting = state.cast.is_some();
+        let drinking = state.cast.is_some_and(|c| Some(c.spell) == coffee);
+        anim.drinking = drinking;
+        anim.casting = state.cast.is_some() && !drinking;
         anim.dead = !state.alive;
     }
 
@@ -223,7 +226,7 @@ fn tick_sim(
             _ => {}
         }
     }
-    apply_anim_events(player_id, anim, &mut npcs, &tick_events);
+    apply_anim_events(player_id, coffee, anim, &mut npcs, &tick_events);
 
     for ev in tick_events {
         events.write(CombatEvent(ev));
@@ -316,6 +319,7 @@ fn idle_pose(state: &UnitState, flow: &GameFlow) -> IdlePose {
 /// never has to clear flags (see `combat_anim.rs`).
 fn apply_anim_events(
     player_id: EntityId,
+    coffee: Option<combat_core::SpellId>,
     player_anim: &mut CombatAnim,
     npcs: &mut Query<
         (&SimUnit, &mut Unit, &mut SimPose, &mut CombatAnim),
@@ -332,6 +336,9 @@ fn apply_anim_events(
     };
     for ev in events {
         match ev {
+            // The sip has its own pose; a release or cast loop would fight it.
+            Event::CastStarted { spell, .. } | Event::CastSucceeded { spell, .. }
+                if Some(*spell) == coffee => {}
             Event::CastStarted { caster, spell, .. } => bump(*caster, &|a| a.cast_spell = spell.0),
             Event::CastSucceeded { caster, spell, .. } => bump(*caster, &|a| {
                 a.cast_release_seq += 1;
@@ -453,6 +460,29 @@ fn auto_attack_key(
             player.0,
             target.0.is_some(),
         );
+    }
+}
+
+/// Shared by the C key and the Coffee button. The sim validates (full mana, cooldown, movement).
+pub fn cast_coffee_break(sim: &Sim, pending: &mut PendingCommands, caster: EntityId) {
+    if let Some(spell) = sim.content().channel_spell() {
+        pending.0.push(Command::Cast {
+            caster,
+            spell: spell.id,
+        });
+    }
+}
+
+fn coffee_key(
+    keys: Res<ButtonInput<KeyCode>>,
+    paused: Res<Paused>,
+    flow: Res<GameFlow>,
+    sim: Res<CombatSim>,
+    mut pending: ResMut<PendingCommands>,
+    player: Single<&SimUnit, With<Player>>,
+) {
+    if !paused.0 && keys.just_pressed(KeyCode::KeyC) && can_act(&sim.0, &flow, player.0) {
+        cast_coffee_break(&sim.0, &mut pending, player.0);
     }
 }
 
@@ -589,6 +619,28 @@ struct AutoFight {
     since: f32,
     sidestep: f32,
     side: f32,
+    /// Cached `Sim::find_path` route (waypoints after the player) and what it was planned for.
+    path: Vec<Vec3>,
+    path_goal: Vec3,
+    path_age: f32,
+}
+
+/// Yaw toward the next waypoint of a walkable route to `to`; replans twice a second or when the
+/// goal moves, and falls back to the straight line when the sim finds no route.
+fn walk_yaw(sim: &Sim, state: &mut AutoFight, from: Vec3, to: Vec3, dt: f32) -> f32 {
+    state.path_age += dt;
+    if state.path.is_empty() || state.path_age > 0.5 || state.path_goal.distance(to) > 1.5 {
+        state.path = sim
+            .find_path(to_core(from), to_core(to))
+            .map(|p| p.into_iter().map(v3).collect())
+            .unwrap_or_else(|| vec![to]);
+        state.path_goal = to;
+        state.path_age = 0.0;
+    }
+    while state.path.len() > 1 && from.distance(state.path[0]) < 0.35 {
+        state.path.remove(0);
+    }
+    yaw_to(from, state.path[0])
 }
 
 fn yaw_to(from: Vec3, to: Vec3) -> f32 {
@@ -655,7 +707,9 @@ fn autofight(
     // Pick up the trophies of the last kill once nothing is fighting us.
     let reach = sim.0.content().config.loot_range_m;
     let corpse_dist = |u: &UnitState| v3(u.pos).distance(body.pos);
-    if !sim.0.units().any(|u| u.hostile && u.alive && engaged(&u))
+    // WOW_NO_LOOT leaves corpses lootable so screenshots can show them.
+    if std::env::var_os("WOW_NO_LOOT").is_none()
+        && !sim.0.units().any(|u| u.hostile && u.alive && engaged(&u))
         && let Some(corpse) = sim
             .0
             .units()
@@ -668,7 +722,7 @@ fn autofight(
                 corpse: corpse.id,
             });
         } else {
-            state.steer = Some(yaw_to(body.pos, v3(corpse.pos)));
+            state.steer = Some(walk_yaw(&sim.0, &mut state, body.pos, v3(corpse.pos), dt));
         }
         return;
     }
@@ -678,7 +732,7 @@ fn autofight(
         if flow.cleared
             && let Some((_, exit, _)) = flow.anchors.iter().find(|a| a.0 == "elevator_exit")
         {
-            state.steer = Some(yaw_to(body.pos, *exit));
+            state.steer = Some(walk_yaw(&sim.0, &mut state, body.pos, *exit, dt));
         }
         return;
     };
@@ -696,7 +750,7 @@ fn autofight(
         Err(CastError::NoLineOfSight | CastError::OutOfRange)
     );
     if (blocked || body.pos.distance(enemy_pos) > autofight_range()) && my.cast.is_none() {
-        state.steer = Some(yaw);
+        state.steer = Some(walk_yaw(&sim.0, &mut state, body.pos, enemy_pos, dt));
         return;
     }
     state.face = Some(yaw);

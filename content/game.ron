@@ -211,6 +211,22 @@
         ),
 
         // ---- enemies ----
+        // Off the action bar: own key (C) and keycap. Channel: 8% max mana per second for up to 6 sec,
+        // cancelled by movement, damage or another spell. The cooldown starts when it ends.
+        (
+            id: 12, name: "Coffee Break", icon: "coffee_break", school: Physical,
+            range_m: 0.0, cast_ms: 6000, mana: 0, gcd: true, cooldown_ms: 8000,
+            target: Caster, learn_level: 1,
+            channel: Some((interval_ms: 1000, mana_pct: 8)),
+            description: "Sit still and sip. Restores 8% of your mana every second for up to 6 sec. Moving, jumping, casting or taking damage ends the break. Does nothing for your HP; it is coffee, not food.",
+            effect: Nothing,
+            yells: [
+                "Coffee first. Then the AI strategy.",
+                "This mug has seen three reorgs.",
+                "Compiling... my thoughts.",
+                "Decaf is a hallucination.",
+            ],
+        ),
         (
             id: 5, name: "Hallucination Blast", icon: "hallucination_blast", school: Arcane,
             range_m: 25.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0,

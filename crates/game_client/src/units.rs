@@ -136,6 +136,10 @@ struct Lineup(u32);
 
 /// `WOW_LINEUP=1|2`: half of the cast per screenshot, two rows facing the player.
 fn spawn_lineup(mut commands: Commands, lineup: Res<Lineup>) {
+    // 0: bare stage, only the player (pose close-ups).
+    if lineup.0 == 0 {
+        return;
+    }
     let keys: Vec<&'static str> = catalog::unit_keys()
         .filter(|k| *k != "senior_engineer")
         .collect();

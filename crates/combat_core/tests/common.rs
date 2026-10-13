@@ -300,6 +300,15 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             t(*target),
             s.map_or_else(|| "?".to_string(), |s| spell_name(sim, s)),
         ),
+        Event::ManaGain {
+            unit,
+            spell,
+            amount,
+        } => format!(
+            "{} restores {amount} mana with {}",
+            t(*unit),
+            spell_name(sim, *spell)
+        ),
         Event::Knockback {
             unit,
             dir,

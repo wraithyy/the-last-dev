@@ -9,6 +9,7 @@ pub mod content;
 mod effects;
 mod floors;
 pub mod geom;
+mod nav;
 mod progression;
 mod rng;
 mod sim;

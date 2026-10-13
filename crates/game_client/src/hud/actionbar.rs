@@ -6,7 +6,8 @@ use super::{
     PANEL_EDGE, asset_key, drop_shadow, fmt_secs, gloss, label, panel_bg, set_text, vgrad,
 };
 use crate::combat::{
-    CombatSim, PendingCommands, SimReady, SimUnit, UiNotice, can_act, cast_slot, toggle_auto_attack,
+    CombatSim, PendingCommands, SimReady, SimUnit, UiNotice, can_act, cast_coffee_break, cast_slot,
+    toggle_auto_attack,
 };
 use crate::config::*;
 use crate::copy;
@@ -29,6 +30,8 @@ const TINT_RANGE: Color = Color::srgba(0.85, 0.1, 0.1, 0.5);
 const ATTACK_ICON: &str = "nitpick";
 const SWING_BAR: Color = Color::srgb(0.95, 0.85, 0.5);
 const ATTACK_EDGE: Color = Color::srgb(0.75, 0.4, 0.26);
+const COFFEE_EDGE: Color = Color::srgb(0.5, 0.34, 0.2);
+const COFFEE_GAP: f32 = 10.0;
 /// Darkens a pressed key; hover lightens it.
 const PRESS: Color = Color::srgba(0.0, 0.0, 0.0, 0.3);
 const HOVER: Color = Color::srgba(1.0, 1.0, 1.0, 0.14);
@@ -104,6 +107,19 @@ struct AttackRing;
 #[derive(Component)]
 struct AttackGlow;
 
+/// The Coffee Break button, right of the attack button.
+#[derive(Component)]
+struct CoffeeButton;
+#[derive(Component)]
+struct CoffeeIcon;
+/// Channel progress while sipping, cooldown remainder afterwards.
+#[derive(Component)]
+struct CoffeeGauge;
+#[derive(Component)]
+struct CoffeeRing;
+#[derive(Component)]
+struct CoffeeGlow;
+
 pub struct ActionBarPlugin;
 
 impl Plugin for ActionBarPlugin {
@@ -113,8 +129,10 @@ impl Plugin for ActionBarPlugin {
             (
                 click_slots,
                 click_attack,
+                click_coffee,
                 update_slots,
                 update_attack,
+                update_coffee,
                 update_tooltip,
             )
                 .chain()
@@ -339,7 +357,7 @@ fn spawn_bar(mut commands: Commands, mut materials: ResMut<Assets<CooldownMateri
             }
         });
 
-    spawn_attack(&mut commands);
+    spawn_accents(&mut commands);
 
     commands
         .spawn((
@@ -393,10 +411,69 @@ fn spawn_bar(mut commands: Commands, mut materials: ResMut<Assets<CooldownMateri
         });
 }
 
-/// The auto attack is a wider, warm accent keycap kept apart from the spell row, like an Esc key.
-fn spawn_attack(commands: &mut Commands) {
+/// Look of one accent keycap: plate behind, key face, face edge and the thin gauge under it.
+struct Accent {
+    legend: &'static str,
+    plate: (Color, Color),
+    face: (Color, Color),
+    edge: Color,
+    gauge: (Color, Color),
+}
+
+const ATTACK_ACCENT: Accent = Accent {
+    legend: "T",
+    plate: (Color::srgb(0.2, 0.08, 0.05), Color::srgb(0.06, 0.03, 0.03)),
+    face: (Color::srgb(0.92, 0.45, 0.24), Color::srgb(0.58, 0.2, 0.12)),
+    edge: ATTACK_EDGE,
+    gauge: (SWING_BAR, Color::srgb(0.6, 0.45, 0.15)),
+};
+
+const COFFEE_ACCENT: Accent = Accent {
+    legend: "C",
+    plate: (Color::srgb(0.12, 0.08, 0.05), Color::srgb(0.04, 0.03, 0.03)),
+    face: (Color::srgb(0.62, 0.42, 0.26), Color::srgb(0.3, 0.17, 0.1)),
+    edge: COFFEE_EDGE,
+    gauge: (Color::srgb(0.45, 0.68, 1.0), Color::srgb(0.2, 0.35, 0.8)),
+};
+
+/// Wider accent keycaps kept apart from the spell row, like an Esc key: auto attack, then coffee.
+fn spawn_accents(commands: &mut Commands) {
     // Right of the bar like an Enter key; the left side belongs to the combat log.
     let left = bar_width() / 2.0 + ATTACK_GAP;
+    accent_key(
+        commands,
+        left,
+        &ATTACK_ACCENT,
+        (
+            AttackRing,
+            AttackButton,
+            AttackIcon,
+            AttackGlow,
+            AttackSwing,
+        ),
+    );
+    accent_key(
+        commands,
+        left + ATTACK_PLATE + COFFEE_GAP,
+        &COFFEE_ACCENT,
+        (
+            CoffeeRing,
+            CoffeeButton,
+            CoffeeIcon,
+            CoffeeGlow,
+            CoffeeGauge,
+        ),
+    );
+}
+
+/// `markers` = (ring, button, icon, glow, gauge fill) components of the control being built.
+fn accent_key<R: Bundle, B: Bundle, I: Bundle, G: Bundle, F: Bundle>(
+    commands: &mut Commands,
+    left: f32,
+    look: &Accent,
+    markers: (R, B, I, G, F),
+) {
+    let (ring_m, button_m, icon_m, glow_m, gauge_m) = markers;
     commands
         .spawn(Node {
             position_type: PositionType::Absolute,
@@ -413,7 +490,7 @@ fn spawn_attack(commands: &mut Commands) {
         })
         .with_children(|root| {
             root.spawn((
-                AttackRing,
+                ring_m,
                 Node {
                     width: px(ATTACK_PLATE),
                     height: px(ATTACK_H),
@@ -422,23 +499,23 @@ fn spawn_attack(commands: &mut Commands) {
                     ..default()
                 },
                 BorderColor::all(PANEL_EDGE),
-                vgrad(Color::srgb(0.2, 0.08, 0.05), Color::srgb(0.06, 0.03, 0.03)),
+                vgrad(look.plate.0, look.plate.1),
                 drop_shadow(),
             ))
             .with_children(|ring| {
                 ring.spawn((
-                    AttackButton,
+                    button_m,
                     Button,
                     Node {
                         overflow: Overflow::clip(),
                         ..face_node(1.0, ATTACK_LIP, 0.0)
                     },
-                    BorderColor::all(ATTACK_EDGE),
-                    vgrad(Color::srgb(0.92, 0.45, 0.24), Color::srgb(0.58, 0.2, 0.12)),
+                    BorderColor::all(look.edge),
+                    vgrad(look.face.0, look.face.1),
                 ))
                 .with_children(|b| {
                     b.spawn((
-                        AttackIcon,
+                        icon_m,
                         ImageNode::default(),
                         Node {
                             position_type: PositionType::Absolute,
@@ -463,7 +540,7 @@ fn spawn_attack(commands: &mut Commands) {
                         ),
                     ));
                     b.spawn((
-                        AttackGlow,
+                        glow_m,
                         Node {
                             position_type: PositionType::Absolute,
                             width: percent(100),
@@ -472,7 +549,7 @@ fn spawn_attack(commands: &mut Commands) {
                         },
                         BackgroundColor(Color::NONE),
                     ));
-                    b.spawn(legend("T"));
+                    b.spawn(legend(look.legend));
                 });
             });
             root.spawn((
@@ -487,13 +564,13 @@ fn spawn_attack(commands: &mut Commands) {
                 BorderColor::all(PANEL_EDGE),
                 BackgroundColor(Color::srgb(0.03, 0.03, 0.05)),
                 children![(
-                    AttackSwing,
+                    gauge_m,
                     Node {
                         height: percent(100),
                         width: percent(0),
                         ..default()
                     },
-                    vgrad(SWING_BAR, Color::srgb(0.6, 0.45, 0.15)),
+                    vgrad(look.gauge.0, look.gauge.1),
                 )],
             ));
         });
@@ -592,6 +669,87 @@ fn update_attack(
             percent(100.0 * done)
         }
         _ => percent(0),
+    };
+}
+
+fn click_coffee(
+    paused: Res<Paused>,
+    flow: Res<GameFlow>,
+    sim: Res<CombatSim>,
+    mut pending: ResMut<PendingCommands>,
+    player: Single<&SimUnit, With<Player>>,
+    button: Single<&Interaction, (With<CoffeeButton>, Changed<Interaction>)>,
+) {
+    if !paused.0 && **button == Interaction::Pressed && can_act(&sim.0, &flow, player.0) {
+        cast_coffee_break(&sim.0, &mut pending, player.0);
+    }
+}
+
+/// The rim glows while sipping; the icon greys out while the break cannot be taken.
+fn update_coffee(
+    time: Res<Time>,
+    sim: Res<CombatSim>,
+    assets: Res<AssetServer>,
+    mut icons: ResMut<IconCache>,
+    player: Single<&SimUnit, With<Player>>,
+    mut button: Single<
+        (&Interaction, &mut BorderColor, &mut Node),
+        (With<CoffeeButton>, Without<CoffeeGauge>),
+    >,
+    mut ring: Single<&mut BorderColor, (With<CoffeeRing>, Without<CoffeeButton>)>,
+    mut icon: Single<&mut ImageNode, With<CoffeeIcon>>,
+    mut glow: Single<&mut BackgroundColor, With<CoffeeGlow>>,
+    mut gauge: Single<&mut Node, (With<CoffeeGauge>, Without<CoffeeButton>)>,
+) {
+    let Some(spell) = sim.0.content().channel_spell() else {
+        return;
+    };
+    let handle = icons.get(&assets, &spell.icon);
+    if icon.image != handle {
+        icon.image = handle;
+    }
+    let view = sim.0.cooldown(player.0, spell.id);
+    let channel = sim
+        .0
+        .unit(player.0)
+        .and_then(|u| u.cast)
+        .filter(|c| c.spell == spell.id);
+    let k = 0.5 + 0.5 * (time.elapsed_secs() * 7.0).sin();
+    let (interaction, border, node) = &mut *button;
+    **border = BorderColor::all(if channel.is_some() {
+        COFFEE_EDGE.mix(&Color::WHITE, 0.8 * k)
+    } else {
+        COFFEE_EDGE
+    });
+    **ring = BorderColor::all(if channel.is_some() {
+        PANEL_EDGE.mix(&COFFEE_ACCENT.gauge.0, k)
+    } else {
+        PANEL_EDGE
+    });
+    icon.color = if channel.is_some() || view.usable.is_ok() {
+        Color::WHITE
+    } else {
+        ICON_STUNNED
+    };
+    let pressed = **interaction == Interaction::Pressed;
+    let (top, bottom) = key_travel(1.0, ATTACK_LIP, pressed);
+    if node.top != top {
+        node.top = top;
+        node.bottom = bottom;
+    }
+    glow.0 = match **interaction {
+        Interaction::Pressed => PRESS,
+        Interaction::Hovered => HOVER,
+        Interaction::None => Color::NONE,
+    };
+    gauge.width = match channel {
+        Some(c) => {
+            percent(100.0 * (1.0 - c.elapsed_ms as f32 / c.total_ms.max(1) as f32).clamp(0.0, 1.0))
+        }
+        None if view.cd_total_ms > 0 => {
+            percent(100.0 * (view.cd_remaining_ms as f32 / view.cd_total_ms as f32).clamp(0.0, 1.0))
+        }
+        None => percent(0),
     };
 }
 
@@ -882,12 +1040,29 @@ fn spell_tip(d: &SpellDef, content: &Content) -> TipContent {
     }
 }
 
+/// Coffee Break is a channel with no action-bar slot, so its tooltip is built from its `ChannelDef`.
+fn coffee_tip(d: &SpellDef) -> TipContent {
+    let (every, pct) = d.channel.map_or((0, 0), |c| (c.interval_ms, c.mana_pct));
+    TipContent {
+        name: asset_key(&d.name),
+        sig: "() -> Mana".to_string(),
+        stats: format!(
+            "{pct}% mana / {:.0}s | {:.0}s channel | {}s cd",
+            every as f32 / 1000.0,
+            d.cast_ms as f32 / 1000.0,
+            d.cooldown_ms / 1000
+        ),
+        doc: format!("/// {}", d.description),
+    }
+}
+
 fn update_tooltip(
     sim: Res<CombatSim>,
     player: Single<&SimUnit, With<Player>>,
     forced: Option<Res<DebugHoverSlot>>,
     slots: Query<(&Slot, &Interaction)>,
     attack: Single<&Interaction, With<AttackButton>>,
+    coffee: Single<&Interaction, With<CoffeeButton>>,
     mut tip: Single<&mut Node, With<Tooltip>>,
     mut lines: Query<(&TipLine, &mut Text)>,
     mut names: Query<&mut TextSpan, (With<TipName>, Without<TipSig>)>,
@@ -902,6 +1077,7 @@ fn update_tooltip(
         .and_then(|i| content_db.action_bar().get(i).copied())
         .and_then(|id| content_db.spell(id).map(|d| (id, d)));
     let hovered_attack = **attack != Interaction::None;
+    let hovered_coffee = **coffee != Interaction::None;
     let content = if let Some((id, d)) = hovered_slot {
         if sim.0.known_spells(player.0).contains(&id) {
             Some(spell_tip(d, content_db))
@@ -934,6 +1110,8 @@ fn update_tooltip(
                     copy::AUTO_ATTACK_FLAVOUR
                 ),
             })
+    } else if hovered_coffee {
+        content_db.channel_spell().map(coffee_tip)
     } else {
         None
     };
@@ -943,10 +1121,12 @@ fn update_tooltip(
     };
     tip.display = Display::Flex;
     // The attack control sits right of the bar, so its tooltip is anchored there instead of mid-bar.
-    tip.margin.left = px(if hovered_slot.is_none() {
-        bar_width() / 2.0 + ATTACK_GAP + ATTACK_PLATE - TOOLTIP_W
-    } else {
+    tip.margin.left = px(if hovered_slot.is_some() {
         -TOOLTIP_W / 2.0
+    } else if hovered_coffee {
+        bar_width() / 2.0 + ATTACK_GAP + 2.0 * ATTACK_PLATE + COFFEE_GAP - TOOLTIP_W
+    } else {
+        bar_width() / 2.0 + ATTACK_GAP + ATTACK_PLATE - TOOLTIP_W
     });
     for mut span in &mut names {
         if span.0 != content.name {

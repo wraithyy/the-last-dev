@@ -29,6 +29,11 @@ struct Nameplate {
 }
 #[derive(Component)]
 struct PlateFill(EntityId);
+/// Name text and "LOOT" tag of a plate; `loot_fx` recolours and reveals them on lootable corpses.
+#[derive(Component)]
+pub struct PlateName(pub EntityId);
+#[derive(Component)]
+pub struct PlateLootTag(pub EntityId);
 
 pub struct NameplatePlugin;
 
@@ -100,9 +105,25 @@ fn spawn_plates(
                     ));
                 }
                 row.spawn((
+                    PlateName(u.id),
                     label(format!("{} {}", u.level, u.name), 13.0),
                     TextColor(if u.hostile { HOSTILE } else { FRIENDLY }),
                 ));
+                if u.hostile {
+                    row.spawn((
+                        PlateLootTag(u.id),
+                        Node {
+                            display: Display::None,
+                            padding: UiRect::axes(px(3), px(0)),
+                            border: UiRect::all(px(1)),
+                            border_radius: BorderRadius::all(px(3)),
+                            ..default()
+                        },
+                        BorderColor::all(crate::loot_fx::GOLD),
+                        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
+                        children![(label("LOOT", 9.0), TextColor(crate::loot_fx::GOLD))],
+                    ));
+                }
             });
             if u.hostile {
                 p.spawn((
@@ -163,7 +184,8 @@ fn place_plates(
             commands.entity(e).despawn();
             continue;
         };
-        let alive = sim.0.unit(plate.sim).is_some_and(|u| u.alive);
+        // A lootable corpse keeps its plate so the gold name marks it.
+        let alive = sim.0.unit(plate.sim).is_some_and(|u| u.alive || u.lootable);
         let world = tf.translation + Vec3::Y * plate.height;
         let dist = world.distance(eye);
         let in_front = (world - eye).dot(*forward) > 0.0;

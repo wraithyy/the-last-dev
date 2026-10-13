@@ -63,7 +63,7 @@ impl Plugin for HudPlugin {
 
 /// Icon files shipped in `assets/icons` (see CREDITS.md). Any other key gets a
 /// generated letter badge, so content can name icons before art exists.
-pub const ICON_FILES: [&str; 105] = [
+pub const ICON_FILES: [&str; 106] = [
     "ab_loser",
     "ab_test",
     "ab_winner",
@@ -87,6 +87,7 @@ pub const ICON_FILES: [&str; 105] = [
     "chatbot_rollout",
     "code_review",
     "code_smell",
+    "coffee_break",
     "coins",
     "contract",
     "culture_fit",
@@ -296,7 +297,7 @@ fn spawn_misc(mut commands: Commands) {
         },
         children![(
             label(
-                "WASD move | RMB steer | LMB orbit | Wheel zoom | Space jump | Tab target | T auto | 1-0 cast | F / right-click talk, loot | B trophies | F3 debug | Esc menu",
+                "WASD move | RMB steer | LMB orbit | Wheel zoom | Space jump | Tab target | T auto | 1-0 cast | F / right-click talk, loot | B trophies | M mute | F3 debug | Esc menu",
                 11.0,
             ),
             TextColor(Color::srgba(0.8, 0.9, 1.0, 0.5)),
@@ -393,6 +394,32 @@ mod tests {
                 it.name,
                 it.icon
             );
+        }
+    }
+
+    /// WebGL2 has no 16-bit normalized textures: one such PNG makes the browser build quit on load.
+    #[test]
+    fn every_png_asset_is_8_bit() {
+        fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    walk(&p, out);
+                } else if p.extension().is_some_and(|x| x == "png") {
+                    out.push(p);
+                }
+            }
+        }
+        let mut files = Vec::new();
+        walk(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets"),
+            &mut files,
+        );
+        assert!(!files.is_empty());
+        for f in files {
+            let bytes = std::fs::read(&f).unwrap();
+            // IHDR bit depth sits at byte 24 of every PNG.
+            assert_eq!(bytes.get(24), Some(&8), "{} is not 8-bit", f.display());
         }
     }
 

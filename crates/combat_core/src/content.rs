@@ -288,6 +288,15 @@ pub struct Area {
     pub allies: bool,
 }
 
+/// Makes a spell a drink-style channel: `cast_ms` is the full duration, and every
+/// `interval_ms` the caster regains `mana_pct` percent of max mana. Movement, jumping,
+/// damage taken or casting another spell cancel it; the cooldown starts when it ends.
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub struct ChannelDef {
+    pub interval_ms: u32,
+    pub mana_pct: u32,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct SpellDef {
     pub id: SpellId,
@@ -317,6 +326,8 @@ pub struct SpellDef {
     /// Lines the caster shouts on release, round-robin; empty means silent.
     #[serde(default)]
     pub yells: Vec<String>,
+    #[serde(default)]
+    pub channel: Option<ChannelDef>,
 }
 
 impl SpellDef {
@@ -646,6 +657,11 @@ impl Content {
         &self.action_bar
     }
 
+    /// The player's mana channel (Coffee Break); it lives off the action bar.
+    pub fn channel_spell(&self) -> Option<&SpellDef> {
+        self.spells.iter().find(|s| s.channel.is_some())
+    }
+
     pub fn unit_def(&self, key: &str) -> Option<&UnitDef> {
         self.units.iter().find(|u| u.key == key)
     }
@@ -728,6 +744,17 @@ impl Content {
                 {
                     return bad(format!("spell {} has an empty RandomAura", s.name));
                 }
+            }
+            if let Some(ch) = &s.channel
+                && (ch.interval_ms == 0
+                    || ch.interval_ms > s.cast_ms
+                    || !(1..=100).contains(&ch.mana_pct)
+                    || s.target != SpellTarget::Caster)
+            {
+                return bad(format!(
+                    "spell {} channel needs 0 < interval_ms <= cast_ms, mana_pct 1..=100 and target Caster",
+                    s.name
+                ));
             }
             if usize::from(s.learn_level) > self.levels.len() || s.learn_level == 0 {
                 return bad(format!("spell {} learn_level out of range", s.name));

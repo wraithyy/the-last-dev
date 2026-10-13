@@ -373,8 +373,11 @@ fn collect_events(
     mut loot: ResMut<LootState>,
     mut xp_gains: Local<usize>,
     mut last: Local<(String, u32)>,
+    // Mana ticks of the running Coffee Break, reported once as a single line.
+    mut coffee_mana: Local<u32>,
 ) {
     let me = sim.0.player();
+    let coffee = sim.0.content().channel_spell().map(|s| s.id);
     let mut push = |text: String, color: Color| {
         // Identical consecutive lines collapse into one with a repeat count.
         if last.1 > 0
@@ -479,6 +482,28 @@ fn collect_events(
                     ),
                 };
                 push(line, Color::srgb(0.8, 0.8, 0.85));
+            }
+            Event::CastStarted { caster, spell, .. }
+                if Some(*caster) == me && Some(*spell) == coffee =>
+            {
+                *coffee_mana = 0;
+                push(copy::COFFEE_START.into(), copy::COFFEE_COLOR);
+            }
+            Event::ManaGain { unit, amount, .. } if Some(*unit) == me => *coffee_mana += amount,
+            Event::CastSucceeded { caster, spell, .. }
+                if Some(*caster) == me && Some(*spell) == coffee =>
+            {
+                push(copy::coffee_restored(*coffee_mana), copy::COFFEE_COLOR);
+                *coffee_mana = 0;
+            }
+            Event::CastInterrupted { caster, spell, .. }
+                if Some(*caster) == me && Some(*spell) == coffee =>
+            {
+                push(copy::COFFEE_INTERRUPTED.into(), Color::srgb(1.0, 0.85, 0.2));
+                if *coffee_mana > 0 {
+                    push(copy::coffee_restored(*coffee_mana), copy::COFFEE_COLOR);
+                }
+                *coffee_mana = 0;
             }
             Event::CastStarted { caster, spell, .. } if Some(*caster) != me => push(
                 format!(

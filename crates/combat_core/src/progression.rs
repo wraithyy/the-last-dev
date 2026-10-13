@@ -77,6 +77,14 @@ impl Sim {
         }
     }
 
+    /// Debug/test helper: sets the player's mana (clamped to max). Silent.
+    pub fn set_player_mana(&mut self, mana: u32) {
+        if let Some(i) = self.player.and_then(|p| self.index(p)) {
+            let u = &mut self.units[i].state;
+            u.mana = mana.min(u.max_mana);
+        }
+    }
+
     /// The player's learned action-bar spells in bar order; every bar spell for other units.
     pub fn known_spells(&self, unit: EntityId) -> Vec<SpellId> {
         let Some(i) = self.index(unit) else {

@@ -12,6 +12,8 @@ pub struct CombatAnim {
     pub cast_spell: u32,
     /// Spell id behind the latest release; 0 is the auto attack.
     pub release_spell: u32,
+    /// Channeling Coffee Break: the arm sips on top of the idle legs, so `casting` stays false.
+    pub drinking: bool,
     pub dead: bool,
     /// Incremented when a spell is released (cast finished or instant cast).
     pub cast_release_seq: u32,

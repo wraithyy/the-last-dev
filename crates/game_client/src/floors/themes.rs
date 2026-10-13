@@ -45,6 +45,9 @@ struct Cast {
     door: Mat,
 }
 
+/// How far the player spawn sits in front of the arrival point, along the route.
+const SPAWN_CLEARANCE: f32 = 3.0;
+
 /// Elevators and the anchors every floor shares; call after `build_walls` and the route.
 fn cast(p: &mut Plan, c: &Cast) {
     let (arrive, yaw) = p.elevator_near(c.elevator.0, c.elevator.1, c.door);
@@ -52,8 +55,11 @@ fn cast(p: &mut Plan, c: &Cast) {
     let (exit, yaw) = p.elevator_near(c.exit.0, c.exit.1, c.door);
     p.anchor("elevator_exit", exit, yaw);
 
-    let spawn = v(c.spawn.0, 0.0, c.spawn.1);
     let first = p.route.get(1).copied().unwrap_or(Vec2::ZERO);
+    // Step away from the elevator wall so the follow camera has room behind the player.
+    let raw = pt(c.spawn.0, c.spawn.1);
+    let step = (first - raw).normalize_or_zero() * SPAWN_CLEARANCE;
+    let spawn = v(raw.x + step.x, 0.0, raw.y + step.y);
     p.anchor(
         "player_spawn",
         spawn,
@@ -266,7 +272,7 @@ fn floor1(p: &mut Plan) {
     cast(
         p,
         &Cast {
-            spawn: (-43.0, 3.0),
+            spawn: (-43.0, 5.5),
             npc: (-40.0, 7.0),
             packs: [
                 (-32.0, -9.0),

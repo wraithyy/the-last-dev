@@ -23,6 +23,7 @@ pub enum CastError {
     Stunned,
     Silenced,
     NotLearned,
+    FullMana,
 }
 
 impl CastError {
@@ -46,6 +47,7 @@ impl CastError {
             CastError::Stunned => "Can't do that while stunned.",
             CastError::Silenced => "Can't do that while silenced.",
             CastError::NotLearned => "You haven't learned that spell yet.",
+            CastError::FullMana => "You are already at full mana.",
         }
     }
 }
@@ -218,6 +220,12 @@ pub enum Event {
         source: EntityId,
         target: EntityId,
         spell: Option<SpellId>,
+        amount: u32,
+    },
+    /// Effective mana restored by a channel tick (clamped to max mana).
+    ManaGain {
+        unit: EntityId,
+        spell: SpellId,
         amount: u32,
     },
     /// Impulse away from the caster. The sim moved sim-owned units already; the

@@ -1,7 +1,7 @@
 //! Env-gated QA hooks, inert unless the variables are set:
 //! - `WOW_SCREENSHOT=<path.png>`: save the window after `WOW_SHOT_DELAY` seconds (default 4) and exit.
 //!   `WOW_SHOT_TIMES=t1,t2,..` instead saves one `<path>_<n>.png` per time (seconds since start).
-//! - `WOW_LINEUP=1|2`: bare stage with half of the cast in two rows (see `units.rs`).
+//! - `WOW_LINEUP=1|2`: bare stage with half of the cast in two rows (see `units.rs`); `0` leaves the stage empty.
 //! - `WOW_HOVER_SLOT=<0-9>`: show that action slot's tooltip without a pointer.
 //!
 //! Floor, level and start-position hooks live in `game.rs`, the autofight bot in `combat.rs`.
@@ -10,6 +10,7 @@
 //! - `WOW_GIVE_ITEMS=1`: grant a sample set of trophies at start (stacks included).
 //! - `WOW_TROPHIES=1`: open the `~/trophies` window at start.
 //! - `WOW_LOOT_DEMO=1`: show the loot window and log lines for three sample items (display only; see `hud/feed.rs`).
+//! - `WOW_COFFEE=<secs>`: drain mana to 30 and start a Coffee Break that many seconds in (1 if not a number).
 //! - `WOW_AUTORUN=1`: hold "forward" so animation and camera can be checked without input.
 
 use crate::camera::OrbitCamera;
@@ -112,6 +113,19 @@ impl Plugin for DebugPlugin {
         if env::var("WOW_GIVE_ITEMS").is_ok() {
             app.add_systems(Update, give_items_once.in_set(SimReady));
         }
+        if let Ok(v) = env::var("WOW_COFFEE") {
+            let at = v.parse().unwrap_or(1.0);
+            app.add_systems(
+                Update,
+                (move |time: Res<Time>,
+                       sim: ResMut<CombatSim>,
+                       pending: ResMut<PendingCommands>,
+                       done: Local<bool>| {
+                    coffee_once(at, time, sim, pending, done)
+                })
+                .in_set(SimReady),
+            );
+        }
         if env::var("WOW_TROPHIES").is_ok() {
             app.insert_resource(TrophiesOpen(true));
         }
@@ -147,6 +161,23 @@ fn give_items_once(mut sim: ResMut<CombatSim>, mut done: Local<bool>) {
         for name in SAMPLE_TROPHIES {
             sim.0.grant_trophy(name);
         }
+    }
+}
+
+fn coffee_once(
+    at: f32,
+    time: Res<Time>,
+    mut sim: ResMut<CombatSim>,
+    mut pending: ResMut<PendingCommands>,
+    mut done: Local<bool>,
+) {
+    if *done || time.elapsed_secs() < at {
+        return;
+    }
+    *done = true;
+    sim.0.set_player_mana(30);
+    if let Some(me) = sim.0.player() {
+        crate::combat::cast_coffee_break(&sim.0, &mut pending, me);
     }
 }
 

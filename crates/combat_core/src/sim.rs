@@ -9,6 +9,7 @@ use crate::content::{
     ticks,
 };
 use crate::geom::{Aabb, Vec3, in_range};
+use crate::nav::{Nav, NavAgent};
 use crate::rng::Rng;
 use crate::targeting::{EntityId, TargetCandidate, validate_target};
 use crate::time::{Tick, ticks_to_ms};
@@ -29,6 +30,8 @@ pub(crate) struct ActiveCast {
     pub end: u64,
     pub pushbacks: u8,
     pub interruptible: bool,
+    /// Next mana tick for a channel (`ChannelDef`); `None` for ordinary casts.
+    pub channel_next: Option<u64>,
 }
 
 pub(crate) struct AuraRt {
@@ -101,6 +104,7 @@ pub(crate) struct Unit {
     /// Last damaging player spell that landed on this unit: (pre-absorb amount, school).
     pub last_player_hit: Option<(u32, School)>,
     pub wander: Wander,
+    pub nav: NavAgent,
 }
 
 /// One resolved damage instance, before modifiers and absorbs.
@@ -127,6 +131,7 @@ pub struct Sim {
     pub(crate) now: u64,
     pub(crate) units: Vec<Unit>,
     pub(crate) blockers: Vec<Aabb>,
+    pub(crate) nav: Nav,
     pub(crate) pending: Vec<Command>,
     pub(crate) events: Vec<Event>,
     pub(crate) player: Option<EntityId>,
@@ -147,6 +152,7 @@ impl Sim {
             now: 0,
             units: Vec::new(),
             blockers: Vec::new(),
+            nav: Nav::default(),
             pending: Vec::new(),
             events: Vec::new(),
             player: None,
@@ -160,6 +166,7 @@ impl Sim {
 
     pub fn set_blockers(&mut self, blockers: Vec<Aabb>) {
         self.blockers = blockers;
+        self.rebuild_nav();
     }
 
     pub fn spawn_player(&mut self, pos: Vec3, yaw: f32) -> EntityId {
@@ -297,6 +304,7 @@ impl Sim {
             last_cast: None,
             last_player_hit: None,
             wander: Wander::new(self.seed, id),
+            nav: NavAgent::default(),
         });
         let i = self.units.len() - 1;
         // Neighbouring NPCs of the same kind start at different lines, so they banter.
@@ -390,6 +398,7 @@ impl Sim {
         for c in cmds {
             self.apply(c);
         }
+        self.update_channels();
         self.update_casts();
         self.run_queue();
         self.update_auto_attack();
@@ -683,6 +692,9 @@ impl Sim {
         if u.state.mana < spell.mana {
             return Err(CastError::NotEnoughMana);
         }
+        if spell.channel.is_some() && u.state.mana >= u.state.max_mana {
+            return Err(CastError::FullMana);
+        }
         Ok(target)
     }
 
@@ -694,7 +706,12 @@ impl Sim {
         }
         let u = &self.units[ci];
         let gcd_rem = u.gcd_end.saturating_sub(self.now);
-        match &u.cast {
+        // Another spell may interrupt a channel (it cancels it in `start_cast`); only the GCD gates it.
+        let cast = u
+            .cast
+            .as_ref()
+            .filter(|c| c.channel_next.is_none() || c.spell == spell.id);
+        match cast {
             Some(c) => Some((
                 CastError::AlreadyCasting,
                 c.end.saturating_sub(self.now).max(gcd_rem),
@@ -751,13 +768,24 @@ impl Sim {
     pub(crate) fn start_cast(&mut self, ci: usize, spell: &SpellDef, target: Option<EntityId>) {
         let haste = self.haste(ci);
         let id = Self::id_of(ci);
+        if self.units[ci]
+            .cast
+            .as_ref()
+            .is_some_and(|c| c.channel_next.is_some())
+        {
+            self.cancel_cast(ci, None, 0);
+        }
         if spell.gcd {
             let gcd = self.content.gcd_ms(haste);
             let u = &mut self.units[ci];
             u.gcd_end = self.now + ticks(gcd);
             u.gcd_total_ms = gcd;
         }
-        let cast_ms = self.cast_time(ci, spell);
+        // Channel length is authored; haste and cast-time auras must not stretch the drink.
+        let cast_ms = match spell.channel {
+            Some(_) => spell.cast_ms,
+            None => self.cast_time(ci, spell),
+        };
         if cast_ms == 0 {
             return self.resolve(ci, spell, target);
         }
@@ -769,12 +797,55 @@ impl Sim {
             end,
             pushbacks: 0,
             interruptible: spell.interruptible,
+            channel_next: spell.channel.map(|ch| self.now + ticks(ch.interval_ms)),
         });
         self.events.push(Event::CastStarted {
             caster: id,
             spell: spell.id,
             total_ms: ticks_to_ms(end - self.now) as u32,
         });
+        // A channel has no release moment, so the player shouts as it begins.
+        if spell.channel.is_some() {
+            self.spell_yell(ci, spell);
+        }
+    }
+
+    /// Mana ticks of active channels. Runs before `update_casts` so the tick that
+    /// lands on the final tick is not lost; a full bar ends the channel early.
+    fn update_channels(&mut self) {
+        for ci in 0..self.units.len() {
+            let Some((spell_id, next)) = self.units[ci]
+                .cast
+                .as_ref()
+                .and_then(|c| c.channel_next.map(|n| (c.spell, n)))
+            else {
+                continue;
+            };
+            let Some(ch) = self.content.spell(spell_id).and_then(|s| s.channel) else {
+                continue;
+            };
+            if next > self.now {
+                continue;
+            }
+            let u = &mut self.units[ci];
+            let want = (u.state.max_mana * ch.mana_pct / 100).max(1);
+            let gain = want.min(u.state.max_mana.saturating_sub(u.state.mana));
+            u.state.mana += gain;
+            let full = u.state.mana >= u.state.max_mana;
+            if let Some(c) = u.cast.as_mut() {
+                c.channel_next = Some(next + ticks(ch.interval_ms));
+            }
+            if gain > 0 {
+                self.events.push(Event::ManaGain {
+                    unit: Self::id_of(ci),
+                    spell: spell_id,
+                    amount: gain,
+                });
+            }
+            if full {
+                self.complete_cast(ci);
+            }
+        }
     }
 
     fn update_casts(&mut self) {
@@ -851,7 +922,9 @@ impl Sim {
             spell: spell.id,
             target,
         });
-        self.spell_yell(ci, spell);
+        if spell.channel.is_none() {
+            self.spell_yell(ci, spell);
+        }
         self.note_cast(ci, spell.id);
         let targets: Vec<usize> = match spell.area {
             Some(area) => self.area_targets(ci, area),
@@ -892,10 +965,17 @@ impl Sim {
         let Some(cast) = self.units[ci].cast.take() else {
             return;
         };
-        if let Some(spell) = self.content.spell(cast.spell)
-            && lockout_ms > 0
-        {
-            self.units[ci].lockout_until[spell.school.index()] = self.now + ticks(lockout_ms);
+        if let Some(spell) = self.content.spell(cast.spell) {
+            if lockout_ms > 0 {
+                self.units[ci].lockout_until[spell.school.index()] = self.now + ticks(lockout_ms);
+            }
+            // A channel's cooldown starts when it ends, however it ends.
+            if spell.channel.is_some() && spell.cooldown_ms > 0 {
+                self.units[ci].cooldowns.insert(
+                    spell.id,
+                    (self.now + ticks(spell.cooldown_ms), spell.cooldown_ms),
+                );
+            }
         }
         self.events.push(Event::CastInterrupted {
             caster: Self::id_of(ci),
@@ -966,6 +1046,14 @@ impl Sim {
 
     /// Pushback is player-only: enemy telegraphs must keep a fixed window.
     fn pushback(&mut self, ti: usize) {
+        // Taking damage breaks a channel outright instead of delaying it.
+        if self.units[ti]
+            .cast
+            .as_ref()
+            .is_some_and(|c| c.channel_next.is_some())
+        {
+            return self.cancel_cast(ti, None, 0);
+        }
         let (ms, max) = (
             self.content.config.pushback_ms,
             self.content.config.pushback_max,

@@ -169,6 +169,10 @@ bonus they grant (red HP, blue mana, violet spell power, gold crit, teal haste, 
 
 Authors: Lorc (https://lorcblog.blogspot.com), Delapouite (https://delapouite.com).
 
+## Drawn for this project
+
+assets/icons/coffee_break.png is original art drawn in code by `scripts/coffee_icon.py` (the navy mug from the 3D model on a dark field), CC0. No external source.
+
 ## Procedural textures
 
 The carpet, marble, ceiling tiles, posters, signs, Gantt charts, skyline and screens are generated in code
@@ -181,3 +185,23 @@ The carpet, marble, ceiling tiles, posters, signs, Gantt charts, skyline and scr
 | assets/fonts/JetBrainsMono-Bold.ttf | JetBrains Mono Bold v2.304, (c) 2020 The JetBrains Mono Project Authors | SIL Open Font License 1.1 (assets/fonts/OFL-JetBrainsMono.txt) | https://github.com/JetBrains/JetBrainsMono |
 
 Icons whose key has no file in `icons/` are generated at runtime as letter badges (no external art).
+
+## Audio
+
+All audio is CC0 (https://creativecommons.org/publicdomain/zero/1.0/); attribution is not required but given gladly. Clips were converted to mono Ogg Vorbis, trimmed or layered with ffmpeg; nothing is AI-generated. assets/audio/LICENSE-kenney.txt is the original Kenney licence text.
+
+| Used for | Source | Author | Licence |
+|---|---|---|---|
+| Interface and pop-ups (error, spell learned, elevator ding, summon, heal, tick, enemy cast) | Interface Sounds, https://kenney.nl/assets/interface-sounds | Kenney | CC0 |
+| Cast zaps, tones and phaser sweeps (Code Review, git blame, Rollback, Refactor, death) | Digital Audio, https://kenney.nl/assets/digital-audio | Kenney | CC0 |
+| Hits, stamp thud, bonk, crit bell, Postmortem, Write It By Hand impact | Impact Sounds, https://kenney.nl/assets/impact-sounds | Kenney | CC0 |
+| Coins (loot), trophy window book open / close | RPG Audio, https://kenney.nl/assets/rpg-audio | Kenney | CC0 |
+| Elevator door, Guardrails and cast hum shield tones | Sci-Fi Sounds, https://kenney.nl/assets/sci-fi-sounds | Kenney | CC0 |
+| Level-up, floor-cleared and victory jingles | Music Jingles, https://kenney.nl/assets/music-jingles | Kenney | CC0 |
+| Keycap clacks, typing burst | Keyboard Soundpack 1, https://opengameart.org/content/keyboard-soundpack-1-typing-and-single-keystrokes | unicaegames | CC0 |
+| Rubber Duck squeak | Squeak toy sounds, https://opengameart.org/content/squeak-toy-sounds | bart | CC0 |
+| Caffeine and Coffee Break sips | Liquid / bottle / drink set, https://opengameart.org/content/liquid-bottle-drink-set | qubodup | CC0 |
+| Miss and Rollback whooshes | Swishes sound pack, https://opengameart.org/content/swishes-sound-pack | artisticdude | CC0 |
+| Air-con ambience (low-passed) | 30 CC0 SFX loops, https://opengameart.org/content/30-cc0-sfx-loops | rubberduck | CC0 |
+| Exploration music (assets/audio/music/office_muzak.ogg) | Elevator Music, https://opengameart.org/content/elevator-music | Alex McCulloch (Pro Sensory) | CC0 |
+| Boss music (assets/audio/music/boss_battle.ogg) | Boss Battle Music (Epic Boss Battle, seamlessly looping), https://opengameart.org/content/boss-battle-music | Juhani Junkala (uploaded by SubspaceAudio) | CC0 |

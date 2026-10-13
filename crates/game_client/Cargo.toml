@@ -7,8 +7,8 @@ license.workspace = true
 
 [dependencies]
 combat_core = { path = "../combat_core" }
-# 3d + ui only: drops audio/2d; default_platform already enables webgl2.
-bevy = { version = "=0.19.1", default-features = false, features = ["3d", "ui"] }
+# 3d + ui + OGG audio only (no 2d, no other codecs); default_platform already enables webgl2.
+bevy = { version = "=0.19.1", default-features = false, features = ["3d", "ui", "bevy_audio", "vorbis"] }
 
 [lints]
 workspace = true

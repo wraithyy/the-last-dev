@@ -88,10 +88,12 @@ fn spawn_texts(
     mut counter: Local<usize>,
 ) {
     // Interrupts show immediately; Damage/Miss arrive via the presentation queue (at impact).
-    let interrupts = raw
-        .read()
-        .map(|CombatEvent(ev)| ev)
-        .filter(|ev| matches!(ev, Event::CastInterrupted { .. } | Event::Heal { .. }));
+    let interrupts = raw.read().map(|CombatEvent(ev)| ev).filter(|ev| {
+        matches!(
+            ev,
+            Event::CastInterrupted { .. } | Event::Heal { .. } | Event::ManaGain { .. }
+        )
+    });
     let presented = present.read().map(|PresentEvent(ev)| ev);
     for ev in interrupts.chain(presented) {
         let (target, specs) = match ev {
@@ -109,6 +111,16 @@ fn spawn_texts(
                     }],
                 )
             }
+            Event::ManaGain { unit, amount, .. } => (
+                *unit,
+                vec![Spec {
+                    text: format!("+{amount}"),
+                    size: FLOAT_TEXT_SIZE,
+                    color: crate::copy::COFFEE_COLOR,
+                    offset: Vec2::ZERO,
+                    pop: false,
+                }],
+            ),
             Event::Damage {
                 target,
                 spell,

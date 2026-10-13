@@ -1,5 +1,6 @@
 mod anim;
 mod arena;
+mod audio;
 mod camera;
 mod catalog;
 mod collision;
@@ -15,6 +16,7 @@ mod gear;
 mod hair;
 mod hud;
 mod input;
+mod loot_fx;
 mod nameplates;
 mod player;
 mod presentation;
@@ -83,6 +85,8 @@ fn main() {
             gear::GearPlugin,
             nameplates::NameplatePlugin,
             debug::DebugPlugin,
+            audio::GameAudioPlugin,
+            loot_fx::LootFxPlugin,
         ))
         .run();
 }

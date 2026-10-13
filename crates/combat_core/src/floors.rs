@@ -116,6 +116,7 @@ impl Sim {
             }
         }
         self.blockers = blockers;
+        self.rebuild_nav();
         self.floor = Some(floor);
         self.next_pack = pack_id;
         for p in plan {
