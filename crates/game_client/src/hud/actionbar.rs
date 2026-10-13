@@ -6,19 +6,24 @@ use super::{
     PANEL_EDGE, asset_key, drop_shadow, fmt_secs, gloss, label, panel_bg, set_text, vgrad,
 };
 use crate::combat::{
-    CombatSim, PendingCommands, SimReady, SimUnit, UiNotice, cast_slot, toggle_auto_attack,
+    CombatSim, PendingCommands, SimReady, SimUnit, UiNotice, can_act, cast_slot, toggle_auto_attack,
 };
 use crate::config::*;
 use crate::copy;
+use crate::game::GameFlow;
 use crate::input::Paused;
 use crate::player::Player;
 use crate::targeting::Target;
 use bevy::prelude::*;
 use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
-use combat_core::{CastError, Effect, SpellId};
+use combat_core::{CastError, Content, Effect, SpellDef, SpellId};
 
-const KEY_LABELS: [&str; 4] = ["1", "2", "3", "4"];
+const KEY_LABELS: [&str; 10] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+/// Locked (silenced / school lockout) keycaps: dimmed under a padlock.
+const TINT_LOCKED: Color = Color::srgba(0.02, 0.02, 0.05, 0.62);
+/// Stunned: every keycap goes grey.
+const ICON_STUNNED: Color = Color::srgb(0.35, 0.35, 0.38);
 const TINT_MANA: Color = Color::srgba(0.1, 0.2, 0.95, 0.5);
 const TINT_RANGE: Color = Color::srgba(0.85, 0.1, 0.1, 0.5);
 const ATTACK_ICON: &str = "nitpick";
@@ -39,7 +44,7 @@ const ATTACK_PLATE: f32 = 64.0;
 const ATTACK_H: f32 = 64.0;
 const ATTACK_BTN: f32 = 38.0;
 const ATTACK_LIP: f32 = 7.0;
-/// Clearance between the attack control and the left brace.
+/// Clearance between the right brace and the attack control.
 const ATTACK_GAP: f32 = 30.0;
 const TOOLTIP_W: f32 = 310.0;
 const TOOLTIP_BOTTOM: f32 = 108.0;
@@ -68,6 +73,10 @@ enum Part {
     Sweep,
     Seconds,
     Press,
+    /// Padlock shown on locked and unlearned slots.
+    Lock,
+    /// "Lv N" on a slot whose spell is not learned yet.
+    LearnAt,
 }
 #[derive(Component)]
 struct SlotPart(usize, Part);
@@ -151,6 +160,49 @@ fn face_node(inset: f32, lip: f32, travel: f32) -> Node {
         border_radius: BorderRadius::all(px(6)),
         ..default()
     }
+}
+
+/// Padlock drawn from two nodes (shackle ring + body), hidden until a slot is locked.
+fn padlock() -> impl Bundle {
+    (
+        Node {
+            position_type: PositionType::Absolute,
+            left: percent(50),
+            top: percent(50),
+            width: px(16),
+            height: px(18),
+            margin: UiRect::new(px(-8), px(0), px(-11), px(0)),
+            display: Display::None,
+            ..default()
+        },
+        children![
+            (
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(3),
+                    top: px(0),
+                    width: px(10),
+                    height: px(11),
+                    border: UiRect::all(px(2)),
+                    border_radius: BorderRadius::top(px(5)),
+                    ..default()
+                },
+                BorderColor::all(Color::srgb(0.85, 0.88, 0.95)),
+            ),
+            (
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(0),
+                    bottom: px(0),
+                    width: px(16),
+                    height: px(10),
+                    border_radius: BorderRadius::all(px(2)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgb(0.85, 0.88, 0.95)),
+            ),
+        ],
+    )
 }
 
 fn spawn_bar(mut commands: Commands, mut materials: ResMut<Assets<CooldownMaterial>>) {
@@ -255,11 +307,11 @@ fn spawn_bar(mut commands: Commands, mut materials: ResMut<Assets<CooldownMateri
                         face.spawn(gloss(0.14));
                         face.spawn((
                             SlotPart(i, Part::Seconds),
-                            label("", 22.0),
+                            label("", 18.0),
                             Node {
                                 position_type: PositionType::Absolute,
                                 width: percent(100),
-                                top: px(10),
+                                top: px(9),
                                 justify_content: JustifyContent::Center,
                                 ..default()
                             },
@@ -267,6 +319,20 @@ fn spawn_bar(mut commands: Commands, mut materials: ResMut<Assets<CooldownMateri
                             TextColor(Color::srgb(1.0, 0.95, 0.7)),
                         ));
                         face.spawn((SlotPart(i, Part::Press), fill, BackgroundColor(Color::NONE)));
+                        face.spawn((SlotPart(i, Part::Lock), padlock()));
+                        face.spawn((
+                            SlotPart(i, Part::LearnAt),
+                            label("", 10.0),
+                            Node {
+                                position_type: PositionType::Absolute,
+                                width: percent(100),
+                                bottom: px(3),
+                                justify_content: JustifyContent::Center,
+                                ..default()
+                            },
+                            TextLayout::justify(Justify::Center),
+                            TextColor(DIM),
+                        ));
                         face.spawn(legend(key));
                     });
                 });
@@ -329,7 +395,8 @@ fn spawn_bar(mut commands: Commands, mut materials: ResMut<Assets<CooldownMateri
 
 /// The auto attack is a wider, warm accent keycap kept apart from the spell row, like an Esc key.
 fn spawn_attack(commands: &mut Commands) {
-    let left = -(bar_width() / 2.0 + ATTACK_GAP + ATTACK_PLATE);
+    // Right of the bar like an Enter key; the left side belongs to the combat log.
+    let left = bar_width() / 2.0 + ATTACK_GAP;
     commands
         .spawn(Node {
             position_type: PositionType::Absolute,
@@ -434,12 +501,13 @@ fn spawn_attack(commands: &mut Commands) {
 
 fn click_slots(
     paused: Res<Paused>,
+    flow: Res<GameFlow>,
     sim: Res<CombatSim>,
     mut pending: ResMut<PendingCommands>,
     player: Single<&SimUnit, With<Player>>,
     slots: Query<(&Slot, &Interaction), Changed<Interaction>>,
 ) {
-    if paused.0 {
+    if paused.0 || !can_act(&sim.0, &flow, player.0) {
         return;
     }
     for (Slot(i), interaction) in &slots {
@@ -533,8 +601,19 @@ fn key_travel(inset: f32, lip: f32, pressed: bool) -> (Val, Val) {
     (px(inset + t), px(lip - t))
 }
 
+/// Per-slot verdict derived from the sim each frame.
+#[derive(Clone, Copy, Default)]
+struct SlotView {
+    spell: Option<SpellId>,
+    learned: bool,
+    /// Silenced or school-locked: dim under a padlock.
+    locked: bool,
+    usable: Option<CastError>,
+}
+
 fn update_slots(
     sim: Res<CombatSim>,
+    flow: Res<GameFlow>,
     keys: Res<ButtonInput<KeyCode>>,
     assets: Res<AssetServer>,
     mut icons: ResMut<IconCache>,
@@ -553,8 +632,24 @@ fn update_slots(
 ) {
     let me = player.0;
     let bar = sim.0.content().action_bar();
+    let known = sim.0.known_spells(me);
+    let able = can_act(&sim.0, &flow, me);
     let casting = sim.0.unit(me).and_then(|u| u.cast).map(|c| c.spell);
-    let spell_of = |i: usize| bar.get(i).copied();
+    let views: Vec<SlotView> = (0..KEY_LABELS.len())
+        .map(|i| {
+            let Some(&id) = bar.get(i) else {
+                return SlotView::default();
+            };
+            let usable = sim.0.cooldown(me, id).usable.err();
+            SlotView {
+                spell: Some(id),
+                learned: known.contains(&id),
+                locked: matches!(usable, Some(CastError::Silenced | CastError::SchoolLocked)),
+                usable,
+            }
+        })
+        .collect();
+    let view = |i: usize| views.get(i).copied().unwrap_or_default();
     let held = |i: usize, interaction: &Interaction| {
         crate::combat::CAST_KEYS
             .get(i)
@@ -568,17 +663,25 @@ fn update_slots(
     for (Slot(i), it) in &slots {
         if let (Some(h), Some(p)) = (hovered.get_mut(*i), pressed.get_mut(*i)) {
             *h = *it == Interaction::Hovered;
-            *p = held(*i, it);
+            *p = able && view(*i).learned && held(*i, it);
         }
     }
+    let is = |arr: &[bool], i: usize| arr.get(i).copied().unwrap_or(false);
     for (KeyFace(i), mut node, mut border) in &mut faces {
-        let active = spell_of(*i).is_some() && spell_of(*i) == casting;
-        let lit = active || hovered.get(*i).copied().unwrap_or(false);
-        let want = BorderColor::all(if lit { ACCENT } else { KEY_RIM });
+        let v = view(*i);
+        let active = v.spell.is_some() && v.spell == casting;
+        let lit = active || (v.learned && is(&hovered, *i));
+        let want = BorderColor::all(if lit {
+            ACCENT
+        } else if v.learned {
+            KEY_RIM
+        } else {
+            KEY_SIDE
+        });
         if *border != want {
             *border = want;
         }
-        let (top, bottom) = key_travel(FACE_INSET, LIP, pressed.get(*i).copied().unwrap_or(false));
+        let (top, bottom) = key_travel(FACE_INSET, LIP, is(&pressed, *i));
         if node.top != top {
             node.top = top;
             node.bottom = bottom;
@@ -589,63 +692,95 @@ fn update_slots(
         if *part != Part::Icon {
             continue;
         }
-        match spell_of(*i).and_then(|id| sim.0.content().spell(id)) {
-            Some(def) => {
+        let v = view(*i);
+        match v.spell.and_then(|id| sim.0.content().spell(id)) {
+            Some(def) if v.learned => {
                 let handle = icons.get(&assets, &def.icon);
                 if img.image != handle {
                     img.image = handle;
                 }
-                img.color = Color::WHITE;
+                img.color = if able { Color::WHITE } else { ICON_STUNNED };
             }
-            None => img.color = Color::NONE,
+            _ => img.color = Color::NONE,
         }
     }
     for (SlotPart(i, part), mut bg) in &mut colors {
-        let Some(id) = spell_of(*i) else {
+        let v = view(*i);
+        if !v.learned {
             bg.0 = Color::NONE;
             continue;
-        };
-        let view = sim.0.cooldown(me, id);
+        }
         bg.0 = match part {
-            Part::Tint => match view.usable {
-                Err(CastError::NotEnoughMana) => TINT_MANA,
-                Err(CastError::OutOfRange) => TINT_RANGE,
+            Part::Tint if v.locked => TINT_LOCKED,
+            Part::Tint => match v.usable {
+                Some(CastError::NotEnoughMana) => TINT_MANA,
+                Some(CastError::OutOfRange) => TINT_RANGE,
                 _ => Color::NONE,
             },
-            Part::Press if pressed.get(*i).copied().unwrap_or(false) => PRESS,
-            Part::Press if hovered.get(*i).copied().unwrap_or(false) => HOVER,
+            Part::Press if is(&pressed, *i) => PRESS,
+            Part::Press if is(&hovered, *i) => HOVER,
             _ => Color::NONE,
         };
     }
     for (SlotPart(i, part), mut node, material) in &mut nodes {
-        if *part != Part::Sweep {
-            continue;
-        }
-        let remaining = spell_of(*i).map_or(0.0, |id| sweep_fraction(&sim, me, id));
-        node.display = if remaining > 0.0 {
-            Display::Flex
-        } else {
-            Display::None
-        };
-        // Read first: get_mut would mark the asset changed and re-upload it every frame.
-        if let Some(handle) = material
-            && materials
-                .get(&handle.0)
-                .is_some_and(|m| m.params.x != remaining)
-            && let Some(mut m) = materials.get_mut(&handle.0)
-        {
-            m.params.x = remaining;
+        let v = view(*i);
+        match part {
+            Part::Lock => {
+                let want = if v.locked || !v.learned {
+                    Display::Flex
+                } else {
+                    Display::None
+                };
+                if node.display != want {
+                    node.display = want;
+                }
+            }
+            Part::Sweep => {
+                let remaining = match v.spell {
+                    Some(id) if v.learned => sweep_fraction(&sim, me, id),
+                    _ => 0.0,
+                };
+                node.display = if remaining > 0.0 {
+                    Display::Flex
+                } else {
+                    Display::None
+                };
+                // Read first: get_mut would mark the asset changed and re-upload it every frame.
+                if let Some(handle) = material
+                    && materials
+                        .get(&handle.0)
+                        .is_some_and(|m| m.params.x != remaining)
+                    && let Some(mut m) = materials.get_mut(&handle.0)
+                {
+                    m.params.x = remaining;
+                }
+            }
+            _ => {}
         }
     }
     for (SlotPart(i, part), mut text) in &mut texts {
-        if *part != Part::Seconds {
-            continue;
+        let v = view(*i);
+        match part {
+            Part::Seconds => {
+                let ms = match v.spell {
+                    Some(id) if v.learned => sim.0.cooldown(me, id).cd_remaining_ms,
+                    _ => 0,
+                };
+                set_text(
+                    &mut text,
+                    &if ms > 0 { fmt_secs(ms) } else { String::new() },
+                );
+            }
+            Part::LearnAt => {
+                let lv = v
+                    .spell
+                    .filter(|_| !v.learned)
+                    .and_then(|id| sim.0.content().spell(id))
+                    .map_or_else(String::new, |d| format!("Lv {}", d.learn_level));
+                set_text(&mut text, &lv);
+            }
+            _ => {}
         }
-        let ms = spell_of(*i).map_or(0, |id| sim.0.cooldown(me, id).cd_remaining_ms);
-        set_text(
-            &mut text,
-            &if ms > 0 { fmt_secs(ms) } else { String::new() },
-        );
     }
 }
 
@@ -674,13 +809,50 @@ struct TipContent {
     doc: String,
 }
 
-fn spell_tip(d: &combat_core::SpellDef) -> TipContent {
-    let ret = match d.effect {
+/// Return "type" of one effect, as the tooltip and the learned-spell toast print it.
+fn effect_ret(effect: &Effect, content: &Content) -> &'static str {
+    match effect {
+        Effect::Damage {
+            execute: Some(_), ..
+        } => "Execute",
         Effect::Damage { .. } => "Damage",
         Effect::Absorb { .. } => "Shield",
         Effect::Interrupt { .. } => "Interrupt",
+        Effect::Heal { .. } => "Heal",
+        Effect::Aura { aura, .. } => match content.aura(aura) {
+            Some(a) if a.periodic.as_ref().is_some_and(|p| p.heal) => "Hot",
+            Some(a) if a.periodic.is_some() => "Dot",
+            Some(a) if a.stun => "Stun",
+            Some(a) if a.silence => "Silence",
+            Some(a) if a.harmful => "Debuff",
+            _ => "Buff",
+        },
+        Effect::RandomAura { .. } => "Aura",
+        Effect::Dispel { .. } => "Dispel",
+        Effect::Lockout { .. } => "Lockout",
+        Effect::Knockback { .. } => "Knockback",
+        Effect::Teleport { .. } => "Teleport",
+        Effect::Summon { .. } => "Summon",
+        _ => "Effect",
+    }
+}
+
+/// `("git_blame", "(target) -> Dot")`; several effects return a tuple.
+pub fn spell_signature(d: &SpellDef, content: &Content) -> (String, String) {
+    let rets: Vec<&str> = std::iter::once(&d.effect)
+        .chain(&d.extra_effects)
+        .map(|e| effect_ret(e, content))
+        .collect();
+    let ret = if rets.len() == 1 {
+        rets[0].to_string()
+    } else {
+        format!("({})", rets.join(", "))
     };
     let arg = if d.range_m > 0.0 { "target" } else { "self" };
+    (asset_key(&d.name), format!("({arg}) -> {ret}"))
+}
+
+fn spell_tip(d: &SpellDef, content: &Content) -> TipContent {
     let mut stats = Vec::new();
     if d.mana > 0 {
         stats.push(format!("{} mana", d.mana));
@@ -698,9 +870,13 @@ fn spell_tip(d: &combat_core::SpellDef) -> TipContent {
     if d.cooldown_ms > 0 {
         stats.push(format!("{}s cd", d.cooldown_ms / 1000));
     }
+    if !d.gcd {
+        stats.push("off-GCD".to_string());
+    }
+    let (name, sig) = spell_signature(d, content);
     TipContent {
-        name: asset_key(&d.name),
-        sig: format!("({arg}) -> {ret}"),
+        name,
+        sig,
         stats: stats.join(" | "),
         doc: format!("/// {}", d.description),
     }
@@ -717,20 +893,31 @@ fn update_tooltip(
     mut names: Query<&mut TextSpan, (With<TipName>, Without<TipSig>)>,
     mut sigs: Query<&mut TextSpan, (With<TipSig>, Without<TipName>)>,
 ) {
-    let hovered_spell = slots
+    let content_db = sim.0.content();
+    let hovered_slot = slots
         .iter()
         .find(|(_, it)| **it != Interaction::None)
         .map(|(Slot(i), _)| *i)
         .or(forced.map(|f| f.0))
-        .and_then(|i| sim.0.content().action_bar().get(i).copied())
-        .and_then(|id| sim.0.content().spell(id));
+        .and_then(|i| content_db.action_bar().get(i).copied())
+        .and_then(|id| content_db.spell(id).map(|d| (id, d)));
     let hovered_attack = **attack != Interaction::None;
-    let content = if let Some(d) = hovered_spell {
-        Some(spell_tip(d))
+    let content = if let Some((id, d)) = hovered_slot {
+        if sim.0.known_spells(player.0).contains(&id) {
+            Some(spell_tip(d, content_db))
+        } else {
+            // Unlearned: show only the stub, like an unresolved symbol.
+            Some(TipContent {
+                name: "locked".into(),
+                sig: "() -> !".into(),
+                stats: format!("unlocks at level {}", d.learn_level),
+                doc: "/// TODO: get promoted first.".into(),
+            })
+        }
     } else if hovered_attack {
         sim.0
             .unit(player.0)
-            .and_then(|u| sim.0.content().unit_def(&u.key))
+            .and_then(|u| content_db.unit_def(&u.key))
             .and_then(|d| d.auto_attack.as_ref())
             .map(|a| TipContent {
                 name: asset_key(&a.name),
@@ -755,9 +942,9 @@ fn update_tooltip(
         return;
     };
     tip.display = Display::Flex;
-    // The attack control sits left of the bar, so its tooltip is anchored there instead of mid-bar.
-    tip.margin.left = px(if hovered_spell.is_none() {
-        -(bar_width() / 2.0 + ATTACK_GAP + ATTACK_PLATE)
+    // The attack control sits right of the bar, so its tooltip is anchored there instead of mid-bar.
+    tip.margin.left = px(if hovered_slot.is_none() {
+        bar_width() / 2.0 + ATTACK_GAP + ATTACK_PLATE - TOOLTIP_W
     } else {
         -TOOLTIP_W / 2.0
     });
@@ -780,5 +967,25 @@ fn update_tooltip(
                 &content.doc
             },
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn signatures_name_the_effect_kind() {
+        let content = Content::from_ron(include_str!("../../../../content/game.ron"))
+            .expect("embedded content parses");
+        let sig = |id: u32| {
+            content
+                .spell(SpellId(id))
+                .map(|d| spell_signature(d, &content))
+        };
+        assert_eq!(sig(6), Some(("git_blame".into(), "(target) -> Dot".into())));
+        assert_eq!(sig(7).map(|s| s.1), Some("(self) -> (Heal, Dispel)".into()));
+        assert_eq!(sig(9).map(|s| s.1), Some("(target) -> Stun".into()));
+        assert_eq!(sig(10).map(|s| s.1), Some("(target) -> Execute".into()));
     }
 }

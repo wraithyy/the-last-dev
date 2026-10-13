@@ -5,7 +5,7 @@
 
 mod common;
 
-use combat_core::{Command, Event, Sim, SpellId, Vec3};
+use combat_core::{Command, Event, Sim, Vec3};
 use common::*;
 use std::fmt::Write as _;
 use std::path::PathBuf;
@@ -15,120 +15,6 @@ const MAX_TICKS: u64 = 3000;
 
 fn golden_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(GOLDEN)
-}
-
-fn name(sim: &Sim, id: u64) -> String {
-    sim.unit(id)
-        .map_or_else(|| format!("#{id}"), |u| u.name.clone())
-}
-
-fn spell(sim: &Sim, id: SpellId) -> String {
-    sim.content()
-        .spell(id)
-        .map_or_else(|| format!("spell{}", id.0), |s| s.name.clone())
-}
-
-fn line(sim: &Sim, tick: u64, e: &Event) -> String {
-    let t = |id: u64| name(sim, id);
-    let body = match e {
-        Event::CastStarted {
-            caster,
-            spell: s,
-            total_ms,
-        } => {
-            format!("{} begins {} ({total_ms} ms)", t(*caster), spell(sim, *s))
-        }
-        Event::CastSucceeded {
-            caster, spell: s, ..
-        } => format!("{} casts {}", t(*caster), spell(sim, *s)),
-        Event::CastFailed {
-            caster,
-            spell: s,
-            reason,
-        } => {
-            format!(
-                "{} failed {}: {}",
-                t(*caster),
-                spell(sim, *s),
-                reason.message()
-            )
-        }
-        Event::CastInterrupted {
-            caster,
-            spell: s,
-            by,
-            lockout_ms,
-        } => format!(
-            "{} {} interrupted by {} (lockout {lockout_ms} ms)",
-            t(*caster),
-            spell(sim, *s),
-            by.map_or_else(|| "movement/cancel".to_string(), t)
-        ),
-        Event::CastQueued { caster, spell: s } => {
-            format!("{} queues {}", t(*caster), spell(sim, *s))
-        }
-        Event::Damage {
-            source,
-            target,
-            spell: s,
-            amount,
-            absorbed,
-            crit,
-            combo,
-            ..
-        } => format!(
-            "{} hits {} with {} for {amount} (absorbed {absorbed}){}{}",
-            t(*source),
-            t(*target),
-            s.map_or_else(|| "melee".to_string(), |s| spell(sim, s)),
-            if *crit { " CRIT" } else { "" },
-            if *combo { " COMBO" } else { "" },
-        ),
-        Event::MeleeSwing { attacker, target } => {
-            format!("{} swings at {}", t(*attacker), t(*target))
-        }
-        Event::Miss {
-            source,
-            target,
-            spell: s,
-        } => format!(
-            "{} misses {} with {}",
-            t(*source),
-            t(*target),
-            s.map_or_else(|| "melee".to_string(), |s| spell(sim, s)),
-        ),
-        Event::AutoAttackToggled { unit, on } => format!(
-            "{} auto attack {}",
-            t(*unit),
-            if *on { "on" } else { "off" }
-        ),
-        Event::AuraApplied { target, key } => format!("{} gains {key}", t(*target)),
-        Event::AuraRemoved {
-            target,
-            key,
-            reason,
-        } => format!("{} loses {key} ({reason:?})", t(*target)),
-        Event::EnterCombat { unit } => format!("{} enters combat", t(*unit)),
-        Event::LeaveCombat { unit } => format!("{} leaves combat", t(*unit)),
-        Event::AiState { unit, state } => format!("{} ai {state:?}", t(*unit)),
-        Event::Death { unit, killer } => {
-            format!(
-                "{} dies (killer {})",
-                t(*unit),
-                killer.map_or_else(|| "none".into(), t)
-            )
-        }
-        Event::XpGained { unit, amount } => format!("{} gains {amount} xp", t(*unit)),
-        Event::LootDropped { corpse, items } => format!("{} drops {items:?}", t(*corpse)),
-        Event::Looted {
-            looter,
-            corpse,
-            items,
-        } => format!("{} loots {} {items:?}", t(*looter), t(*corpse)),
-        Event::Respawned { unit } => format!("{} respawns", t(*unit)),
-        Event::Yell { unit, text } => format!("{} yells: {text}", t(*unit)),
-    };
-    format!("[{tick:05}] {body}")
 }
 
 /// What a reasonable player does: shield the first Blast, kick the second, otherwise DPS.
@@ -204,9 +90,16 @@ impl Script {
 }
 
 /// Runs the spec scenario and returns the formatted event log.
+/// The original single-CEO spec encounter: the legacy CEO fixture at its old level 3, and
+/// the player at level 3 too (so Guardrails and Reject PR are learned and stats come from
+/// the level table). Floors are covered by `playthrough.rs`.
 fn run_scenario(seed: u64) -> String {
-    let mut sim = Sim::new(content(), seed);
+    let mut c = content();
+    legacy_ceo(&mut c);
+    def_mut(&mut c, "ceo").level = 3;
+    let mut sim = Sim::new(c, seed);
     let player = sim.spawn_player(Vec3::new(0.0, 0.0, 0.0), 0.0);
+    sim.set_player_level(3);
     let mob = match sim.spawn_unit("ceo", Vec3::new(0.0, 0.0, -20.0), 0.0) {
         Ok(id) => id,
         Err(e) => panic!("{e}"),
@@ -243,7 +136,7 @@ fn run_scenario(seed: u64) -> String {
         for e in sim.tick() {
             script.observe(mob, &e);
             respawned |= matches!(e, Event::Respawned { .. });
-            let _ = writeln!(out, "{}", line(&sim, sim.now().0, &e));
+            let _ = writeln!(out, "{}", log_line(&sim, sim.now().0, &e));
         }
     }
     out

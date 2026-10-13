@@ -8,7 +8,7 @@ use crate::player::Player;
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll, MouseScrollUnit};
 use bevy::prelude::*;
 use combat_core::{Aabb, Vec3 as CVec3, line_of_sight};
-use std::f32::consts::{PI, TAU};
+use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 #[derive(Component)]
 pub struct OrbitCamera {
@@ -20,11 +20,31 @@ pub struct OrbitCamera {
     dist: f32,
 }
 
+impl OrbitCamera {
+    /// Turn the camera to look along a player yaw (start of a floor, debug teleports).
+    pub fn set_yaw(&mut self, yaw: f32) {
+        self.yaw = yaw;
+    }
+
+    /// Debug close-ups (`WOW_CAM_DIST`).
+    pub fn set_zoom(&mut self, dist: f32) {
+        self.zoom = dist.clamp(CAM_MIN_DIST, CAM_MAX_DIST);
+        self.dist = self.zoom;
+    }
+}
+
+/// Short screen shake (knockbacks); `trauma` decays to zero in about half a second.
+#[derive(Resource, Default)]
+pub struct CameraShake {
+    pub trauma: f32,
+}
+
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_camera)
+        app.init_resource::<CameraShake>()
+            .add_systems(Startup, spawn_camera)
             .add_systems(Update, (follow_player, orbit_input, place_camera).chain());
     }
 }
@@ -33,7 +53,8 @@ fn spawn_camera(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
         OrbitCamera {
-            yaw: 0.0,
+            // Floors run west to east and the player starts facing east.
+            yaw: -FRAC_PI_2,
             pitch: CAM_START_PITCH,
             zoom: CAM_START_DIST,
             dist: CAM_START_DIST,
@@ -122,6 +143,7 @@ fn clear_distance(origin: Vec3, dir: Vec3, max: f32, blockers: &[Aabb]) -> f32 {
 fn place_camera(
     time: Res<Time>,
     colliders: Res<Colliders>,
+    mut shake: ResMut<CameraShake>,
     player: Single<&Transform, (With<Player>, Without<OrbitCamera>)>,
     cam: Single<(&mut OrbitCamera, &mut Transform)>,
 ) {
@@ -151,6 +173,14 @@ fn place_camera(
     };
 
     *tf = Transform::from_translation(focus + dir * cam.dist).looking_at(focus, Vec3::Y);
+    if shake.trauma > 0.0 {
+        let t = time.elapsed_secs() * 45.0;
+        let amp = CAM_SHAKE_AMPLITUDE * shake.trauma * shake.trauma;
+        let jitter = Vec3::new(t.sin(), (t * 1.3).cos(), 0.0) * amp;
+        let offset = tf.rotation * jitter;
+        tf.translation += offset;
+        shake.trauma = (shake.trauma - 2.0 * time.delta_secs()).max(0.0);
+    }
 }
 
 fn inflate(b: &Aabb, r: f32) -> Aabb {

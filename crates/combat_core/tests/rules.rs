@@ -11,7 +11,7 @@ fn sponge(c: &mut Content) {
     let m = def_mut(c, "ceo");
     m.max_hp = 1_000_000_000;
     if let Some(ai) = m.ai.as_mut() {
-        ai.ability = None;
+        ai.abilities.clear();
         ai.melee_damage = 0;
     }
 }
@@ -98,7 +98,7 @@ fn melee_timer_is_independent_of_spell_timers() {
     let mut h = H::new(1, -2.0, |c| {
         def_mut(c, "senior_engineer").max_hp = 10_000;
         if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
-            ai.ability = None;
+            ai.abilities.clear();
         }
     });
     h.target(h.mob);
@@ -229,7 +229,7 @@ fn mana_trickles_in_combat_and_ooc_relies_on_the_regen_tick() {
             drain(c);
             if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
                 ai.melee_damage = damage;
-                ai.ability = None;
+                ai.abilities.clear();
             }
         });
         h.cast(GR);
@@ -243,7 +243,7 @@ fn mana_trickles_in_combat_and_ooc_relies_on_the_regen_tick() {
         (false, 0),
         "no continuous regen out of combat; the percent tick is off in H::new"
     );
-    assert_eq!(delta(-2.0, 0), (true, 25), "25 mana per 5 s in combat");
+    assert_eq!(delta(-2.0, 0), (true, 60), "60 mana per 5 s in combat");
 }
 
 // ---- movement ----
@@ -326,7 +326,7 @@ fn incoming_damage_pushes_the_cast_back_at_most_twice() {
         if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
             ai.melee_ms = 500;
             ai.melee_damage = 10;
-            ai.ability = None;
+            ai.abilities.clear();
         }
     });
     h.target(h.mob);
@@ -348,7 +348,7 @@ fn incoming_damage_pushes_the_cast_back_at_most_twice() {
 
 fn caster_mob(c: &mut Content) {
     if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
-        ai.ability.iter_mut().for_each(|a| {
+        ai.abilities.iter_mut().for_each(|a| {
             a.cooldown_min_ms = 100;
             a.cooldown_max_ms = 100;
         });
@@ -551,7 +551,7 @@ fn guardrails_absorbs_then_depletes() {
     let mut h = H::new(1, -2.0, |c| {
         if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
             ai.melee_damage = 60;
-            ai.ability = None;
+            ai.abilities.clear();
         }
     });
     h.cast(GR);
@@ -663,7 +663,7 @@ fn leash_makes_the_enemy_evade_heal_and_ignore_damage() {
     let mut h = H::new(1, -20.0, |c| {
         def_mut(c, "senior_engineer").max_mana = 1000;
         if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
-            ai.ability = None;
+            ai.abilities.clear();
         }
     });
     h.target(h.mob);
@@ -723,7 +723,7 @@ fn leash_makes_the_enemy_evade_heal_and_ignore_damage() {
 fn one_shot(c: &mut Content) {
     def_mut(c, "senior_engineer").spell_power = 100_000;
     if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
-        ai.ability = None;
+        ai.abilities.clear();
     }
 }
 
@@ -821,7 +821,7 @@ fn player_death_resets_the_encounter_and_respawn_restores_the_player() {
     let mut h = H::new(1, -2.0, |c| {
         if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
             ai.melee_damage = 1000;
-            ai.ability = None;
+            ai.abilities.clear();
         }
     });
     h.target(h.mob);
@@ -965,7 +965,7 @@ fn evading_target_is_invalid_and_completing_cast_spends_no_mana() {
     let mut h = H::new(1, -20.0, |c| {
         def_mut(c, "senior_engineer").max_mana = 1000;
         if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
-            ai.ability = None;
+            ai.abilities.clear();
         }
     });
     h.target(h.mob);
@@ -1001,7 +1001,7 @@ fn evading_target_is_invalid_and_completing_cast_spends_no_mana() {
     let mut h = H::new(1, -20.0, |c| {
         def_mut(c, "senior_engineer").max_mana = 1000;
         if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
-            ai.ability = None;
+            ai.abilities.clear();
             ai.leash_m = 10.0;
         }
     });
@@ -1029,12 +1029,13 @@ fn evading_target_is_invalid_and_completing_cast_spends_no_mana() {
 #[test]
 fn one_hit_depletes_every_exhausted_absorb_aura() {
     let mut h = H::new(1, -2.0, |c| {
-        c.auras.push(combat_core::AuraDef {
-            key: "extra".into(),
-            name: "Extra".into(),
-            icon: "extra".into(),
-            harmful: false,
-        });
+        let Some(mut extra) = c.aura("guardrails").cloned() else {
+            panic!("no guardrails aura");
+        };
+        extra.key = "extra".into();
+        extra.name = "Extra".into();
+        extra.icon = "extra".into();
+        c.auras.push(extra);
         if let Some(s) = c.spells.iter_mut().find(|s| s.id == GR) {
             s.effect = combat_core::Effect::Absorb {
                 aura: "guardrails".into(),
@@ -1044,13 +1045,13 @@ fn one_hit_depletes_every_exhausted_absorb_aura() {
         }
         if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
             ai.melee_damage = 60;
-            ai.ability = None;
+            ai.abilities.clear();
         }
     });
-    // Two shields with different keys: a second Guardrails-like spell via id 6.
+    // Two shields with different keys: a second Guardrails-like spell via an unused id.
     let mut c = h.sim.content().clone();
     c.spells.push(combat_core::SpellDef {
-        id: SpellId(6),
+        id: SpellId(99),
         effect: combat_core::Effect::Absorb {
             aura: "extra".into(),
             amount: 10,
@@ -1070,7 +1071,7 @@ fn one_hit_depletes_every_exhausted_absorb_aura() {
     });
     sim.push(Command::Cast {
         caster: player,
-        spell: SpellId(6),
+        spell: SpellId(99),
     });
     let mut events = Vec::new();
     for _ in 0..5 {
@@ -1097,7 +1098,7 @@ fn death_of_a_casting_unit_emits_cast_interrupted() {
     let mut h = H::new(1, -2.0, |c| {
         if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
             ai.melee_damage = 1000;
-            ai.ability = None;
+            ai.abilities.clear();
         }
     });
     h.target(h.mob);

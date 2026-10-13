@@ -2,7 +2,7 @@
 
 use crate::arena::Colliders;
 use crate::collision::to_core;
-use crate::combat::CombatSim;
+use crate::combat::{CombatSim, SimUnit};
 use crate::config::*;
 use crate::input::{MouseState, Paused};
 use crate::player::{Player, PlayerBody};
@@ -99,7 +99,8 @@ fn handle_keys(
     mut paused: ResMut<Paused>,
     mut target: ResMut<Target>,
     player: Single<&PlayerBody, With<Player>>,
-    units: Query<(Entity, &Transform, &Unit)>,
+    units: Query<(Entity, &Transform, &Unit, Option<&SimUnit>)>,
+    sim: Res<CombatSim>,
 ) {
     if keys.just_pressed(KeyCode::Escape) {
         if target.0.take().is_none() {
@@ -110,9 +111,16 @@ fn handle_keys(
     if paused.0 || !keys.just_pressed(KeyCode::Tab) {
         return;
     }
+    let fighting = |s: Option<&SimUnit>| {
+        s.and_then(|s| sim.0.unit(s.0))
+            .is_some_and(|u| u.alive && u.hostile && u.in_combat)
+    };
+    // Mid-fight, Tab cycles only the enemies already fighting you, so it never pulls the next pack.
+    let in_fight = units.iter().any(|(_, _, _, s)| fighting(s));
     let candidates: Vec<TargetCandidate> = units
         .iter()
-        .map(|(e, tf, u)| TargetCandidate {
+        .filter(|(_, _, _, s)| !in_fight || fighting(*s))
+        .map(|(e, tf, u, _)| TargetCandidate {
             id: e.to_bits(),
             pos: to_core(tf.translation),
             hostile: u.hostile,

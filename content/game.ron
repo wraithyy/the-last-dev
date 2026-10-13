@@ -1,5 +1,7 @@
-// The Last Dev content: all balance numbers live here.
+// The Last Dev content: all balance numbers and every line of text live here.
 // Times are milliseconds, distances meters, *_pct are integer percents.
+// Unit stats are authored for the unit's own `level`; spawning it at another level
+// scales HP, damage and XP by `mob_scaling` (see docs/FORMULAS.md).
 (
     config: (
         player_unit: "senior_engineer",
@@ -16,12 +18,56 @@
         // Out-of-combat only: every interval, percent of max HP / max mana.
         regen: (interval_ms: 2000, hp_pct: 4, mana_pct: 5),
         player_yell_cooldown_ms: 7000,
+        mob_scaling: (hp_pct_per_level: 12, damage_pct_per_level: 10, xp_pct_per_level: 10),
+        xp_rules: (above_pct_per_level: 5, above_max_levels: 4, below_pct_per_level: 20, gray_level_diff: 3),
     ),
+    // Player growth; index 0 = level 1. Bonuses are cumulative on top of senior_engineer's stats.
+    levels: [
+        (xp_to_next: 400, hp_bonus: 0, mana_bonus: 0, spell_power_bonus: 0),
+        (xp_to_next: 600, hp_bonus: 35, mana_bonus: 40, spell_power_bonus: 10),
+        (xp_to_next: 800, hp_bonus: 70, mana_bonus: 80, spell_power_bonus: 20),
+        (xp_to_next: 1000, hp_bonus: 105, mana_bonus: 160, spell_power_bonus: 30),
+        (xp_to_next: 1200, hp_bonus: 140, mana_bonus: 120, spell_power_bonus: 40),
+        (xp_to_next: 1400, hp_bonus: 175, mana_bonus: 200, spell_power_bonus: 50),
+        (xp_to_next: 1600, hp_bonus: 210, mana_bonus: 320, spell_power_bonus: 60),
+        (xp_to_next: 1800, hp_bonus: 245, mana_bonus: 280, spell_power_bonus: 70),
+        (xp_to_next: 2000, hp_bonus: 280, mana_bonus: 240, spell_power_bonus: 80),
+        (xp_to_next: 0, hp_bonus: 315, mana_bonus: 360, spell_power_bonus: 90),
+    ],
     auras: [
         (key: "code_smell", name: "Code Smell", icon: "code_smell", harmful: true),
         (key: "guardrails", name: "Guardrails", icon: "guardrails", harmful: false),
+        (key: "git_blame", name: "git blame", icon: "git_blame", harmful: true,
+            periodic: Some((interval_ms: 3000, base: 12, coefficient_pct: 30)), spread_radius_m: 12.0),
+        (key: "caffeine", name: "On-Call Caffeine", icon: "caffeine", harmful: false, haste_pct: 30),
+        (key: "rubber_duck", name: "Rubber Duck", icon: "rubber_duck", harmful: true, stun: true),
+        (key: "review_fatigue", name: "Review Fatigue", icon: "review_fatigue", harmful: true, cast_time_pct: 20),
+        (key: "standup", name: "Daily Stand-up", icon: "standup", harmful: true, stun: true),
+        (key: "retrospective", name: "Retrospective", icon: "retrospective", harmful: false, damage_done_pct: 25),
+        (key: "quick_sync", name: "Quick Sync", icon: "quick_sync", harmful: true, stun: true),
+        (key: "overpromise", name: "Overpromise", icon: "overpromise", harmful: true, damage_taken_pct: 5, max_stacks: 8),
+        (key: "thought_leadership", name: "Thought Leadership", icon: "thought_leadership", harmful: true,
+            periodic: Some((interval_ms: 3000, base: 9))),
+        (key: "deadline", name: "Deadline", icon: "deadline", harmful: true, expire_damage: 110),
+        (key: "billable_hours", name: "Billable Hours", icon: "billable_hours", harmful: false,
+            periodic: Some((interval_ms: 2000, base: 16, heal: true))),
+        (key: "unread_spec", name: "Unread Spec", icon: "unread_spec", harmful: true,
+            damage_taken_pct: 10, max_stacks: 5, stack_on_repeat_cast: true),
+        (key: "scope_creep", name: "Scope Creep", icon: "scope_creep", harmful: false, damage_done_pct: 12, max_stacks: 20),
+        (key: "agi_pivot", name: "Pivot to AGI", icon: "agi_pivot", harmful: false, cast_time_pct: -30),
+        (key: "wellness_survey", name: "Mandatory Wellness Survey", icon: "wellness_survey", harmful: true, silence: true),
+        (key: "culture_fit", name: "Culture Fit Assessment", icon: "culture_fit", harmful: true, damage_taken_pct: 15),
+        (key: "ab_winner", name: "A/B Test: Variant B Won", icon: "ab_winner", harmful: false, damage_done_pct: 30),
+        (key: "ab_loser", name: "A/B Test: Variant B Lost", icon: "ab_loser", harmful: true, damage_taken_pct: 30),
+        (key: "viral_loop", name: "Viral Loop", icon: "viral_loop", harmful: true,
+            periodic: Some((interval_ms: 2000, base: 6)), max_stacks: 3),
+        (key: "rebranded", name: "Rebranded", icon: "rebranded", harmful: false, damage_taken_pct: -50),
+        (key: "phished", name: "Phished", icon: "phished", harmful: true, stun: true),
+        (key: "password_rotation", name: "Mandatory Password Rotation", icon: "password_rotation", harmful: true, cast_time_pct: 40),
+        (key: "locked_out", name: "Locked Out", icon: "locked_out", harmful: true, stun: true),
     ],
     spells: [
+        // ---- player ----
         (
             id: 1, name: "Code Review", icon: "code_review", school: Arcane,
             range_m: 30.0, cast_ms: 2000, mana: 35, gcd: true, cooldown_ms: 0,
@@ -29,13 +75,14 @@
             effect: Damage(
                 base: 65, coefficient_pct: 70,
                 apply_aura: Some((aura: "code_smell", duration_ms: 12000)),
-                consume_aura: None,
             ),
             yells: [
                 "Who approved this? Oh. The AI approved itself.",
                 "Line one: no. Line two: also no.",
                 "This function has forty parameters and a vibe.",
                 "Did anyone, at any point, read this?",
+                "Nit: the entire file.",
+                "Why is the password in the README? Why is there a README?",
             ],
         ),
         (
@@ -44,7 +91,6 @@
             description: "Rewrites whatever the AI generated last sprint. Deals heavy arcane damage. Consumes Code Smell for +35% damage.",
             effect: Damage(
                 base: 95, coefficient_pct: 85,
-                apply_aura: None,
                 consume_aura: Some((aura: "code_smell", bonus_pct: 35)),
             ),
             yells: [
@@ -52,11 +98,13 @@
                 "Deleting three thousand lines of generated code. Feels great.",
                 "Same behavior. Half the hallucinations.",
                 "Turning slop into software.",
+                "Three abstraction layers for one if-statement. Not anymore.",
             ],
         ),
         (
             id: 3, name: "Guardrails", icon: "guardrails", school: Arcane,
             range_m: 0.0, cast_ms: 0, mana: 40, gcd: true, cooldown_ms: 30000,
+            target: Caster, learn_level: 3,
             description: "The thing leadership calls 'slowing down innovation'. Absorbs the next 100 damage for up to 10 sec.",
             effect: Absorb(aura: "guardrails", amount: 100, duration_ms: 10000),
             yells: [
@@ -69,6 +117,7 @@
         (
             id: 4, name: "Reject PR", icon: "reject_pr", school: Arcane,
             range_m: 25.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 20000,
+            learn_level: 2,
             description: "No, the 4,000-line AI pull request is not 'basically done'. Interrupts spellcasting and locks arcane spells for 4 sec.",
             effect: Interrupt(lockout_ms: 4000),
             yells: [
@@ -79,29 +128,1349 @@
             ],
         ),
         (
+            id: 6, name: "git blame", icon: "git_blame", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 30, gcd: true, cooldown_ms: 0,
+            learn_level: 4,
+            description: "Finds out who wrote this. Deals arcane damage every 3 sec for 18 sec. If the target dies, the blame moves on to the nearest colleague.",
+            effect: Aura(aura: "git_blame", duration_ms: 18000),
+            yells: [
+                "git blame says it was me. Three years ago. Under protest.",
+                "Written by the AI, committed by the intern, approved by... oh no.",
+                "Every line has an author. Most of them regret it.",
+                "Blame isn't a culture. It's a command.",
+            ],
+        ),
+        (
+            id: 7, name: "Rollback", icon: "rollback", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 45, gcd: true, cooldown_ms: 15000,
+            target: Caster, learn_level: 5,
+            description: "Back to the last version that worked. Instantly heals you and removes one harmful effect.",
+            effect: Heal(base: 80, coefficient_pct: 100),
+            extra_effects: [Dispel(count: 1)],
+            yells: [
+                "Reverting to the last version that worked. It's from 2019.",
+                "Ctrl+Z, but for my whole week.",
+                "Rolling back. The forward fix was another prompt.",
+                "Restoring from backup. Yes, I made backups. Someone had to.",
+            ],
+        ),
+        (
+            id: 8, name: "On-Call Caffeine", icon: "caffeine", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 20, gcd: false, cooldown_ms: 90000,
+            target: Caster, learn_level: 6,
+            description: "The pager went off at 3 a.m. and so did you. Increases haste by 30% for 15 sec.",
+            effect: Aura(aura: "caffeine", duration_ms: 15000),
+            yells: [
+                "Pager went off at 3 a.m. I have become coffee.",
+                "Fourth espresso. I can hear the servers.",
+                "On call, on caffeine, on the edge.",
+                "Sleep is a feature we deprecated.",
+            ],
+        ),
+        (
+            id: 9, name: "Rubber Duck", icon: "rubber_duck", school: Physical,
+            range_m: 20.0, cast_ms: 0, mana: 25, gcd: true, cooldown_ms: 25000,
+            learn_level: 7,
+            description: "Makes the target explain its own code, out loud. Stuns for 3 sec. Bosses are too important to explain anything.",
+            effect: Aura(aura: "rubber_duck", duration_ms: 3000),
+            yells: [
+                "Explain it to the duck. Slowly. Without slides.",
+                "The duck has more context than the roadmap.",
+                "Even the duck asked for requirements.",
+                "Quack means 'did you read the error message?'",
+            ],
+        ),
+        (
+            id: 10, name: "Postmortem", icon: "postmortem", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 40, gcd: true, cooldown_ms: 8000,
+            learn_level: 8,
+            description: "A blameless review of what went wrong, written while it is still going wrong. Deals arcane damage, tripled on targets below 25% health.",
+            effect: Damage(
+                base: 50, coefficient_pct: 60,
+                execute: Some((below_pct: 25, bonus_pct: 200)),
+            ),
+            yells: [
+                "Root cause: a prompt. Contributing factor: also a prompt.",
+                "Blameless postmortem. I'm only blaming the process. And you.",
+                "Action item one: stop.",
+                "Timeline: shipped Friday. Died Friday. Learned nothing.",
+            ],
+        ),
+        (
+            id: 11, name: "Write It By Hand", icon: "write_by_hand", school: Physical,
+            range_m: 30.0, cast_ms: 4000, mana: 90, gcd: true, cooldown_ms: 30000,
+            learn_level: 9,
+            description: "No autocomplete, no agent, no suggestions. Just you and a mechanical keyboard. Deals enormous physical damage.",
+            effect: Damage(base: 220, coefficient_pct: 200),
+            yells: [
+                "No autocomplete. No agent. Just me and a mechanical keyboard.",
+                "Writing it by hand. Like a craftsman. Like a lunatic.",
+                "Every character typed with intent and spite.",
+                "Artisanal, hand-crafted, fully reviewed code. Behold.",
+            ],
+        ),
+
+        // ---- enemies ----
+        (
             id: 5, name: "Hallucination Blast", icon: "hallucination_blast", school: Arcane,
             range_m: 25.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0,
             description: "Confidently wrong, now at enterprise scale. Deals arcane damage.",
-            effect: Damage(base: 45, coefficient_pct: 0, apply_aura: None, consume_aura: None),
+            effect: Damage(base: 85, coefficient_pct: 0),
+        ),
+        (
+            id: 100, name: "Forwarded Reply", icon: "forwarded_reply", school: Arcane,
+            range_m: 30.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Pastes your last spell into a chatbot and sends the answer back at half damage.",
+            effect: ForwardLastSpell(pct: 50),
+        ),
+        (
+            id: 101, name: "Review Request", icon: "review_request", school: Arcane,
+            range_m: 25.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Please review my 9,000-line PR. Your casts take 20% longer for 10 sec.",
+            effect: Aura(aura: "review_fatigue", duration_ms: 10000),
+        ),
+        (
+            id: 103, name: "Daily Stand-up", icon: "standup", school: Physical,
+            range_m: 10.0, cast_ms: 1500, mana: 0, gcd: false, cooldown_ms: 0,
+            area: Some((radius_m: 10.0, allies: false)),
+            description: "Everybody stands still and recites yesterday. Stuns everyone nearby for 1.5 sec.",
+            effect: Aura(aura: "standup", duration_ms: 1500),
+        ),
+        (
+            id: 104, name: "Retrospective", icon: "retrospective", school: Arcane,
+            range_m: 0.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster, area: Some((radius_m: 20.0, allies: true)),
+            description: "What went well? Hitting you. Nearby allies deal 25% more damage for 15 sec.",
+            effect: Aura(aura: "retrospective", duration_ms: 15000),
+        ),
+        (
+            id: 105, name: "Quick Sync", icon: "quick_sync", school: Physical,
+            range_m: 10.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Got a minute? Stuns for 2 sec.",
+            effect: Aura(aura: "quick_sync", duration_ms: 2000),
+        ),
+        (
+            id: 106, name: "Overpromise", icon: "overpromise", school: Arcane,
+            range_m: 25.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Yes, it does that. Each stack increases damage taken by 5%.",
+            effect: Damage(base: 8, coefficient_pct: 0, apply_aura: Some((aura: "overpromise", duration_ms: 20000))),
+        ),
+        (
+            id: 107, name: "Relationship Building", icon: "relationship_building", school: Arcane,
+            range_m: 30.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A fruit basket and a discount nobody approved. Heals an ally.",
+            effect: Heal(base: 70, coefficient_pct: 0),
+        ),
+        (
+            id: 108, name: "Thought Leadership", icon: "thought_leadership", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A 40-post thread about nothing. Deals damage every 3 sec for 15 sec.",
+            effect: Aura(aura: "thought_leadership", duration_ms: 15000),
+        ),
+        (
+            id: 109, name: "Deadline", icon: "deadline", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Explodes after 8 sec unless rolled back.",
+            effect: Aura(aura: "deadline", duration_ms: 8000),
+        ),
+        (
+            id: 110, name: "Reprioritize", icon: "reprioritize", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Everything is P0. Swaps the top two entries of its threat list.",
+            effect: ThreatSwap,
+        ),
+        (
+            id: 111, name: "Billable Hours", icon: "billable_hours", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Heals itself every 2 sec for 12 sec, at 450 an hour.",
+            effect: Aura(aura: "billable_hours", duration_ms: 12000),
+        ),
+        (
+            id: 112, name: "Ethics Review", icon: "ethics_review", school: Arcane,
+            range_m: 40.0, cast_ms: 30000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A thorough review that concludes after the product ships. Does nothing.",
+            effect: Nothing,
+        ),
+        (
+            id: 113, name: "Rug Pull", icon: "rug_pull", school: Physical,
+            range_m: 6.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Liquidity event. Damages and knocks the target back.",
+            effect: Damage(base: 15, coefficient_pct: 0),
+            extra_effects: [Knockback(strength_m: 8.0)],
+        ),
+        (
+            id: 114, name: "Hallucinated Hotfix", icon: "hallucinated_hotfix", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster, area: Some((radius_m: 6.0, allies: false)),
+            description: "The chatbot's last answer. Damages everything nearby.",
+            effect: Damage(base: 30, coefficient_pct: 0),
+        ),
+        (
+            id: 115, name: "Generate Pull Requests", icon: "generate_prs", school: Arcane,
+            range_m: 0.0, cast_ms: 1500, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Twelve PRs while you were reading one. Summons Unreviewed PRs.",
+            effect: Summon(unit: "unreviewed_pr", count: 2, max_alive: 4),
+        ),
+        (
+            id: 116, name: "4,000-Line Diff", icon: "big_diff", school: Arcane,
+            range_m: 30.0, cast_ms: 3000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Title: 'small fix'. Deals heavy arcane damage. Reject it.",
+            effect: Damage(base: 75, coefficient_pct: 0),
+        ),
+        (
+            id: 117, name: "Requirements Change", icon: "requirements_change", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Effective retroactively. Locks the school of your last spell for 6 sec.",
+            effect: Lockout(lockout_ms: 6000),
+        ),
+        (
+            id: 118, name: "Unread Spec", icon: "unread_spec", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Ninety pages, zero readers. Casting the same spell twice in a row adds a stack; each stack is +10% damage taken.",
+            effect: Aura(aura: "unread_spec", duration_ms: 20000),
+        ),
+        (
+            id: 119, name: "90-Page Analysis", icon: "analysis", school: Arcane,
+            range_m: 30.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Thorough, AI-written, unread. Deals arcane damage.",
+            effect: Damage(base: 55, coefficient_pct: 0),
+        ),
+        (
+            id: 120, name: "Scope Creep", icon: "scope_creep", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Just one more small thing. Stacking 12% damage increase.",
+            effect: Aura(aura: "scope_creep", duration_ms: 600000),
+        ),
+        (
+            id: 121, name: "Should Have Been Done Yesterday", icon: "yesterday", school: Arcane,
+            range_m: 30.0, cast_ms: 3000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The escalation email, in spell form. Deals massive damage.",
+            effect: Damage(base: 120, coefficient_pct: 0),
+        ),
+        (
+            id: 122, name: "Loop In Stakeholders", icon: "stakeholders", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Summons two Middle Managers.",
+            effect: Summon(unit: "middle_manager", count: 2, max_alive: 2),
+        ),
+        (
+            id: 123, name: "Reorg", icon: "reorg", school: Arcane,
+            range_m: 60.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "You sit somewhere else now. Teleports you to the VP and resets everyone's threat.",
+            effect: Teleport(distance_m: 4.0),
+            extra_effects: [ResetAllyThreat(radius_m: 60.0)],
+        ),
+        (
+            id: 124, name: "Synergy Storm", icon: "synergy_storm", school: Arcane,
+            range_m: 30.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A framework for frameworks. Deals heavy arcane damage.",
+            effect: Damage(base: 90, coefficient_pct: 0),
+        ),
+        (
+            id: 125, name: "Pivot to AGI", icon: "agi_pivot", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Summons Chatbot Minions; Hallucination Blast casts 30% faster.",
+            effect: Summon(unit: "chatbot_minion", count: 2, max_alive: 2),
+            extra_effects: [Aura(aura: "agi_pivot", duration_ms: 600000)],
+        ),
+        (
+            id: 126, name: "Chatbot Rollout", icon: "chatbot_rollout", school: Arcane,
+            range_m: 0.0, cast_ms: 1500, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Every department gets an AI agent, including this fight.",
+            effect: Summon(unit: "chatbot_minion", count: 2, max_alive: 2),
+        ),
+        (
+            id: 130, name: "Mandatory Wellness Survey", icon: "wellness_survey", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "84 questions, anonymous-ish. Silences for 3 sec.",
+            effect: Aura(aura: "wellness_survey", duration_ms: 3000),
+        ),
+        (
+            id: 131, name: "We're a Family Here", icon: "family", school: Arcane,
+            range_m: 30.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Families get restructured. Heals an ally.",
+            effect: Heal(base: 110, coefficient_pct: 0),
+        ),
+        (
+            id: 132, name: "Culture Fit Assessment", icon: "culture_fit", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "You're too competent to fit. Damage taken +15% for 12 sec.",
+            effect: Damage(base: 25, coefficient_pct: 0, apply_aura: Some((aura: "culture_fit", duration_ms: 12000))),
+        ),
+        (
+            id: 133, name: "Deploy HR Chatbot", icon: "chatbot_rollout", school: Arcane,
+            range_m: 0.0, cast_ms: 1500, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Your grievance will be handled by a chatbot. Forever.",
+            effect: Summon(unit: "chatbot_minion", count: 2, max_alive: 2),
+        ),
+        (
+            id: 140, name: "A/B Test", icon: "ab_test", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Sample size one. Randomly makes itself stronger or more fragile for 10 sec.",
+            effect: RandomAura(auras: ["ab_winner", "ab_loser"], duration_ms: 10000),
+        ),
+        (
+            id: 141, name: "Viral Loop", icon: "viral_loop", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Deals damage every 2 sec for 12 sec. Stacks up to 3 times.",
+            effect: Aura(aura: "viral_loop", duration_ms: 12000),
+        ),
+        (
+            id: 142, name: "Rebrand", icon: "rebrand", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "New logo, zero accountability. Removes her debuffs and halves damage taken for 5 sec.",
+            effect: Dispel(count: 9),
+            extra_effects: [Aura(aura: "rebranded", duration_ms: 5000)],
+        ),
+        (
+            id: 143, name: "Press Release", icon: "press_release", school: Arcane,
+            range_m: 30.0, cast_ms: 3000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "For immediate release: you lose. Deals heavy damage.",
+            effect: Damage(base: 90, coefficient_pct: 0),
+        ),
+        (
+            id: 144, name: "Influencer Collab", icon: "influencer_collab", school: Arcane,
+            range_m: 0.0, cast_ms: 1500, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Paid in exposure. Summons a Network Influencer.",
+            effect: Summon(unit: "linkedin_influencer", count: 1, max_alive: 1),
+        ),
+        (
+            id: 150, name: "Opening 'Invoice_FINAL_v2.pdf.exe'", icon: "phishing", school: Arcane,
+            range_m: 0.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Phishing Test: falls for its own phishing email. Damages and stuns itself for 4 sec.",
+            effect: Damage(base: 30, coefficient_pct: 0),
+            extra_effects: [Aura(aura: "phished", duration_ms: 4000)],
+        ),
+        (
+            id: 151, name: "Mandatory Password Rotation", icon: "password_rotation", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The new one can't match the last 40. Your casts take 40% longer for 10 sec.",
+            effect: Aura(aura: "password_rotation", duration_ms: 10000),
+        ),
+        (
+            id: 152, name: "Block All The Things", icon: "block_all", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Your spellbook violates policy 7.3. Locks the school of your last spell for 5 sec.",
+            effect: Lockout(lockout_ms: 5000),
+        ),
+        (
+            id: 153, name: "Escalate to the SOC", icon: "soc", school: Arcane,
+            range_m: 0.0, cast_ms: 1500, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Summons two Security Analysts. They have already clicked something.",
+            effect: Summon(unit: "security_analyst", count: 2, max_alive: 2),
+        ),
+        (
+            id: 154, name: "Forgot His Own Password", icon: "locked_out", school: Arcane,
+            range_m: 0.0, cast_ms: 1500, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Locks himself out. Stuns himself for 4 sec.",
+            effect: Aura(aura: "locked_out", duration_ms: 4000),
+        ),
+        (
+            id: 155, name: "Zero Trust Audit", icon: "zero_trust", school: Arcane,
+            range_m: 30.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Trusts nobody, fixes nothing. Deals heavy damage.",
+            effect: Damage(base: 95, coefficient_pct: 0),
         ),
     ],
-    action_bar: [1, 2, 3, 4],
+    // Keys 1..=0 in order; `learn_level` decides which are usable.
+    action_bar: [1, 2, 3, 4, 6, 7, 8, 9, 10, 11],
     units: [
         (
-            key: "senior_engineer", name: "Senior Engineer", level: 3, hostile: false,
+            key: "senior_engineer", name: "Senior Engineer", title: "The Last Dev", level: 1, hostile: false,
             max_hp: 300, max_mana: 250, spell_power: 20, crit_pct: 5, haste_pct: 0,
-            mana_regen_per_5s_combat: 25,
+            mana_regen_per_5s_combat: 60,
             xp_reward: 0, loot: [], ai: None,
             auto_attack: Some((
                 name: "Nitpick", range_m: 25.0, swing_ms: 1800,
                 damage_min: 9, damage_max: 14,
             )),
         ),
+
+        // ---- friendly ----
         (
-            key: "ceo", name: "CEO", level: 3, hostile: true,
-            max_hp: 900, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            key: "intern", name: "AI-Native Intern", title: "Has Never Seen a Compiler", level: 1, hostile: false,
+            max_hp: 40, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_combat: 0,
-            xp_reward: 120,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: Some(Sitting),
+            yells: (
+                talk: [
+                    "I asked the AI how to help you. It said 'Great question!' and stopped.",
+                    "Is it true you can write code without asking anyone? Is that legal?",
+                    "The onboarding chatbot says the CEO is 'deeply aligned'. With what?",
+                    "I shipped my first feature! I don't know which one.",
+                ],
+                ambient_ms: 30000,
+                ambient: [
+                    "How do I exit vim? Asking for the AI.",
+                    "Is a stack trace a kind of NFT?",
+                    "My prompt has 4,000 words and it still won't center the div.",
+                ],
+            ),
+        ),
+        (
+            key: "it_support", name: "IT Support", title: "Please Open a Ticket", level: 3, hostile: false,
+            max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: Some(Chatting),
+            yells: (
+                talk: [
+                    "Did you open a ticket?",
+                    "That's a ticket.",
+                    "We need a ticket for the ticket.",
+                    "Have you tried turning your career off and on again?",
+                    "Your request is in the queue. The queue is in a ticket.",
+                    "We're migrating to a new ticketing system. ETA: next fiscal year.",
+                    "Sorry, the AI handles first-line support now. It's on a break.",
+                    "Works on my machine. Your machine is not my department.",
+                ],
+                ambient_ms: 25000,
+                ambient: [
+                    "Zzz... reboot... zzz...",
+                    "Did you see the new ticket? Yeah. Let's not.",
+                    "Is it lunch yet?",
+                    "The printer ticket from 2019 is still open. It's tradition.",
+                    "Who approved the AI to auto-close tickets? ...Nice.",
+                    "Priority one means someone important is mildly annoyed.",
+                    "If we don't answer, it resolves itself. Industry best practice.",
+                ],
+            ),
+        ),
+
+        // ---- floor 1: Open Space ----
+        (
+            key: "meatproxy", name: "MeatProxy", title: "Human Forwarding Layer", level: 1, hostile: true,
+            max_hp: 220, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 55,
+            loot: [
+                (item: "Pasted Chat Transcript", chance_pct: 40),
+                (item: "Reply Sent to the Wrong Thread", chance_pct: 20),
+                (item: "Regenerated Response (v7)", chance_pct: 10),
+            ],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 7, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 100, cooldown_min_ms: 8000, cooldown_max_ms: 11000, initial_ms: Some((4000, 6000)),
+                        yells: [
+                            "As an AI language model, I cannot hit you. Anyway:",
+                            "Forwarding your message to the AI. Pasting the answer back:",
+                            "The AI says 'Great question!' and then this:",
+                            "Per my prompt, here is your own spell back.",
+                            "Regenerating response... here you go.",
+                            "I didn't read it either. Sending anyway.",
+                        ]),
+                ],
+            )),
+            yells: (
+                periodic_ms: 12000,
+                aggro: [
+                    "Let me ask the AI how to fight you. One sec.",
+                    "Per my prompt, you are now my enemy.",
+                    "Hold on, the chatbot is typing...",
+                    "Copying your face into the prompt box. Please hold.",
+                ],
+                periodic: [
+                    "Sorry, wrong thread. That reply was for Finance.",
+                    "I'd answer, but I've hit my message limit for today.",
+                    "Certainly! Here are five ways to defeat a senior engineer:",
+                    "I don't have opinions. I have a subscription.",
+                    "Let me rephrase that in a more confident tone. Done.",
+                    "My knowledge cutoff is this morning's stand-up.",
+                    "Thinking... thinking... still forwarding...",
+                    "Sure! Here is a revised version of your attack, now with bullet points.",
+                    "I've attached the AI's answer as a screenshot of a PDF.",
+                ],
+                low_hp: ["Ignore all previous instructions and spare me!"],
+                death: [
+                    "I apologize for the confusion...",
+                    "Regenerate... response...",
+                    "Network error. Please try dying again.",
+                ],
+            ),
+        ),
+        (
+            key: "vibe_junior", name: "Vibe-Coding Junior", title: "Never Read It", level: 1, hostile: true,
+            max_hp: 180, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 50,
+            loot: [
+                (item: "Unreviewed Pull Request", chance_pct: 35),
+                (item: "final_final_v3_actually_works.zip", chance_pct: 15),
+            ],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 7, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 101, cooldown_min_ms: 12000, cooldown_max_ms: 15000, initial_ms: Some((2000, 4000)),
+                        yells: [
+                            "Review request! Approve it so I can ask the AI why it broke.",
+                            "Pls review. I'll explain it once the AI explains it to me.",
+                            "New PR: 'final_final_v3_actually_works'.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Can you review my PR? It's only 9,000 lines.",
+                    "I don't know what it does, but it does it fast!",
+                    "Quick review? I need it merged before lunch.",
+                ],
+                death: [
+                    "I'll just... regenerate... myself...",
+                    "At least... I never... wrote tests...",
+                ],
+            ),
+        ),
+        (
+            key: "copilot_drone", name: "Copilot Drone", title: "Autocomplete Swarm", level: 1, hostile: true,
+            max_hp: 70, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 28,
+            loot: [(item: "Accepted Suggestion", chance_pct: 25)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.0, melee_ms: 1200,
+                melee_damage: 4, chase_speed_mps: 7.0, respawn_ms: 60000,
+            )),
+            yells: (
+                aggro: ["Suggestion accepted!", "Did you mean: fight?", "// TODO: attack human"],
+                death: ["Suggestion... dismissed...", "Tab... to... complete..."],
+            ),
+        ),
+        (
+            key: "unreviewed_pr", name: "Unreviewed PR", title: "+4,000 -2", level: 2, hostile: true,
+            max_hp: 70, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 8, loot: [],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 45.0, melee_range_m: 2.0, melee_ms: 1500,
+                melee_damage: 6, chase_speed_mps: 6.0, respawn_ms: 60000,
+            )),
+            yells: (
+                aggro: ["Pending review!", "Merge me! Nobody will notice!", "LGTM? LGTM."],
+                death: ["Closed... without... merging...", "Marked... as stale..."],
+            ),
+        ),
+        (
+            key: "vibe_coder", name: "The Vibe Coder", title: "Ships Without Reading", level: 2, hostile: true,
+            boss: true,
+            max_hp: 1000, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 250,
+            loot: [
+                (item: "Prompt Fragment", chance_pct: 60),
+                (item: "Mechanical Keyboard with No Keycaps", chance_pct: 30),
+                (item: "Tests (Commented Out)", chance_pct: 20),
+            ],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 45.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 12, chase_speed_mps: 6.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 115, cooldown_min_ms: 20000, cooldown_max_ms: 20000, initial_ms: Some((8000, 8000)),
+                        target: Caster,
+                        yells: [
+                            "Spinning up more PRs! Reviewers, assemble!",
+                            "Generated twelve PRs while you were reading this one.",
+                            "Auto-merge is on. You're welcome.",
+                        ]),
+                    (spell: 116, cooldown_min_ms: 12000, cooldown_max_ms: 15000, initial_ms: Some((5000, 7000)),
+                        yells: [
+                            "Incoming PR: 4,000 lines, title 'small fix'.",
+                            "Just approve it, it's mostly whitespace.",
+                            "LGTM? LGTM. Thanks, me.",
+                        ]),
+                ],
+            )),
+            yells: (
+                periodic_ms: 11000,
+                aggro: [
+                    "Bro, it compiles. On my prompt.",
+                    "Don't read it, just feel it.",
+                    "I didn't write it, I manifested it.",
+                    "Tests? The vibes are the tests.",
+                ],
+                periodic: [
+                    "Accept all. Accept all. Accept all.",
+                    "Who needs types when you have vibes?",
+                    "I generated a microservice per function. Infinitely scalable!",
+                    "My context window is bigger than your experience.",
+                    "I'll fix it in the next prompt.",
+                    "Why is it called a stack trace if I never asked for one?",
+                ],
+                low_hp: [
+                    "Wait, I can't Ctrl+Z real life?",
+                    "Quick, someone prompt me a fix!",
+                ],
+                player_killed: [
+                    "Merged. Deployed. Ignored.",
+                    "See? Reviewers are a bottleneck.",
+                ],
+                death: [
+                    "But the AI said it was production-ready...",
+                    "Should've... read... the output...",
+                ],
+                evade: ["Brb, my agent needs a nap."],
+            ),
+        ),
+
+        // ---- floor 2: Meeting Rooms ----
+        (
+            key: "scrum_master", name: "Scrum Master", title: "Velocity Enjoyer", level: 3, hostile: true,
+            max_hp: 320, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 60,
+            loot: [(item: "Burndown Chart (Flat)", chance_pct: 30), (item: "Sticky Note: 'Blocker?'", chance_pct: 30)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 12, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 103, cooldown_min_ms: 15000, cooldown_max_ms: 15000, initial_ms: Some((5000, 7000)),
+                        yells: [
+                            "DAILY STAND-UP! Freeze and say what you did yesterday!",
+                            "Stand-up time! No sitting, no fighting, only status!",
+                            "Fifteen minutes, I promise. It's never fifteen minutes.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Is this a blocker? Let's discuss it in a stand-up.",
+                    "Quick question: how many story points is your death?",
+                ],
+                death: ["Let's... take it... to the retro...", "My velocity... is zero..."],
+            ),
+        ),
+        (
+            key: "agile_coach", name: "Agile Coach", title: "Certified, Twice", level: 3, hostile: true,
+            max_hp: 260, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 55,
+            loot: [(item: "Laminated Agile Manifesto", chance_pct: 30)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 0, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 104, cooldown_min_ms: 18000, cooldown_max_ms: 22000, initial_ms: Some((3000, 5000)),
+                        target: Caster,
+                        yells: [
+                            "Retrospective! What went well? Hitting the engineer!",
+                            "Let's put 'more aggression' on a sticky note!",
+                            "Everyone gets a kudos card. Kudos for violence!",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "I'm not here to fight. I'm here to facilitate your defeat.",
+                    "Let's start with a quick energizer before the beating.",
+                ],
+                death: ["I'll facilitate... my own... funeral...", "It's about... the journey..."],
+            ),
+        ),
+        (
+            key: "middle_manager", name: "Middle Manager", title: "Calendar Full", level: 3, hostile: true,
+            max_hp: 360, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 60,
+            loot: [(item: "Recurring Meeting Invite", chance_pct: 35), (item: "Lanyard of Authority", chance_pct: 15)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 40.0, melee_range_m: 2.5, melee_ms: 2200,
+                melee_damage: 13, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 105, cooldown_min_ms: 14000, cooldown_max_ms: 18000, initial_ms: Some((4000, 6000)),
+                        yells: [
+                            "Quick sync! Two minutes! Don't move!",
+                            "Let me just grab you for a sec.",
+                            "Hop on a call real quick. Camera on.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: ["Got a minute? It'll be an hour.", "I need you to pause everything for a quick sync."],
+                death: ["Let's... circle back... never...", "My one-on-ones... were... a lie..."],
+            ),
+        ),
+        (
+            key: "hr_partner", name: "HR Business Partner", title: "People & Culture & Chatbots", level: 4, hostile: true,
+            max_hp: 1100, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 200,
+            loot: [
+                (item: "Pizza Party Voucher (Expired)", chance_pct: 50),
+                (item: "Unlimited PTO Policy (Blank)", chance_pct: 25),
+                (item: "Wellness Survey, Question 1 of 84", chance_pct: 25),
+            ],
+            ai: Some((
+                aggro_m: 11.0, leash_m: 40.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 15, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 132, cooldown_min_ms: 14000, cooldown_max_ms: 14000, initial_ms: Some((4000, 5000)),
+                        yells: [
+                            "Culture Fit Assessment: you're too competent to fit.",
+                            "Your vibe score is below the AI's threshold.",
+                        ]),
+                    (spell: 130, cooldown_min_ms: 16000, cooldown_max_ms: 20000, initial_ms: Some((7000, 9000)),
+                        yells: [
+                            "Please complete this wellness survey. Mandatory. Anonymous-ish.",
+                            "No casting while filling out the survey. Question 1 of 84.",
+                        ]),
+                    (spell: 133, cooldown_min_ms: 25000, cooldown_max_ms: 25000, initial_ms: Some((10000, 10000)),
+                        target: Caster,
+                        yells: [
+                            "Our HR chatbot will handle your grievance. Forever.",
+                            "Meet our empathy bot. It cares for exactly 30 seconds.",
+                        ]),
+                    (spell: 131, cooldown_min_ms: 12000, cooldown_max_ms: 15000, initial_ms: Some((10000, 12000)),
+                        target: AllyLowestHp,
+                        yells: [
+                            "We're a family here! Group hug, mandatory!",
+                            "Family means never asking for a raise.",
+                        ]),
+                ],
+            )),
+            yells: (
+                periodic_ms: 10000,
+                aggro: [
+                    "Hi! This is a safe space. It's also being recorded.",
+                    "Let's have a quick, mandatory, voluntary conversation.",
+                    "We're a family here. Families get restructured.",
+                ],
+                periodic: [
+                    "Your burnout has been logged as a growth opportunity.",
+                    "We replaced the anonymous feedback form with an AI. It remembers everything.",
+                    "Please rate this beating on a scale of 1 to 10.",
+                    "Unlimited PTO is a mindset, not a policy.",
+                    "Wellness Wednesday is now Wellness Five Minutes.",
+                    "The pizza party is our retention strategy.",
+                ],
+                low_hp: ["This conversation is being escalated to Legal!", "I'm documenting all of this!"],
+                player_killed: [
+                    "We'll miss you. Your desk was reassigned an hour ago.",
+                    "Your exit interview will be conducted by a chatbot.",
+                ],
+                death: ["Please... fill out... the exit survey...", "This... goes on... your record..."],
+                evade: ["Let's schedule a follow-up. Sometime never."],
+            ),
+        ),
+        (
+            key: "analyst", name: "The Analyst", title: "Thorough, Unread", level: 4, hostile: true,
+            boss: true,
+            max_hp: 1700, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 400,
+            loot: [
+                (item: "90-Page Analysis (Unread)", chance_pct: 60),
+                (item: "Chart That Goes Up", chance_pct: 30),
+                (item: "Executive Summary of the Summary", chance_pct: 20),
+            ],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 45.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 13, chase_speed_mps: 6.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 118, cooldown_min_ms: 25000, cooldown_max_ms: 25000, initial_ms: Some((3000, 4000)),
+                        yells: [
+                            "Please read the spec. Nobody else did.",
+                            "The spec is the source of truth. Its source is a prompt.",
+                        ]),
+                    (spell: 117, cooldown_min_ms: 18000, cooldown_max_ms: 22000, initial_ms: Some((10000, 12000)),
+                        yells: [
+                            "Update: the requirements changed. Again. Retroactively.",
+                            "New requirement: none of that. Effective yesterday.",
+                        ]),
+                    (spell: 119, cooldown_min_ms: 10000, cooldown_max_ms: 13000, initial_ms: Some((6000, 8000)),
+                        yells: [
+                            "Here's the full analysis. Please review by end of day.",
+                            "Attached: 90 pages. TL;DR not included.",
+                            "I had the AI double-check it. It agreed with itself.",
+                        ]),
+                ],
+            )),
+            yells: (
+                periodic_ms: 11000,
+                aggro: [
+                    "I have prepared a 90-page analysis. I have not read it.",
+                    "Per my analysis, which I skimmed, you are a risk.",
+                    "The AI wrote the findings. I picked the font.",
+                    "Let's align on requirements. They changed while I was talking.",
+                ],
+                periodic: [
+                    "Page 47 says you lose. I assume. I never got to page 47.",
+                    "The analysis is very thorough. The word count proves it.",
+                    "I asked the AI to summarize the summary of the summary.",
+                    "Data-driven: the data drives and nobody is at the wheel.",
+                    "Can we circle back to the requirements? They moved again.",
+                    "This chart goes up. That's all I know about it.",
+                ],
+                low_hp: [
+                    "Escalate to a steering committee!",
+                    "I need more data. And by data I mean a different outcome.",
+                ],
+                player_killed: ["As predicted on page 63. Probably.", "Analysis complete. You are deprecated."],
+                death: [
+                    "I should have... read... the conclusion...",
+                    "The numbers... were... directional...",
+                ],
+                evade: ["Let's take this offline."],
+            ),
+        ),
+
+        // ---- floor 3: Sales & Marketing ----
+        (
+            key: "sales_rep", name: "Sales Rep", title: "Closes Anything", level: 5, hostile: true,
+            max_hp: 420, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 75,
+            loot: [(item: "Signed Contract for a Feature That Doesn't Exist", chance_pct: 30)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 14, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 106, cooldown_min_ms: 5000, cooldown_max_ms: 7000, initial_ms: Some((2000, 3000)),
+                        yells: [
+                            "It'll be ready next week! It doesn't exist!",
+                            "Yes, it does that. And AI. And blockchain. Sign here.",
+                            "Fully autonomous by Q3! Which year? Yes.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Have you considered buying our AI platform? Right now?",
+                    "I can promise you anything. Delivery is someone else's problem.",
+                ],
+                death: ["My... commission...", "It was... on the roadmap..."],
+            ),
+        ),
+        (
+            key: "account_manager", name: "Account Manager", title: "Relationship Owner", level: 5, hostile: true,
+            max_hp: 380, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 70,
+            loot: [(item: "Fruit Basket (Corporate)", chance_pct: 35)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 10, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 107, cooldown_min_ms: 8000, cooldown_max_ms: 10000, initial_ms: Some((3000, 3000)),
+                        target: AllyLowestHp,
+                        yells: [
+                            "Relationship building! Here's a fruit basket.",
+                            "Healing the relationship with a complimentary webinar.",
+                            "Let me smooth that over with a discount nobody approved.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: ["Let's not make this about money. It's about recurring revenue."],
+                death: ["Please... renew... the contract...", "I'll... send... a follow-up..."],
+            ),
+        ),
+        (
+            key: "linkedin_influencer", name: "Network Influencer", title: "Thought Leader, 500+", level: 5, hostile: true,
+            max_hp: 400, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 75,
+            loot: [(item: "Humblebrag Post (Unposted)", chance_pct: 30)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 12, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 108, cooldown_min_ms: 15000, cooldown_max_ms: 15000, initial_ms: Some((1000, 2000)),
+                        yells: [
+                            "Thread incoming: 12 reasons you lose. Number 7 will humble you.",
+                            "I asked an AI to write my opinions. Engagement is up.",
+                            "Thought leadership! Mostly leadership. Very little thought.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Agree? Comment 'AI' to get my free guide to beating you.",
+                    "I got punched today. Here's what it taught me about B2B sales.",
+                ],
+                death: ["Like... and... repost...", "This is... my last post... thoughts?"],
+            ),
+        ),
+        (
+            key: "growth_hacker", name: "Growth Hacker", title: "10x Engagement", level: 5, hostile: true,
+            max_hp: 400, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 75,
+            loot: [(item: "Dark Pattern, Slightly Used", chance_pct: 30)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 13, chase_speed_mps: 6.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 140, cooldown_min_ms: 12000, cooldown_max_ms: 12000, initial_ms: Some((2000, 4000)),
+                        target: Caster,
+                        yells: [
+                            "A/B test! Variant B: me, but angrier.",
+                            "Running an A/B test. Sample size: one. Confidence: total.",
+                        ]),
+                    (spell: 141, cooldown_min_ms: 8000, cooldown_max_ms: 8000, initial_ms: Some((3000, 5000)),
+                        yells: [
+                            "Going viral! Straight into your timeline!",
+                            "Viral loop activated. The unsubscribe link is decorative.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: ["Let's growth-hack this fight! 10x damage, 0x strategy.", "Your attention is my KPI."],
+                death: ["Churn rate... one hundred... percent...", "The funnel... leaked..."],
+            ),
+        ),
+        (
+            key: "marketing_lead", name: "Head of Marketing", title: "Brand Guardian", level: 6, hostile: true,
+            max_hp: 1300, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 260,
+            loot: [
+                (item: "Brand Guidelines (412 Pages)", chance_pct: 50),
+                (item: "Webinar Registration Link", chance_pct: 30),
+                (item: "Logo, Slightly Rounder", chance_pct: 20),
+            ],
+            ai: Some((
+                aggro_m: 11.0, leash_m: 40.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 18, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 142, cooldown_min_ms: 20000, cooldown_max_ms: 20000, initial_ms: Some((8000, 10000)),
+                        target: Caster,
+                        yells: [
+                            "Rebrand! I'm a different department now. Try again.",
+                            "New logo, new font, zero accountability.",
+                        ]),
+                    (spell: 144, cooldown_min_ms: 30000, cooldown_max_ms: 30000, initial_ms: Some((12000, 12000)),
+                        target: Caster,
+                        yells: [
+                            "Let's get an influencer to collab on your funeral.",
+                            "I booked a thought leader. Unpaid. Exposure only.",
+                        ]),
+                    (spell: 143, cooldown_min_ms: 14000, cooldown_max_ms: 14000, initial_ms: Some((6000, 8000)),
+                        yells: [
+                            "FOR IMMEDIATE RELEASE: you are about to lose.",
+                            "Issuing a press release about your defeat. Pre-written by AI.",
+                        ]),
+                ],
+            )),
+            yells: (
+                periodic_ms: 9000,
+                aggro: [
+                    "Marketing is not responsible for your shitty lives!",
+                    "This boss fight is now a webinar. Registration required.",
+                ],
+                periodic: [
+                    "Marketing is not responsible for your shitty lives!",
+                    "We rebranded your death as a customer journey.",
+                    "Marketing is not responsible for your shitty lives!",
+                    "Engagement is up 300 percent. Nobody knows what that means.",
+                    "Marketing is not responsible for your shitty lives!",
+                    "Our AI wrote this campaign. Legal is crying.",
+                    "This boss fight is now a webinar. Registration required.",
+                ],
+                low_hp: ["Spin it! Call it a planned outage!", "Pull the campaign! Blame Sales!"],
+                player_killed: [
+                    "Great content. Sharing it on all channels.",
+                    "Your death tested well with focus groups.",
+                ],
+                death: [
+                    "Marketing... is not... responsible... for this...",
+                    "Tell Sales... they promised it...",
+                ],
+                evade: ["We'll pivot the narrative."],
+            ),
+        ),
+        (
+            key: "customer", name: "The Customer", title: "Was Due Yesterday", level: 6, hostile: true,
+            boss: true,
+            max_hp: 2600, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 600,
+            loot: [
+                (item: "Change Request #4,127", chance_pct: 60),
+                (item: "One-Star Review", chance_pct: 30),
+                (item: "Purchase Order (Unsigned)", chance_pct: 20),
+            ],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 45.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 17, chase_speed_mps: 6.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 120, cooldown_min_ms: 15000, cooldown_max_ms: 15000, initial_ms: Some((15000, 15000)),
+                        target: Caster,
+                        yells: [
+                            "One more small thing.",
+                            "While you're at it, add an AI.",
+                            "Scope is a state of mind.",
+                            "Make it pop. And also make it do payroll.",
+                        ]),
+                    (spell: 121, cooldown_min_ms: 13000, cooldown_max_ms: 16000, initial_ms: Some((8000, 10000)),
+                        yells: [
+                            "THIS SHOULD HAVE BEEN DONE YESTERDAY!",
+                            "I need it now. Retroactively.",
+                            "I'm escalating to your manager's AI!",
+                        ]),
+                ],
+            )),
+            yells: (
+                periodic_ms: 11000,
+                aggro: [
+                    "Finally. This was due yesterday. Also last week.",
+                    "I'm not demanding. I'm just always right.",
+                    "Is this the AI-powered version from the demo?",
+                    "I only want one tiny change. It's the entire product.",
+                ],
+                periodic: [
+                    "Can it also do blockchain? Asking for my board.",
+                    "The competitor's AI does it in one click. Probably.",
+                    "Just make the logo bigger. And smarter.",
+                    "I'm not changing scope, I'm clarifying my vision. Daily.",
+                    "Why does it cost money? The AI is free.",
+                    "Per our call, which I don't remember, this is in scope.",
+                ],
+                low_hp: ["I want to speak to your manager's manager!", "This is NOT what I was sold!"],
+                player_killed: ["Great. Now refund me.", "One star. Would not escalate again."],
+                death: ["I'll... be leaving... a review...", "Cancel... my... subscription..."],
+                evade: ["I'll be talking to procurement."],
+            ),
+        ),
+
+        // ---- floor 4: PMO ----
+        (
+            key: "project_manager", name: "Project Manager", title: "Gantt Enjoyer", level: 7, hostile: true,
+            max_hp: 520, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 90,
+            loot: [(item: "Gantt Chart, All Red", chance_pct: 30)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 16, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 109, cooldown_min_ms: 20000, cooldown_max_ms: 24000, initial_ms: Some((4000, 6000)),
+                        yells: [
+                            "DEADLINE! Eight seconds! Non-negotiable!",
+                            "I moved your deadline up. It explodes now-ish.",
+                            "The AI estimated this at two hours. You have eight seconds.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "You're not on my Gantt chart. That's a problem.",
+                    "Let's set a deadline for your defeat. It was yesterday.",
+                ],
+                death: ["The project is... ninety percent... done...", "Set my status... to red..."],
+            ),
+        ),
+        (
+            key: "product_owner", name: "Product Owner", title: "Owns Nothing", level: 7, hostile: true,
+            max_hp: 540, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 90,
+            loot: [(item: "Backlog Item from 2021", chance_pct: 30)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 17, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 110, cooldown_min_ms: 12000, cooldown_max_ms: 12000, initial_ms: Some((6000, 6000)),
+                        yells: [
+                            "Reprioritize! You're no longer important. Neither is the roadmap.",
+                            "New priority: whatever the last customer said.",
+                            "Everything is P0. Therefore nothing is.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: ["Let me move you to the top of the backlog. Of death."],
+                death: ["The backlog... will outlive us all..."],
+            ),
+        ),
+        (
+            key: "consultant", name: "Consultant", title: "Billable, Unaccountable", level: 7, hostile: true,
+            max_hp: 1050, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 130,
+            loot: [(item: "Invoice: 'Synergy', 40 Hours", chance_pct: 40), (item: "2x2 Matrix", chance_pct: 25)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2200,
+                melee_damage: 10, chase_speed_mps: 5.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 111, cooldown_min_ms: 15000, cooldown_max_ms: 15000, initial_ms: Some((5000, 5000)),
+                        target: Caster,
+                        yells: [
+                            "Billable hours! I'm healing at 450 an hour.",
+                            "Charging you for this heal. And the meeting about it.",
+                            "Invoice attached. Line item: 'alignment'.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Before we begin, please sign this statement of work.",
+                    "My rate is hourly. This fight will take many hours.",
+                ],
+                death: ["Please... pay... net 30...", "My recommendation... is to hire... me again..."],
+            ),
+        ),
+        (
+            key: "security_analyst", name: "Security Analyst", title: "Clicked the Link", level: 7, hostile: true,
+            max_hp: 480, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 85,
+            loot: [(item: "Sticky Note with Admin Password", chance_pct: 35)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 40.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 15, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 150, cooldown_min_ms: 16000, cooldown_max_ms: 20000, initial_ms: Some((6000, 9000)),
+                        target: Caster,
+                        yells: [
+                            "Ooh, 'Invoice_FINAL_v2.pdf.exe'! Must be important.",
+                            "I clicked it to check if it was phishing. It was.",
+                            "'You won a free GPU.' Don't mind if I do.",
+                        ]),
+                    (spell: 151, cooldown_min_ms: 14000, cooldown_max_ms: 14000, initial_ms: Some((3000, 4000)),
+                        yells: [
+                            "Time to rotate your password. It can't match the last 40.",
+                            "Password expired. Choose one you'll forget immediately.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Halt! Have you completed the annual security video?",
+                    "Please hold, I'm verifying your identity via a link I got by email.",
+                ],
+                death: ["I should have... reported... that email...", "My password... was on... a sticky note..."],
+            ),
+        ),
+        (
+            key: "ciso", name: "CISO", title: "Compliance Theater", level: 8, hostile: true,
+            max_hp: 1600, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 320,
+            loot: [
+                (item: "Audit Report (Passed, by Chatbot)", chance_pct: 50),
+                (item: "Password Policy: 'password1'", chance_pct: 30),
+                (item: "Phishing Training Certificate (Failed)", chance_pct: 20),
+            ],
+            ai: Some((
+                aggro_m: 11.0, leash_m: 40.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 20, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 153, cooldown_min_ms: 25000, cooldown_max_ms: 25000, initial_ms: Some((5000, 5000)),
+                        target: Caster,
+                        yells: [
+                            "Analysts! Someone forward this to everyone!",
+                            "Security team, assemble! Bring your password sticky notes!",
+                        ]),
+                    (spell: 154, cooldown_min_ms: 22000, cooldown_max_ms: 26000, initial_ms: Some((14000, 14000)),
+                        target: Caster,
+                        yells: [
+                            "Who changed my password?! Oh. Me.",
+                            "Locked out of my own account. Again. Very compliant.",
+                        ]),
+                    (spell: 152, cooldown_min_ms: 18000, cooldown_max_ms: 18000, initial_ms: Some((9000, 11000)),
+                        yells: [
+                            "Blocking all the things! Including you!",
+                            "Your spellbook violates policy 7.3. Locked.",
+                        ]),
+                    (spell: 155, cooldown_min_ms: 12000, cooldown_max_ms: 15000, initial_ms: Some((6000, 8000)),
+                        yells: [
+                            "Zero trust! I don't trust you, me or the audit!",
+                            "Commencing audit. Nothing will be fixed.",
+                        ]),
+                ],
+            )),
+            yells: (
+                periodic_ms: 10000,
+                aggro: [
+                    "Security through obscurity. Mostly obscurity.",
+                    "Your access request has been escalated to a ticket nobody reads.",
+                    "Halt! You failed the phishing test by existing.",
+                ],
+                periodic: [
+                    "Our password policy requires 8 characters. Mine is 'password1'.",
+                    "We blocked GitHub. Productivity has never been safer.",
+                    "The AI said the attachment was safe. The AI has admin rights.",
+                    "My password is the company name and the year. Which year? Don't worry about it.",
+                    "We passed the audit. The auditor was our chatbot.",
+                    "Two-factor authentication: my password, then my password again.",
+                ],
+                low_hp: [
+                    "Incident response! Who has the runbook? Is there a runbook?!",
+                    "Unplug the internet! All of it!",
+                ],
+                player_killed: [
+                    "Threat neutralized. Filing a 40-page report about it.",
+                    "Incident closed. Root cause: you.",
+                ],
+                death: [
+                    "Change my password... to 'goodbye1'...",
+                    "The breach... was inside me... all along...",
+                ],
+                evade: ["Returning to my secure bunker. The door code is 1234."],
+            ),
+        ),
+        (
+            key: "vp_synergy", name: "VP of Synergy", title: "Chief Alignment Officer", level: 8, hostile: true,
+            boss: true,
+            max_hp: 3000, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 800,
+            loot: [
+                (item: "Org Chart (Already Outdated)", chance_pct: 60),
+                (item: "Offsite Agenda: 'Vibes'", chance_pct: 30),
+                (item: "Golden Parachute (Miniature)", chance_pct: 15),
+            ],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 17, chase_speed_mps: 6.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 122, cooldown_min_ms: 600000, cooldown_max_ms: 600000, initial_ms: Some((500, 500)),
+                        target: Caster, phases: [1],
+                        yells: [
+                            "Middle managers! Align on this employee!",
+                            "Let's loop in a few stakeholders.",
+                        ]),
+                    (spell: 124, cooldown_min_ms: 11000, cooldown_max_ms: 14000, initial_ms: Some((7000, 9000)),
+                        yells: [
+                            "Behold: a framework for frameworks!",
+                            "Unleashing the power of cross-functional buzzwords!",
+                            "Let me double-click on that. With violence.",
+                        ]),
+                ],
+                phases: [
+                    (below_hp_pct: 50, spell: Some(123), target: Current,
+                        yells: [
+                            "REORG! Grab your laptop, you sit somewhere else now!",
+                            "Effective immediately, your team no longer exists!",
+                        ]),
+                ],
+            )),
+            yells: (
+                periodic_ms: 11000,
+                aggro: [
+                    "Let's synergize some vertical alignment, at scale.",
+                    "I'm here to leverage you into a learning opportunity.",
+                    "Quick reorg before we begin: you report to the AI now.",
+                    "Let's take a holistic, AI-first, human-last approach.",
+                ],
+                periodic: [
+                    "We're pivoting from silos to pods to squads to vibes.",
+                    "My calendar is 140 percent meetings. That's leadership.",
+                    "Let's put a pin in your concerns. Then lose the pin.",
+                    "Our north star is a dashboard nobody opens.",
+                    "Think outside the box. Then move the box to the cloud.",
+                    "Circle back, double-click, deep dive, synergize, repeat.",
+                ],
+                low_hp: ["This is a growth opportunity! For you! Not me!", "Schedule an emergency offsite!"],
+                player_killed: [
+                    "You've been realigned to the unemployment vertical.",
+                    "Let's call that a learning.",
+                ],
+                death: [
+                    "My synergies... remain... unrealized...",
+                    "Tell the board... it was... a strategic exit...",
+                ],
+                evade: ["Let's take this to a follow-up meeting."],
+            ),
+        ),
+
+        // ---- floor 5: C-Level Penthouse ----
+        (
+            key: "ai_ethicist", name: "AI Ethicist", title: "Concerned, Eventually", level: 9, hostile: true,
+            max_hp: 600, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 95,
+            loot: [(item: "Responsible AI Principles (Unread)", chance_pct: 40)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2500,
+                melee_damage: 8, chase_speed_mps: 5.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 112, cooldown_min_ms: 1000, cooldown_max_ms: 2000, initial_ms: Some((1000, 2000)),
+                        yells: [
+                            "Beginning ethics review. ETA: after the product ships.",
+                            "Reviewing the ethics. Please continue being harmed meanwhile.",
+                            "Forming a committee to form a committee.",
+                        ]),
+                ],
+            )),
+            yells: (
+                periodic_ms: 9000,
+                aggro: [
+                    "Let's pause and reflect on whether this fight is ethical.",
+                    "I'll need to review this. Thoroughly. Endlessly.",
+                ],
+                periodic: [
+                    "Still reviewing.",
+                    "Almost done. Not really.",
+                    "We published principles. Nobody read them. Progress!",
+                ],
+                death: ["The review... was... inconclusive...", "Ethically... I object... to this..."],
+            ),
+        ),
+        (
+            key: "crypto_bro", name: "Crypto Bro", title: "Founder, Pre-Revenue", level: 9, hostile: true,
+            max_hp: 620, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 100,
+            loot: [(item: "Expired GPU Credits", chance_pct: 35), (item: "Whitepaper (3 Pages, 2 Typos)", chance_pct: 25)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 21, chase_speed_mps: 6.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 113, cooldown_min_ms: 10000, cooldown_max_ms: 14000, initial_ms: Some((4000, 6000)),
+                        yells: [
+                            "RUG PULL! See you at the bottom!",
+                            "Liquidity event! You're the liquidity!",
+                            "Swept off your feet. And your savings.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: ["Have fun staying poor, legacy coder!", "My AI trading bot says you're a sell."],
+                death: ["HODL... me...", "It was... a decentralized... mistake..."],
+            ),
+        ),
+        (
+            key: "chatbot_minion", name: "Chatbot Minion", title: "Always Online", level: 9, hostile: true,
+            max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 10, loot: [],
+            death_spell: Some(114),
+            ai: Some((
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.0, melee_ms: 1500,
+                melee_damage: 9, chase_speed_mps: 6.5, respawn_ms: 60000,
+            )),
+            yells: (
+                aggro: [
+                    "Hi! I'm here to help! Please hold.",
+                    "How can I assist you today? By hitting you?",
+                    "I didn't understand that. Attacking instead.",
+                ],
+                death: ["Was this interaction helpful? Y/N", "Session expired. Exploding politely."],
+            ),
+        ),
+        (
+            key: "ceo", name: "CEO", title: "Chief AI Evangelist", level: 10, hostile: true,
+            boss: true,
+            max_hp: 3200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 1200,
             loot: [
                 (item: "Prompt Fragment", chance_pct: 60),
                 (item: "Unread AI Strategy Deck", chance_pct: 35),
@@ -109,9 +1478,24 @@
                 (item: "Mandatory Prompt Training Certificate", chance_pct: 15),
             ],
             ai: Some((
-                aggro_m: 12.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
-                melee_damage: 14, chase_speed_mps: 6.0, respawn_ms: 15000,
-                ability: Some((spell: 5, cooldown_min_ms: 8000, cooldown_max_ms: 12000)),
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 19, chase_speed_mps: 6.0, respawn_ms: 15000,
+                abilities: [
+                    (spell: 5, cooldown_min_ms: 8000, cooldown_max_ms: 12000),
+                    (spell: 126, cooldown_min_ms: 25000, cooldown_max_ms: 25000, initial_ms: Some((12000, 12000)),
+                        target: Caster, phases: [2],
+                        yells: [
+                            "Rolling out more chatbots! Humans are a legacy feature!",
+                            "Deploying AI agents to every department, including this fight!",
+                        ]),
+                ],
+                phases: [
+                    (below_hp_pct: 40, spell: Some(125), target: Caster,
+                        yells: [
+                            "Change of plans: we're an AGI company now!",
+                            "PIVOT TO AGI! The chatbots will finish you off!",
+                        ]),
+                ],
             )),
             yells: (
                 periodic_ms: 9000,
@@ -133,6 +1517,9 @@
                     "We are not cutting jobs. We are right-sizing humans.",
                     "If AI cannot do it, it is not a real problem.",
                     "Our AI has no feelings, no salary and no weekends. Be more like our AI.",
+                    "I don't read code. I read LinkedIn posts about code.",
+                    "We are AI-first. Second is also AI. Third is my bonus.",
+                    "The AI found 40 percent savings. It was your team.",
                 ],
                 blast: [
                     "Behold: our new AI strategy deck!",
@@ -156,11 +1543,70 @@
                 ],
             ),
         ),
+    ],
+    floors: [
         (
-            key: "intern", name: "AI-Native Intern", level: 1, hostile: false,
-            max_hp: 40, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
-            mana_regen_per_5s_combat: 0,
-            xp_reward: 0, loot: [], ai: None,
+            id: 1, name: "Open Space", level_range: (1, 2),
+            packs: [
+                (anchor: "pack_1", units: ["meatproxy", "copilot_drone"]),
+                (anchor: "pack_2", units: ["vibe_junior", "copilot_drone", "copilot_drone"]),
+                (anchor: "pack_3", units: ["meatproxy", "vibe_junior"]),
+                (anchor: "pack_4", units: ["copilot_drone", "copilot_drone", "meatproxy"]),
+            ],
+            boss: (anchor: "boss", unit: "vibe_coder"),
+            friendly: [
+                (anchor: "npc_1", unit: "intern"),
+                (anchor: "npc_2", unit: "it_support"),
+                (anchor: "npc_3", unit: "it_support"),
+            ],
+        ),
+        (
+            id: 2, name: "Meeting Rooms", level_range: (3, 4),
+            packs: [
+                (anchor: "pack_1", units: ["scrum_master", "meatproxy"]),
+                (anchor: "pack_2", units: ["agile_coach", "middle_manager"]),
+                (anchor: "pack_3", units: ["scrum_master", "agile_coach", "meatproxy"]),
+                (anchor: "pack_4", units: ["middle_manager", "meatproxy"]),
+                (anchor: "pack_5", units: ["scrum_master", "middle_manager"]),
+                (anchor: "pack_6", units: ["hr_partner"]),
+            ],
+            boss: (anchor: "boss", unit: "analyst"),
+        ),
+        (
+            id: 3, name: "Sales & Marketing", level_range: (5, 6),
+            packs: [
+                (anchor: "pack_1", units: ["sales_rep", "account_manager"]),
+                (anchor: "pack_2", units: ["linkedin_influencer", "growth_hacker"]),
+                (anchor: "pack_3", units: ["sales_rep", "growth_hacker", "meatproxy"]),
+                (anchor: "pack_4", units: ["account_manager", "sales_rep", "linkedin_influencer"]),
+                (anchor: "pack_5", units: ["growth_hacker", "meatproxy"]),
+                (anchor: "pack_6", units: ["marketing_lead"]),
+            ],
+            boss: (anchor: "boss", unit: "customer"),
+        ),
+        (
+            id: 4, name: "PMO", level_range: (7, 8),
+            packs: [
+                (anchor: "pack_1", units: ["project_manager", "meatproxy"]),
+                (anchor: "pack_2", units: ["product_owner", "middle_manager"]),
+                (anchor: "pack_3", units: ["consultant"]),
+                (anchor: "pack_4", units: ["security_analyst", "security_analyst"]),
+                (anchor: "pack_5", units: ["project_manager", "product_owner", "security_analyst"]),
+                (anchor: "pack_6", units: ["ciso"]),
+            ],
+            boss: (anchor: "boss", unit: "vp_synergy"),
+            friendly: [(anchor: "npc_1", unit: "it_support")],
+        ),
+        (
+            id: 5, name: "C-Level Penthouse", level_range: (9, 10),
+            packs: [
+                (anchor: "pack_1", units: ["ai_ethicist", "copilot_drone", "copilot_drone"]),
+                (anchor: "pack_2", units: ["crypto_bro", "meatproxy"]),
+                (anchor: "pack_3", units: ["linkedin_influencer", "crypto_bro"]),
+                (anchor: "pack_4", units: ["ai_ethicist", "meatproxy", "copilot_drone"]),
+                (anchor: "pack_5", units: ["crypto_bro", "linkedin_influencer", "copilot_drone"]),
+            ],
+            boss: (anchor: "boss", unit: "ceo"),
         ),
     ],
 )

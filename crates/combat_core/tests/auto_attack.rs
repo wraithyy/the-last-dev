@@ -245,7 +245,7 @@ fn reject_pr_never_misses_and_enemy_blast_can_be_resisted() {
         if let Some(ab) = def_mut(c, "ceo")
             .ai
             .as_mut()
-            .and_then(|a| a.ability.as_mut())
+            .and_then(|a| a.abilities.first_mut())
         {
             ab.cooldown_min_ms = 100;
             ab.cooldown_max_ms = 100;

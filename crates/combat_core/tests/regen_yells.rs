@@ -22,7 +22,7 @@ fn fight_then_win() -> (H, u64) {
             ai.melee_ms = 500;
             // A respawned CEO would re-aggro and end the out-of-combat window.
             ai.respawn_ms = 10_000_000;
-            ai.ability = None;
+            ai.abilities.clear();
         }
     });
     h.target(h.mob);
@@ -71,7 +71,7 @@ fn no_percent_regen_in_combat() {
         d.max_hp = 1_000_000;
         if let Some(ai) = d.ai.as_mut() {
             ai.melee_damage = 1;
-            ai.ability = None;
+            ai.abilities.clear();
         }
     });
     h.target(h.mob);

@@ -1,6 +1,7 @@
 mod anim;
 mod arena;
 mod camera;
+mod catalog;
 mod collision;
 mod combat;
 mod combat_anim;
@@ -8,8 +9,13 @@ mod config;
 mod copy;
 mod debug;
 mod floating_text;
+mod floors;
+mod game;
+mod gear;
+mod hair;
 mod hud;
 mod input;
+mod nameplates;
 mod player;
 mod presentation;
 mod targeting;
@@ -55,6 +61,7 @@ fn main() {
         .insert_resource(Time::<Fixed>::from_hz(f64::from(TICK_HZ)))
         .add_plugins((
             arena::ArenaPlugin,
+            floors::FloorsPlugin,
             input::InputPlugin,
             player::PlayerPlugin,
             camera::CameraPlugin,
@@ -67,6 +74,12 @@ fn main() {
             presentation::PresentationPlugin,
             floating_text::FloatingTextPlugin,
             yell::YellPlugin,
+        ))
+        .add_plugins((
+            game::GamePlugin,
+            hair::HairPlugin,
+            gear::GearPlugin,
+            nameplates::NameplatePlugin,
             debug::DebugPlugin,
         ))
         .run();

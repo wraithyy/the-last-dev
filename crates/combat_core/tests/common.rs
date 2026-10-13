@@ -2,7 +2,8 @@
 #![allow(dead_code)] // each test binary uses a different subset of the harness
 
 use combat_core::{
-    Aabb, CastError, Command, Content, EntityId, Event, Sim, SpellId, UnitDef, UnitState, Vec3,
+    Aabb, CastError, Command, Content, Effect, EntityId, Event, Sim, SpellId, UnitDef, UnitState,
+    Vec3,
 };
 
 pub const SRC: &str = include_str!("../../../content/game.ron");
@@ -46,7 +47,10 @@ impl H {
         c.config.regen.mana_pct = 0;
         for s in &mut c.spells {
             s.yells.clear();
+            // Rules tests exercise every spell from level 1; progression has its own tests.
+            s.learn_level = 1;
         }
+        legacy_ceo(&mut c);
         tweak(&mut c);
         let mut sim = Sim::new(c, seed);
         let player = sim.spawn_player(Vec3::new(0.0, 0.0, 0.0), 0.0);
@@ -148,6 +152,180 @@ impl H {
             })
             .collect()
     }
+}
+
+/// Rules tests predate floors and levels: pin the CEO to its original single-ability
+/// encounter (900 HP, 14 melee, 45 Blast, same level as the player, no phases).
+pub fn legacy_ceo(c: &mut Content) {
+    let ceo = def_mut(c, "ceo");
+    ceo.level = 1;
+    ceo.max_hp = 900;
+    ceo.xp_reward = 120;
+    if let Some(ai) = ceo.ai.as_mut() {
+        ai.melee_damage = 14;
+        ai.leash_m = 35.0;
+        ai.respawn_ms = 15000;
+        ai.abilities.retain(|a| a.spell == BLAST);
+        ai.phases.clear();
+    }
+    for s in c.spells.iter_mut().filter(|s| s.id == BLAST) {
+        if let Effect::Damage { base, .. } = &mut s.effect {
+            *base = 45;
+        }
+    }
+}
+
+pub fn unit_name(sim: &Sim, id: u64) -> String {
+    sim.unit(id)
+        .map_or_else(|| format!("#{id}"), |u| u.name.clone())
+}
+
+pub fn spell_name(sim: &Sim, id: SpellId) -> String {
+    sim.content()
+        .spell(id)
+        .map_or_else(|| format!("spell{}", id.0), |s| s.name.clone())
+}
+
+pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
+    let t = |id: u64| unit_name(sim, id);
+    let body = match e {
+        Event::CastStarted {
+            caster,
+            spell: s,
+            total_ms,
+        } => {
+            format!(
+                "{} begins {} ({total_ms} ms)",
+                t(*caster),
+                spell_name(sim, *s)
+            )
+        }
+        Event::CastSucceeded {
+            caster, spell: s, ..
+        } => format!("{} casts {}", t(*caster), spell_name(sim, *s)),
+        Event::CastFailed {
+            caster,
+            spell: s,
+            reason,
+        } => {
+            format!(
+                "{} failed {}: {}",
+                t(*caster),
+                spell_name(sim, *s),
+                reason.message()
+            )
+        }
+        Event::CastInterrupted {
+            caster,
+            spell: s,
+            by,
+            lockout_ms,
+        } => format!(
+            "{} {} interrupted by {} (lockout {lockout_ms} ms)",
+            t(*caster),
+            spell_name(sim, *s),
+            by.map_or_else(|| "movement/cancel".to_string(), t)
+        ),
+        Event::CastQueued { caster, spell: s } => {
+            format!("{} queues {}", t(*caster), spell_name(sim, *s))
+        }
+        Event::Damage {
+            source,
+            target,
+            spell: s,
+            amount,
+            absorbed,
+            crit,
+            combo,
+            ..
+        } => format!(
+            "{} hits {} with {} for {amount} (absorbed {absorbed}){}{}",
+            t(*source),
+            t(*target),
+            s.map_or_else(|| "melee".to_string(), |s| spell_name(sim, s)),
+            if *crit { " CRIT" } else { "" },
+            if *combo { " COMBO" } else { "" },
+        ),
+        Event::MeleeSwing { attacker, target } => {
+            format!("{} swings at {}", t(*attacker), t(*target))
+        }
+        Event::Miss {
+            source,
+            target,
+            spell: s,
+        } => format!(
+            "{} misses {} with {}",
+            t(*source),
+            t(*target),
+            s.map_or_else(|| "melee".to_string(), |s| spell_name(sim, s)),
+        ),
+        Event::AutoAttackToggled { unit, on } => format!(
+            "{} auto attack {}",
+            t(*unit),
+            if *on { "on" } else { "off" }
+        ),
+        Event::AuraApplied { target, key } => format!("{} gains {key}", t(*target)),
+        Event::AuraRemoved {
+            target,
+            key,
+            reason,
+        } => format!("{} loses {key} ({reason:?})", t(*target)),
+        Event::EnterCombat { unit } => format!("{} enters combat", t(*unit)),
+        Event::LeaveCombat { unit } => format!("{} leaves combat", t(*unit)),
+        Event::AiState { unit, state } => format!("{} ai {state:?}", t(*unit)),
+        Event::Death { unit, killer } => {
+            format!(
+                "{} dies (killer {})",
+                t(*unit),
+                killer.map_or_else(|| "none".into(), t)
+            )
+        }
+        Event::XpGained { unit, amount } => format!("{} gains {amount} xp", t(*unit)),
+        Event::LootDropped { corpse, items } => format!("{} drops {items:?}", t(*corpse)),
+        Event::Looted {
+            looter,
+            corpse,
+            items,
+        } => format!("{} loots {} {items:?}", t(*looter), t(*corpse)),
+        Event::Respawned { unit } => format!("{} respawns", t(*unit)),
+        Event::Yell { unit, text } => format!("{} yells: {text}", t(*unit)),
+        Event::Heal {
+            source,
+            target,
+            spell: s,
+            amount,
+        } => format!(
+            "{} heals {} with {} for {amount}",
+            t(*source),
+            t(*target),
+            s.map_or_else(|| "?".to_string(), |s| spell_name(sim, s)),
+        ),
+        Event::Knockback {
+            unit,
+            dir,
+            strength,
+        } => format!(
+            "{} knocked back {strength:.1} m toward ({:.2}, {:.2})",
+            t(*unit),
+            dir.x,
+            dir.z
+        ),
+        Event::Teleported { unit, pos } => {
+            format!("{} teleported to ({:.1}, {:.1})", t(*unit), pos.x, pos.z)
+        }
+        Event::LevelUp { unit, level } => format!("{} reaches level {level}", t(*unit)),
+        Event::SpellLearned { unit, spell: s } => {
+            format!("{} learns {}", t(*unit), spell_name(sim, *s))
+        }
+        Event::PhaseChanged { unit, phase } => format!("{} enters phase {phase}", t(*unit)),
+        Event::Summoned { unit, summoner } => {
+            format!("{} summons {} #{unit}", t(*summoner), t(*unit))
+        }
+        Event::Despawned { unit } => format!("#{unit} despawns"),
+        Event::FloorLoaded { floor } => format!("floor {floor} loaded"),
+        Event::FloorCleared { floor } => format!("floor {floor} cleared"),
+    };
+    format!("[{tick:05}] {body}")
 }
 
 pub fn wall(z: f32) -> Aabb {

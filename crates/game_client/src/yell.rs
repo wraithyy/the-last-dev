@@ -45,7 +45,10 @@ fn spawn_bubbles(
         };
         let state = sim.0.unit(*unit);
         let anchor_y = state.map_or(PLAYER_HEIGHT, |u| head_height(&u.key)) + BUBBLE_HEAD_GAP;
-        let trim = yell_color(sim.0.player() == Some(*unit));
+        let trim = yell_color(
+            sim.0.player() == Some(*unit),
+            state.is_some_and(|u| u.hostile),
+        );
         // Newer yell replaces the older bubble of the same unit (also one from this same frame).
         for (e, b) in &old {
             if b.sim == *unit {

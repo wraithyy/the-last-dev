@@ -18,6 +18,8 @@ pub struct PlayerBody {
     prev_pos: Vec3,
     prev_yaw: f32,
     vy: f32,
+    /// Horizontal knockback velocity, decaying each tick.
+    knock: Vec3,
 }
 
 impl PlayerBody {
@@ -26,6 +28,20 @@ impl PlayerBody {
         self.pos = pos;
         self.prev_pos = pos;
         self.vy = 0.0;
+        self.knock = Vec3::ZERO;
+    }
+
+    /// Teleport that also faces `yaw` without interpolating from the old heading.
+    pub fn teleport_facing(&mut self, pos: Vec3, yaw: f32) {
+        self.teleport(pos);
+        self.yaw = yaw;
+        self.prev_yaw = yaw;
+    }
+
+    /// Sim knockback: travel about `strength` metres along `dir` with a small hop.
+    pub fn knock_back(&mut self, dir: Vec3, strength: f32) {
+        self.knock = Vec3::new(dir.x, 0.0, dir.z).normalize_or_zero() * strength * KNOCK_DECAY;
+        self.vy = self.vy.max(KNOCK_HOP);
     }
 
     /// Off the ground: `simulate` zeroes `vy` whenever it snaps the feet to a surface.
@@ -47,19 +63,22 @@ impl Plugin for PlayerPlugin {
     }
 }
 
+/// Placed at the floor's `player_spawn` by the game flow once the first floor loads.
 fn spawn_player(mut commands: Commands) {
-    let pos = Vec3::from(PLAYER_SPAWN);
+    let pos = Vec3::ZERO;
+    let yaw = -std::f32::consts::FRAC_PI_2;
     commands.spawn((
         Player,
         PlayerBody {
             pos,
-            yaw: 0.0,
+            yaw,
             prev_pos: pos,
-            prev_yaw: 0.0,
+            prev_yaw: yaw,
             vy: 0.0,
+            knock: Vec3::ZERO,
         },
         Character {
-            kind: ModelKind::Engineer,
+            kind: ModelKind::ENGINEER,
             scale: PLAYER_MODEL_SCALE,
         },
         Transform::from_translation(pos),
@@ -91,7 +110,13 @@ fn simulate(
     };
     let local = Vec3::new(input.strafe, 0.0, -input.forward) * RUN_SPEED;
     let velocity = rot * local.clamp_length_max(max_speed);
-    body.pos = slide(body.pos, velocity * dt, &colliders.0);
+    let knock = body.knock;
+    body.pos = slide(body.pos, (velocity + knock) * dt, &colliders.0);
+    // Exponential decay: the integral of the initial speed is `strength` metres.
+    body.knock *= (-KNOCK_DECAY * dt).exp();
+    if body.knock.length_squared() < 0.01 {
+        body.knock = Vec3::ZERO;
+    }
 
     let ground = ground_height(body.pos, &colliders.0);
     if input.jump {

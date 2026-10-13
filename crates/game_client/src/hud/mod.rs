@@ -4,6 +4,7 @@
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
 mod actionbar;
+mod banners;
 mod feed;
 mod frames;
 
@@ -14,6 +15,8 @@ use bevy::prelude::*;
 use std::collections::HashMap;
 
 pub use actionbar::CooldownMaterial;
+pub use banners::Banner;
+pub use feed::LogLineMsg;
 
 /// Terminal cyan: focus, hover and "active" states across the HUD.
 pub const ACCENT: Color = Color::srgb(0.36, 0.82, 0.86);
@@ -46,6 +49,7 @@ impl Plugin for HudPlugin {
                 frames::FramesPlugin,
                 actionbar::ActionBarPlugin,
                 feed::FeedPlugin,
+                banners::BannersPlugin,
             ))
             .add_systems(Startup, spawn_misc)
             .add_systems(
@@ -55,6 +59,23 @@ impl Plugin for HudPlugin {
     }
 }
 
+/// Icon files shipped in `assets/icons` (see CREDITS.md). Any other key gets a
+/// generated letter badge, so content can name icons before art exists.
+pub const ICON_FILES: [&str; 12] = [
+    "code_review",
+    "code_smell",
+    "expired_gpu_credits",
+    "guardrails",
+    "hallucination_blast",
+    "mandatory_prompt_training_certificate",
+    "melee",
+    "nitpick",
+    "prompt_fragment",
+    "refactor",
+    "reject_pr",
+    "unread_ai_strategy_deck",
+];
+
 /// Icon handles by asset key, so per-frame UI updates never reload files.
 #[derive(Resource, Default)]
 pub struct IconCache(HashMap<String, Handle<Image>>);
@@ -63,7 +84,13 @@ impl IconCache {
     pub fn get(&mut self, assets: &AssetServer, key: &str) -> Handle<Image> {
         self.0
             .entry(key.to_owned())
-            .or_insert_with(|| assets.load(format!("icons/{key}.png")))
+            .or_insert_with(|| {
+                if ICON_FILES.contains(&key) {
+                    assets.load(format!("icons/{key}.png"))
+                } else {
+                    assets.add(crate::floors::icon_image(key))
+                }
+            })
             .clone()
     }
 }
@@ -174,7 +201,7 @@ fn spawn_misc(mut commands: Commands) {
         },
         children![(
             label(
-                "WASD move | RMB steer | LMB orbit | Wheel zoom | Space jump | Tab target | T auto | 1-4 cast | F loot | F3 debug | Esc menu",
+                "WASD move | RMB steer | LMB orbit | Wheel zoom | Space jump | Tab target | T auto | 1-0 cast | F / right-click talk, loot | F3 debug | Esc menu",
                 11.0,
             ),
             TextColor(Color::srgba(0.8, 0.9, 1.0, 0.5)),
@@ -253,6 +280,19 @@ fn update_dev_overlay(
         None => format!("tick {:?}\nno target", sim.0.now()),
     };
     set_text(text, &line);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ICON_FILES;
+
+    #[test]
+    fn listed_icon_files_exist() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/icons");
+        for k in ICON_FILES {
+            assert!(dir.join(format!("{k}.png")).exists(), "{k}");
+        }
+    }
 }
 
 /// QA hook (`WOW_HOVER_SLOT`): forces the tooltip of one action slot so it can be screenshotted without a pointer.

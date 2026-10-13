@@ -1,0 +1,464 @@
+# floor 1 playthrough, seed 7, start level 1
+[00001] floor 1 loaded
+[00002] Senior Engineer auto attack on
+[00002] Senior Engineer swings at Copilot Drone
+[00002] Senior Engineer hits Copilot Drone with melee for 13 (absorbed 0) CRIT
+[00002] MeatProxy ai Chase
+[00002] Copilot Drone ai Chase
+[00002] Senior Engineer enters combat
+[00002] MeatProxy enters combat
+[00002] Copilot Drone enters combat
+[00002] MeatProxy yells: Let me ask the AI how to fight you. One sec.
+[00002] Copilot Drone yells: Suggestion accepted!
+[00003] Senior Engineer begins Code Review (2000 ms)
+[00063] Senior Engineer casts Code Review
+[00063] Senior Engineer yells: Who approved this? Oh. The AI approved itself.
+[00063] Senior Engineer hits Copilot Drone with Code Review for 79 (absorbed 0)
+[00063] Senior Engineer auto attack off
+[00063] Copilot Drone dies (killer Senior Engineer)
+[00063] Copilot Drone ai Dead
+[00063] Senior Engineer gains 28 xp
+[00063] Copilot Drone drops []
+[00063] Copilot Drone leaves combat
+[00063] Copilot Drone yells: Suggestion... dismissed...
+[00064] Senior Engineer auto attack on
+[00064] Senior Engineer swings at MeatProxy
+[00064] Senior Engineer hits MeatProxy with melee for 14 (absorbed 0)
+[00065] Senior Engineer begins Code Review (2000 ms)
+[00098] MeatProxy ai Attack
+[00098] MeatProxy swings at Senior Engineer
+[00098] MeatProxy hits Senior Engineer with melee for 7 (absorbed 0)
+[00140] Senior Engineer casts Code Review
+[00140] Senior Engineer hits MeatProxy with Code Review for 79 (absorbed 0)
+[00140] MeatProxy gains code_smell
+[00140] Senior Engineer swings at MeatProxy
+[00140] Senior Engineer hits MeatProxy with melee for 9 (absorbed 0)
+[00141] Senior Engineer begins Refactor (2500 ms)
+[00158] MeatProxy swings at Senior Engineer
+[00158] MeatProxy hits Senior Engineer with melee for 7 (absorbed 0)
+[00169] MeatProxy begins Forwarded Reply (2000 ms)
+[00169] MeatProxy ai Casting
+[00169] MeatProxy yells: As an AI language model, I cannot hit you. Anyway:
+[00229] MeatProxy casts Forwarded Reply
+[00229] MeatProxy misses Senior Engineer with Forwarded Reply
+[00229] MeatProxy ai Attack
+[00229] MeatProxy swings at Senior Engineer
+[00229] MeatProxy hits Senior Engineer with melee for 7 (absorbed 0)
+[00246] Senior Engineer casts Refactor
+[00246] MeatProxy loses code_smell (Consumed)
+[00246] Senior Engineer hits MeatProxy with Refactor for 151 (absorbed 0) COMBO
+[00246] Senior Engineer auto attack off
+[00246] MeatProxy dies (killer Senior Engineer)
+[00246] MeatProxy ai Dead
+[00246] Senior Engineer gains 55 xp
+[00246] MeatProxy drops ["Pasted Chat Transcript", "Reply Sent to the Wrong Thread"]
+[00246] Senior Engineer leaves combat
+[00246] MeatProxy leaves combat
+[00246] MeatProxy yells: I apologize for the confusion...
+[00248] Senior Engineer auto attack on
+[00248] Senior Engineer swings at Copilot Drone
+[00248] Senior Engineer hits Copilot Drone with melee for 12 (absorbed 0)
+[00248] Copilot Drone ai Chase
+[00248] Vibe-Coding Junior ai Chase
+[00248] Copilot Drone ai Chase
+[00248] Senior Engineer enters combat
+[00248] Vibe-Coding Junior enters combat
+[00248] Copilot Drone enters combat
+[00248] Copilot Drone enters combat
+[00248] Vibe-Coding Junior yells: Can you review my PR? It's only 9,000 lines.
+[00248] Copilot Drone yells: Suggestion accepted!
+[00248] Copilot Drone yells: Suggestion accepted!
+[00249] Senior Engineer begins Code Review (2000 ms)
+[00309] Senior Engineer casts Code Review
+[00309] Senior Engineer yells: Line one: no. Line two: also no.
+[00309] Senior Engineer hits Copilot Drone with Code Review for 79 (absorbed 0)
+[00309] Senior Engineer auto attack off
+[00309] Copilot Drone dies (killer Senior Engineer)
+[00309] Copilot Drone ai Dead
+[00309] Senior Engineer gains 28 xp
+[00309] Copilot Drone drops ["Accepted Suggestion"]
+[00309] Copilot Drone leaves combat
+[00309] Copilot Drone yells: Suggestion... dismissed...
+[00310] Senior Engineer auto attack on
+[00310] Senior Engineer swings at Copilot Drone
+[00310] Senior Engineer hits Copilot Drone with melee for 12 (absorbed 0)
+[00311] Senior Engineer begins Code Review (2000 ms)
+[00312] Vibe-Coding Junior begins Review Request (2000 ms)
+[00312] Vibe-Coding Junior ai Casting
+[00312] Vibe-Coding Junior yells: Review request! Approve it so I can ask the AI why it broke.
+[00322] Copilot Drone ai Attack
+[00322] Copilot Drone swings at Senior Engineer
+[00322] Copilot Drone hits Senior Engineer with melee for 4 (absorbed 0)
+[00358] Copilot Drone swings at Senior Engineer
+[00358] Copilot Drone hits Senior Engineer with melee for 4 (absorbed 0)
+[00372] Vibe-Coding Junior casts Review Request
+[00372] Senior Engineer gains review_fatigue
+[00372] Vibe-Coding Junior ai Chase
+[00394] Copilot Drone swings at Senior Engineer
+[00394] Copilot Drone hits Senior Engineer with melee for 4 (absorbed 0)
+[00401] Senior Engineer casts Code Review
+[00401] Senior Engineer hits Copilot Drone with Code Review for 79 (absorbed 0)
+[00401] Senior Engineer auto attack off
+[00401] Copilot Drone dies (killer Senior Engineer)
+[00401] Copilot Drone ai Dead
+[00401] Senior Engineer gains 28 xp
+[00401] Copilot Drone drops ["Accepted Suggestion"]
+[00401] Copilot Drone leaves combat
+[00401] Copilot Drone yells: Suggestion... dismissed...
+[00402] Senior Engineer auto attack on
+[00402] Senior Engineer swings at Vibe-Coding Junior
+[00402] Senior Engineer hits Vibe-Coding Junior with melee for 9 (absorbed 0)
+[00403] Senior Engineer begins Code Review (2400 ms)
+[00404] Vibe-Coding Junior ai Attack
+[00404] Vibe-Coding Junior swings at Senior Engineer
+[00404] Vibe-Coding Junior hits Senior Engineer with melee for 7 (absorbed 0)
+[00451] AI-Native Intern yells: How do I exit vim? Asking for the AI.
+[00464] Vibe-Coding Junior swings at Senior Engineer
+[00464] Vibe-Coding Junior hits Senior Engineer with melee for 7 (absorbed 0)
+[00505] Senior Engineer casts Code Review
+[00505] Senior Engineer hits Vibe-Coding Junior with Code Review for 79 (absorbed 0)
+[00505] Vibe-Coding Junior gains code_smell
+[00505] Senior Engineer swings at Vibe-Coding Junior
+[00505] Senior Engineer misses Vibe-Coding Junior with melee
+[00506] Senior Engineer begins Refactor (3000 ms)
+[00524] Vibe-Coding Junior swings at Senior Engineer
+[00524] Vibe-Coding Junior hits Senior Engineer with melee for 7 (absorbed 0)
+[00563] IT Support yells: If we don't answer, it resolves itself. Industry best practice.
+[00584] Vibe-Coding Junior swings at Senior Engineer
+[00584] Vibe-Coding Junior hits Senior Engineer with melee for 7 (absorbed 0)
+[00626] Senior Engineer casts Refactor
+[00626] Senior Engineer yells: Rewriting this before it becomes load-bearing.
+[00626] Vibe-Coding Junior loses code_smell (Consumed)
+[00626] Senior Engineer hits Vibe-Coding Junior with Refactor for 151 (absorbed 0) COMBO
+[00626] Senior Engineer auto attack off
+[00626] Vibe-Coding Junior dies (killer Senior Engineer)
+[00626] Vibe-Coding Junior ai Dead
+[00626] Senior Engineer gains 50 xp
+[00626] Vibe-Coding Junior drops []
+[00626] Senior Engineer leaves combat
+[00626] Vibe-Coding Junior leaves combat
+[00626] Vibe-Coding Junior yells: I'll just... regenerate... myself...
+[00628] Senior Engineer auto attack on
+[00628] Senior Engineer swings at Vibe-Coding Junior
+[00628] Senior Engineer hits Vibe-Coding Junior with melee for 11 (absorbed 0)
+[00628] MeatProxy ai Chase
+[00628] Vibe-Coding Junior ai Chase
+[00628] Senior Engineer enters combat
+[00628] MeatProxy enters combat
+[00628] Vibe-Coding Junior enters combat
+[00628] MeatProxy yells: Let me ask the AI how to fight you. One sec.
+[00628] Vibe-Coding Junior yells: Can you review my PR? It's only 9,000 lines.
+[00629] Senior Engineer begins Code Review (2400 ms)
+[00672] Senior Engineer loses review_fatigue (Expired)
+[00701] Senior Engineer casts Code Review
+[00701] Senior Engineer hits Vibe-Coding Junior with Code Review for 79 (absorbed 0)
+[00701] Vibe-Coding Junior gains code_smell
+[00701] Senior Engineer swings at Vibe-Coding Junior
+[00701] Senior Engineer hits Vibe-Coding Junior with melee for 12 (absorbed 0)
+[00702] Senior Engineer begins Refactor (2500 ms)
+[00720] Vibe-Coding Junior ai Attack
+[00720] Vibe-Coding Junior swings at Senior Engineer
+[00720] Vibe-Coding Junior hits Senior Engineer with melee for 7 (absorbed 0)
+[00724] MeatProxy ai Attack
+[00724] MeatProxy swings at Senior Engineer
+[00724] MeatProxy hits Senior Engineer with melee for 7 (absorbed 0)
+[00737] Vibe-Coding Junior begins Review Request (2000 ms)
+[00737] Vibe-Coding Junior ai Casting
+[00737] Vibe-Coding Junior yells: Review request! Approve it so I can ask the AI why it broke.
+[00751] IT Support yells: Zzz... reboot... zzz...
+[00759] MeatProxy begins Forwarded Reply (2000 ms)
+[00759] MeatProxy ai Casting
+[00759] MeatProxy yells: As an AI language model, I cannot hit you. Anyway:
+[00797] Vibe-Coding Junior casts Review Request
+[00797] Senior Engineer gains review_fatigue
+[00797] Vibe-Coding Junior ai Attack
+[00797] Vibe-Coding Junior swings at Senior Engineer
+[00797] Vibe-Coding Junior hits Senior Engineer with melee for 7 (absorbed 0)
+[00807] Senior Engineer casts Refactor
+[00807] Vibe-Coding Junior loses code_smell (Consumed)
+[00807] Senior Engineer hits Vibe-Coding Junior with Refactor for 151 (absorbed 0) COMBO
+[00807] Senior Engineer auto attack off
+[00807] Vibe-Coding Junior dies (killer Senior Engineer)
+[00807] Vibe-Coding Junior ai Dead
+[00807] Senior Engineer gains 57 xp
+[00807] Vibe-Coding Junior drops ["final_final_v3_actually_works.zip"]
+[00807] Vibe-Coding Junior leaves combat
+[00807] Vibe-Coding Junior yells: I'll just... regenerate... myself...
+[00808] Senior Engineer auto attack on
+[00808] Senior Engineer swings at MeatProxy
+[00808] Senior Engineer misses MeatProxy with melee
+[00809] Senior Engineer begins Code Review (2400 ms)
+[00819] MeatProxy casts Forwarded Reply
+[00819] MeatProxy ai Attack
+[00819] MeatProxy swings at Senior Engineer
+[00819] MeatProxy hits Senior Engineer with melee for 7 (absorbed 0)
+[00879] MeatProxy swings at Senior Engineer
+[00879] MeatProxy hits Senior Engineer with melee for 7 (absorbed 0)
+[00911] Senior Engineer casts Code Review
+[00911] Senior Engineer yells: This function has forty parameters and a vibe.
+[00911] Senior Engineer hits MeatProxy with Code Review for 79 (absorbed 0)
+[00911] MeatProxy gains code_smell
+[00911] Senior Engineer swings at MeatProxy
+[00911] Senior Engineer hits MeatProxy with melee for 14 (absorbed 0)
+[00912] Senior Engineer begins Refactor (3000 ms)
+[00939] MeatProxy swings at Senior Engineer
+[00939] MeatProxy hits Senior Engineer with melee for 7 (absorbed 0)
+[00999] MeatProxy swings at Senior Engineer
+[00999] MeatProxy hits Senior Engineer with melee for 7 (absorbed 0)
+[01032] Senior Engineer casts Refactor
+[01032] MeatProxy loses code_smell (Consumed)
+[01032] Senior Engineer hits MeatProxy with Refactor for 151 (absorbed 0) COMBO
+[01032] Senior Engineer swings at MeatProxy
+[01032] Senior Engineer hits MeatProxy with melee for 14 (absorbed 0)
+[01032] Senior Engineer auto attack off
+[01032] MeatProxy dies (killer Senior Engineer)
+[01032] MeatProxy ai Dead
+[01032] Senior Engineer gains 63 xp
+[01032] MeatProxy drops []
+[01032] Senior Engineer leaves combat
+[01032] MeatProxy leaves combat
+[01032] MeatProxy yells: I apologize for the confusion...
+[01034] Senior Engineer auto attack on
+[01035] Senior Engineer begins Code Review (2400 ms)
+[01097] Senior Engineer loses review_fatigue (Expired)
+[01107] Senior Engineer casts Code Review
+[01107] Senior Engineer hits Copilot Drone with Code Review for 79 (absorbed 0)
+[01107] MeatProxy ai Chase
+[01107] Copilot Drone ai Chase
+[01107] Senior Engineer auto attack off
+[01107] Copilot Drone dies (killer Senior Engineer)
+[01107] Copilot Drone ai Dead
+[01107] Senior Engineer gains 31 xp
+[01107] Copilot Drone drops []
+[01107] Senior Engineer enters combat
+[01107] Copilot Drone enters combat
+[01107] MeatProxy enters combat
+[01107] Copilot Drone yells: Suggestion accepted!
+[01107] Copilot Drone yells: Suggestion... dismissed...
+[01107] MeatProxy yells: Let me ask the AI how to fight you. One sec.
+[01108] Senior Engineer auto attack on
+[01108] Senior Engineer swings at Copilot Drone
+[01108] Senior Engineer hits Copilot Drone with melee for 10 (absorbed 0)
+[01109] Senior Engineer begins Code Review (2000 ms)
+[01169] Senior Engineer casts Code Review
+[01169] Senior Engineer yells: Did anyone, at any point, read this?
+[01169] Senior Engineer hits Copilot Drone with Code Review for 79 (absorbed 0)
+[01169] Senior Engineer auto attack off
+[01169] Copilot Drone dies (killer Senior Engineer)
+[01169] Copilot Drone ai Dead
+[01169] Senior Engineer gains 31 xp
+[01169] Copilot Drone drops []
+[01169] Copilot Drone leaves combat
+[01169] Copilot Drone yells: Suggestion... dismissed...
+[01170] Senior Engineer auto attack on
+[01170] Senior Engineer swings at MeatProxy
+[01170] Senior Engineer hits MeatProxy with melee for 9 (absorbed 0)
+[01171] Senior Engineer begins Code Review (2000 ms)
+[01199] MeatProxy ai Attack
+[01199] MeatProxy swings at Senior Engineer
+[01199] MeatProxy hits Senior Engineer with melee for 7 (absorbed 0)
+[01246] Senior Engineer casts Code Review
+[01246] Senior Engineer hits MeatProxy with Code Review for 79 (absorbed 0)
+[01246] MeatProxy gains code_smell
+[01246] Senior Engineer swings at MeatProxy
+[01246] Senior Engineer hits MeatProxy with melee for 9 (absorbed 0)
+[01247] Senior Engineer begins Refactor (2500 ms)
+[01253] MeatProxy begins Forwarded Reply (2000 ms)
+[01253] MeatProxy ai Casting
+[01253] MeatProxy yells: As an AI language model, I cannot hit you. Anyway:
+[01313] MeatProxy casts Forwarded Reply
+[01313] MeatProxy hits Senior Engineer with Forwarded Reply for 39 (absorbed 0)
+[01313] MeatProxy ai Attack
+[01313] MeatProxy swings at Senior Engineer
+[01313] MeatProxy hits Senior Engineer with melee for 7 (absorbed 0)
+[01313] IT Support yells: Zzz... reboot... zzz...
+[01351] AI-Native Intern yells: Is a stack trace a kind of NFT?
+[01352] Senior Engineer casts Refactor
+[01352] Senior Engineer misses MeatProxy with Refactor
+[01352] Senior Engineer swings at MeatProxy
+[01352] Senior Engineer hits MeatProxy with melee for 10 (absorbed 0)
+[01353] Senior Engineer begins Refactor (2500 ms)
+[01373] MeatProxy swings at Senior Engineer
+[01373] MeatProxy hits Senior Engineer with melee for 7 (absorbed 0)
+[01433] MeatProxy swings at Senior Engineer
+[01433] MeatProxy hits Senior Engineer with melee for 7 (absorbed 0)
+[01458] Senior Engineer casts Refactor
+[01458] Senior Engineer yells: Deleting three thousand lines of generated code. Feels great.
+[01458] MeatProxy loses code_smell (Consumed)
+[01458] Senior Engineer hits MeatProxy with Refactor for 151 (absorbed 0) COMBO
+[01458] Senior Engineer auto attack off
+[01458] MeatProxy dies (killer Senior Engineer)
+[01458] MeatProxy ai Dead
+[01458] Senior Engineer gains 63 xp
+[01458] Senior Engineer reaches level 2
+[01458] Senior Engineer learns Reject PR
+[01458] MeatProxy drops ["Pasted Chat Transcript"]
+[01458] Senior Engineer leaves combat
+[01458] MeatProxy leaves combat
+[01458] MeatProxy yells: I apologize for the confusion...
+[01460] Senior Engineer auto attack on
+[01460] Senior Engineer swings at The Vibe Coder
+[01460] Senior Engineer hits The Vibe Coder with melee for 11 (absorbed 0)
+[01460] The Vibe Coder ai Chase
+[01460] Senior Engineer enters combat
+[01460] The Vibe Coder enters combat
+[01460] The Vibe Coder yells: Bro, it compiles. On my prompt.
+[01461] Senior Engineer begins Code Review (2000 ms)
+[01501] IT Support yells: Did you see the new ticket? Yeah. Let's not.
+[01521] Senior Engineer casts Code Review
+[01521] Senior Engineer hits The Vibe Coder with Code Review for 86 (absorbed 0)
+[01521] The Vibe Coder gains code_smell
+[01521] Senior Engineer swings at The Vibe Coder
+[01521] Senior Engineer hits The Vibe Coder with melee for 9 (absorbed 0)
+[01522] Senior Engineer begins Refactor (2500 ms)
+[01548] The Vibe Coder ai Attack
+[01548] The Vibe Coder swings at Senior Engineer
+[01548] The Vibe Coder hits Senior Engineer with melee for 12 (absorbed 0)
+[01608] The Vibe Coder swings at Senior Engineer
+[01608] The Vibe Coder hits Senior Engineer with melee for 12 (absorbed 0)
+[01627] Senior Engineer casts Refactor
+[01627] The Vibe Coder loses code_smell (Consumed)
+[01627] Senior Engineer hits The Vibe Coder with Refactor for 162 (absorbed 0) COMBO
+[01627] Senior Engineer swings at The Vibe Coder
+[01627] Senior Engineer hits The Vibe Coder with melee for 12 (absorbed 0)
+[01628] Senior Engineer begins Code Review (2000 ms)
+[01665] The Vibe Coder begins 4,000-Line Diff (3000 ms)
+[01665] The Vibe Coder ai Casting
+[01665] The Vibe Coder yells: Incoming PR: 4,000 lines, title 'small fix'.
+[01666] Senior Engineer casts Reject PR
+[01666] The Vibe Coder 4,000-Line Diff interrupted by Senior Engineer (lockout 4000 ms)
+[01666] The Vibe Coder ai Attack
+[01668] The Vibe Coder swings at Senior Engineer
+[01668] The Vibe Coder hits Senior Engineer with melee for 12 (absorbed 0)
+[01703] Senior Engineer casts Code Review
+[01703] Senior Engineer yells: Nit: the entire file.
+[01703] Senior Engineer hits The Vibe Coder with Code Review for 86 (absorbed 0)
+[01703] The Vibe Coder gains code_smell
+[01703] Senior Engineer swings at The Vibe Coder
+[01703] Senior Engineer hits The Vibe Coder with melee for 13 (absorbed 0)
+[01704] Senior Engineer begins Refactor (2500 ms)
+[01728] The Vibe Coder swings at Senior Engineer
+[01728] The Vibe Coder hits Senior Engineer with melee for 12 (absorbed 0)
+[01786] The Vibe Coder begins Generate Pull Requests (1500 ms)
+[01786] The Vibe Coder ai Casting
+[01786] The Vibe Coder yells: Spinning up more PRs! Reviewers, assemble!
+[01794] Senior Engineer casts Refactor
+[01794] The Vibe Coder loses code_smell (Consumed)
+[01794] Senior Engineer hits The Vibe Coder with Refactor for 162 (absorbed 0) COMBO
+[01794] Senior Engineer swings at The Vibe Coder
+[01794] Senior Engineer hits The Vibe Coder with melee for 11 (absorbed 0)
+[01795] Senior Engineer begins Code Review (2000 ms)
+[01831] The Vibe Coder casts Generate Pull Requests
+[01831] The Vibe Coder summons Unreviewed PR #16
+[01831] Unreviewed PR ai Chase
+[01831] The Vibe Coder summons Unreviewed PR #17
+[01831] Unreviewed PR ai Chase
+[01831] The Vibe Coder ai Attack
+[01831] The Vibe Coder swings at Senior Engineer
+[01831] The Vibe Coder hits Senior Engineer with melee for 12 (absorbed 0)
+[01831] Unreviewed PR enters combat
+[01831] Unreviewed PR enters combat
+[01831] Unreviewed PR yells: Pending review!
+[01831] Unreviewed PR yells: Pending review!
+[01832] Senior Engineer auto attack off
+[01832] Senior Engineer auto attack on
+[01833] Unreviewed PR ai Attack
+[01833] Unreviewed PR swings at Senior Engineer
+[01833] Unreviewed PR hits Senior Engineer with melee for 6 (absorbed 0)
+[01833] Unreviewed PR ai Attack
+[01833] Unreviewed PR swings at Senior Engineer
+[01833] Unreviewed PR hits Senior Engineer with melee for 6 (absorbed 0)
+[01878] Unreviewed PR swings at Senior Engineer
+[01878] Unreviewed PR hits Senior Engineer with melee for 6 (absorbed 0)
+[01878] Unreviewed PR swings at Senior Engineer
+[01878] Unreviewed PR hits Senior Engineer with melee for 6 (absorbed 0)
+[01885] Senior Engineer casts Code Review
+[01885] Senior Engineer hits The Vibe Coder with Code Review for 86 (absorbed 0)
+[01885] The Vibe Coder gains code_smell
+[01885] Senior Engineer swings at Unreviewed PR
+[01885] Senior Engineer hits Unreviewed PR with melee for 9 (absorbed 0)
+[01886] Senior Engineer begins Code Review (2000 ms)
+[01891] The Vibe Coder swings at Senior Engineer
+[01891] The Vibe Coder hits Senior Engineer with melee for 12 (absorbed 0)
+[01923] Unreviewed PR swings at Senior Engineer
+[01923] Unreviewed PR hits Senior Engineer with melee for 6 (absorbed 0)
+[01923] Unreviewed PR swings at Senior Engineer
+[01923] Unreviewed PR hits Senior Engineer with melee for 6 (absorbed 0)
+[01951] The Vibe Coder swings at Senior Engineer
+[01951] The Vibe Coder hits Senior Engineer with melee for 12 (absorbed 0)
+[01968] Unreviewed PR swings at Senior Engineer
+[01968] Unreviewed PR hits Senior Engineer with melee for 6 (absorbed 0)
+[01968] Unreviewed PR swings at Senior Engineer
+[01968] Unreviewed PR hits Senior Engineer with melee for 6 (absorbed 0)
+[01976] Senior Engineer casts Code Review
+[01976] Senior Engineer yells: Why is the password in the README? Why is there a README?
+[01976] Senior Engineer hits Unreviewed PR with Code Review for 86 (absorbed 0)
+[01976] Senior Engineer auto attack off
+[01976] Unreviewed PR dies (killer Senior Engineer)
+[01976] Unreviewed PR ai Dead
+[01976] Unreviewed PR drops []
+[01976] Unreviewed PR leaves combat
+[01976] Unreviewed PR yells: Closed... without... merging...
+[01977] Senior Engineer auto attack on
+[01977] Senior Engineer swings at Unreviewed PR
+[01977] Senior Engineer hits Unreviewed PR with melee for 9 (absorbed 0)
+[01978] Senior Engineer begins Code Review (2000 ms)
+[02011] The Vibe Coder swings at Senior Engineer
+[02011] The Vibe Coder hits Senior Engineer with melee for 12 (absorbed 0)
+[02013] Unreviewed PR swings at Senior Engineer
+[02013] Unreviewed PR hits Senior Engineer with melee for 6 (absorbed 0)
+[02058] Unreviewed PR swings at Senior Engineer
+[02058] Unreviewed PR hits Senior Engineer with melee for 6 (absorbed 0)
+[02062] The Vibe Coder begins 4,000-Line Diff (3000 ms)
+[02062] The Vibe Coder ai Casting
+[02062] The Vibe Coder yells: Just approve it, it's mostly whitespace.
+[02063] IT Support yells: Did you see the new ticket? Yeah. Let's not.
+[02068] Senior Engineer casts Code Review
+[02068] Senior Engineer hits Unreviewed PR with Code Review for 86 (absorbed 0)
+[02068] Senior Engineer auto attack off
+[02068] Unreviewed PR dies (killer Senior Engineer)
+[02068] Unreviewed PR ai Dead
+[02068] Unreviewed PR drops []
+[02068] Unreviewed PR leaves combat
+[02068] Unreviewed PR yells: Closed... without... merging...
+[02069] Senior Engineer auto attack on
+[02069] Senior Engineer swings at The Vibe Coder
+[02069] Senior Engineer hits The Vibe Coder with melee for 13 (absorbed 0)
+[02070] Senior Engineer begins Refactor (2500 ms)
+[02145] Senior Engineer casts Refactor
+[02145] The Vibe Coder loses code_smell (Consumed)
+[02145] Senior Engineer hits The Vibe Coder with Refactor for 162 (absorbed 0) COMBO
+[02145] Senior Engineer swings at The Vibe Coder
+[02145] Senior Engineer hits The Vibe Coder with melee for 10 (absorbed 0)
+[02145] The Vibe Coder yells: Wait, I can't Ctrl+Z real life?
+[02146] Senior Engineer begins Code Review (2000 ms)
+[02152] The Vibe Coder casts 4,000-Line Diff
+[02152] The Vibe Coder hits Senior Engineer with 4,000-Line Diff for 75 (absorbed 0)
+[02152] The Vibe Coder ai Attack
+[02152] The Vibe Coder swings at Senior Engineer
+[02152] The Vibe Coder hits Senior Engineer with melee for 12 (absorbed 0)
+[02212] The Vibe Coder swings at Senior Engineer
+[02212] The Vibe Coder hits Senior Engineer with melee for 12 (absorbed 0)
+[02236] Senior Engineer casts Code Review
+[02236] Senior Engineer yells: Who approved this? Oh. The AI approved itself.
+[02236] Senior Engineer hits The Vibe Coder with Code Review for 86 (absorbed 0)
+[02236] The Vibe Coder gains code_smell
+[02236] Senior Engineer swings at The Vibe Coder
+[02236] Senior Engineer hits The Vibe Coder with melee for 11 (absorbed 0)
+[02237] Senior Engineer begins Refactor (2500 ms)
+[02251] AI-Native Intern yells: My prompt has 4,000 words and it still won't center the div.
+[02251] IT Support yells: Is it lunch yet?
+[02272] The Vibe Coder swings at Senior Engineer
+[02272] The Vibe Coder hits Senior Engineer with melee for 12 (absorbed 0)
+[02327] Senior Engineer casts Refactor
+[02327] The Vibe Coder loses code_smell (Consumed)
+[02327] Senior Engineer hits The Vibe Coder with Refactor for 162 (absorbed 0) COMBO
+[02327] Senior Engineer auto attack off
+[02327] The Vibe Coder dies (killer Senior Engineer)
+[02327] The Vibe Coder ai Dead
+[02327] Senior Engineer gains 250 xp
+[02327] The Vibe Coder drops ["Prompt Fragment", "Mechanical Keyboard with No Keycaps"]
+[02327] floor 1 cleared
+[02327] Senior Engineer leaves combat
+[02327] The Vibe Coder leaves combat
+[02327] The Vibe Coder yells: But the AI said it was production-ready...

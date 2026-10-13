@@ -1,6 +1,6 @@
 //! Player-vs-static-AABB collision, kept free of ECS so it is unit-testable.
 
-use crate::config::{ARENA_HALF, PLAYER_HEIGHT, PLAYER_RADIUS, STEP_HEIGHT};
+use crate::config::{FLOOR_HALF_X, FLOOR_HALF_Z, PLAYER_HEIGHT, PLAYER_RADIUS, STEP_HEIGHT};
 use bevy::math::Vec3;
 use combat_core::{Aabb, Vec3 as CVec3};
 
@@ -28,6 +28,12 @@ fn blocks(pos: Vec3, b: &Aabb) -> bool {
     overlaps_xz(pos, b) && b.max.y > pos.y + STEP_HEIGHT && b.min.y < pos.y + PLAYER_HEIGHT
 }
 
+/// Public twin of `blocks` for layout validation (is this standing point free?).
+#[cfg(test)]
+pub fn blocks_at(pos: Vec3, b: &Aabb) -> bool {
+    blocks(pos, b)
+}
+
 /// Height of the walkable surface under the feet (floor or a prop top).
 pub fn ground_height(pos: Vec3, colliders: &[Aabb]) -> f32 {
     colliders
@@ -37,16 +43,35 @@ pub fn ground_height(pos: Vec3, colliders: &[Aabb]) -> f32 {
         .fold(0.0, f32::max)
 }
 
+/// A teleport target the sim chose without checking walls: the closest point on the way
+/// back towards `from` where the player fits (falls back to `from`).
+pub fn nearest_free(target: Vec3, from: Vec3, colliders: &[Aabb]) -> Vec3 {
+    let (limit_x, limit_z) = (FLOOR_HALF_X - PLAYER_RADIUS, FLOOR_HALF_Z - PLAYER_RADIUS);
+    let clamp = |p: Vec3| {
+        Vec3::new(
+            p.x.clamp(-limit_x, limit_x),
+            0.0,
+            p.z.clamp(-limit_z, limit_z),
+        )
+    };
+    let (target, from) = (clamp(target), clamp(from));
+    let steps = (target.distance(from) / 0.25).ceil().max(1.0) as u32;
+    (0..=steps)
+        .map(|i| target.lerp(from, i as f32 / steps as f32))
+        .find(|p| !colliders.iter().any(|b| blocks(*p, b)))
+        .unwrap_or(from)
+}
+
 /// Axis-separated sliding: each axis is committed only if it stays unblocked,
 /// so the player slides along walls instead of sticking.
 pub fn slide(mut pos: Vec3, delta: Vec3, colliders: &[Aabb]) -> Vec3 {
-    let limit = ARENA_HALF - PLAYER_RADIUS;
-    let x = (pos.x + delta.x).clamp(-limit, limit);
+    let (limit_x, limit_z) = (FLOOR_HALF_X - PLAYER_RADIUS, FLOOR_HALF_Z - PLAYER_RADIUS);
+    let x = (pos.x + delta.x).clamp(-limit_x, limit_x);
     let tried = Vec3::new(x, pos.y, pos.z);
     if !colliders.iter().any(|b| blocks(tried, b)) {
         pos = tried;
     }
-    let z = (pos.z + delta.z).clamp(-limit, limit);
+    let z = (pos.z + delta.z).clamp(-limit_z, limit_z);
     let tried = Vec3::new(pos.x, pos.y, z);
     if !colliders.iter().any(|b| blocks(tried, b)) {
         pos = tried;
@@ -71,6 +96,14 @@ mod tests {
         );
         assert_eq!(p.x, 0.2);
         assert_eq!(p.z, -4.0);
+    }
+
+    #[test]
+    fn teleport_into_a_wall_backs_off_towards_the_origin() {
+        let p = nearest_free(Vec3::new(0.0, 0.0, -5.0), Vec3::new(0.0, 0.0, 0.0), &wall());
+        assert!(p.z > -4.5 + PLAYER_RADIUS - 0.3 && p.z <= -4.0, "{p}");
+        let free = Vec3::new(3.0, 0.0, 2.0);
+        assert_eq!(nearest_free(free, Vec3::ZERO, &wall()), free);
     }
 
     #[test]

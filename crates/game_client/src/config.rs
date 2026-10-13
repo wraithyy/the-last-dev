@@ -4,16 +4,17 @@ use std::f32::consts::PI;
 
 pub const WINDOW_TITLE: &str = "The Last Dev";
 
-// Arena (metres). The floor spans [-ARENA_HALF, ARENA_HALF] on X and Z.
-pub const ARENA_HALF: f32 = 20.0;
+// Floors (metres). Every floor spans [-FLOOR_HALF_X, FLOOR_HALF_X] x [-FLOOR_HALF_Z, FLOOR_HALF_Z].
+pub const FLOOR_HALF_X: f32 = 40.0;
+pub const FLOOR_HALF_Z: f32 = 20.0;
 /// Also the ceiling height: the ceiling slab sits on top of the walls.
 pub const WALL_HEIGHT: f32 = 4.5;
 pub const WALL_THICKNESS: f32 = 0.5;
 
 // Player
-// Far enough from the south wall that the default camera distance is not clipped.
-// The CEO (z = -8) stays outside its 12 m aggro range from here.
-pub const PLAYER_SPAWN: [f32; 3] = [0.0, 0.0, 8.0];
+/// Knockback speed decay rate (1/s); also scales the initial speed so the push covers `strength` m.
+pub const KNOCK_DECAY: f32 = 7.0;
+pub const KNOCK_HOP: f32 = 3.5;
 pub const PLAYER_RADIUS: f32 = 0.4;
 pub const PLAYER_HEIGHT: f32 = 1.8;
 /// Eye height used as ray origin for LoS and camera collision.
@@ -30,8 +31,6 @@ pub const MOUSE_YAW_SENS: f32 = 0.005;
 
 /// Quaternius characters stand about 3.2 units tall (hair included) at scale 1, measured from the mesh bounds.
 pub const MODEL_NATIVE_HEIGHT: f32 = 3.2;
-pub const CEO_HEIGHT: f32 = PLAYER_HEIGHT * 1.5;
-pub const INTERN_HEIGHT: f32 = PLAYER_HEIGHT * 0.9;
 pub const PLAYER_MODEL_SCALE: f32 = PLAYER_HEIGHT / MODEL_NATIVE_HEIGHT;
 /// Tolerance for "standing on the ground" when deciding if a jump is allowed.
 pub const GROUND_EPSILON: f32 = 1e-3;
@@ -60,6 +59,8 @@ pub const CAM_MIN_HEIGHT: f32 = 0.2;
 /// Keeps the camera (and its near plane) below the ceiling slab.
 pub const CAM_MAX_HEIGHT: f32 = WALL_HEIGHT - 0.4;
 pub const CAM_FOCUS_HEIGHT: f32 = 1.5;
+/// Peak camera offset (m) of a full-trauma shake.
+pub const CAM_SHAKE_AMPLITUDE: f32 = 0.18;
 
 // Input
 /// Mouse travel (px) below which a left-button release counts as a click.
@@ -74,15 +75,13 @@ pub const PICK_SPHERE_HEIGHT: f32 = 1.3;
 
 // Combat bridge
 pub const SIM_SEED: u64 = 0x5EED_0000_C0DE;
-/// Client-side pre-check so an out-of-reach loot click gives feedback instead of silence.
-pub const LOOT_RANGE: f32 = 5.0;
 
 // HUD layout (logical px)
 pub const FRAME_W: f32 = 230.0;
 pub const FRAME_BAR_H: f32 = 13.0;
 pub const PORTRAIT_SIZE: f32 = 44.0;
-pub const ACTION_SLOT: f32 = 56.0;
-pub const ACTION_GAP: f32 = 6.0;
+pub const ACTION_SLOT: f32 = 46.0;
+pub const ACTION_GAP: f32 = 5.0;
 pub const AURA_ICON: f32 = 30.0;
 pub const AURA_SLOTS: usize = 8;
 pub const COMBAT_LOG_LINES: usize = 8;
@@ -97,7 +96,7 @@ pub const FLOAT_TEXT_RISE: f32 = 60.0;
 /// Gap above a unit's head where its floating numbers start.
 pub const FLOAT_TEXT_HEAD_GAP: f32 = 0.25;
 /// Speech bubbles sit above the floating-number start so numbers do not overprint them.
-pub const BUBBLE_HEAD_GAP: f32 = 0.7;
+pub const BUBBLE_HEAD_GAP: f32 = 1.05;
 pub const FLOAT_TEXT_SIZE: f32 = 26.0;
 pub const FLOAT_TEXT_CRIT_SIZE: f32 = 36.0;
 
@@ -124,6 +123,8 @@ pub const DEATH_FADE_COLOR: [f32; 3] = [0.5, 0.25, 0.7];
 pub const SHIELD_COLOR: [f32; 3] = [1.0, 0.85, 0.4];
 pub const TELEGRAPH_COLOR: [f32; 3] = [0.7, 0.2, 1.0];
 pub const TELEGRAPH_RADIUS: f32 = 2.4;
+pub const STUN_COLOR: [f32; 3] = [1.0, 0.9, 0.3];
+pub const LEVEL_UP_COLOR: [f32; 3] = [1.0, 0.8, 0.25];
 
 // HUD scaling
 pub const UI_REFERENCE_HEIGHT: f32 = 900.0;
@@ -134,9 +135,9 @@ pub const UI_MAX_SCALE: f32 = 2.0;
 
 /// Model height in metres by sim unit key; HUD anchors (numbers, bubbles) follow the unit's real head.
 pub fn head_height(key: &str) -> f32 {
-    match key {
-        "ceo" => CEO_HEIGHT,
-        "intern" => INTERN_HEIGHT,
-        _ => PLAYER_HEIGHT,
+    if crate::catalog::is_known(key) {
+        crate::catalog::unit_visual(key).height
+    } else {
+        PLAYER_HEIGHT
     }
 }

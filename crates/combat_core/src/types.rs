@@ -1,6 +1,6 @@
 //! Public value types shared with the client: commands in, events out.
 
-use crate::content::{School, SpellId};
+use crate::content::{IdlePose, School, SpellId};
 use crate::geom::Vec3;
 use crate::targeting::{EntityId, TargetError};
 
@@ -20,6 +20,9 @@ pub enum CastError {
     Moving,
     NotInterruptible,
     NothingToInterrupt,
+    Stunned,
+    Silenced,
+    NotLearned,
 }
 
 impl CastError {
@@ -40,6 +43,9 @@ impl CastError {
             CastError::Moving => "Can't do that while moving.",
             CastError::NotInterruptible => "That spell can't be interrupted.",
             CastError::NothingToInterrupt => "Nothing to interrupt.",
+            CastError::Stunned => "Can't do that while stunned.",
+            CastError::Silenced => "Can't do that while silenced.",
+            CastError::NotLearned => "You haven't learned that spell yet.",
         }
     }
 }
@@ -107,6 +113,10 @@ pub enum Command {
         unit: EntityId,
     },
     RespawnPlayer,
+    /// Talk to a friendly unit within `loot_range_m`; it answers with a `Yell` from its `talk` lines.
+    Talk {
+        unit: EntityId,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -204,6 +214,50 @@ pub enum Event {
     Respawned {
         unit: EntityId,
     },
+    Heal {
+        source: EntityId,
+        target: EntityId,
+        spell: Option<SpellId>,
+        amount: u32,
+    },
+    /// Impulse away from the caster. The sim moved sim-owned units already; the
+    /// client applies it to the player body.
+    Knockback {
+        unit: EntityId,
+        dir: Vec3,
+        strength: f32,
+    },
+    /// The unit was moved to `pos` (the client must move the player body there).
+    Teleported {
+        unit: EntityId,
+        pos: Vec3,
+    },
+    LevelUp {
+        unit: EntityId,
+        level: u8,
+    },
+    SpellLearned {
+        unit: EntityId,
+        spell: SpellId,
+    },
+    PhaseChanged {
+        unit: EntityId,
+        phase: u8,
+    },
+    Summoned {
+        unit: EntityId,
+        summoner: EntityId,
+    },
+    /// The unit is gone for good (floor change, or a summoned add that finished evading).
+    Despawned {
+        unit: EntityId,
+    },
+    FloorLoaded {
+        floor: u8,
+    },
+    FloorCleared {
+        floor: u8,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -223,6 +277,7 @@ pub struct AuraView {
     pub remaining_ms: u32,
     pub total_ms: u32,
     pub absorb_remaining: Option<u32>,
+    pub stacks: u8,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -252,6 +307,17 @@ pub struct UnitState {
     pub auto_attack: bool,
     /// Time until the next auto swing; 0 when off or ready and waiting.
     pub swing_remaining_ms: u32,
+    /// Player: XP needed for the next level (0 at the cap); others 0.
+    pub xp_to_next: u32,
+    /// The client must freeze the player while stunned.
+    pub stunned: bool,
+    pub silenced: bool,
+    pub boss: bool,
+    /// Social aggro group: when one member is pulled the whole pack joins.
+    pub pack: Option<u32>,
+    /// Boss phase, starting at 1.
+    pub phase: u8,
+    pub idle_pose: Option<IdlePose>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

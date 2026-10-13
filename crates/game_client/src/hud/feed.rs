@@ -17,6 +17,10 @@ const XP_PURPLE: Color = Color::srgb(0.6, 0.25, 0.85);
 
 #[derive(Resource, Default)]
 struct CombatLog(VecDeque<(String, Color)>);
+
+/// A client-side line for the combat log (no sim event behind it).
+#[derive(Message)]
+pub struct LogLineMsg(pub String, pub Color);
 #[derive(Component)]
 struct LogLine(usize);
 
@@ -55,9 +59,11 @@ pub struct FeedPlugin;
 impl Plugin for FeedPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CombatLog>()
+            .add_message::<LogLineMsg>()
             .init_resource::<ErrorBanner>()
             .init_resource::<LootState>()
             .add_systems(Startup, spawn_feed)
+            .add_systems(Update, close_loot_on_restart)
             .add_systems(
                 Update,
                 (
@@ -354,6 +360,7 @@ fn aura_name(sim: &CombatSim, target: EntityId, key: &str) -> String {
 fn collect_events(
     mut events: MessageReader<CombatEvent>,
     mut notices: MessageReader<UiNotice>,
+    mut extra: MessageReader<LogLineMsg>,
     sim: Res<CombatSim>,
     mut log: ResMut<CombatLog>,
     mut banner: ResMut<ErrorBanner>,
@@ -367,6 +374,9 @@ fn collect_events(
             log.0.pop_front();
         }
     };
+    for LogLineMsg(text, color) in extra.read() {
+        push(text.clone(), *color);
+    }
     for n in notices.read() {
         banner.text.clone_from(&n.0);
         banner.left = ERROR_TEXT_SECS;
@@ -480,10 +490,12 @@ fn collect_events(
             }
             Event::AuraApplied { target, key } => {
                 let name = aura_name(&sim, *target, key);
-                let line = if Some(*target) == me {
-                    format!("You gain {name}.")
-                } else {
-                    format!("{} is afflicted by {name}.", who(&sim, *target))
+                let harmful = sim.0.content().aura(key).is_none_or(|a| a.harmful);
+                let line = match (Some(*target) == me, harmful) {
+                    (true, true) => format!("You are afflicted by {name}."),
+                    (true, false) => format!("You gain {name}."),
+                    (false, true) => format!("{} is afflicted by {name}.", who(&sim, *target)),
+                    (false, false) => format!("{} gains {name}.", who(&sim, *target)),
                 };
                 push(line, Color::srgb(0.6, 0.85, 1.0));
             }
@@ -522,15 +534,64 @@ fn collect_events(
             }
             Event::Yell { unit, text } => {
                 // "you" would read oddly in "<name> yells", so use the unit's own name.
-                let name = sim
-                    .0
-                    .unit(*unit)
-                    .map_or_else(|| "Someone".into(), |u| u.name.clone());
+                let (name, hostile) = sim.0.unit(*unit).map_or_else(
+                    || ("Someone".to_string(), false),
+                    |u| (u.name.clone(), u.hostile),
+                );
                 push(
-                    format!("{name} yells: {text}"),
-                    copy::yell_color(me == Some(*unit)),
+                    format!("{name} {}: {text}", copy::speech_verb(hostile)),
+                    copy::yell_color(me == Some(*unit), hostile),
                 );
             }
+            Event::Heal {
+                source,
+                target,
+                spell,
+                amount,
+            } if *amount > 0 => {
+                let by = match spell {
+                    Some(s) => format!("{} {}", possessive(&sim, *source), spell_name(&sim, *s)),
+                    None => subject(&sim, *source),
+                };
+                push(
+                    format!("{by} heals {} for {amount}.", who(&sim, *target)),
+                    Color::srgb(0.4, 1.0, 0.45),
+                );
+            }
+            Event::LevelUp { unit, level } if Some(*unit) == me => {
+                push(copy::level_up_line(*level), Color::srgb(1.0, 0.82, 0.3));
+            }
+            Event::SpellLearned { unit, spell } if Some(*unit) == me => push(
+                format!("You learned {}.", spell_name(&sim, *spell)),
+                Color::srgb(1.0, 0.9, 0.5),
+            ),
+            Event::PhaseChanged { unit, phase } => push(
+                if *phase > 1 {
+                    format!("{} enters phase {phase}.", subject(&sim, *unit))
+                } else {
+                    format!("{} resets to phase 1.", subject(&sim, *unit))
+                },
+                Color::srgb(1.0, 0.55, 0.2),
+            ),
+            Event::Summoned { unit, summoner } => push(
+                format!("{} summons {}.", subject(&sim, *summoner), who(&sim, *unit)),
+                Color::srgb(0.85, 0.7, 1.0),
+            ),
+            Event::Knockback { unit, .. } if Some(*unit) == me => {
+                push("You are knocked back.".into(), Color::srgb(1.0, 0.6, 0.4));
+            }
+            Event::Teleported { unit, .. } if Some(*unit) == me => push(
+                "You have been reorganised to a new location.".into(),
+                Color::srgb(1.0, 0.6, 0.4),
+            ),
+            Event::FloorCleared { floor } => push(
+                if *floor >= crate::floors::FLOOR_COUNT {
+                    format!("Floor {floor} cleared. The board is calling an emergency meeting.")
+                } else {
+                    format!("Floor {floor} cleared. The elevator is unlocked.")
+                },
+                Color::srgb(0.4, 1.0, 0.5),
+            ),
             Event::Looted { looter, items, .. } if Some(*looter) == me => {
                 for item in items {
                     push(format!("You loot [{item}]."), Color::srgb(0.3, 0.9, 0.4));
@@ -655,13 +716,38 @@ fn update_xp(
     mut fill: Single<&mut Node, With<XpFill>>,
     mut text: Single<&mut Text, With<XpText>>,
 ) {
-    let xp = sim
-        .0
-        .player()
-        .and_then(|id| sim.0.unit(id))
-        .map_or(0, |u| u.xp);
-    let max = sim.0.content().config.xp_per_level.max(1);
-    let pct = (100.0 * xp as f32 / max as f32).clamp(0.0, 100.0);
+    let Some(u) = sim.0.player().and_then(|id| sim.0.unit(id)) else {
+        return;
+    };
+    if u.xp_to_next == 0 {
+        fill.width = percent(100);
+        set_text(
+            &mut text,
+            &format!(
+                "Lv {} | sprint progress: max level, backlog infinite",
+                u.level
+            ),
+        );
+        return;
+    }
+    let pct = (100.0 * u.xp as f32 / u.xp_to_next as f32).clamp(0.0, 100.0);
     fill.width = percent(pct);
-    set_text(&mut text, &format!("sprint progress {pct:.0}%"));
+    set_text(
+        &mut text,
+        &format!(
+            "Lv {} | sprint progress {} / {} ({pct:.0}%)",
+            u.level, u.xp, u.xp_to_next
+        ),
+    );
+}
+
+/// The old sim's corpse loot must not survive a restart.
+fn close_loot_on_restart(
+    mut restarted: MessageReader<crate::game::GameRestarted>,
+    mut loot: ResMut<LootState>,
+) {
+    if restarted.read().count() > 0 {
+        loot.items.clear();
+        loot.dirty = true;
+    }
 }

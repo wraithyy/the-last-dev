@@ -15,7 +15,7 @@ fn yells(h: &H) -> Vec<(u64, String)> {
 
 fn calm(c: &mut combat_core::Content) {
     if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
-        ai.ability = None;
+        ai.abilities.clear();
         ai.melee_damage = 0;
     }
 }
@@ -94,7 +94,7 @@ fn low_hp_once_then_death() {
 fn player_killed_yell() {
     let mut h = H::new(1, -3.0, |c| {
         if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
-            ai.ability = None;
+            ai.abilities.clear();
             ai.melee_damage = 10_000;
         }
     });

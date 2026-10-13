@@ -71,6 +71,7 @@ impl Sim {
         .is_ok();
         if u.swing_next > self.now
             || u.cast.is_some()
+            || self.has_aura_flag(i, |a| a.stun)
             || t.ai == Some(AiState::Evade)
             || !in_position
         {

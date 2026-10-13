@@ -3,39 +3,50 @@
 //! Locomotion is derived from transform motion; combat clips come from the
 //! `CombatAnim` counters on the same entity.
 
+use crate::catalog::{IdlePose, Paint};
 use crate::combat_anim::CombatAnim;
 use crate::config::RUN_SPEED;
 use crate::player::PlayerBody;
 use bevy::animation::AnimationTargetId;
-use bevy::gltf::Gltf;
+use bevy::gltf::{Gltf, GltfMaterialName};
 use bevy::prelude::*;
 use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::time::Duration;
 
+/// A character GLB, identified by its asset path (see `catalog::unit_visual`).
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ModelKind {
-    Ceo,
-    Engineer,
-    Intern,
-}
+pub struct ModelKind(pub &'static str);
 
 impl ModelKind {
-    const ALL: [ModelKind; 3] = [ModelKind::Ceo, ModelKind::Engineer, ModelKind::Intern];
+    pub const CEO: ModelKind = ModelKind("models/characters/Suit_Male_Bald.glb");
+    pub const ENGINEER: ModelKind = ModelKind("models/characters/Engineer.glb");
+    pub const INTERN: ModelKind = ModelKind("models/characters/Casual_Female.glb");
 
     fn path(self) -> &'static str {
-        match self {
-            ModelKind::Ceo => "models/characters/Suit_Male.glb",
-            ModelKind::Engineer => "models/characters/Casual3_Male.glb",
-            ModelKind::Intern => "models/characters/Casual_Female.glb",
-        }
+        self.0
     }
 }
+
+/// Runtime material recolours for a unit (shirt, skin, hair ...), applied once
+/// the model scene has spawned.
+#[derive(Component, Clone, Copy)]
+pub struct Paints(pub &'static [Paint]);
+
+#[derive(Component)]
+struct Painted;
+
+/// Marks the spawned scene root under a unit, so the idle pose can tilt it.
+#[derive(Component)]
+struct ModelRoot;
+
+#[derive(Resource, Default)]
+struct PaintCache(HashMap<(AssetId<StandardMaterial>, usize, usize), Handle<StandardMaterial>>);
 
 /// Put on a unit root; the model is spawned as a child once its glTF is loaded.
 /// Requires `CombatAnim` so every animated entity can be driven by the combat bridge.
 #[derive(Component)]
-#[require(AnimState, CombatAnim)]
+#[require(AnimState, CombatAnim, IdlePose)]
 pub struct Character {
     pub kind: ModelKind,
     pub scale: f32,
@@ -58,6 +69,8 @@ enum Clip {
     ReleaseUpper,
     /// Upper-body hit reaction, layered over whatever the legs are doing.
     Hit,
+    /// Seated idle: plays once and holds the last frame.
+    Sit,
 }
 
 struct Spec {
@@ -85,7 +98,7 @@ const fn overlay(clip: &'static str, speed: f32) -> Spec {
 }
 
 /// Indexed by `Clip as usize`.
-const SPECS: [Spec; 13] = [
+const SPECS: [Spec; 14] = [
     spec("Idle", 1.0),
     spec("Walk", 1.0),
     spec("Run", 1.0),
@@ -99,6 +112,7 @@ const SPECS: [Spec; 13] = [
     spec("Death", 1.0),
     overlay("Shoot_OneHanded", 1.0),
     overlay("RecieveHit", 1.3),
+    spec("SitDown", 1.0),
 ];
 const CLIP_COUNT: usize = SPECS.len();
 
@@ -113,6 +127,7 @@ impl Clip {
                 | Clip::Death
                 | Clip::ReleaseUpper
                 | Clip::Hit
+                | Clip::Sit
         )
     }
 }
@@ -174,13 +189,18 @@ pub struct AnimPlugin;
 
 impl Plugin for AnimPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, load_models)
-            .add_systems(Update, (spawn_models, attach_players, drive).chain());
+        app.init_resource::<PaintCache>()
+            .add_systems(Startup, load_models)
+            .add_systems(
+                Update,
+                (spawn_models, attach_players, apply_paints, pose_lean, drive).chain(),
+            );
     }
 }
 
 fn load_models(mut commands: Commands, assets: Res<AssetServer>) {
-    let map = ModelKind::ALL
+    // The three always-present models load now; catalog models load on first use.
+    let map = [ModelKind::CEO, ModelKind::ENGINEER, ModelKind::INTERN]
         .into_iter()
         .map(|k| {
             (
@@ -222,6 +242,7 @@ fn build_graph(
 
 fn spawn_models(
     mut commands: Commands,
+    assets: Res<AssetServer>,
     mut models: ResMut<Models>,
     gltfs: Res<Assets<Gltf>>,
     mut graphs: ResMut<Assets<AnimationGraph>>,
@@ -229,9 +250,12 @@ fn spawn_models(
     chars: Query<(Entity, &Character), Without<ModelSpawned>>,
 ) {
     for (entity, c) in &chars {
-        let Some(data) = models.0.get_mut(&c.kind) else {
-            continue;
-        };
+        let data = models.0.entry(c.kind).or_insert_with(|| ModelData {
+            gltf: assets.load(c.kind.path()),
+            graph: None,
+            built: false,
+            masked: false,
+        });
         let Some(gltf) = gltfs.get(&data.gltf) else {
             continue; // still loading
         };
@@ -254,6 +278,7 @@ fn spawn_models(
             .with_children(|p| {
                 // The models face +Z; Bevy "forward" is -Z.
                 p.spawn((
+                    ModelRoot,
                     WorldAssetRoot(scene),
                     Transform::from_rotation(Quat::from_rotation_y(PI))
                         .with_scale(Vec3::splat(c.scale)),
@@ -332,7 +357,13 @@ const VEL_SMOOTHING: f32 = 10.0;
 
 fn drive(
     time: Res<Time>,
-    mut owners: Query<(&Transform, &CombatAnim, &mut AnimState, Option<&PlayerBody>)>,
+    mut owners: Query<(
+        &Transform,
+        &CombatAnim,
+        &mut AnimState,
+        Option<&PlayerBody>,
+        &IdlePose,
+    )>,
     mut players: Query<(&mut AnimationPlayer, &mut AnimationTransitions, &AnimLink)>,
 ) {
     let dt = time.delta_secs();
@@ -340,7 +371,7 @@ fn drive(
         return;
     }
     for (mut player, mut tr, link) in &mut players {
-        let Ok((tf, ca, mut st, body)) = owners.get_mut(link.owner) else {
+        let Ok((tf, ca, mut st, body, pose)) = owners.get_mut(link.owner) else {
             continue;
         };
 
@@ -426,7 +457,7 @@ fn drive(
         } else if let (true, Some(cur)) = (st.one_shot, st.current) {
             cur
         } else {
-            base_clip(&mut st, tf, ca, body)
+            base_clip(&mut st, tf, ca, body, *pose)
         };
 
         if force || st.current != Some(want) {
@@ -450,7 +481,11 @@ fn base_clip(
     tf: &Transform,
     ca: &CombatAnim,
     body: Option<&PlayerBody>,
+    pose: IdlePose,
 ) -> Clip {
+    if matches!(pose, IdlePose::Sitting | IdlePose::Sleeping) && !ca.casting {
+        return Clip::Sit;
+    }
     if body.is_some_and(PlayerBody::airborne) {
         return Clip::Air;
     }
@@ -477,5 +512,87 @@ fn base_clip(
         Clip::Run
     } else {
         Clip::Walk
+    }
+}
+
+/// The player model's hair is split into `Hair_1`..`Hair_5` (thinning stages, see `hair.rs`);
+/// a "Hair" paint still covers every part.
+fn paint_matches(slot: &str, material: &str) -> bool {
+    material == slot
+        || (slot == "Hair"
+            && material
+                .strip_prefix("Hair_")
+                .is_some_and(|n| n.parse::<u8>().is_ok()))
+}
+
+/// Applies a unit's `Paints` to its model's materials. Recoloured materials are
+/// cached per (base material, paint list, slot) so units of one type share them.
+#[allow(clippy::type_complexity)] // Bevy query filter tuple
+fn apply_paints(
+    mut commands: Commands,
+    chars: Query<(Entity, &Paints), (With<ModelSpawned>, Without<Painted>)>,
+    children: Query<&Children>,
+    mut meshes: Query<(&GltfMaterialName, &mut MeshMaterial3d<StandardMaterial>)>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut cache: ResMut<PaintCache>,
+) {
+    for (entity, paints) in &chars {
+        let mut found = false;
+        for d in children.iter_descendants(entity) {
+            let Ok((name, mut handle)) = meshes.get_mut(d) else {
+                continue;
+            };
+            found = true;
+            let Some((idx, paint)) = paints
+                .0
+                .iter()
+                .enumerate()
+                .find(|(_, p)| paint_matches(p.slot, &name.0))
+            else {
+                continue;
+            };
+            let key = (handle.0.id(), paints.0.as_ptr() as usize, idx);
+            let painted = if let Some(h) = cache.0.get(&key) {
+                h.clone()
+            } else {
+                let Some(base) = materials.get(&handle.0) else {
+                    continue;
+                };
+                let mut m = base.clone();
+                m.base_color = Color::srgb(paint.rgb[0], paint.rgb[1], paint.rgb[2]);
+                if paint.glow {
+                    let lin = m.base_color.to_linear();
+                    m.emissive = LinearRgba::rgb(lin.red * 3.0, lin.green * 3.0, lin.blue * 3.0);
+                }
+                let h = materials.add(m);
+                cache.0.insert(key, h.clone());
+                h
+            };
+            handle.0 = painted;
+        }
+        if found {
+            commands.entity(entity).insert(Painted);
+        }
+    }
+}
+
+/// Slumps sleeping units forward; every other pose stands upright.
+fn pose_lean(
+    poses: Query<&IdlePose>,
+    mut roots: Query<(&ChildOf, &mut Transform), With<ModelRoot>>,
+) {
+    for (parent, mut tf) in &mut roots {
+        let Ok(pose) = poses.get(parent.parent()) else {
+            continue;
+        };
+        let lean = if *pose == IdlePose::Sleeping {
+            0.5
+        } else {
+            0.0
+        };
+        let rot = Quat::from_rotation_y(PI) * Quat::from_rotation_x(lean);
+        if tf.rotation != rot {
+            tf.rotation = rot;
+        }
     }
 }

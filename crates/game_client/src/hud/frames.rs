@@ -64,6 +64,17 @@ struct PoolRow(Who, Pool);
 struct Disc(Who);
 #[derive(Component)]
 struct BossTag(Who);
+/// "PROD" (boss, with its phase) or "ELITE" (mini-boss).
+#[derive(Component)]
+struct BossTagText(Who);
+
+/// The frame disc flashes when the tracked boss changes phase.
+#[derive(Resource, Default)]
+struct PhaseFlash {
+    unit: Option<EntityId>,
+    left: f32,
+}
+const PHASE_FLASH_SECS: f32 = 0.9;
 
 #[derive(Component)]
 struct CastRoot(Who);
@@ -98,6 +109,7 @@ enum Part {
     Icon,
     Time,
     Absorb,
+    Stacks,
 }
 #[derive(Component)]
 struct AuraPart(Row, usize, Part);
@@ -117,10 +129,13 @@ pub struct FramesPlugin;
 impl Plugin for FramesPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CastFlash>()
+            .init_resource::<PhaseFlash>()
             .add_systems(Startup, spawn_frames)
+            .add_systems(Update, reset_phase_flash_on_restart)
             .add_systems(
                 Update,
                 (
+                    collect_phase_flash,
                     update_frames,
                     collect_cast_flash,
                     update_cast_bars,
@@ -295,7 +310,11 @@ fn spawn_frame(commands: &mut Commands, who: Who, left: f32) {
                                         Color::srgb(0.4, 0.08, 0.06),
                                         Color::srgb(0.16, 0.03, 0.03),
                                     ),
-                                    children![(label("PROD", 9.0), TextColor(ACCENT_WARM))],
+                                    children![(
+                                        BossTagText(who),
+                                        label("PROD", 9.0),
+                                        TextColor(ACCENT_WARM)
+                                    )],
                                 ));
                             });
                         names.spawn((TextOf(who, Field::Title), label("", 10.0), TextColor(DIM)));
@@ -506,6 +525,17 @@ fn spawn_aura_row(
                         TextLayout::justify(Justify::Center),
                     ));
                     slot.spawn((
+                        AuraPart(row, i, Part::Stacks),
+                        label("", 11.0),
+                        TextColor(Color::WHITE),
+                        Node {
+                            position_type: PositionType::Absolute,
+                            bottom: px(0),
+                            right: px(1),
+                            ..default()
+                        },
+                    ));
+                    slot.spawn((
                         AuraPart(row, i, Part::Absorb),
                         label("", 10.0),
                         TextColor(Color::srgb(1.0, 0.9, 0.4)),
@@ -590,10 +620,27 @@ fn tracked(
     }
 }
 
+fn collect_phase_flash(
+    time: Res<Time>,
+    mut events: MessageReader<CombatEvent>,
+    mut flash: ResMut<PhaseFlash>,
+) {
+    flash.left = (flash.left - time.delta_secs()).max(0.0);
+    for CombatEvent(ev) in events.read() {
+        if let Event::PhaseChanged { unit, phase } = ev
+            && *phase > 1
+        {
+            flash.unit = Some(*unit);
+            flash.left = PHASE_FLASH_SECS;
+        }
+    }
+}
+
 fn update_frames(
     sim: Res<CombatSim>,
     target: Res<Target>,
     time: Res<Time>,
+    flash: Res<PhaseFlash>,
     units: Query<&SimUnit>,
     mut roots: Query<(&FrameRoot, &mut Node)>,
     mut rows: Query<(&PoolRow, &mut Node, &mut Visibility), Without<FrameRoot>>,
@@ -605,11 +652,21 @@ fn update_frames(
         (&BossTag, &mut Node, &mut Visibility),
         (Without<FrameRoot>, Without<PoolRow>, Without<Fill>),
     >,
-    mut texts: Query<(&TextOf, &mut Text, &mut TextColor)>,
+    mut texts: Query<(&TextOf, &mut Text, &mut TextColor), Without<BossTagText>>,
+    mut tag_texts: Query<(&BossTagText, &mut Text)>,
     mut discs: Query<(&Disc, &mut BackgroundColor, &mut BorderColor)>,
 ) {
     let state = |who| tracked(who, &sim, &target, &units).and_then(|id| sim.0.unit(id));
-    let boss = |who| state(who).is_some_and(|u| copy::is_boss(&u.key));
+    let boss = |who| state(who).is_some_and(|u| u.boss || copy::is_elite(&u.key));
+    for (BossTagText(who), mut text) in &mut tag_texts {
+        let Some(u) = state(*who) else { continue };
+        let tag = match (u.boss, u.phase) {
+            (true, p) if p > 1 => format!("PROD P{p}"),
+            (true, _) => "PROD".to_string(),
+            (false, _) => "ELITE".to_string(),
+        };
+        set_text(&mut text, &tag);
+    }
     for (root, mut node) in &mut roots {
         node.display = if state(root.0).is_some() {
             Display::Flex
@@ -682,7 +739,14 @@ fn update_frames(
                     Color::srgb(0.35, 1.0, 0.4)
                 };
             }
-            Field::Title => set_text(&mut text, copy::title_for(&u.key)),
+            Field::Title => set_text(
+                &mut text,
+                &sim.0
+                    .content()
+                    .unit_def(&u.key)
+                    .filter(|d| !d.title.is_empty())
+                    .map_or_else(String::new, |d| format!("<{}>", d.title)),
+            ),
             Field::Level => set_text(&mut text, &u.level.to_string()),
             Field::Initial => {
                 set_text(&mut text, &u.name.chars().next().unwrap_or('?').to_string())
@@ -701,7 +765,10 @@ fn update_frames(
     }
     for (Disc(who), mut bg, mut rim) in &mut discs {
         let Some(u) = state(*who) else { continue };
-        let want = BorderColor::all(if copy::is_boss(&u.key) {
+        let flashing = flash.left > 0.0 && flash.unit == Some(u.id);
+        let want = BorderColor::all(if flashing {
+            Color::WHITE
+        } else if u.boss || copy::is_elite(&u.key) {
             ACCENT_WARM
         } else {
             AVATAR_RIM
@@ -709,10 +776,18 @@ fn update_frames(
         if *rim != want {
             *rim = want;
         }
-        bg.0 = match (*who, u.hostile) {
+        let base = match (*who, u.hostile) {
             (Who::Player, _) => Color::srgb(0.2, 0.32, 0.75),
             (_, true) => Color::srgb(0.5, 0.14, 0.2),
             (_, false) => Color::srgb(0.2, 0.5, 0.3),
+        };
+        // A pulsing white-orange flash that fades over PHASE_FLASH_SECS.
+        bg.0 = if flashing {
+            let k = flash.left / PHASE_FLASH_SECS;
+            let pulse = 0.5 + 0.5 * (time.elapsed_secs() * 18.0).sin();
+            base.mix(&ACCENT_WARM.mix(&Color::WHITE, pulse), k)
+        } else {
+            base
         };
     }
 }
@@ -968,7 +1043,26 @@ fn update_auras(
                 &a.absorb_remaining
                     .map_or_else(String::new, |n| n.to_string()),
             ),
+            Part::Stacks => set_text(
+                &mut text,
+                &if a.stacks > 1 {
+                    a.stacks.to_string()
+                } else {
+                    String::new()
+                },
+            ),
             Part::Icon => {}
         }
+    }
+}
+
+/// Sim ids restart at 1, so a pending flash could match an unrelated new unit.
+fn reset_phase_flash_on_restart(
+    mut restarted: MessageReader<crate::game::GameRestarted>,
+    mut flash: ResMut<PhaseFlash>,
+) {
+    if restarted.read().count() > 0 {
+        flash.unit = None;
+        flash.left = 0.0;
     }
 }

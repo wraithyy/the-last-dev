@@ -26,6 +26,7 @@ impl Plugin for VfxPlugin {
                 update_hand_glow,
                 update_shield,
                 update_telegraph,
+                update_stun_stars,
                 move_projectiles,
                 fade_transients,
             )
@@ -39,6 +40,7 @@ impl Plugin for VfxPlugin {
 struct VfxAssets {
     sphere: Handle<Mesh>,
     ring: Handle<Mesh>,
+    star: Handle<StandardMaterial>,
 }
 
 #[derive(Component)]
@@ -49,6 +51,9 @@ struct HandGlow;
 struct ShieldBubble;
 #[derive(Component)]
 struct Telegraph(EntityId);
+/// Spinning stars over a stunned unit's head.
+#[derive(Component)]
+struct StunStars(EntityId);
 
 #[derive(Component)]
 struct Projectile {
@@ -92,10 +97,15 @@ fn glow(color: Color) -> StandardMaterial {
     }
 }
 
-fn setup_assets(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
+fn setup_assets(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     commands.insert_resource(VfxAssets {
         sphere: meshes.add(Sphere::new(1.0)),
         ring: meshes.add(Annulus::new(0.9, 1.0)),
+        star: materials.add(glow(rgb(STUN_COLOR))),
     });
 }
 
@@ -104,11 +114,34 @@ fn attach_vfx(
     mut commands: Commands,
     assets: Res<VfxAssets>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    q: Query<(Entity, &SimUnit, &Unit, Has<Player>), Without<VfxAttached>>,
+    sim: Res<CombatSim>,
+    q: Query<(Entity, &SimUnit, Option<&Unit>, Has<Player>), Without<VfxAttached>>,
 ) {
     for (entity, sim_unit, unit, is_player) in &q {
         let mut e = commands.entity(entity);
         e.insert(VfxAttached);
+        let head = sim
+            .0
+            .unit(sim_unit.0)
+            .map_or(PLAYER_HEIGHT, |u| head_height(&u.key));
+        e.with_children(|c| {
+            c.spawn((
+                StunStars(sim_unit.0),
+                Transform::from_xyz(0.0, head + 0.25, 0.0),
+                Visibility::Hidden,
+            ))
+            .with_children(|stars| {
+                for k in 0..3 {
+                    let a = k as f32 * std::f32::consts::TAU / 3.0;
+                    stars.spawn((
+                        Mesh3d(assets.sphere.clone()),
+                        MeshMaterial3d(assets.star.clone()),
+                        Transform::from_xyz(0.32 * a.cos(), 0.0, 0.32 * a.sin())
+                            .with_scale(Vec3::splat(0.07)),
+                    ));
+                }
+            });
+        });
         if is_player {
             let glow_mat = materials.add(glow(Color::srgba(0.5, 0.8, 1.0, 0.9)));
             let shield_mat = materials.add(glow(rgb(SHIELD_COLOR).with_alpha(0.22)));
@@ -130,7 +163,7 @@ fn attach_vfx(
                     Visibility::Hidden,
                 ));
             });
-        } else if unit.hostile {
+        } else if unit.is_some_and(|u| u.hostile) {
             let mat = materials.add(glow(rgb(TELEGRAPH_COLOR).with_alpha(0.6)));
             e.with_children(|c| {
                 c.spawn((
@@ -177,6 +210,51 @@ fn spawn_transient(
         MeshMaterial3d(material),
         Transform::from_translation(at).with_scale(Vec3::splat(from)),
     ));
+}
+
+/// Flat expanding ring on the ground plane (level-up burst).
+fn spawn_ring(
+    commands: &mut Commands,
+    assets: &VfxAssets,
+    materials: &mut Assets<StandardMaterial>,
+    at: Vec3,
+    (from, to, life): (f32, f32, f32),
+    color: Color,
+) {
+    let material = materials.add(glow(color));
+    commands.spawn((
+        Transient {
+            age: 0.0,
+            life,
+            from,
+            to,
+            color,
+            material: material.clone(),
+        },
+        Mesh3d(assets.ring.clone()),
+        MeshMaterial3d(material),
+        Transform::from_translation(at)
+            .with_rotation(Quat::from_rotation_x(-FRAC_PI_2))
+            .with_scale(Vec3::splat(from)),
+    ));
+}
+
+fn update_stun_stars(
+    time: Res<Time>,
+    sim: Res<CombatSim>,
+    mut stars: Query<(&StunStars, &mut Visibility, &mut Transform)>,
+) {
+    for (s, mut vis, mut tf) in &mut stars {
+        let stunned = sim.0.unit(s.0).is_some_and(|u| u.stunned && u.alive);
+        vis.set_if_neq(if stunned {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        });
+        if stunned {
+            tf.rotation = Quat::from_rotation_y(time.elapsed_secs() * 4.0);
+        }
+    }
 }
 
 fn spawn_from_events(
@@ -258,6 +336,41 @@ fn spawn_from_events(
                         at + Vec3::Y * PROJECTILE_TARGET_Y,
                         (0.3, 1.6, BURST_SECS),
                         rgb(INTERRUPT_COLOR).with_alpha(0.8),
+                    );
+                }
+            }
+            Event::Summoned { unit, .. } => {
+                if let Some(u) = sim.0.unit(*unit) {
+                    spawn_transient(
+                        &mut commands,
+                        &assets,
+                        &mut materials,
+                        Vec3::new(u.pos.x, u.pos.y + 1.0, u.pos.z),
+                        (0.3, 1.7, 0.6),
+                        Color::srgba(0.85, 0.85, 0.9, 0.6),
+                    );
+                }
+            }
+            Event::LevelUp { unit, .. } if *unit == player.0 => {
+                if let Some(at) = unit_pos(units.iter(), *unit) {
+                    let gold = rgb(LEVEL_UP_COLOR);
+                    for (from, to, life, y) in [(0.4, 3.2, 0.9, 0.1), (0.2, 2.2, 1.2, 1.0)] {
+                        spawn_ring(
+                            &mut commands,
+                            &assets,
+                            &mut materials,
+                            at + Vec3::Y * y,
+                            (from, to, life),
+                            gold.with_alpha(0.9),
+                        );
+                    }
+                    spawn_transient(
+                        &mut commands,
+                        &assets,
+                        &mut materials,
+                        at + Vec3::Y * 1.0,
+                        (0.5, 1.8, 0.8),
+                        gold.with_alpha(0.45),
                     );
                 }
             }

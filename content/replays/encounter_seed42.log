@@ -10,7 +10,7 @@
 [00003] Senior Engineer begins Code Review (2000 ms)
 [00063] Senior Engineer casts Code Review
 [00063] Senior Engineer yells: Who approved this? Oh. The AI approved itself.
-[00063] Senior Engineer hits CEO with Code Review for 79 (absorbed 0)
+[00063] Senior Engineer hits CEO with Code Review for 93 (absorbed 0)
 [00063] CEO gains code_smell
 [00063] Senior Engineer swings at CEO
 [00063] Senior Engineer hits CEO with melee for 10 (absorbed 0)
@@ -22,14 +22,14 @@
 [00150] CEO hits Senior Engineer with melee for 14 (absorbed 0)
 [00169] Senior Engineer casts Refactor
 [00169] CEO loses code_smell (Consumed)
-[00169] Senior Engineer hits CEO with Refactor for 151 (absorbed 0) COMBO
+[00169] Senior Engineer hits CEO with Refactor for 174 (absorbed 0) COMBO
 [00169] Senior Engineer swings at CEO
 [00169] Senior Engineer misses CEO with melee
 [00170] Senior Engineer begins Code Review (2000 ms)
 [00210] CEO swings at Senior Engineer
 [00210] CEO hits Senior Engineer with melee for 14 (absorbed 0)
 [00245] Senior Engineer casts Code Review
-[00245] Senior Engineer hits CEO with Code Review for 79 (absorbed 0)
+[00245] Senior Engineer hits CEO with Code Review for 93 (absorbed 0)
 [00245] CEO gains code_smell
 [00245] Senior Engineer swings at CEO
 [00245] Senior Engineer hits CEO with melee for 9 (absorbed 0)
@@ -53,21 +53,21 @@
 [00394] CEO hits Senior Engineer with melee for 0 (absorbed 14)
 [00413] Senior Engineer casts Refactor
 [00413] CEO loses code_smell (Consumed)
-[00413] Senior Engineer hits CEO with Refactor for 151 (absorbed 0) COMBO
+[00413] Senior Engineer hits CEO with Refactor for 174 (absorbed 0) COMBO
 [00413] Senior Engineer swings at CEO
 [00413] Senior Engineer hits CEO with melee for 14 (absorbed 0)
 [00414] Senior Engineer begins Code Review (2000 ms)
 [00454] CEO swings at Senior Engineer
 [00454] CEO hits Senior Engineer with melee for 0 (absorbed 14)
 [00474] Senior Engineer casts Code Review
-[00474] Senior Engineer hits CEO with Code Review for 79 (absorbed 0)
+[00474] Senior Engineer hits CEO with Code Review for 93 (absorbed 0)
 [00474] CEO gains code_smell
 [00474] Senior Engineer swings at CEO
 [00474] Senior Engineer hits CEO with melee for 13 (absorbed 0)
+[00474] CEO yells: Impossible! The AI said this quarter would be flawless!
 [00475] Senior Engineer begins Refactor (2500 ms)
 [00514] CEO swings at Senior Engineer
 [00514] CEO hits Senior Engineer with melee for 0 (absorbed 14)
-[00529] CEO yells: AI is not a tool. AI is a lifestyle.
 [00542] CEO begins Hallucination Blast (2500 ms)
 [00542] CEO ai Casting
 [00542] CEO yells: Mandatory all-hands! Attendance is tracked!
@@ -77,54 +77,24 @@
 [00543] CEO ai Attack
 [00550] Senior Engineer casts Refactor
 [00550] CEO loses code_smell (Consumed)
-[00550] Senior Engineer hits CEO with Refactor for 151 (absorbed 0) COMBO
+[00550] Senior Engineer hits CEO with Refactor for 174 (absorbed 0) COMBO
 [00550] Senior Engineer swings at CEO
 [00550] Senior Engineer hits CEO with melee for 11 (absorbed 0)
-[00550] CEO yells: Impossible! The AI said this quarter would be flawless!
+[00551] Senior Engineer begins Code Review (2000 ms)
 [00574] CEO swings at Senior Engineer
 [00574] CEO hits Senior Engineer with melee for 1 (absorbed 13)
 [00574] Senior Engineer loses guardrails (Depleted)
-[00604] Senior Engineer swings at CEO
-[00604] Senior Engineer hits CEO with melee for 14 (absorbed 0)
-[00633] Senior Engineer begins Code Review (2000 ms)
-[00634] CEO swings at Senior Engineer
-[00634] CEO hits Senior Engineer with melee for 14 (absorbed 0)
-[00694] CEO swings at Senior Engineer
-[00694] CEO hits Senior Engineer with melee for 14 (absorbed 0)
-[00723] Senior Engineer casts Code Review
-[00723] Senior Engineer hits CEO with Code Review for 79 (absorbed 0)
-[00723] CEO gains code_smell
-[00723] Senior Engineer swings at CEO
-[00723] Senior Engineer hits CEO with melee for 15 (absorbed 0) CRIT
-[00754] CEO swings at Senior Engineer
-[00754] CEO hits Senior Engineer with melee for 14 (absorbed 0)
-[00777] Senior Engineer swings at CEO
-[00777] Senior Engineer hits CEO with melee for 9 (absorbed 0)
-[00799] CEO begins Hallucination Blast (2500 ms)
-[00799] CEO ai Casting
-[00799] CEO yells: Synergize THIS!
-[00831] Senior Engineer swings at CEO
-[00831] Senior Engineer hits CEO with melee for 11 (absorbed 0)
-[00843] Senior Engineer begins Code Review (2000 ms)
-[00874] CEO casts Hallucination Blast
-[00874] CEO hits Senior Engineer with Hallucination Blast for 45 (absorbed 0)
-[00874] CEO ai Attack
-[00874] CEO swings at Senior Engineer
-[00874] CEO hits Senior Engineer with melee for 14 (absorbed 0)
-[00933] Senior Engineer casts Code Review
-[00933] Senior Engineer yells: Line one: no. Line two: also no.
-[00933] Senior Engineer misses CEO with Code Review
-[00933] Senior Engineer swings at CEO
-[00933] Senior Engineer hits CEO with melee for 10 (absorbed 0)
-[00933] CEO loses code_smell (Death)
-[00933] Senior Engineer auto attack off
-[00933] CEO dies (killer Senior Engineer)
-[00933] CEO ai Dead
-[00933] Senior Engineer gains 120 xp
-[00933] CEO drops ["Prompt Fragment"]
-[00933] Senior Engineer leaves combat
-[00933] CEO leaves combat
-[00933] CEO yells: But... the slide deck... promised... ROI...
-[00934] Senior Engineer loots CEO ["Prompt Fragment"]
-[01383] CEO respawns
-[01383] CEO ai Idle
+[00626] Senior Engineer casts Code Review
+[00626] Senior Engineer hits CEO with Code Review for 93 (absorbed 0)
+[00626] Senior Engineer auto attack off
+[00626] CEO dies (killer Senior Engineer)
+[00626] CEO ai Dead
+[00626] Senior Engineer gains 120 xp
+[00626] CEO drops ["Prompt Fragment"]
+[00626] Senior Engineer leaves combat
+[00626] CEO leaves combat
+[00626] CEO yells: But... the slide deck... promised... ROI...
+[00627] Senior Engineer loots CEO ["Prompt Fragment"]
+[00901] AI-Native Intern yells: My prompt has 4,000 words and it still won't center the div.
+[01076] CEO respawns
+[01076] CEO ai Idle

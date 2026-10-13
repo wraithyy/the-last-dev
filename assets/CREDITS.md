@@ -8,13 +8,23 @@ Both packs are CC0 (https://creativecommons.org/publicdomain/zero/1.0/); attribu
 
 Ultimate Animated Character Pack (Nov 2019) by Quaternius (https://quaternius.com), CC0. The original License.txt is
 assets/models/LICENSE-quaternius.txt. The glTF files were repacked into single .glb files
-(scripts/gltf_to_glb.py), and the "Skin" and "Face" material colours were changed to skin tones and dark eyes.
+(scripts/gltf_to_glb.py), and the "Skin" and "Face" material colours were changed to skin tones and dark eyes. Suit_Male_Bald.glb (the CEO) is derived from Suit_Male by scripts/ceo_hair.py: short hair, receding hairline, grey-to-black vertex colours.
 
-| File | Character | Role |
+Nine base models cover the whole cast; per-unit shirt, hair and skin colours are applied at runtime
+(`crates/game_client/src/catalog.rs`). Skin tones differ per base model for variety.
+
+| File | Character | Used for |
 |---|---|---|
-| assets/models/characters/Suit_Male.glb | Suit_Male | CEO |
-| assets/models/characters/Casual3_Male.glb | Casual3_Male | Senior Engineer |
-| assets/models/characters/Casual_Female.glb | Casual_Female | AI-Native Intern |
+| assets/models/characters/Suit_Male.glb | Suit_Male | CEO, Customer, CISO, Middle Manager, Project Manager |
+| assets/models/characters/Suit_Female.glb | Suit_Female | VP of Synergy, Head of Marketing, HR Business Partner, Sales Rep, Account Manager |
+| assets/models/characters/Casual3_Male.glb | Casual3_Male | Product Owner |
+| assets/models/characters/Engineer.glb | Casual2_Male body with the Casual3_Male hair, recoloured (black tee, jeans) and hair split into Hair_1..Hair_5 by scripts/split_hair.py | Senior Engineer (player) |
+| assets/models/characters/Casual_Female.glb | Casual_Female | AI-Native Intern, Agile Coach, LinkedIn Influencer |
+| assets/models/characters/Casual2_Male.glb | Casual2_Male | Vibe Coder, Vibe-Coding Junior, Scrum Master, Crypto Bro, Growth Hacker, IT Support |
+| assets/models/characters/Casual_Male.glb | Casual_Male | MeatProxy, Copilot Drone, Chatbot Minion, Unreviewed PR |
+| assets/models/characters/Doctor_Male_Young.glb | Doctor_Male_Young | The Analyst |
+| assets/models/characters/Doctor_Female_Old.glb | Doctor_Female_Old | AI Ethicist |
+| assets/models/characters/Worker_Male.glb | Worker_Male | Consultant, Security Analyst |
 
 ### Furniture (Kenney)
 
@@ -25,6 +35,13 @@ The original License.txt is in assets/models/LICENSE-kenney.txt.
 | assets/models/furniture/ | Kenney Furniture Kit 2.0 | https://kenney.nl/assets/furniture-kit |
 
 Author: Kenney (https://www.kenney.nl).
+
+Used pieces, unmodified: bookcaseClosed, bookcaseClosedWide, bookcaseOpen, books, cardboardBoxClosed, chairDesk,
+chairModernCushion, coatRackStanding, computerKeyboard, computerMouse, computerScreen, desk, cabinetTelevision,
+benchCushion, kitchenCoffeeMachine, kitchenFridge, lampRoundFloor, lampRoundTable, lampSquareFloor, laptop,
+loungeChair, loungeChairRelax, loungeDesignSofa, loungeSofa, loungeSofaLong, plantSmall1-3, pottedPlant,
+rugRectangle, rugRound, sideTable, stoolBar, table, tableCoffee, tableCoffeeGlass, tableGlass, tableRound,
+televisionModern, trashcan. Everything else (walls, glass, elevators, foosball, shrines, signs) is built from primitives.
 
 ## Spell icons (Painterly Spell Icons)
 
@@ -60,10 +77,13 @@ Authors: Lorc (https://lorcblog.blogspot.com), Delapouite (https://delapouite.co
 
 ## Procedural textures
 
-The carpet, ceiling tiles and wall posters are generated in code (`crates/game_client/src/arena.rs`). No external art is used.
+The carpet, marble, ceiling tiles, posters, signs, Gantt charts, skyline and screens are generated in code
+(`crates/game_client/src/floors/textures.rs`), text included, with a built-in 5x7 bitmap font. No external art or font is used for them.
 
 ## Fonts
 
 | File | Font | Licence | Source |
 |---|---|---|---|
 | assets/fonts/JetBrainsMono-Bold.ttf | JetBrains Mono Bold v2.304, (c) 2020 The JetBrains Mono Project Authors | SIL Open Font License 1.1 (assets/fonts/OFL-JetBrainsMono.txt) | https://github.com/JetBrains/JetBrainsMono |
+
+Icons whose key has no file in `icons/` are generated at runtime as letter badges (no external art).

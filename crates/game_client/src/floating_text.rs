@@ -7,7 +7,38 @@ use crate::config::*;
 use crate::player::Player;
 use crate::presentation::PresentEvent;
 use bevy::prelude::*;
-use combat_core::{EntityId, Event};
+use combat_core::{Content, Effect, EntityId, Event, SpellId};
+
+const DOT_TEXT_SIZE: f32 = 18.0;
+const HEAL_GREEN: Color = Color::srgb(0.35, 1.0, 0.4);
+
+/// Damage from a spell whose effects deal no direct damage came from its aura (DoT tick, Deadline).
+fn is_periodic(content: &Content, spell: Option<SpellId>) -> bool {
+    spell.and_then(|id| content.spell(id)).is_some_and(|d| {
+        !std::iter::once(&d.effect)
+            .chain(&d.extra_effects)
+            .any(|e| matches!(e, Effect::Damage { .. }))
+    })
+}
+
+/// An execute spell that hit a target at or below its threshold (judged from HP after the hit).
+fn is_execute(
+    content: &Content,
+    spell: Option<SpellId>,
+    hp_after: u32,
+    amount: u32,
+    max_hp: u32,
+) -> bool {
+    let threshold = spell
+        .and_then(|id| content.spell(id))
+        .and_then(|d| match &d.effect {
+            Effect::Damage {
+                execute: Some(e), ..
+            } => Some(e.below_pct),
+            _ => None,
+        });
+    threshold.is_some_and(|pct| (hp_after + amount) * 100 <= pct * max_hp.max(1))
+}
 
 const POP_SECS: f32 = 0.22;
 const TEXT_BOX_W: f32 = 240.0;
@@ -60,12 +91,27 @@ fn spawn_texts(
     let interrupts = raw
         .read()
         .map(|CombatEvent(ev)| ev)
-        .filter(|ev| matches!(ev, Event::CastInterrupted { .. }));
+        .filter(|ev| matches!(ev, Event::CastInterrupted { .. } | Event::Heal { .. }));
     let presented = present.read().map(|PresentEvent(ev)| ev);
     for ev in interrupts.chain(presented) {
         let (target, specs) = match ev {
+            Event::Heal { target, amount, .. } if *amount > 0 => {
+                let stagger = STAGGER[*counter % STAGGER.len()];
+                *counter += 1;
+                (
+                    *target,
+                    vec![Spec {
+                        text: format!("+{amount}"),
+                        size: FLOAT_TEXT_SIZE,
+                        color: HEAL_GREEN,
+                        offset: Vec2::new(stagger, 0.0),
+                        pop: false,
+                    }],
+                )
+            }
             Event::Damage {
                 target,
+                spell,
                 amount,
                 absorbed,
                 crit,
@@ -73,6 +119,11 @@ fn spawn_texts(
                 ..
             } => {
                 let on_player = *target == player.0;
+                let content = sim.0.content();
+                let dot = is_periodic(content, *spell);
+                let execute = sim.0.unit(*target).is_some_and(|u| {
+                    *amount > 0 && is_execute(content, *spell, u.hp, *amount, u.max_hp)
+                });
                 let stagger = STAGGER[*counter % STAGGER.len()];
                 *counter += 1;
                 let base = if on_player {
@@ -90,14 +141,25 @@ fn spawn_texts(
                         } else {
                             amount.to_string()
                         },
-                        size: if *crit {
+                        size: if *crit || execute {
                             FLOAT_TEXT_CRIT_SIZE
+                        } else if dot {
+                            DOT_TEXT_SIZE
                         } else {
                             FLOAT_TEXT_SIZE
                         },
                         color: base,
                         offset: Vec2::new(stagger, 0.0),
-                        pop: *crit,
+                        pop: *crit || execute,
+                    });
+                }
+                if execute && !on_player {
+                    specs.push(Spec {
+                        text: "EXECUTE!".into(),
+                        size: 20.0,
+                        color: Color::srgb(1.0, 0.3, 0.2),
+                        offset: Vec2::new(stagger, -26.0),
+                        pop: true,
                     });
                 }
                 if *absorbed > 0 {
