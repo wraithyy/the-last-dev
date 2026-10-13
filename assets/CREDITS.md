@@ -41,7 +41,9 @@ chairModernCushion, coatRackStanding, computerKeyboard, computerMouse, computerS
 benchCushion, kitchenCoffeeMachine, kitchenFridge, lampRoundFloor, lampRoundTable, lampSquareFloor, laptop,
 loungeChair, loungeChairRelax, loungeDesignSofa, loungeSofa, loungeSofaLong, plantSmall1-3, pottedPlant,
 rugRectangle, rugRound, sideTable, stoolBar, table, tableCoffee, tableCoffeeGlass, tableGlass, tableRound,
-televisionModern, trashcan. Everything else (walls, glass, elevators, foosball, shrines, signs) is built from primitives.
+televisionModern, trashcan. Everything else (walls, glass, elevators, foosball, shrines, signs, the whole campus,
+data center and innovation lab, and the primitive-built units in `crates/game_client/src/rigs.rs`) is built from
+primitives and procedural textures; no new assets were added for those zones.
 
 ## Spell icons (Painterly Spell Icons)
 
@@ -109,6 +111,32 @@ found at http://opengameart.org. Used under CC BY 3.0
 | assets/icons/write_by_hand.png | part 2, lightning-magenta-1 | https://opengameart.org/content/painterly-spell-icons-part-2 |
 | assets/icons/yesterday.png | part 1, fireball-sky-1 | https://opengameart.org/content/painterly-spell-icons-part-1 |
 | assets/icons/zero_trust.png | part 1, protect-sky-1 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/recalculating_route.png | part 3, runes-blue-2 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/hit_and_run.png | part 2, rock-plain-1 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/free_swag.png | part 3, leaf-royal-1 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/brand_awareness.png | part 1, enchant-royal-1 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/batch_blessing.png | part 2, haste-sky-1 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/exhaust_gust.png | part 3, wind-red-2 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/context_window.png | part 2, beam-eerie-1 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/agentic_copy.png | part 2, vines-jade-1 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/job_pending.png | part 2, ice-sky-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/preemption.png | part 2, lighting-sky-1 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/fair_share.png | part 3, explosion-sky-1 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/overheating.png | part 1, fireball-red-2 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/rack_failover.png | part 2, beam-orange-1 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/thermal_event.png | part 3, explosion-orange-3 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/hot_aisle.png | part 2, lightning-orange-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/live_demo.png | part 1, fireball-acid-1 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/series_b.png | part 3, leaf-orange-1 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/demo_works.png | part 1, protect-jade-1 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/demo_crashed.png | part 3, horror-red-3 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/prompt_injected.png | part 2, lightning-jade-1 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/jailbreak.png | part 2, lighting-eerie-1 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/confident_answer.png | part 1, enchant-acid-1 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/hallucinate_copies.png | part 3, wild-acid-1 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/emergent_capability.png | part 1, evil-eye-eerie-3 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/alignment_training.png | part 1, protect-acid-1 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/self_improvement.png | part 1, enchant-red-1 | https://opengameart.org/content/painterly-spell-icons-part-1 |
 
 ## UI icons (game-icons.net)
 
@@ -166,8 +194,38 @@ bonus they grant (red HP, blue mana, violet spell power, gold crit, teal haste, 
 | assets/icons/parachute.png | parachute | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/parachute.svg |
 | assets/icons/robot.png | robot-grab | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/robot-grab.svg |
 | assets/icons/rss.png | rss | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/rss.svg |
+| assets/icons/access_badge.png | police-badge | andymeneely | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/andymeneely/police-badge.svg |
+| assets/icons/delivery_receipt.png | door | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/door.svg |
+| assets/icons/scooter_helmet.png | full-motorcycle-helmet | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/full-motorcycle-helmet.svg |
+| assets/icons/oat_milk_prompt.png | milk-carton | rihlsul | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/rihlsul/milk-carton.svg |
+| assets/icons/stress_ball.png | throwing-ball | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/throwing-ball.svg |
+| assets/icons/gpu_candle.png | candle-flame | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/candle-flame.svg |
+| assets/icons/rack_screw.png | screw | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/screw.svg |
+| assets/icons/token_invoice.png | price-tag | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/price-tag.svg |
+| assets/icons/agent_memory.png | microchip | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/microchip.svg |
+| assets/icons/cron.png | clockwork | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/clockwork.svg |
+| assets/icons/queue_ticket.png | human-pyramid | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/human-pyramid.svg |
+| assets/icons/priority_low.png | snail | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/snail.svg |
+| assets/icons/thermal_paste.png | dripping-tube | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/dripping-tube.svg |
+| assets/icons/incident_report.png | thermometer-hot | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/thermometer-hot.svg |
+| assets/icons/fan_blade.png | computer-fan | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/computer-fan.svg |
+| assets/icons/demo_laptop.png | laptop | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/laptop.svg |
+| assets/icons/term_sheet.png | scroll-quill | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/scroll-quill.svg |
+| assets/icons/prompt_certificate.png | ribbon-medal | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/ribbon-medal.svg |
+| assets/icons/rack_chair.png | server-rack | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/server-rack.svg |
+| assets/icons/still_typing.png | discussion | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/discussion.svg |
+| assets/icons/benchmark.png | podium-winner | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/podium-winner.svg |
+| assets/icons/visitor_badge.png | mug-shot | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/mug-shot.svg |
+| assets/icons/judgment.png | semi-closed-eye | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/semi-closed-eye.svg |
+| assets/icons/lighter.png | lighter | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/lighter.svg |
+| assets/icons/room_booking.png | checklist | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/checklist.svg |
+| assets/icons/wont_fix.png | cancel | sbed | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/sbed/cancel.svg |
+| assets/icons/human_inside.png | person | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/person.svg |
+| assets/icons/demo_lanyard.png | ribbon | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/ribbon.svg |
 
-Authors: Lorc (https://lorcblog.blogspot.com), Delapouite (https://delapouite.com).
+Authors: Lorc (https://lorcblog.blogspot.com), Delapouite (https://delapouite.com), Andy Meneely (http://www.se.rit.edu/~andy/), sbed (http://opengameart.org/content/95-game-icons), rihlsul (https://github.com/game-icons/icons/tree/master/rihlsul). Glyph names and authors per https://game-icons.net/about.html.
+
+The 28 item icons added later are regenerated by `scripts/game_icons.py`, which holds the glyph table.
 
 ## Drawn for this project
 

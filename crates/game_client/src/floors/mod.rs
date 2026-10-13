@@ -1,34 +1,47 @@
-//! Client-side world for the five-floor tower. `layout` builds each floor as
+//! Client-side world: the campus, the tower, the data center and the lab (zones). `layout` builds each floor as
 //! pure data (pieces, blockers, anchors); this module turns a layout into
 //! entities and keeps the shared `Colliders` list in sync. The game flow
 //! (`game.rs`) decides which floor to load; `WOW_LINEUP=1|2` shows the whole
 //! cast side by side on a bare stage instead.
 
+mod campus;
+mod datacenter;
 mod kit;
+mod lab;
 mod layout;
 mod props;
 mod shape;
+#[cfg(test)]
+mod testgrid;
 mod textures;
 mod themes;
+mod zones;
 
-pub use layout::{FLOOR_COUNT, build_floor, elevator_exit_trigger};
+use layout::build_floor;
+pub use layout::{FloorLayout, elevator_exit_trigger};
 pub use textures::{icon_image, z_image};
+pub use zones::{build_zone, door_trigger};
 
 use crate::arena::Colliders;
 use crate::config::WALL_HEIGHT;
 use bevy::asset::RenderAssetUsages;
+use bevy::camera::visibility::VisibilityRange;
 use bevy::light::{CascadeShadowConfigBuilder, NotShadowCaster};
 use bevy::math::Affine2;
 use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::pbr::DistanceFog;
 use bevy::prelude::*;
-use kit::{FURNITURE_SCALE, Mat, Piece, Tex};
+use kit::{FURNITURE_SCALE, Mat, Piece, PrimKind, Tex};
 use shape::Seg;
 use std::collections::HashMap;
 
-/// Ask the floors module to swap to floor `id` (1..=5) on the next frame.
+/// Ask the floors module to swap to tower floor `id` (1..=5) on the next frame.
 #[derive(Message)]
 pub struct LoadFloor(pub u8);
+
+/// Ask the floors module to swap to any zone of the contract ("campus", "lab/2", ...).
+#[derive(Message)]
+pub struct LoadZone(pub String);
 
 /// Only the floor, ceiling and lights: used by the cast lineup.
 #[derive(Resource)]
@@ -40,22 +53,40 @@ struct FloorEntity;
 #[derive(Component)]
 struct Sun;
 
+/// Decor further than this from the camera is not drawn outdoors (WebGL2 draw-call budget);
+/// the fog hides the cut. Indoors the walls already hide most of it, so the range is shorter.
+const DECOR_RANGE_OUTDOOR: f32 = 95.0;
+const DECOR_RANGE_INDOOR: f32 = 70.0;
+/// Pieces whose longest side is below this are decor, the rest are structure.
+const DECOR_MAX_SIDE: f32 = 7.0;
+/// Pieces lower than this cast no shadow: they would only add draw calls to the shadow pass.
+const SHADOW_MIN_HEIGHT: f32 = 1.3;
+
 pub struct FloorsPlugin;
 
 impl Plugin for FloorsPlugin {
     fn build(&self, app: &mut App) {
-        if std::env::var("WOW_LINEUP").is_ok() {
+        if let Ok(which) = std::env::var("WOW_LINEUP") {
+            // The big rigs of lineup 3 need open sky above them; the others fit under the tower ceiling.
+            let outdoors = which == "3";
             app.insert_resource(BareStage).add_systems(
                 Startup,
-                |mut w: MessageWriter<LoadFloor>| {
-                    w.write(LoadFloor(1));
+                move |mut floor: MessageWriter<LoadFloor>, mut zone: MessageWriter<LoadZone>| {
+                    if outdoors {
+                        zone.write(LoadZone("campus".into()));
+                    } else {
+                        floor.write(LoadFloor(1));
+                    }
                 },
             );
         }
         app.add_message::<LoadFloor>()
+            .add_message::<LoadZone>()
+            .init_resource::<BlinkMats>()
             .add_systems(Startup, spawn_sun)
             // Same frame as the sim floor swap, so movement never slides against old blockers.
-            .add_systems(Update, load_floor.after(crate::game::FloorSwap));
+            .add_systems(Update, load_floor.after(crate::game::FloorSwap))
+            .add_systems(Update, blink_leds);
     }
 }
 
@@ -91,42 +122,116 @@ fn get_mat(
         .clone()
 }
 
+/// Scene-wide look settings a zone load rewrites.
+#[derive(bevy::ecs::system::SystemParam)]
+struct Look<'w, 's> {
+    ambient: ResMut<'w, GlobalAmbientLight>,
+    clear: ResMut<'w, ClearColor>,
+    ceiling: ResMut<'w, crate::arena::CameraCeiling>,
+    fogs: Query<'w, 's, &'static mut DistanceFog>,
+    sun: Query<'w, 's, &'static mut DirectionalLight, With<Sun>>,
+}
+
+/// The shared materials of the blinking LEDs with their resting emissive colour and pattern.
+#[derive(Resource, Default)]
+struct BlinkMats(Vec<(Handle<StandardMaterial>, LinearRgba, Mat)>);
+
+/// Square-ish blink: each pattern has its own period and duty, so racks never pulse in unison.
+fn blink_level(pattern: Mat, t: f32) -> f32 {
+    let (period, duty, phase) = match pattern {
+        Mat::BlinkGreenA => (1.3, 0.7, 0.0),
+        Mat::BlinkGreenB => (0.7, 0.5, 0.3),
+        Mat::BlinkRed => (2.1, 0.35, 0.9),
+        Mat::BlinkBlue => (1.7, 0.6, 0.5),
+        _ => (0.9, 0.45, 0.1),
+    };
+    let x = (t / period + phase).fract();
+    if x < duty { 1.0 } else { 0.08 }
+}
+
+fn blink_leds(
+    time: Res<Time>,
+    blink: Res<BlinkMats>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let t = time.elapsed_secs();
+    for (handle, base, pattern) in &blink.0 {
+        let k = blink_level(*pattern, t);
+        if let Some(mut m) = materials.get_mut(handle) {
+            let e = *base * k;
+            if m.emissive != e {
+                m.emissive = e;
+            }
+        }
+    }
+}
+
+fn is_blink(mat: Mat) -> bool {
+    matches!(
+        mat,
+        Mat::BlinkGreenA | Mat::BlinkGreenB | Mat::BlinkRed | Mat::BlinkBlue | Mat::BlinkAmber
+    )
+}
+
+/// Longest horizontal or vertical side.
+fn max_side(v: Vec3) -> f32 {
+    v.x.max(v.y).max(v.z)
+}
+
 #[allow(clippy::too_many_arguments)] // Bevy system params
 fn load_floor(
     mut commands: Commands,
-    mut requests: MessageReader<LoadFloor>,
+    mut floor_requests: MessageReader<LoadFloor>,
+    mut zone_requests: MessageReader<LoadZone>,
     old: Query<Entity, With<FloorEntity>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut images: ResMut<Assets<Image>>,
     assets: Res<AssetServer>,
     mut colliders: ResMut<Colliders>,
-    mut ambient: ResMut<GlobalAmbientLight>,
-    mut clear: ResMut<ClearColor>,
-    mut fogs: Query<&mut DistanceFog>,
-    mut sun: Query<&mut DirectionalLight, With<Sun>>,
+    mut look: Look,
+    mut blink: ResMut<BlinkMats>,
     bare: Option<Res<BareStage>>,
 ) {
-    let Some(LoadFloor(id)) = requests.read().last() else {
-        return;
+    let floor_req = floor_requests.read().last().map(|r| r.0);
+    let zone_req = zone_requests.read().last().map(|r| r.0.clone());
+    let layout = match (zone_req, floor_req) {
+        (Some(id), _) => match build_zone(&id) {
+            Some(l) => l,
+            None => {
+                error!("unknown zone {id:?}");
+                return;
+            }
+        },
+        (None, Some(id)) => build_floor(id),
+        (None, None) => return,
     };
-    let layout = build_floor(*id);
     for e in &old {
         commands.entity(e).despawn();
     }
+    let bare = bare.is_some();
 
     let t = &layout.theme;
-    ambient.color = t.ambient;
-    ambient.brightness = t.ambient_brightness;
-    clear.0 = t.fog;
-    for mut fog in &mut fogs {
+    look.ambient.color = t.ambient;
+    look.ambient.brightness = t.ambient_brightness;
+    look.clear.0 = t.fog;
+    for mut fog in &mut look.fogs {
         fog.color = t.fog;
+        fog.falloff = bevy::pbr::FogFalloff::Linear {
+            start: t.fog_range.0,
+            end: t.fog_range.1,
+        };
     }
-    for mut light in &mut sun {
+    for mut light in &mut look.sun {
         light.color = t.sun;
         light.illuminance = t.sun_illuminance;
     }
-    colliders.0 = if bare.is_some() {
+    look.ceiling.0 = if layout.outdoor {
+        60.0
+    } else {
+        crate::config::CAM_MAX_HEIGHT
+    };
+    colliders.0 = if bare {
         Vec::new()
     } else {
         layout.blockers.clone()
@@ -136,10 +241,10 @@ fn load_floor(
     let floor = materials.add(StandardMaterial {
         base_color_texture: Some(images.add(textures::floor_image(t.floor))),
         uv_transform: Affine2::from_scale(Vec2::splat(0.25)),
-        perceptual_roughness: if matches!(t.floor, layout::FloorKind::Marble) {
-            0.3
-        } else {
-            0.95
+        perceptual_roughness: match t.floor {
+            layout::FloorKind::Marble | layout::FloorKind::Gloss(_) => 0.3,
+            layout::FloorKind::Tile(_) => 0.5,
+            _ => 0.95,
         },
         ..default()
     });
@@ -151,30 +256,59 @@ fn load_floor(
     ));
     // Ceiling is single-sided (culled from above, so the overview camera sees through it).
     // It casts no shadow (it would black out the directional light) and is not a collider:
-    // camera.rs clamps height instead.
-    let ceiling = materials.add(StandardMaterial {
-        base_color_texture: Some(images.add(textures::ceiling_image())),
-        // 4 tiles per repeat: ~0.6 m panels.
-        uv_transform: Affine2::from_scale(Vec2::splat(0.4)),
-        perceptual_roughness: 0.95,
-        // The slab is only lit from below by point lights; a faint floor keeps it readable.
-        emissive: LinearRgba::rgb(0.05, 0.05, 0.06),
-        ..default()
-    });
-    commands.spawn((
-        FloorEntity,
-        Mesh3d(meshes.add(flat_mesh(&runs, WALL_HEIGHT, false))),
-        MeshMaterial3d(ceiling),
-        NotShadowCaster,
-    ));
+    // camera.rs clamps height instead. Outdoors there is none: that is the sky.
+    if !layout.outdoor {
+        let ceiling = materials.add(StandardMaterial {
+            base_color_texture: Some(images.add(textures::ceiling_image())),
+            // 4 tiles per repeat: ~0.6 m panels.
+            uv_transform: Affine2::from_scale(Vec2::splat(0.4)),
+            perceptual_roughness: 0.95,
+            // The slab is only lit from below by point lights; a faint floor keeps it readable.
+            emissive: LinearRgba::rgb(0.05, 0.05, 0.06),
+            ..default()
+        });
+        commands.spawn((
+            FloorEntity,
+            Mesh3d(meshes.add(flat_mesh(&runs, WALL_HEIGHT, false))),
+            MeshMaterial3d(ceiling),
+            NotShadowCaster,
+        ));
+    }
 
     let unit_cube = meshes.add(Cuboid::from_length(1.0));
     let quad = meshes.add(Rectangle::new(1.0, 1.0));
+    let cylinder = meshes.add(Cylinder::new(0.5, 1.0));
+    let sphere = meshes.add(Sphere::new(0.5).mesh().uv(24, 12));
+    let cone = meshes.add(Cone {
+        radius: 0.5,
+        height: 1.0,
+    });
     let mut mats: HashMap<Mat, Handle<StandardMaterial>> = HashMap::new();
     let mut texs: HashMap<Tex, Handle<StandardMaterial>> = HashMap::new();
+    // The QA overview camera sits far above everything: culling would hide all the decor.
+    let overview = std::env::var_os("WOW_TOPDOWN").is_some();
+    let decor_range = VisibilityRange::abrupt(
+        0.0,
+        match (overview, layout.outdoor) {
+            (true, _) => f32::MAX,
+            (_, true) => DECOR_RANGE_OUTDOOR,
+            (_, false) => DECOR_RANGE_INDOOR,
+        },
+    );
+    // Small, low or see-through things: no shadow, culled with distance when small.
+    let finish = |e: &mut EntityCommands, size: Vec3, mat: Option<Mat>| {
+        if mat.is_some_and(|m| matches!(m, Mat::Glass | Mat::LightPanel | Mat::Facade))
+            || size.y < SHADOW_MIN_HEIGHT && layout.outdoor
+        {
+            e.insert(NotShadowCaster);
+        }
+        if max_side(size) < DECOR_MAX_SIDE {
+            e.insert(decor_range.clone());
+        }
+    };
 
     for piece in &layout.pieces {
-        if bare.is_some() && !matches!(piece, Piece::Light { .. }) {
+        if bare && !matches!(piece, Piece::Light { .. }) {
             continue;
         }
         match piece {
@@ -187,9 +321,7 @@ fn load_floor(
                     MeshMaterial3d(get_mat(&mut mats, &mut materials, t, *mat)),
                     Transform::from_translation(*center).with_scale(*size),
                 ));
-                if matches!(mat, Mat::Glass | Mat::LightPanel) {
-                    e.insert(NotShadowCaster);
-                }
+                finish(&mut e, *size, Some(*mat));
             }
             Piece::Prop {
                 model,
@@ -208,19 +340,18 @@ fn load_floor(
                     0.0,
                     -(model.lo[1] + model.size[2] / 2.0),
                 ) * s;
-                commands
-                    .spawn((
-                        FloorEntity,
-                        Transform::from_translation(*pos)
-                            .with_rotation(Quat::from_rotation_y(*yaw)),
-                        Visibility::default(),
-                    ))
-                    .with_children(|c| {
-                        c.spawn((
-                            WorldAssetRoot(scene),
-                            Transform::from_translation(offset).with_scale(Vec3::splat(s)),
-                        ));
-                    });
+                let mut e = commands.spawn((
+                    FloorEntity,
+                    Transform::from_translation(*pos).with_rotation(Quat::from_rotation_y(*yaw)),
+                    Visibility::default(),
+                ));
+                finish(&mut e, Vec3::from(model.size) * s, None);
+                e.with_children(|c| {
+                    c.spawn((
+                        WorldAssetRoot(scene),
+                        Transform::from_translation(offset).with_scale(Vec3::splat(s)),
+                    ));
+                });
             }
             Piece::Panel {
                 center,
@@ -235,7 +366,7 @@ fn load_floor(
                         materials.add(textures::tex_material(*tex, img))
                     })
                     .clone();
-                commands.spawn((
+                let mut e = commands.spawn((
                     FloorEntity,
                     Mesh3d(quad.clone()),
                     MeshMaterial3d(handle),
@@ -244,6 +375,9 @@ fn load_floor(
                         .with_scale(size.extend(1.0)),
                     NotShadowCaster,
                 ));
+                if size.x.max(size.y) < DECOR_MAX_SIDE {
+                    e.insert(decor_range.clone());
+                }
             }
             Piece::Light {
                 pos,
@@ -275,9 +409,29 @@ fn load_floor(
                         .with_rotation(Quat::from_rotation_y(*yaw))
                         .with_scale(*size),
                 ));
-                if matches!(mat, Mat::Glass | Mat::LightPanel) {
-                    e.insert(NotShadowCaster);
-                }
+                finish(&mut e, *size, Some(*mat));
+            }
+            Piece::Prim {
+                kind,
+                center,
+                size,
+                yaw,
+                mat,
+            } => {
+                let mesh = match kind {
+                    PrimKind::Cylinder => &cylinder,
+                    PrimKind::Sphere => &sphere,
+                    PrimKind::Cone => &cone,
+                };
+                let mut e = commands.spawn((
+                    FloorEntity,
+                    Mesh3d(mesh.clone()),
+                    MeshMaterial3d(get_mat(&mut mats, &mut materials, t, *mat)),
+                    Transform::from_translation(*center)
+                        .with_rotation(Quat::from_rotation_y(*yaw))
+                        .with_scale(*size),
+                ));
+                finish(&mut e, *size, Some(*mat));
             }
             Piece::Run {
                 segs,
@@ -306,6 +460,11 @@ fn load_floor(
             Piece::Block(_) => {}
         }
     }
+    blink.0 = mats
+        .iter()
+        .filter(|(m, _)| is_blink(**m))
+        .filter_map(|(m, h)| materials.get(h).map(|mat| (h.clone(), mat.emissive, *m)))
+        .collect();
 }
 
 fn mesh_from(pos: Vec<[f32; 3]>, normals: Vec<[f32; 3]>, uv: Vec<[f32; 2]>, idx: Vec<u32>) -> Mesh {

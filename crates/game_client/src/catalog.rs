@@ -73,6 +73,8 @@ const CASUAL_M: &str = "models/characters/Casual_Male.glb";
 const DOC_M: &str = "models/characters/Doctor_Male_Young.glb";
 const DOC_F: &str = "models/characters/Doctor_Female_Old.glb";
 const WORKER: &str = "models/characters/Worker_Male.glb";
+/// Model prefix of units built from primitives (`rigs.rs`) instead of a character GLB.
+const PRIM: &str = "prim/";
 
 /// Every character GLB the catalog references.
 pub const CHARACTER_MODELS: [&str; 11] = [
@@ -460,7 +462,234 @@ static TABLE: &[(&str, UnitVisual)] = &[
         "ceo",
         v(SUIT_M_BALD, 2.7, "CEO", "<Chief AI Visionary>", &[]),
     ),
+    // ---- campus
+    (
+        "facilities_guy",
+        v(
+            WORKER,
+            1.8,
+            "Facilities Guy",
+            "<Ticket Closed: Won't Fix>",
+            &[
+                paint("Vest", 0.95, 0.5, 0.05),
+                paint("Hat", 0.9, 0.8, 0.1),
+                paint("Shirt", 0.3, 0.3, 0.35),
+            ],
+        ),
+    ),
+    (
+        "barista",
+        v(
+            CASUAL_F,
+            1.7,
+            "Barista",
+            "<Judges Your Order>",
+            &[
+                paint("Shirt", 0.1, 0.35, 0.25),
+                paint("Hair", 0.3, 0.17, 0.1),
+                paint("Pants", 0.12, 0.12, 0.14),
+            ],
+        ),
+    ),
+    (
+        "smoking_corner_dev",
+        v(
+            CASUAL3,
+            1.75,
+            "Smoking-Corner Dev",
+            "<Quit In Spirit>",
+            &[
+                paint("Shirt", 0.32, 0.34, 0.4),
+                paint("Pants", 0.15, 0.15, 0.2),
+                paint("Skin", 0.85, 0.65, 0.5),
+            ],
+        ),
+    ),
+    (
+        "delivery_robot",
+        v(
+            "prim/delivery_robot",
+            1.0,
+            "Delivery Robot",
+            "<Confidently Wrong>",
+            &[],
+        ),
+    ),
+    (
+        "scooter_exec",
+        v(
+            SUIT_M,
+            1.85,
+            "Scooter Exec",
+            "<Disrupting Sidewalks>",
+            &[
+                paint("Black", 0.1, 0.5, 0.5),
+                paint("Shirt", 0.95, 0.95, 0.95),
+                paint("Skin", 0.8, 0.6, 0.48),
+            ],
+        ),
+    ),
+    (
+        "unpaid_ambassador",
+        v(
+            CASUAL2,
+            1.8,
+            "Brand Ambassador",
+            "<Brand Ambassador, Unpaid>",
+            &[
+                paint("Shirt", 0.95, 0.2, 0.6),
+                paint("Pants", 0.15, 0.15, 0.2),
+                paint("Hair", 0.1, 0.8, 0.9),
+                paint("Skin", 0.9, 0.7, 0.58),
+            ],
+        ),
+    ),
+    // ---- data center
+    (
+        "gpu_cultist",
+        v(
+            CASUAL_M,
+            1.8,
+            "GPU Cultist",
+            "<Praise the Cluster>",
+            &[
+                paint("Shirt", 0.25, 0.05, 0.35),
+                paint("Pants", 0.08, 0.05, 0.1),
+                paint("Hair", 0.05, 0.05, 0.05),
+                glow("Face", 0.3, 1.0, 0.35),
+            ],
+        ),
+    ),
+    (
+        "cooling_fan",
+        v("prim/cooling_fan", 1.7, "Cooling Fan", "<Hot Air>", &[]),
+    ),
+    (
+        "token_counter",
+        v(
+            WORKER,
+            1.95,
+            "Token Counter",
+            "<Context Window Exceeded>",
+            &[
+                paint("Vest", 0.1, 0.7, 0.8),
+                paint("Hat", 0.05, 0.2, 0.3),
+                paint("Shirt", 0.12, 0.14, 0.2),
+                glow("Face", 0.3, 0.9, 1.0),
+            ],
+        ),
+    ),
+    (
+        "rogue_agent",
+        v(
+            SUIT_M,
+            2.0,
+            "Rogue Agent",
+            "<Autonomous, Unsupervised>",
+            &[
+                paint("Black", 0.04, 0.04, 0.06),
+                paint("Shirt", 0.9, 0.1, 0.1),
+                paint("Skin", 0.7, 0.72, 0.78),
+                glow("Face", 1.0, 0.1, 0.1),
+            ],
+        ),
+    ),
+    (
+        "the_scheduler",
+        v(
+            SUIT_F,
+            2.3,
+            "The Scheduler",
+            "<Your Job Is Pending>",
+            &[
+                paint("Black", 0.28, 0.28, 0.45),
+                paint("Shirt", 0.85, 0.85, 0.95),
+                paint("Hair", 0.6, 0.6, 0.7),
+                paint("Skin", 0.8, 0.82, 0.88),
+            ],
+        ),
+    ),
+    (
+        "cooling_failure",
+        v(
+            "prim/cooling_failure",
+            3.6,
+            "Cooling Failure",
+            "<It's Getting Hot In Here>",
+            &[],
+        ),
+    ),
+    (
+        "overheated_rack",
+        v(
+            "prim/overheated_rack",
+            1.3,
+            "Overheated Rack",
+            "<Thermal Throttling>",
+            &[],
+        ),
+    ),
+    // ---- innovation lab
+    (
+        "demo_presenter",
+        v(
+            CASUAL2,
+            1.8,
+            "Demo Presenter",
+            "<Works On My Demo>",
+            &[
+                paint("Shirt", 0.95, 0.95, 0.97),
+                paint("Pants", 0.1, 0.1, 0.12),
+                paint("Skin", 0.95, 0.78, 0.65),
+            ],
+        ),
+    ),
+    (
+        "vc_partner",
+        v(
+            SUIT_M,
+            1.9,
+            "VC Partner",
+            "<Series B or Bust>",
+            &[
+                paint("Black", 0.15, 0.25, 0.4),
+                paint("Shirt", 0.9, 0.9, 0.95),
+                paint("Skin", 0.95, 0.8, 0.7),
+            ],
+        ),
+    ),
+    (
+        "prompt_whisperer",
+        v(
+            CASUAL_F,
+            1.7,
+            "Prompt Whisperer",
+            "<Speaks Fluent Prompt>",
+            &[
+                paint("Shirt", 0.6, 0.3, 0.9),
+                paint("Hair", 0.3, 0.9, 0.95),
+                paint("Pants", 0.1, 0.1, 0.15),
+            ],
+        ),
+    ),
+    (
+        "agi_prototype",
+        v(
+            "prim/agi_prototype",
+            4.0,
+            "AGI Prototype",
+            "<Definitely Not Sentient>",
+            &[],
+        ),
+    ),
 ];
+
+/// Primitive rig kind (see `rigs.rs`) of a unit key, `None` for character-model units.
+pub fn primitive_rig(key: &str) -> Option<&'static str> {
+    is_known(key)
+        .then(|| unit_visual(key).model.strip_prefix(PRIM))
+        .flatten()
+}
 
 /// Every unit key the catalog knows, in table order.
 pub fn unit_keys() -> impl Iterator<Item = &'static str> {
@@ -539,6 +768,102 @@ pub fn pack_roster(floor: u8, pack: usize) -> &'static [&'static str] {
     R[usize::from(floor.clamp(1, 5)) - 1][pack.min(5)]
 }
 
+/// Who stands in a pack of a campus, data center or lab zone (debug dummies and the content
+/// reference); `None` for zones the towers' `pack_roster` covers.
+pub fn zone_pack_roster(zone: &str, pack: usize) -> Option<&'static [&'static str]> {
+    const CAMPUS: [&[&str]; 8] = [
+        &["delivery_robot", "delivery_robot"],
+        &["scooter_exec", "unpaid_ambassador"],
+        &["delivery_robot", "unpaid_ambassador", "scooter_exec"],
+        &["scooter_exec", "scooter_exec"],
+        &["unpaid_ambassador", "delivery_robot", "delivery_robot"],
+        &["scooter_exec", "unpaid_ambassador", "unpaid_ambassador"],
+        &["delivery_robot", "delivery_robot", "scooter_exec"],
+        &["unpaid_ambassador", "unpaid_ambassador"],
+    ];
+    const DC1: [&[&str]; 5] = [
+        &["gpu_cultist", "gpu_cultist", "cooling_fan"],
+        &["token_counter", "gpu_cultist"],
+        &["cooling_fan", "cooling_fan", "overheated_rack"],
+        &["rogue_agent", "gpu_cultist", "token_counter"],
+        &[
+            "gpu_cultist",
+            "gpu_cultist",
+            "gpu_cultist",
+            "overheated_rack",
+        ],
+    ];
+    const DC2: [&[&str]; 5] = [
+        &["overheated_rack", "overheated_rack", "cooling_fan"],
+        &["rogue_agent", "token_counter"],
+        &["cooling_fan", "overheated_rack", "gpu_cultist"],
+        &["overheated_rack", "overheated_rack", "rogue_agent"],
+        &[
+            "cooling_fan",
+            "cooling_fan",
+            "overheated_rack",
+            "gpu_cultist",
+        ],
+    ];
+    const LAB1: [&[&str]; 5] = [
+        &["demo_presenter", "prompt_whisperer"],
+        &["vc_partner", "demo_presenter"],
+        &["prompt_whisperer", "prompt_whisperer", "demo_presenter"],
+        &["vc_partner", "vc_partner"],
+        &["demo_presenter", "prompt_whisperer", "vc_partner"],
+    ];
+    const LAB2: [&[&str]; 5] = [
+        &["rogue_agent", "prompt_whisperer"],
+        &["chatbot_minion", "chatbot_minion", "rogue_agent"],
+        &["token_counter", "prompt_whisperer", "chatbot_minion"],
+        &["rogue_agent", "rogue_agent"],
+        &[
+            "prompt_whisperer",
+            "prompt_whisperer",
+            "token_counter",
+            "chatbot_minion",
+        ],
+    ];
+    let table: &[&[&str]] = match zone {
+        "campus" => &CAMPUS,
+        "datacenter/1" => &DC1,
+        "datacenter/2" => &DC2,
+        "lab/1" => &LAB1,
+        "lab/2" => &LAB2,
+        _ => return None,
+    };
+    table.get(pack).copied()
+}
+
+/// Boss unit key of a non-tower zone.
+pub fn zone_boss_key(zone: &str) -> Option<&'static str> {
+    match zone {
+        "datacenter/1" => Some("the_scheduler"),
+        "datacenter/2" => Some("cooling_failure"),
+        "lab/1" => Some("vc_partner"),
+        "lab/2" => Some("agi_prototype"),
+        _ => None,
+    }
+}
+
+/// Friendly NPC at a named anchor of a non-tower zone. The campus order is: intern, the three
+/// quest givers (facilities guy, barista, smoking-corner dev), then two ambient NPCs.
+pub fn zone_npc_at(zone: &str, anchor: &str) -> Option<(&'static str, IdlePose)> {
+    match (zone, anchor) {
+        ("campus", "npc_1") => Some(("intern", IdlePose::Standing)),
+        ("campus", "npc_2") => Some(("facilities_guy", IdlePose::Standing)),
+        ("campus", "npc_3") => Some(("barista", IdlePose::Standing)),
+        ("campus", "npc_4") => Some(("smoking_corner_dev", IdlePose::Standing)),
+        ("campus", "npc_5") => Some(("unpaid_ambassador", IdlePose::Chatting)),
+        ("campus", "npc_6") => Some(("scooter_exec", IdlePose::Standing)),
+        ("datacenter/1", "npc_1") => Some(("it_support", IdlePose::Standing)),
+        ("datacenter/2", "npc_1") => Some(("it_support", IdlePose::Sleeping)),
+        ("lab/1", "npc_1") => Some(("intern", IdlePose::Chatting)),
+        ("lab/2", "npc_1") => Some(("ai_ethicist", IdlePose::Standing)),
+        _ => None,
+    }
+}
+
 pub fn boss_key(floor: u8) -> &'static str {
     ["vibe_coder", "analyst", "customer", "vp_synergy", "ceo"][usize::from(floor.clamp(1, 5)) - 1]
 }
@@ -588,6 +913,23 @@ mod tests {
         "security_analyst",
         "ciso",
         "it_support",
+        "facilities_guy",
+        "barista",
+        "smoking_corner_dev",
+        "delivery_robot",
+        "scooter_exec",
+        "unpaid_ambassador",
+        "gpu_cultist",
+        "cooling_fan",
+        "token_counter",
+        "rogue_agent",
+        "the_scheduler",
+        "cooling_failure",
+        "overheated_rack",
+        "demo_presenter",
+        "vc_partner",
+        "prompt_whisperer",
+        "agi_prototype",
     ];
 
     #[test]
@@ -602,11 +944,35 @@ mod tests {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
         for k in unit_keys() {
             let vis = unit_visual(k);
+            if primitive_rig(k).is_some() {
+                continue;
+            }
             assert!(dir.join(vis.model).exists(), "{k}: {}", vis.model);
             assert!(CHARACTER_MODELS.contains(&vis.model), "{k}: {}", vis.model);
             assert!(!vis.title.is_empty() || k == "senior_engineer");
         }
         assert!(CHARACTER_MODELS.len() <= 11);
+    }
+
+    #[test]
+    fn zone_rosters_only_name_known_units() {
+        for zone in ["campus", "datacenter/1", "datacenter/2", "lab/1", "lab/2"] {
+            for pack in 0..8 {
+                for k in zone_pack_roster(zone, pack).unwrap_or(&[]) {
+                    assert!(is_known(k), "{zone} pack {pack}: {k}");
+                }
+            }
+            for n in 1..=6 {
+                if let Some((k, _)) = zone_npc_at(zone, &format!("npc_{n}")) {
+                    assert!(is_known(k), "{zone} npc_{n}: {k}");
+                }
+            }
+            if let Some(b) = zone_boss_key(zone) {
+                assert!(is_known(b));
+            }
+        }
+        assert_eq!(primitive_rig("agi_prototype"), Some("agi_prototype"));
+        assert_eq!(primitive_rig("ceo"), None);
     }
 
     #[test]

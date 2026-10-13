@@ -6,12 +6,13 @@ Play it: https://wraithyy.github.io/the-last-dev/
 
 ## The satire
 
-The whole game is a long, loving roast of corporations that push AI onto every task for no reason. You play a Senior Engineer who climbs a five-floor office tower to reach the **CEO** ("Chief AI Evangelist"). Every floor has trash packs, a boss and an exit elevator that unlocks once the boss is down; bosses and mini-bosses yell AI buzzwords in classic MMO boss-yell style (red chat line plus a speech bubble), friendly NPCs (the AI-Native Intern, a permanently ticket-blocked IT Support) chat in green. Your hair thins as your HP drops. When you die your role is backfilled by an AI agent. All text is original; no real companies or people are named.
+The whole game is a long, loving roast of corporations that push AI onto every task for no reason. You play a Senior Engineer who starts on the corporate campus at level 1, closes Jira tickets for the people the AI forgot, climbs a five-floor office tower to reach the **CEO** ("Chief AI Evangelist"), clears the data center and finally walks into the Innovation Lab to shut down the AGI Prototype (it was a guy forwarding prompts the whole time). Every tower floor has trash packs, a boss and an exit elevator that unlocks once the boss is down; bosses and mini-bosses yell AI buzzwords in classic MMO boss-yell style (red chat line plus a speech bubble), friendly NPCs (the AI-Native Intern, a permanently ticket-blocked IT Support) chat in green. Your hair thins as your HP drops. When you die your role is backfilled by an AI agent. All text is original; no real companies or people are named.
 
 ## Features
 
-- Five floors, each loaded in the sim and the client together: Open Space (1-2), Meeting Rooms (3-4), Sales & Marketing (5-6), PMO (7-8), C-Level Penthouse (9-10). Kill the floor boss, the exit elevator doors open and its lamp turns green, walk in: fade to black and the next floor's name banner. Level and XP carry over.
-- Killing the CEO on floor 5 rolls the satirical credits; press R to start a new sprint (fresh sim, floor 1, level 1).
+- A zone graph loaded in the sim and the client together: the outdoor campus hub (1-2), the tower's five floors Open Space (1-2), Meeting Rooms (3-4), Sales & Marketing (5-6), PMO (7-8), C-Level Penthouse (9-10), the data center (6-8, opens after tower floor 3) and the Innovation Lab (10, opens after the CEO). Doors and elevators fade to black with a rotating loading tip; locked doors say what they need. Every building has a door back to the campus; the penthouse elevator goes down to it. Cleared bosses stay dead, trash returns after 5 minutes away, death respawns you at the zone's graveyard.
+- Quests as Jira tickets: "!" / grey "?" / yellow "?" over givers, F or right-click opens the ticket (Accept / Complete / Close), the "Sprint backlog" tracker on the right, progress toasts, a "Ticket closed" banner and sound, and the `~/jira` log on J (with Abandon). N opens the map: the current zone's outline with player, giver and boss dots plus the zone tree with locked / open / cleared state.
+- The AGI Prototype's rack opens on death and shows who was inside; then the final retrospective with run stats. Press R to start a new sprint (fresh sim, campus, level 1).
 - Ten action-bar spells on keys 1-9, 0 (number row by physical key, so Czech and other layouts work; numpad too). Unlearned spells show a locked keycap with "Lv N"; level-ups play a golden ring, a "LEVEL UP" banner and an IDE-style "New spell" notification.
 - Nameplates over every NPC within 40 m (red + HP bar for hostiles, green + title for friendlies, BOSS / ELITE tags); the target frame shows the boss phase ("PROD P2"), aura stacks and generated letter-badge icons for auras without art.
 - Stuns freeze movement and casting (spinning stars, grey keycaps); silence and school lockouts lock keycaps with a padlock. Knockbacks shake the camera and push you (walls clamp it), teleports land on the nearest free spot.
@@ -60,10 +61,13 @@ See [docs/PLAN.md](docs/PLAN.md), [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md), [d
 | 1-9, 0 (or numpad) | Action bar: Code Review, Refactor, Guardrails, Reject PR, git blame, Rollback, On-Call Caffeine, Rubber Duck, Postmortem, Write It By Hand (unlocked by level) |
 | F / right-click corpse | Loot (F on a friendly target talks) |
 | B | Toggle the `~/trophies` inventory window (B, `[x]` or Esc closes it) |
+| J | Toggle the `~/jira` quest log (abandon tickets there) |
+| N | Toggle the map (current zone + zone tree) |
+| Up / Down, Enter, Backspace (ticket dialog) | Pick a ticket, accept / complete it, back to the list |
 | R (victory screen) | Start a new sprint |
 | M | Mute / unmute all audio |
 | F3 | Debug overlay (range, facing, LoS) |
-| Escape | Close the trophies window, else clear target, else toggle the pause overlay (also holds the master / music / effects volume keycaps) |
+| Escape | Close the ticket dialog, quest log, map or trophies window, else clear target, else toggle the pause overlay (also holds the master / music / effects volume keycaps) |
 
 Rotation: Code Review applies Code Smell, and Refactor consumes it for +35% damage. Interrupt the big casts with Reject PR (level 2), shield with Guardrails, keep git blame ticking, finish with Postmortem below 25%.
 
@@ -90,11 +94,16 @@ docs/                 plan, version choices, known limitations
 | Variable | Effect |
 |---|---|
 | `WOW_SCREENSHOT=path.png` (`WOW_SHOT_DELAY=s`) | Save an offscreen 1280x720 shot and exit |
-| `WOW_FLOOR=1..5` | Start on that floor at its minimum level |
+| `WOW_ZONE=<id>` | Start in that zone (campus, tower/1..5, datacenter/1..2, lab/1..2), sim-backed and playable, at its minimum level; `WOW_FLOOR=n` is `WOW_ZONE=tower/n` |
+| `WOW_QUESTS=id[:active\|ready\|done],..` | Force quest states at start |
+| `WOW_UNLOCK_ALL=1` | Open every door and elevator |
+| `WOW_JIRA=1`, `WOW_MAP=1` | Open the quest log or the map at start |
+| `WOW_KILL_BOSS=secs` | The zone boss dies (as a player kill) that many seconds in |
+| `WOW_SHOT_TIMES=t1,t2,..`, `WOW_SHOT_SIZE=WxH` | Several timed screenshots (`<path>_<n>.png`); offscreen target size (e.g. 2560x1080) |
+| `WOW_FPS=1` | Log average frame time and drawn meshes every 3 s |
 | `WOW_LEVEL=n` | Start level (overrides the floor minimum) |
 | `WOW_PLAYER_AT=x,z,yaw_deg[,cam_deg]` | Start position after the first floor load; optional camera yaw offset (180 = front view) |
 | `WOW_CAM_DIST=m` | Start zoom |
-| `WOW_CLEARED=1` | Open the first floor's exit elevator without killing the boss |
 | `WOW_AUTOFIGHT=1` | Bot: walks to the nearest hostile (adds first), interrupts, heals/shields, runs the rotation, loots corpses, respawns, takes the elevator; logs every sim event |
 | `WOW_COFFEE=secs`, `WOW_LINEUP=0` | Drain mana and start a Coffee Break after that many seconds; empty bare stage for pose close-ups |
 | `WOW_TALK=1` | Talk to the nearest friendly NPC two seconds in |
@@ -108,9 +117,9 @@ docs/                 plan, version choices, known limitations
 ## Verification status (2026-10-13)
 
 Verified:
-- `./scripts/check.sh` exit 0: fmt, clippy `-D warnings` (native and wasm32), 153 tests (131 `combat_core`, 22 `game_client`).
-- `./scripts/build-web.sh` exit 0 (not served in this pass).
-- Native screenshots driven by the debug hooks (`.playwright-mcp/`): floor 1 start, a trash pull with nameplates, the floor 1 boss, level-up banner and spell toast, stun, the opened exit elevator, the floor 2 arrival banner, IT Support talk bubble, the CEO in phase 2, the victory screen, and a restart back to floor 1 at level 1.
+- `./scripts/check.sh` exit 0: fmt, clippy `-D warnings` (native and wasm32), 240 tests passed, 3 ignored (186 `combat_core`, 54 `game_client`).
+- Native screenshots driven by the debug hooks (`.playwright-mcp/integration/`): campus start with quest markers, the ticket dialog and ticket list, tracker progress, the `~/jira` log, the map on campus and in the data center, a locked door, a door transition, the CEO's "New zone unlocked" banner, the AGI fight, the AGI reveal, the victory screen and a 2560x1080 campus HUD. Campus native frame time about 5 ms (WOW_FPS, Apple Silicon, debug build).
+- The browser build was not rebuilt in this pass.
 
 Not verified:
 - Manual playtest of game feel (movement, camera, combat pacing) and real mouse/keyboard input for talking and restarting.

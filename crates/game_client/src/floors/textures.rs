@@ -2,7 +2,7 @@
 //! flat shapes and a tiny 5x7 bitmap font, so no external art or font is needed
 //! and the same code runs on WebGL2.
 
-use super::kit::{Mat, Tex};
+use super::kit::{Mat, Sign, Tex, sign_canvas};
 use super::layout::{FloorKind, Theme};
 use bevy::asset::RenderAssetUsages;
 use bevy::image::{ImageAddressMode, ImageSampler, ImageSamplerDescriptor};
@@ -101,6 +101,33 @@ pub fn material(mat: Mat, t: &Theme) -> StandardMaterial {
             emissive: LinearRgba::rgb(0.9, 0.2, 2.6),
             ..default()
         },
+        Mat::Asphalt => matte(c(0.16, 0.16, 0.18)),
+        Mat::Concrete => matte(c(0.55, 0.55, 0.56)),
+        Mat::Brick => matte(c(0.5, 0.26, 0.2)),
+        Mat::Bark => matte(c(0.28, 0.19, 0.12)),
+        Mat::Leaf => matte(c(0.16, 0.45, 0.17)),
+        Mat::LeafDark => matte(c(0.1, 0.32, 0.14)),
+        Mat::CarRed => shiny(c(0.75, 0.1, 0.1), 0.6, 0.35),
+        Mat::CarBlue => shiny(c(0.12, 0.25, 0.7), 0.6, 0.35),
+        Mat::CarWhite => shiny(c(0.9, 0.9, 0.92), 0.6, 0.35),
+        Mat::CarTeal => shiny(c(0.1, 0.55, 0.55), 0.6, 0.35),
+        Mat::Tire => matte(c(0.04, 0.04, 0.05)),
+        Mat::Hot => glow(LinearRgba::rgb(4.0, 1.0, 0.15)),
+        Mat::Cold => glow(LinearRgba::rgb(1.4, 2.4, 3.0)),
+        Mat::BlinkGreenA | Mat::BlinkGreenB => glow(LinearRgba::rgb(0.2, 4.0, 0.6)),
+        Mat::BlinkRed => glow(LinearRgba::rgb(4.0, 0.3, 0.2)),
+        Mat::BlinkBlue => glow(LinearRgba::rgb(0.3, 1.0, 4.0)),
+        Mat::BlinkAmber => glow(LinearRgba::rgb(4.0, 2.2, 0.3)),
+        Mat::Chrome => shiny(c(0.8, 0.82, 0.86), 1.0, 0.15),
+        Mat::Facade => StandardMaterial {
+            base_color: Color::srgb(0.18, 0.3, 0.4),
+            metallic: 0.7,
+            perceptual_roughness: 0.18,
+            ..default()
+        },
+        Mat::NeonRed => glow(LinearRgba::rgb(4.0, 0.2, 0.3)),
+        Mat::Hazard => matte(c(0.95, 0.72, 0.05)),
+        Mat::Sand => matte(c(0.72, 0.64, 0.45)),
     }
 }
 
@@ -108,7 +135,17 @@ pub fn material(mat: Mat, t: &Theme) -> StandardMaterial {
 fn unlit(tex: Tex) -> bool {
     matches!(
         tex,
-        Tex::DaysCounter
+        Tex::Sign(
+            Sign::DaysAi
+                | Sign::Billboard
+                | Sign::InnovationNeon
+                | Sign::NocBoard
+                | Sign::Uptime
+                | Sign::TempWarning
+                | Sign::Printing
+                | Sign::AgiArena
+                | Sign::Shrine,
+        ) | Tex::DaysCounter
             | Tex::CloseDeals
             | Tex::ChatbotFace
             | Tex::Skyline
@@ -272,10 +309,60 @@ fn marble_texture() -> Image {
     mipped_texture(N, N, data, true)
 }
 
+/// Mown lawn: two greens in noisy patches; repeats over 4 m.
+fn grass_texture() -> Image {
+    const N: u32 = 64;
+    let mut data = Vec::with_capacity((N * N * 4) as usize);
+    for y in 0..N {
+        for x in 0..N {
+            let patch = hash(x / 8, y / 8);
+            let blade = hash(x, y);
+            let v = 0.55 + 0.25 * patch + 0.2 * blade;
+            let px = |k: f32| (v * k * 255.0).min(255.0) as u8;
+            data.extend_from_slice(&[px(0.23), px(0.5), px(0.2), 255]);
+        }
+    }
+    mipped_texture(N, N, data, true)
+}
+
+/// 1 m floor tiles with seams; `perforated` adds the vent holes of a raised data-centre floor.
+fn tile_texture(tint: [f32; 3], perforated: bool) -> Image {
+    const N: u32 = 64;
+    const TILE: u32 = N / 4;
+    let mut data = Vec::with_capacity((N * N * 4) as usize);
+    for y in 0..N {
+        for x in 0..N {
+            let seam = x % TILE <= 1 || y % TILE <= 1;
+            let (lx, ly) = (x % TILE, y % TILE);
+            let hole = perforated
+                && lx > 3
+                && ly > 3
+                && lx < TILE - 3
+                && ly < TILE - 3
+                && lx % 3 == 0
+                && ly % 3 == 0;
+            let base = if perforated { 0.42 } else { 0.85 };
+            let v = if seam {
+                base * 0.55
+            } else if hole {
+                base * 0.35
+            } else {
+                base * (0.96 + 0.08 * hash(x / 2, y / 2))
+            };
+            let px = |k: f32| (v * k * 255.0).min(255.0) as u8;
+            data.extend_from_slice(&[px(tint[0]), px(tint[1]), px(tint[2]), 255]);
+        }
+    }
+    mipped_texture(N, N, data, true)
+}
+
 pub fn floor_image(kind: FloorKind) -> Image {
     match kind {
         FloorKind::Carpet(tint) => carpet_texture(tint),
         FloorKind::Marble => marble_texture(),
+        FloorKind::Grass => grass_texture(),
+        FloorKind::Tile(tint) => tile_texture(tint, true),
+        FloorKind::Gloss(tint) => tile_texture(tint, false),
     }
 }
 
@@ -343,6 +430,13 @@ const FONT: &[(char, &str)] = &[
     ('%', "##..#/##..#/...#./..#../.#.../#..##/#..##"),
     ('+', "...../..#../..#../#####/..#../..#../....."),
     ('>', "#..../.#.../..#../...#./..#../.#.../#...."),
+    (',', "...../...../...../...../.##../..#../.#..."),
+    ('/', "....#/....#/...#./..#../.#.../#..../#...."),
+    ('(', "...#./..#../.#.../.#.../.#.../..#../...#."),
+    (')', ".#.../..#../...#./...#./...#./..#../.#..."),
+    ('&', ".##../#..#./#.#../.#.../#.#.#/#..#./.##.#"),
+    ('=', "...../#####/...../#####/...../...../....."),
+    ('*', "...../#.#.#/.###./#####/.###./#.#.#/....."),
 ];
 
 fn glyph(c: char) -> Option<&'static str> {
@@ -475,12 +569,332 @@ const WHITE: Rgb = [250, 250, 250];
 const BLACK: Rgb = [20, 20, 24];
 const RED: Rgb = [210, 40, 40];
 
+struct SignSpec {
+    lines: &'static [&'static str],
+    bg: Rgb,
+    fg: Rgb,
+    /// Second colour: the last line and the frame.
+    hi: Rgb,
+}
+
+fn sign_spec(s: Sign) -> SignSpec {
+    let sp = |lines, bg, fg, hi| SignSpec { lines, bg, fg, hi };
+    match s {
+        Sign::DaysAi => sp(
+            &["DAYS WITHOUT AN", "AI INCIDENT:", "0"],
+            [14, 8, 8],
+            [255, 180, 60],
+            [255, 50, 40],
+        ),
+        Sign::AiStrategy => sp(
+            &["AI STRATEGY:", "YES"],
+            [20, 30, 70],
+            [235, 240, 255],
+            [250, 210, 60],
+        ),
+        Sign::Billboard => sp(
+            &["AI", "NOW WITH MORE AI"],
+            [30, 14, 70],
+            [120, 240, 255],
+            [255, 120, 220],
+        ),
+        Sign::Welcome => sp(
+            &["WELCOME TO", "SYNERGY CAMPUS"],
+            [30, 70, 60],
+            [240, 245, 240],
+            [250, 210, 90],
+        ),
+        Sign::ParkingAi => sp(
+            &["PARKING", "RESERVED FOR", "AI AGENTS"],
+            [20, 50, 110],
+            [240, 240, 250],
+            [250, 210, 60],
+        ),
+        Sign::NoFeed => sp(
+            &["PLEASE DO NOT", "FEED THE MODEL"],
+            [240, 230, 200],
+            [60, 40, 30],
+            [200, 40, 40],
+        ),
+        Sign::Compute => sp(
+            &["COMPUTE IS OUR MOST", "VALUABLE EMPLOYEE"],
+            [20, 24, 36],
+            [200, 210, 230],
+            [90, 230, 150],
+        ),
+        Sign::Cafe => sp(
+            &["CAFETERIA", "TOKENS ACCEPTED"],
+            [90, 55, 30],
+            [250, 235, 210],
+            [250, 190, 80],
+        ),
+        Sign::SmokingCorner => sp(
+            &["SMOKING CORNER", "AI COMPLAINTS DEPT."],
+            [50, 50, 54],
+            [220, 220, 225],
+            [250, 150, 60],
+        ),
+        Sign::TowerName => sp(
+            &["THE TOWER"],
+            [24, 34, 60],
+            [225, 235, 255],
+            [90, 200, 255],
+        ),
+        Sign::DataCenterName => sp(
+            &["DATA CENTER", "KEEP COOL"],
+            [40, 44, 50],
+            [210, 220, 230],
+            [90, 220, 255],
+        ),
+        Sign::InnovationNeon => sp(&["INNOVATION"], [10, 6, 20], [255, 90, 210], [255, 90, 210]),
+        Sign::Reception => sp(
+            &["RECEPTION", "PLEASE TAKE A NUMBER", "(WE LOST THE NUMBERS)"],
+            [235, 235, 238],
+            [40, 50, 70],
+            [200, 60, 60],
+        ),
+        Sign::BikeRack => sp(
+            &["BIKE RACK", "(1 BIKE)"],
+            [70, 110, 70],
+            [240, 245, 235],
+            [250, 220, 90],
+        ),
+        Sign::AiCar => sp(
+            &["AI-POWERED CAR", "PARKING: CONFIDENT"],
+            [20, 30, 50],
+            [120, 240, 255],
+            [255, 140, 220],
+        ),
+        Sign::ShuttleBus => sp(
+            &["SHUTTLE BUS", "ALWAYS LATE"],
+            [200, 160, 30],
+            [30, 30, 30],
+            [160, 30, 30],
+        ),
+        Sign::ScooterZone => sp(
+            &["SCOOTERS:", "PLEASE STEP OVER"],
+            [230, 230, 235],
+            [40, 40, 50],
+            [200, 60, 60],
+        ),
+        Sign::CampusExit => sp(
+            &["EXIT TO CAMPUS", "FRESH AIR"],
+            [30, 80, 50],
+            [235, 245, 235],
+            [250, 230, 100],
+        ),
+        Sign::GraveSprint => sp(
+            &["HERE LIES", "THE LAST SPRINT", "RIP"],
+            [60, 62, 70],
+            [215, 215, 220],
+            [150, 150, 160],
+        ),
+        Sign::ColdAisle => sp(
+            &["COLD AISLE", "BRING A JACKET"],
+            [14, 40, 70],
+            [150, 225, 255],
+            [255, 255, 255],
+        ),
+        Sign::HotAisle => sp(
+            &["HOT AISLE", "BRING A WILL"],
+            [70, 24, 10],
+            [255, 190, 110],
+            [255, 90, 40],
+        ),
+        Sign::NocBoard => sp(
+            &["ALL SYSTEMS", "PROBABLY FINE", "(ALERTS MUTED)"],
+            [6, 18, 14],
+            [90, 255, 150],
+            [255, 200, 60],
+        ),
+        Sign::Shrine => sp(
+            &["PRAISE", "THE CLUSTER"],
+            [16, 8, 24],
+            [150, 255, 160],
+            [255, 200, 90],
+        ),
+        Sign::Uptime => sp(
+            &["UPTIME 99.9%", "*SEE FINE PRINT"],
+            [8, 14, 24],
+            [120, 230, 255],
+            [255, 200, 60],
+        ),
+        Sign::DoNotUnplug => sp(
+            &["PLEASE DO NOT", "UNPLUG THE MODEL", "IT KNOWS"],
+            [230, 200, 40],
+            [30, 30, 30],
+            [170, 30, 30],
+        ),
+        Sign::ThisIsFine => sp(
+            &["THIS IS FINE"],
+            [210, 90, 30],
+            [255, 245, 220],
+            [255, 245, 220],
+        ),
+        Sign::TempWarning => sp(
+            &["TEMP: 41 C", "THIS IS FINE"],
+            [30, 6, 6],
+            [255, 170, 70],
+            [255, 70, 50],
+        ),
+        Sign::ToCampus => sp(
+            &["EXIT TO CAMPUS", "SUNLIGHT AHEAD"],
+            [30, 80, 50],
+            [235, 245, 235],
+            [250, 230, 100],
+        ),
+        Sign::ToDataCenter2 => sp(
+            &["SUBLEVEL 2", "HOT AISLE ONLY"],
+            [60, 20, 14],
+            [255, 200, 140],
+            [255, 90, 40],
+        ),
+        Sign::ToDataCenter1 => sp(
+            &["BACK UP", "TO SUBLEVEL 1"],
+            [24, 40, 60],
+            [190, 225, 250],
+            [255, 255, 255],
+        ),
+        Sign::WhiteboardA => sp(
+            &[
+                "SYNERGY", "DISRUPT", "PIVOT", "10X", "AGENTIC", "MOAT", "ALIGN",
+            ],
+            [244, 246, 248],
+            [40, 80, 200],
+            [210, 50, 50],
+        ),
+        Sign::WhiteboardB => sp(
+            &[
+                "FAIL FAST",
+                "SHIP IT",
+                "AI+AI=AI",
+                "NORTH STAR",
+                "PROMPT",
+                "VIBES",
+                "SCALE",
+            ],
+            [244, 246, 248],
+            [30, 140, 70],
+            [200, 80, 30],
+        ),
+        Sign::WhiteboardC => sp(
+            &[
+                "IDEA ???",
+                "THEN AI",
+                "PROFIT",
+                "LEVERAGE",
+                "PARADIGM",
+                "HOCKEY STICK",
+                "MVP",
+            ],
+            [244, 246, 248],
+            [120, 50, 170],
+            [40, 120, 200],
+        ),
+        Sign::InnovationHere => sp(
+            &["INNOVATION HAPPENS HERE", "(RESULTS MAY VARY)"],
+            [240, 244, 250],
+            [30, 40, 70],
+            [220, 60, 160],
+        ),
+        Sign::Printing => sp(
+            &["PRINTING...", "0%"],
+            [10, 14, 22],
+            [120, 240, 255],
+            [255, 200, 60],
+        ),
+        Sign::VrDemo => sp(
+            &["VR DEMO", "NO ONE ASKED"],
+            [40, 20, 70],
+            [235, 220, 255],
+            [120, 240, 255],
+        ),
+        Sign::FailFast => sp(
+            &["FAIL FAST", "FAIL OFTEN", "FAIL"],
+            [235, 240, 245],
+            [40, 50, 70],
+            [210, 50, 50],
+        ),
+        Sign::AgiArena => sp(
+            &["AGI", "DEFINITELY NOT SENTIENT"],
+            [6, 6, 16],
+            [120, 255, 240],
+            [255, 90, 220],
+        ),
+        Sign::SeriesB => sp(
+            &["SERIES B", "OR BUST"],
+            [20, 60, 40],
+            [235, 250, 240],
+            [250, 220, 90],
+        ),
+        Sign::ToLab2 => sp(
+            &["RESTRICTED", "THE SANCTUM"],
+            [14, 10, 30],
+            [190, 170, 255],
+            [255, 90, 220],
+        ),
+        Sign::ToLab1 => sp(
+            &["BACK TO THE", "OPEN SPACE"],
+            [235, 238, 245],
+            [40, 50, 70],
+            [60, 140, 220],
+        ),
+        Sign::LabRules => sp(
+            &["COMPUTE IS OUR MOST", "VALUABLE EMPLOYEE"],
+            [235, 238, 245],
+            [40, 50, 70],
+            [60, 140, 220],
+        ),
+    }
+}
+
+fn draw_sign(s: Sign) -> Canvas {
+    let spec = sign_spec(s);
+    let (w, h) = sign_canvas(s);
+    let mut c = Canvas::new(w, h, spec.bg);
+    let (wi, hi) = (w as i32, h as i32);
+    if matches!(s, Sign::WhiteboardA | Sign::WhiteboardB | Sign::WhiteboardC) {
+        c.frame(2, 2, wi - 4, hi - 4, 3, [150, 150, 158]);
+        let seed = s as u32 * 31;
+        for (i, word) in spec.lines.iter().enumerate() {
+            let col = if i % 2 == 0 { spec.fg } else { spec.hi };
+            let (col_i, row_i) = ((i % 2) as i32, (i / 2) as i32);
+            let x = 10 + col_i * 92 + (hash(seed + i as u32, 3) * 14.0) as i32;
+            let y = 12 + row_i * 28 + (hash(seed + i as u32, 5) * 6.0) as i32;
+            let scale = if word.len() > 8 { 1 } else { 2 };
+            let tw = c.text(x, y, scale, word, col);
+            c.rect(x, y + 7 * scale + 2, tw, 1, col);
+        }
+        // Arrows between the words, because every whiteboard has arrows.
+        c.line((60.0, 40.0), (110.0, 66.0), [60, 60, 70]);
+        c.line((104.0, 62.0), (110.0, 66.0), [60, 60, 70]);
+        c.line((140.0, 100.0), (90.0, 112.0), [60, 60, 70]);
+        return c;
+    }
+    c.frame(3, 3, wi - 6, hi - 6, 2, spec.hi);
+    let n = spec.lines.len() as i32;
+    let slot = (hi - 12) / n;
+    for (i, line) in spec.lines.iter().enumerate() {
+        let len = line.chars().count() as i32;
+        let fit = (wi - 20) / (6 * len).max(1);
+        let scale = fit
+            .clamp(1, if n == 1 { 6 } else { 4 })
+            .min((slot - 4) / 7)
+            .max(1);
+        let col = if i as i32 == n - 1 { spec.hi } else { spec.fg };
+        let y = 6 + i as i32 * slot + (slot - 7 * scale) / 2;
+        c.text_c(y, scale, line, col);
+    }
+    c
+}
+
 pub fn tex_image(tex: Tex) -> Image {
     draw(tex).into_image()
 }
 
 fn draw(tex: Tex) -> Canvas {
     match tex {
+        Tex::Sign(s) => draw_sign(s),
         Tex::PosterBars => {
             let mut c = Canvas::new(64, 80, [22, 46, 92]);
             for i in 0..5 {

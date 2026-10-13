@@ -182,6 +182,33 @@ pub enum Mat {
     Plant,
     Dead,
     Monolith,
+    Asphalt,
+    Concrete,
+    Brick,
+    Bark,
+    Leaf,
+    LeafDark,
+    CarRed,
+    CarBlue,
+    CarWhite,
+    CarTeal,
+    Tire,
+    /// Orange emissive: overheating gear.
+    Hot,
+    /// Icy emissive: cold aisles and lab lighting.
+    Cold,
+    /// Emissive LEDs whose brightness flickers (see `mod.rs`), one pattern each.
+    BlinkGreenA,
+    BlinkGreenB,
+    BlinkRed,
+    BlinkBlue,
+    BlinkAmber,
+    Chrome,
+    /// Opaque-ish tinted glass for building facades and the dome.
+    Facade,
+    NeonRed,
+    Hazard,
+    Sand,
 }
 
 /// Procedurally drawn textures (see `textures.rs`); several carry short text
@@ -229,6 +256,57 @@ pub enum Tex {
     Misc,
     TurnItOff,
     NextAgent,
+    Sign(Sign),
+}
+
+/// Text signs: the satirical dressing. Each is one small bitmap-font texture (`textures.rs`).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Sign {
+    // campus
+    DaysAi,
+    AiStrategy,
+    Billboard,
+    Welcome,
+    ParkingAi,
+    NoFeed,
+    Compute,
+    Cafe,
+    SmokingCorner,
+    TowerName,
+    DataCenterName,
+    InnovationNeon,
+    Reception,
+    BikeRack,
+    AiCar,
+    ShuttleBus,
+    ScooterZone,
+    CampusExit,
+    GraveSprint,
+    // data center
+    ColdAisle,
+    HotAisle,
+    NocBoard,
+    Shrine,
+    Uptime,
+    DoNotUnplug,
+    ThisIsFine,
+    TempWarning,
+    ToCampus,
+    ToDataCenter2,
+    ToDataCenter1,
+    // lab
+    WhiteboardA,
+    WhiteboardB,
+    WhiteboardC,
+    InnovationHere,
+    Printing,
+    VrDemo,
+    FailFast,
+    AgiArena,
+    SeriesB,
+    ToLab2,
+    ToLab1,
+    LabRules,
 }
 
 #[derive(Clone, Debug)]
@@ -278,6 +356,22 @@ pub enum Piece {
     },
     /// Wall-top strip, only seen from above (debug overview).
     Cap { segs: Vec<Seg> },
+    /// Round primitive, visual only (trees, wheels, domes, fans).
+    Prim {
+        kind: PrimKind,
+        center: Vec3,
+        size: Vec3,
+        yaw: f32,
+        mat: Mat,
+    },
+}
+
+/// Unit-sized shapes: a cylinder stands on Y with diameter `size.x` and height `size.y`.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum PrimKind {
+    Cylinder,
+    Sphere,
+    Cone,
 }
 
 /// Direction a wall-mounted item faces (into the room).
@@ -415,6 +509,44 @@ impl Plan {
 
     pub fn anchor(&mut self, name: &'static str, pos: Vec3, yaw: f32) {
         self.anchors.push(Anchor { name, pos, yaw });
+    }
+
+    pub fn prim(&mut self, kind: PrimKind, center: Vec3, size: Vec3, mat: Mat) {
+        self.prim_yawed(kind, center, size, 0.0, mat);
+    }
+
+    pub fn prim_yawed(&mut self, kind: PrimKind, center: Vec3, size: Vec3, yaw: f32, mat: Mat) {
+        let (center, yaw) = (self.to_world(center), yaw + self.yaw_sum());
+        self.pieces.push(Piece::Prim {
+            kind,
+            center,
+            size,
+            yaw,
+            mat,
+        });
+    }
+
+    /// Sign panel `width` metres wide; the height follows the texture's aspect ratio.
+    pub fn sign(&mut self, center: Vec3, yaw: f32, width: f32, sign: Sign) {
+        let (w, h) = sign_canvas(sign);
+        self.panel(
+            center,
+            yaw,
+            Vec2::new(width, width * h as f32 / w as f32),
+            Tex::Sign(sign),
+        );
+    }
+
+    /// Sign on the nearest wall, framed like a poster.
+    pub fn sign_near(&mut self, x: f32, z: f32, y: f32, width: f32, sign: Sign) {
+        let (w, h) = sign_canvas(sign);
+        self.poster_near(
+            x,
+            z,
+            y,
+            Vec2::new(width, width * h as f32 / w as f32),
+            Tex::Sign(sign),
+        );
     }
 
     pub fn slab(&mut self, center: Vec3, yaw: f32, size: Vec3, mat: Mat) {
@@ -574,6 +706,32 @@ impl Plan {
         (Vec3::new(arrive.x, 0.0, arrive.y), (-n.x).atan2(-n.y))
     }
 
+    /// Doorway set into the nearest wall with a sign above it. Returns the arrival point 1.8 m
+    /// in front and the unit yaw that faces into the room (same convention as `elevator_near`).
+    pub fn door_near(&mut self, x: f32, z: f32, sign: Sign) -> (Vec3, f32) {
+        let (pt, n) = self.wall_near(x, z).unwrap_or((Vec2::new(x, z), Vec2::X));
+        let yaw = n.x.atan2(n.y);
+        let lat = Vec2::new(yaw.cos(), -yaw.sin());
+        let at = |depth: f32, l: f32, y: f32| {
+            let c = pt + n * depth + lat * l;
+            Vec3::new(c.x, y, c.y)
+        };
+        self.slab(at(0.1, 0.0, 1.3), yaw, Vec3::new(2.3, 2.6, 0.2), Mat::Dark);
+        for l in [-0.5, 0.5] {
+            self.slab(at(0.22, l, 1.1), yaw, Vec3::new(0.9, 2.2, 0.06), Mat::Glass);
+        }
+        self.slab(
+            at(0.2, 0.0, 2.75),
+            yaw,
+            Vec3::new(1.9, 0.08, 0.06),
+            Mat::LedGreen,
+        );
+        let c = at(0.2, 0.0, 3.25);
+        self.sign(c, yaw, 1.5, sign);
+        let arrive = pt + n * 1.8;
+        (Vec3::new(arrive.x, 0.0, arrive.y), (-n.x).atan2(-n.y))
+    }
+
     /// Framed panel on a wall: `face` is the direction the picture looks.
     pub fn wall_panel(&mut self, pos: Vec3, face: Face, size: Vec2, tex: Tex) {
         self.panel(pos + face.dir() * 0.03, face.yaw(), size, tex);
@@ -675,6 +833,15 @@ impl Plan {
             false,
         );
         at(1.8, 0.0, 0.0)
+    }
+}
+
+/// Pixel size of a sign texture; `sign()` derives the panel's aspect ratio from it.
+pub fn sign_canvas(sign: Sign) -> (u32, u32) {
+    match sign {
+        Sign::WhiteboardA | Sign::WhiteboardB | Sign::WhiteboardC => (192, 128),
+        Sign::Billboard | Sign::InnovationNeon => (256, 96),
+        _ => (192, 96),
     }
 }
 

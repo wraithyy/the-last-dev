@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""Regenerates the game-icons.net item icons in assets/icons/ from the GLYPHS table below.
+
+Why: the styled 64x64 icons (white glyph on a coloured bevelled gradient) were made one at a time; this keeps the
+recipe reproducible. The frame/gradient is not redrawn: each theme borrows it from an existing icon of that colour
+(glyph-free border + a per-row gradient taken from column 3, which no glyph ever touches), so new icons match the
+old ones pixel for pixel. The glyph is rasterized at 44x44 and placed at offset (10, 10), measured from badge.png.
+
+Needs PIL and rsvg-convert on PATH; glyph SVGs (CC BY 3.0, https://github.com/game-icons/icons) are fetched into a
+cache dir. Run from the repo root: python3 scripts/game_icons.py [cache_dir] [key ...]
+Output is always 8-bit RGBA (16-bit PNGs crash WebGL2).
+"""
+import io
+import shutil
+import subprocess
+import sys
+import urllib.request
+from pathlib import Path
+
+from PIL import Image
+
+ICONS = Path("assets/icons")
+RAW = "https://raw.githubusercontent.com/game-icons/icons/master/{}.svg"
+
+# Colour = bonus the item grants: an existing icon of that colour provides the frame.
+THEME_REF = {
+    "red": "medal",
+    "blue": "pizza",
+    "violet": "chart_up",
+    "gold": "logo",
+    "teal": "calendar",
+    "green": "padlock",
+}
+
+# key -> (author folder/glyph, theme)
+GLYPHS = {
+    "access_badge": ("andymeneely/police-badge", "red"),
+    "delivery_receipt": ("delapouite/door", "teal"),
+    "scooter_helmet": ("delapouite/full-motorcycle-helmet", "red"),
+    "oat_milk_prompt": ("rihlsul/milk-carton", "blue"),
+    "stress_ball": ("delapouite/throwing-ball", "green"),
+    "gpu_candle": ("lorc/candle-flame", "violet"),
+    "rack_screw": ("delapouite/screw", "red"),
+    "token_invoice": ("delapouite/price-tag", "blue"),
+    "agent_memory": ("lorc/microchip", "gold"),
+    "cron": ("lorc/clockwork", "teal"),
+    "queue_ticket": ("delapouite/human-pyramid", "red"),
+    "priority_low": ("lorc/snail", "green"),
+    "thermal_paste": ("lorc/dripping-tube", "gold"),
+    "incident_report": ("delapouite/thermometer-hot", "red"),
+    "fan_blade": ("delapouite/computer-fan", "teal"),
+    "demo_laptop": ("delapouite/laptop", "violet"),
+    "term_sheet": ("delapouite/scroll-quill", "red"),
+    "prompt_certificate": ("delapouite/ribbon-medal", "blue"),
+    "rack_chair": ("delapouite/server-rack", "red"),
+    "still_typing": ("delapouite/discussion", "gold"),
+    "benchmark": ("delapouite/podium-winner", "teal"),
+    "visitor_badge": ("delapouite/mug-shot", "red"),
+    "judgment": ("lorc/semi-closed-eye", "gold"),
+    "lighter": ("delapouite/lighter", "violet"),
+    "room_booking": ("delapouite/checklist", "teal"),
+    "wont_fix": ("sbed/cancel", "red"),
+    "human_inside": ("delapouite/person", "red"),
+    "demo_lanyard": ("lorc/ribbon", "green"),
+}
+
+GLYPH_PX, OFFSET, FRAME = 44, 10, 3
+
+
+def fetch(path, cache):
+    f = cache / (path.replace("/", "__") + ".svg")
+    if not f.exists():
+        with urllib.request.urlopen(RAW.format(path), timeout=30) as r:  # raises on non-200
+            f.write_bytes(r.read())
+    return f.read_text()
+
+
+def template(theme):
+    ref = Image.open(ICONS / f"{THEME_REF[theme]}.png").convert("RGBA")
+    px = ref.load()
+    for y in range(FRAME, 64 - FRAME):
+        for x in range(FRAME, 64 - FRAME):
+            px[x, y] = px[FRAME, y]
+    return ref
+
+
+def render(svg, theme):
+    # Drop the opaque black background square so only the glyph is rasterized.
+    svg = svg.replace('<path d="M0 0h512v512H0z"/>', "")
+    png = subprocess.run(
+        ["rsvg-convert", "-w", str(GLYPH_PX), "-h", str(GLYPH_PX), "-"],
+        input=svg.encode(), capture_output=True, check=True,
+    ).stdout
+    g = Image.open(io.BytesIO(png)).convert("RGBA")
+    # White glyph: keep only alpha, force colour white.
+    white = Image.new("RGBA", g.size, (255, 255, 255, 255))
+    white.putalpha(g.getchannel("A"))
+    img = template(theme)
+    img.alpha_composite(white, (OFFSET, OFFSET))
+    return img
+
+
+def main():
+    args = sys.argv[1:]
+    cache = Path(args[0]) if args else Path("/tmp/game_icons_cache")
+    cache.mkdir(parents=True, exist_ok=True)
+    keys = args[1:] or list(GLYPHS)
+    assert shutil.which("rsvg-convert"), "rsvg-convert not found"
+    for k in keys:
+        path, theme = GLYPHS[k]
+        img = render(fetch(path, cache), theme)
+        img.save(ICONS / f"{k}.png")
+        print(k, path, theme)
+
+
+if __name__ == "__main__":
+    main()

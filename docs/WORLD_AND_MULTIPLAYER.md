@@ -1,6 +1,7 @@
 # The Last Dev: bigger world and multiplayer (design proposal)
 
-Status: proposal, nothing implemented. It builds on docs/GAME_DESIGN.md and docs/COMBAT_API.md.
+Status: Part 1 is implemented in `combat_core`, content and the client (see "Implemented" below);
+Part 2 is a proposal. It builds on docs/GAME_DESIGN.md and docs/COMBAT_API.md.
 
 ## Goals
 
@@ -79,7 +80,48 @@ Determinism stays: quest progress is driven by sim events and needs no rng.
 | Quest UI + map | 0.5-1 day |
 | Writing quests, yells and trophies for 3 new buildings | 1 day |
 
+### Implemented (combat_core + content)
+
+- Zones replace floors: `campus` (outdoor hub, 1-3), `tower/1`..`tower/5`, `datacenter/1`-`2` (6-8,
+  unlocked by clearing tower/3), `lab/1`-`2` (10, unlocked by the CEO's death; the AGI Prototype in
+  lab/2). `Sim::load_zone`, `zone_links` with unlock state, `ZoneLoaded` / `ZoneCleared` / `Unlocked`.
+- Session world state: cleared bosses stay dead, killed trash returns only after 5 minutes away, the
+  respawn point is the zone's `graveyard` anchor.
+- Quests: 15 in `content/game.ron` (kill, loot, talk, clear-zone objectives; chains, level gates, XP
+  and trophy rewards), `AcceptQuest` / `TurnInQuest` / `AbandonQuest`, quest events, per-player logs.
+- New units: 4 campus NPCs (3 quest givers plus the intern), 3 campus trash, 5 data center units and
+  2 bosses, 4 lab units and the final boss. New mechanics: spell reflect, mana drain.
+- Client: every zone has a layout (outdoor campus kit, data center, lab, the five tower floors) whose
+  anchors and blockers go to `Sim::load_zone`; doors and elevators fade with loading tips, locked doors
+  name their requirement, every building has a way back to the campus. Quest UI: giver markers, the
+  Jira-ticket dialog, the "Sprint backlog" tracker, progress toasts, the "Ticket closed" banner and the
+  `~/jira` log (J). Map on N. The AGI's rack opens on death to show the MeatProxy, then the victory
+  screen.
+- Not done: the Sales Tower and HR Annex buildings, fast travel, saving. See COMBAT_API.md (Zones,
+  Quests) and KNOWN_LIMITATIONS.md.
+
 ## Part 2: co-op multiplayer
+
+### Requirement: offline first
+
+The offline single-player game is the product; online co-op is an optional mode on top of it.
+
+- The game starts and runs fully offline, with the local `Sim` in the browser. No network call at
+  startup, and no server URL is needed to build or deploy to GitHub Pages.
+- Online is an explicit menu choice ("Join room"). The client probes the server with a short timeout;
+  if it is missing or down, it shows a message and stays offline. Nothing crashes or blocks.
+- If the connection drops mid-session, the player returns to the offline game with a notice.
+
+### Requirement: self-hosted server, join by address
+
+- The server is a single self-hostable binary (`the-last-dev-server`), runnable on any machine on a
+  LAN or a VPS. No central service is required.
+- The "Join room" screen takes a server address (`192.168.1.20:7777` or a hostname) plus a room code;
+  the last address is remembered locally.
+- Browsers block `ws://` from an `https://` page (mixed content), so the GitHub Pages build can only
+  reach `wss://` servers. For LAN play the server binary also serves the web client over plain HTTP:
+  players open `http://<lan-ip>:7777/` and connect back to the same host over `ws://`. The native build
+  can connect to any address.
 
 ### Architecture
 

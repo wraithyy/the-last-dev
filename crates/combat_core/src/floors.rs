@@ -1,8 +1,8 @@
-//! Floors: one call swaps the whole set of non-player units for a floor's packs, boss and NPCs.
+//! Pack formation, the legacy floor loader and unit removal (adds, despawn).
 
 use crate::content::ContentError;
 use crate::geom::{Aabb, Vec3};
-use crate::sim::{Sim, SpawnOpts};
+use crate::sim::Sim;
 use crate::targeting::EntityId;
 use crate::types::{AiState, AuraEnd, Event};
 
@@ -31,113 +31,18 @@ pub fn pack_offsets(n: usize) -> Vec<(f32, f32)> {
         .collect()
 }
 
-struct Planned {
-    def: usize,
-    pos: Vec3,
-    yaw: f32,
-    level: u8,
-    pack: Option<u32>,
-    boss: bool,
-}
-
 impl Sim {
-    /// Despawns every non-player unit (emitting `Despawned`), replaces the blockers and
-    /// spawns the floor. Pack units alternate between the floor's level range (first half of
-    /// the packs at the low level, the rest at the high level); boss and friendlies keep their
-    /// authored level. Floor spawns never respawn. All anchors are resolved before anything
-    /// changes, so an error leaves the sim untouched. Events are returned by the next `tick`.
+    /// Legacy entry point: loads zone `tower/<floor>` (see `load_zone`).
     pub fn load_floor(
         &mut self,
         floor: u8,
         anchors: &dyn Fn(&str) -> Option<(Vec3, f32)>,
         blockers: Vec<Aabb>,
     ) -> Result<(), ContentError> {
-        let f = self
-            .content
-            .floor(floor)
-            .cloned()
-            .ok_or_else(|| ContentError::Invalid(format!("unknown floor {floor}")))?;
-        let anchor = |a: &str| {
-            anchors(a).ok_or_else(|| ContentError::Invalid(format!("floor {floor}: no anchor {a}")))
-        };
-        let (lo, hi) = f.level_range;
-        let mut plan = Vec::new();
-        let mut pack_id = self.next_pack;
-        for (k, p) in f.packs.iter().enumerate() {
-            let (at, yaw) = anchor(&p.anchor)?;
-            let level = if k * 2 < f.packs.len() { lo } else { hi };
-            for (key, (dx, dz)) in p.units.iter().zip(pack_offsets(p.units.len())) {
-                plan.push(Planned {
-                    def: self.def_index(key)?,
-                    pos: Vec3::new(at.x + dx, at.y, at.z + dz),
-                    yaw,
-                    level,
-                    pack: Some(pack_id),
-                    boss: false,
-                });
-            }
-            pack_id += 1;
-        }
-        let (at, yaw) = anchor(&f.boss.anchor)?;
-        let def = self.def_index(&f.boss.unit)?;
-        plan.push(Planned {
-            def,
-            pos: at,
-            yaw,
-            level: self.content.units[def].level,
-            pack: Some(pack_id),
-            boss: true,
-        });
-        pack_id += 1;
-        for s in &f.friendly {
-            let (at, yaw) = anchor(&s.anchor)?;
-            let def = self.def_index(&s.unit)?;
-            plan.push(Planned {
-                def,
-                pos: at,
-                yaw,
-                level: self.content.units[def].level,
-                pack: None,
-                boss: false,
-            });
-        }
-
-        let player = self.player.and_then(|p| self.index(p));
-        // A cast started on the old floor would land on a unit that no longer exists.
-        if let Some(pi) = player {
-            if self.units[pi].state.cast.is_some() {
-                self.cancel_cast(pi, None, 0);
-            }
-            self.units[pi].queued = None;
-        }
-        for i in 0..self.units.len() {
-            if Some(i) != player && !self.units[i].despawned {
-                self.despawn(i);
-            }
-        }
-        self.blockers = blockers;
-        self.rebuild_nav();
-        self.floor = Some(floor);
-        self.next_pack = pack_id;
-        for p in plan {
-            self.spawn(
-                p.def,
-                p.pos,
-                p.yaw,
-                SpawnOpts {
-                    level: Some(p.level),
-                    pack: p.pack,
-                    respawns: false,
-                    summoner: None,
-                    floor_boss: p.boss,
-                },
-            );
-        }
-        self.events.push(Event::FloorLoaded { floor });
-        Ok(())
+        self.load_zone(&format!("tower/{floor}"), anchors, blockers)
     }
 
-    /// Where `RespawnPlayer` puts the player (e.g. the floor's elevator).
+    /// Where `RespawnPlayer` puts the player; `load_zone` sets it from the `graveyard` anchor.
     pub fn set_respawn_point(&mut self, pos: Vec3, yaw: f32) {
         if let Some(i) = self.player.and_then(|p| self.index(p)) {
             self.units[i].spawn_pos = pos;

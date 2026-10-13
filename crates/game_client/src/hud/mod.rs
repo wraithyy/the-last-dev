@@ -7,6 +7,8 @@ mod actionbar;
 mod banners;
 mod feed;
 mod frames;
+mod map;
+mod quests;
 mod trophies;
 
 use crate::combat::{CombatSim, SimReady};
@@ -18,6 +20,7 @@ use std::collections::HashMap;
 pub use actionbar::CooldownMaterial;
 pub use banners::Banner;
 pub use feed::LogLineMsg;
+pub use quests::giver_mark;
 
 /// Terminal cyan: focus, hover and "active" states across the HUD.
 pub const ACCENT: Color = Color::srgb(0.36, 0.82, 0.86);
@@ -52,6 +55,8 @@ impl Plugin for HudPlugin {
                 feed::FeedPlugin,
                 banners::BannersPlugin,
                 trophies::TrophiesPlugin,
+                quests::QuestsPlugin,
+                map::MapPlugin,
             ))
             .add_systems(Startup, spawn_misc)
             .add_systems(
@@ -63,21 +68,28 @@ impl Plugin for HudPlugin {
 
 /// Icon files shipped in `assets/icons` (see CREDITS.md). Any other key gets a
 /// generated letter badge, so content can name icons before art exists.
-pub const ICON_FILES: [&str; 106] = [
+pub const ICON_FILES: [&str; 160] = [
     "ab_loser",
     "ab_test",
     "ab_winner",
     "accepted",
+    "access_badge",
+    "agent_memory",
+    "agentic_copy",
     "agi_pivot",
+    "alignment_training",
     "analysis",
     "backlog",
     "badge",
+    "batch_blessing",
+    "benchmark",
     "big_diff",
     "billable_hours",
     "block_all",
     "box",
     "brain",
     "brand",
+    "brand_awareness",
     "caffeine",
     "calendar",
     "cash",
@@ -89,23 +101,47 @@ pub const ICON_FILES: [&str; 106] = [
     "code_smell",
     "coffee_break",
     "coins",
+    "confident_answer",
+    "context_window",
     "contract",
+    "cron",
     "culture_fit",
     "deadline",
+    "delivery_receipt",
+    "demo_crashed",
+    "demo_lanyard",
+    "demo_laptop",
+    "demo_works",
+    "emergent_capability",
     "ethics_review",
+    "exhaust_gust",
     "expired_gpu_credits",
+    "fair_share",
     "family",
+    "fan_blade",
     "forwarded_reply",
+    "free_swag",
     "generate_prs",
     "git_blame",
+    "gpu_candle",
     "guardrails",
+    "hallucinate_copies",
     "hallucinated_hotfix",
     "hallucination_blast",
+    "hit_and_run",
     "hook",
+    "hot_aisle",
     "hourglass",
+    "human_inside",
+    "incident_report",
     "influencer_collab",
+    "jailbreak",
+    "job_pending",
+    "judgment",
     "key",
     "keyboard",
+    "lighter",
+    "live_demo",
     "locked_out",
     "logo",
     "mailbox",
@@ -116,7 +152,9 @@ pub const ICON_FILES: [&str; 106] = [
     "megaphone",
     "melee",
     "nitpick",
+    "oat_milk_prompt",
     "org_chart",
+    "overheating",
     "overpromise",
     "padlock",
     "parachute",
@@ -125,13 +163,22 @@ pub const ICON_FILES: [&str; 106] = [
     "phishing",
     "pizza",
     "postmortem",
+    "preemption",
     "press_release",
+    "priority_low",
+    "prompt_certificate",
     "prompt_fragment",
+    "prompt_injected",
     "pto",
     "pull_request",
+    "queue_ticket",
     "quick_sync",
+    "rack_chair",
+    "rack_failover",
+    "rack_screw",
     "rebrand",
     "rebranded",
+    "recalculating_route",
     "refactor",
     "regen",
     "reject_pr",
@@ -145,26 +192,38 @@ pub const ICON_FILES: [&str; 106] = [
     "robot",
     "robot_audit",
     "rollback",
+    "room_booking",
     "rss",
     "rubber_duck",
     "rug_pull",
+    "scooter_helmet",
     "scope_creep",
+    "self_improvement",
+    "series_b",
     "soc",
     "spiral",
     "stakeholders",
     "standup",
     "sticky",
+    "still_typing",
+    "stress_ball",
     "synergy_storm",
+    "term_sheet",
     "tests_off",
+    "thermal_event",
+    "thermal_paste",
     "thought_leadership",
     "thumb_down",
+    "token_invoice",
     "unread_ai_strategy_deck",
     "unread_spec",
     "vibes",
     "viral_loop",
+    "visitor_badge",
     "webinar",
     "wellness",
     "wellness_survey",
+    "wont_fix",
     "write_by_hand",
     "wrong_thread",
     "yesterday",
@@ -297,7 +356,7 @@ fn spawn_misc(mut commands: Commands) {
         },
         children![(
             label(
-                "WASD move | RMB steer | LMB orbit | Wheel zoom | Space jump | Tab target | T auto | 1-0 cast | F / right-click talk, loot | B trophies | M mute | F3 debug | Esc menu",
+                "WASD move | RMB steer | LMB orbit | Wheel zoom | Space jump | Tab target | T auto | 1-0 cast | F / right-click talk, loot | J jira | N map | B trophies | M mute | Esc menu",
                 11.0,
             ),
             TextColor(Color::srgba(0.8, 0.9, 1.0, 0.5)),
@@ -382,19 +441,24 @@ fn update_dev_overlay(
 mod tests {
     use super::ICON_FILES;
 
+    /// Anything without a shipped file renders as a generated letter badge.
     #[test]
-    fn every_trophy_has_a_shipped_icon_file() {
+    fn every_spell_aura_and_trophy_has_a_shipped_icon_file() {
         let Ok(sim) = crate::combat::new_sim() else {
             panic!("embedded content invalid");
         };
-        for it in &sim.content().items {
-            assert!(
-                ICON_FILES.contains(&it.icon.as_str()),
-                "{}: {}",
-                it.name,
-                it.icon
-            );
-        }
+        let c = sim.content();
+        let icons = c
+            .items
+            .iter()
+            .map(|i| (&i.name, &i.icon))
+            .chain(c.spells.iter().map(|s| (&s.name, &s.icon)))
+            .chain(c.auras.iter().map(|a| (&a.name, &a.icon)));
+        let missing: Vec<String> = icons
+            .filter(|(_, icon)| !ICON_FILES.contains(&icon.as_str()))
+            .map(|(name, icon)| format!("{name}: {icon}"))
+            .collect();
+        assert!(missing.is_empty(), "{missing:?}");
     }
 
     /// WebGL2 has no 16-bit normalized textures: one such PNG makes the browser build quit on load.

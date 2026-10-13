@@ -27,6 +27,11 @@ pub enum FloorKind {
     /// Carpet tiles multiplied by this colour.
     Carpet([f32; 3]),
     Marble,
+    Grass,
+    /// Raised-floor tiles with vent holes, multiplied by this colour.
+    Tile([f32; 3]),
+    /// Polished plain tiles (lab).
+    Gloss([f32; 3]),
 }
 
 /// Per-floor look: surface colours, lighting and fog.
@@ -42,11 +47,18 @@ pub struct Theme {
     pub ambient_brightness: f32,
     pub sun: Color,
     pub sun_illuminance: f32,
+    /// Linear distance fog start and end, metres.
+    pub fog_range: (f32, f32),
 }
 
 pub struct FloorLayout {
+    /// Tower floor number for `tower/n`; 0 for the campus and 1.. within other buildings.
     pub id: u8,
+    /// Zone id from the contract ("campus", "tower/3", "datacenter/1", ...).
+    pub zone: &'static str,
     pub name: &'static str,
+    /// Open sky: no ceiling, long fog, the camera may rise above wall height.
+    pub outdoor: bool,
     /// Movement and line-of-sight blockers, same semantics as the old arena colliders.
     pub blockers: Vec<Aabb>,
     /// Named anchors: world position on the floor plane and unit yaw (the yaw a
@@ -59,6 +71,10 @@ pub struct FloorLayout {
     #[cfg_attr(not(test), allow(dead_code))]
     pub route: Vec<Vec2>,
 }
+
+/// Zone layouts are floor layouts; the alias is the contract name.
+#[allow(dead_code)] // contract surface, used by the integration pass
+pub type ZoneLayout = FloorLayout;
 
 impl FloorLayout {
     pub fn anchor(&self, name: &str) -> Option<(Vec3, f32)> {
@@ -81,19 +97,9 @@ pub fn yaw_towards(from: Vec3, to: Vec3) -> f32 {
     (-d.x).atan2(-d.z)
 }
 
-/// Floor 1..=5 (clamped). Same id always yields the same layout.
-pub fn build_floor(id: u8) -> FloorLayout {
-    let id = id.clamp(1, FLOOR_COUNT);
-    let mut plan = Plan::default();
-    let theme = themes::build(id, &mut plan);
-    let Plan {
-        pieces,
-        anchors,
-        fp,
-        route,
-        ..
-    } = plan;
-    let blockers = pieces
+/// Blockers are every solid box and prop footprint plus the explicit `Block` pieces.
+fn blockers_of(pieces: &[Piece]) -> Vec<Aabb> {
+    pieces
         .iter()
         .filter_map(|p| match p {
             Piece::Box {
@@ -118,11 +124,31 @@ pub fn build_floor(id: u8) -> FloorLayout {
             Piece::Block(b) => Some(*b),
             _ => None,
         })
-        .collect();
+        .collect()
+}
+
+/// Shared tail of every zone builder: turns a filled `Plan` into a layout.
+pub fn assemble(
+    zone: &'static str,
+    id: u8,
+    name: &'static str,
+    outdoor: bool,
+    plan: Plan,
+    theme: Theme,
+) -> FloorLayout {
+    let Plan {
+        pieces,
+        anchors,
+        fp,
+        route,
+        ..
+    } = plan;
     FloorLayout {
         id,
-        name: floor_name(id),
-        blockers,
+        zone,
+        name,
+        outdoor,
+        blockers: blockers_of(&pieces),
         anchors: anchors
             .into_iter()
             .map(|Anchor { name, pos, yaw }| (name, pos, yaw))
@@ -132,6 +158,24 @@ pub fn build_floor(id: u8) -> FloorLayout {
         footprint: fp,
         route,
     }
+}
+
+pub const TOWER_ZONES: [&str; FLOOR_COUNT as usize] =
+    ["tower/1", "tower/2", "tower/3", "tower/4", "tower/5"];
+
+/// Floor 1..=5 (clamped). Same id always yields the same layout.
+pub fn build_floor(id: u8) -> FloorLayout {
+    let id = id.clamp(1, FLOOR_COUNT);
+    let mut plan = Plan::default();
+    let theme = themes::build(id, &mut plan);
+    assemble(
+        TOWER_ZONES[usize::from(id) - 1],
+        id,
+        floor_name(id),
+        false,
+        plan,
+        theme,
+    )
 }
 
 /// Box in front of the exit doors; the bridge unlocks the next floor when the
@@ -149,113 +193,11 @@ pub fn elevator_exit_trigger(layout: &FloorLayout) -> Aabb {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{FLOOR_HALF_X, FLOOR_HALF_Z, PLAYER_RADIUS};
+    use crate::config::{FLOOR_HALF_X, FLOOR_HALF_Z};
+    use crate::floors::testgrid::{Grid, route_dist};
     use combat_core::{Vec3 as CVec3, line_of_sight, pack_offsets};
-    use std::collections::VecDeque;
 
-    const CELL: f32 = 0.5;
     const NAMES: [&str; 6] = ["pack_1", "pack_2", "pack_3", "pack_4", "pack_5", "pack_6"];
-
-    /// Player-sized walkability grid over the whole clamp area with BFS path lengths from a point.
-    struct Grid {
-        w: usize,
-        h: usize,
-        blocked: Vec<bool>,
-        dist: Vec<f32>,
-    }
-
-    impl Grid {
-        fn new(layout: &FloorLayout) -> Self {
-            let w = (FLOOR_HALF_X * 2.0 / CELL) as usize;
-            let h = (FLOOR_HALF_Z * 2.0 / CELL) as usize;
-            let mut blocked = vec![false; w * h];
-            for b in layout
-                .blockers
-                .iter()
-                .filter(|b| b.max.y > 0.3 && b.min.y < 1.8)
-            {
-                let lo = |v: f32, half: f32| {
-                    (((v - PLAYER_RADIUS + half) / CELL).floor().max(0.0)) as usize
-                };
-                let hi = |v: f32, half: f32, n: usize| {
-                    (((v + PLAYER_RADIUS + half) / CELL).ceil().max(0.0) as usize).min(n - 1)
-                };
-                for j in lo(b.min.z, FLOOR_HALF_Z)..=hi(b.max.z, FLOOR_HALF_Z, h) {
-                    for i in lo(b.min.x, FLOOR_HALF_X)..=hi(b.max.x, FLOOR_HALF_X, w) {
-                        let (x, z) = (
-                            i as f32 * CELL - FLOOR_HALF_X + CELL / 2.0,
-                            j as f32 * CELL - FLOOR_HALF_Z + CELL / 2.0,
-                        );
-                        if x + PLAYER_RADIUS > b.min.x
-                            && x - PLAYER_RADIUS < b.max.x
-                            && z + PLAYER_RADIUS > b.min.z
-                            && z - PLAYER_RADIUS < b.max.z
-                        {
-                            blocked[j * w + i] = true;
-                        }
-                    }
-                }
-            }
-            Self {
-                w,
-                h,
-                blocked,
-                dist: Vec::new(),
-            }
-        }
-
-        fn cell(&self, p: Vec3) -> usize {
-            let i = (((p.x + FLOOR_HALF_X) / CELL) as usize).min(self.w - 1);
-            let j = (((p.z + FLOOR_HALF_Z) / CELL) as usize).min(self.h - 1);
-            j * self.w + i
-        }
-
-        fn from(layout: &FloorLayout, from: Vec3) -> Self {
-            let mut g = Self::new(layout);
-            let mut dist = vec![f32::INFINITY; g.w * g.h];
-            let s = g.cell(from);
-            dist[s] = 0.0;
-            let mut q = VecDeque::from([s]);
-            while let Some(k) = q.pop_front() {
-                let (i, j) = ((k % g.w) as i32, (k / g.w) as i32);
-                for (di, dj) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-                    let (ni, nj) = (i + di, j + dj);
-                    if ni < 0 || nj < 0 || ni as usize >= g.w || nj as usize >= g.h {
-                        continue;
-                    }
-                    let n = nj as usize * g.w + ni as usize;
-                    if !g.blocked[n] && dist[n].is_infinite() {
-                        dist[n] = dist[k] + CELL;
-                        q.push_back(n);
-                    }
-                }
-            }
-            g.dist = dist;
-            g
-        }
-
-        fn at(&self, p: Vec3) -> f32 {
-            self.dist[self.cell(p)]
-        }
-
-        fn free(&self, p: Vec3) -> bool {
-            !self.blocked[self.cell(p)]
-        }
-    }
-
-    fn seg_dist(p: Vec2, a: Vec2, b: Vec2) -> f32 {
-        let d = b - a;
-        let t = ((p - a).dot(d) / d.length_squared().max(1e-6)).clamp(0.0, 1.0);
-        p.distance(a + d * t)
-    }
-
-    fn route_dist(l: &FloorLayout, p: Vec3) -> f32 {
-        let q = Vec2::new(p.x, p.z);
-        l.route
-            .windows(2)
-            .map(|w| seg_dist(q, w[0], w[1]))
-            .fold(f32::INFINITY, f32::min)
-    }
 
     const REQUIRED: [&str; 11] = [
         "pack_1",

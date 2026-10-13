@@ -237,7 +237,11 @@ fn place_bubbles(
     let eye = cam_tf.translation();
     let forward = cam_tf.forward();
     let player_pos = player.single().ok().map(|t| t.translation);
-    let (win_w, win_h) = (window.width(), window.height());
+    // The camera's target, which is the offscreen image during screenshots.
+    let view = cam
+        .logical_viewport_size()
+        .unwrap_or(Vec2::new(window.width(), window.height()));
+    let (win_w, win_h) = (view.x, view.y);
 
     let mut slots: Vec<Slot> = Vec::new();
     let mut hidden: Vec<Entity> = Vec::new();
@@ -334,9 +338,11 @@ fn place_bubbles(
         }
         *vis = Visibility::Inherited;
         let offset = bubble.offset.max(0.0);
+        // A tall unit close to the camera would push the bubble off the top edge; slide it down.
+        let clip = (slot.h + 4.0 - (slot.bottom - offset)).max(0.0);
         // Anchored by `bottom` so a taller (wrapped) bubble grows upwards, not into the unit.
         node.left = px(slot.x / scale - BUBBLE_MAX_W / 2.0);
-        node.bottom = px((win_h - slot.bottom - TAIL_PX + offset) / scale);
+        node.bottom = px((win_h - slot.bottom - TAIL_PX + offset - clip) / scale);
         if let Ok(mut stem) = stems.get_mut(bubble.stem) {
             stem.height = px(offset / scale);
             stem.bottom = px(-TAIL_PX - offset / scale);

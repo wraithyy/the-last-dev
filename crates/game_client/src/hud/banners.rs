@@ -4,6 +4,7 @@
 use super::actionbar::spell_signature;
 use super::{ACCENT, DIM, PANEL_EDGE, drop_shadow, label, panel_bg, set_text};
 use crate::combat::{CombatEvent, CombatSim, SimReady};
+use crate::floors::LoadZone;
 use bevy::prelude::*;
 use combat_core::Event;
 use std::collections::VecDeque;
@@ -117,10 +118,15 @@ fn progress_events(
     mut commands: Commands,
     mut events: MessageReader<CombatEvent>,
     mut banners: MessageReader<Banner>,
+    mut zones: MessageReader<LoadZone>,
     mut queue: ResMut<BannerQueue>,
     sim: Res<CombatSim>,
     stack: Single<Entity, With<ToastStack>>,
 ) {
+    // The banner on screen belongs to the zone just left (its name would print over the new one).
+    if zones.read().count() > 0 {
+        queue.current = None;
+    }
     let me = sim.0.player();
     for b in banners.read() {
         queue.queue.push_back(b.clone());

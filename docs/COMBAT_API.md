@@ -4,13 +4,13 @@ Shared contract between `combat_core` (rules) and `game_client` (presentation). 
 
 ## combat_core (pure Rust, deterministic, 30 Hz integer ticks)
 
-Content is data-driven: `content/game.ron` (spells, auras, units, levels, floors, balance), parsed by `combat_core::Content::from_ron(&str)`. The client embeds it with `include_str!`, which also works on wasm. Every reference (spell ids, aura keys, unit keys, summons, floors, learn levels) is validated at load; a bad file is a `ContentError`.
+Content is data-driven: `content/game.ron` (spells, auras, units, items, levels, zones, quests, balance), parsed by `combat_core::Content::from_ron(&str)`. The client embeds it with `include_str!`, which also works on wasm. Every reference (spell ids, aura keys, unit keys, summons, zones, links, unlocks, quest objectives, learn levels) is validated at load; a bad file is a `ContentError`.
 
 ```rust
 pub struct SpellId(pub u32);              // Copy, Eq, Hash, Ord, Debug
 pub enum School { Physical, Arcane }      // only two; a school lockout locks one of them
 
-pub struct Content { pub config, pub auras, pub spells, pub units, pub items, pub action_bar, pub levels, pub floors }
+pub struct Content { pub config, pub auras, pub spells, pub units, pub items, pub action_bar, pub levels, pub zones, pub quests }
 impl Content {
     pub fn from_ron(src: &str) -> Result<Content, ContentError>;
     pub fn spell(&self, id: SpellId) -> Option<&SpellDef>;
@@ -19,7 +19,9 @@ impl Content {
     pub fn unit_def(&self, key: &str) -> Option<&UnitDef>;
     pub fn item(&self, name: &str) -> Option<&ItemDef>;   // trophy table entry by loot item name
     pub fn aura(&self, key: &str) -> Option<&AuraDef>;
-    pub fn floor(&self, id: u8) -> Option<&FloorDef>;
+    pub fn zone(&self, id: &str) -> Option<&ZoneDef>;
+    pub fn floor(&self, id: u8) -> Option<&ZoneDef>;  // legacy: zone "tower/<id>"
+    pub fn quest(&self, id: &str) -> Option<&QuestDef>;
     pub fn max_level(&self) -> u8;                   // 10
     pub fn xp_to_next(&self, level: u8) -> u32;      // XP bar maximum at `level`; 0 at the cap
     pub fn kill_xp(&self, player_level: u8, mob_level: u8, reward: u32) -> u32;
@@ -27,7 +29,7 @@ impl Content {
     pub fn cast_ms(&self, spell: &SpellDef, haste_pct: u32) -> u32;   // haste only; auras are applied by the sim
 }
 pub const MAX_ACTION_BAR: usize = 10;
-pub fn pack_offsets(n: usize) -> Vec<(f32, f32)>;    // shared pack formation, see Floors
+pub fn pack_offsets(n: usize) -> Vec<(f32, f32)>;    // shared pack formation, see Zones
 
 pub struct Sim { /* ... */ }
 impl Sim {
@@ -35,8 +37,14 @@ impl Sim {
     pub fn set_blockers(&mut self, blockers: Vec<Aabb>);
     pub fn spawn_player(&mut self, pos: Vec3, yaw: f32) -> EntityId;      // level 1, 0 XP
     pub fn spawn_unit(&mut self, unit_key: &str, pos: Vec3, yaw: f32) -> Result<EntityId, ContentError>; // authored level, respawns
-    pub fn load_floor(&mut self, floor: u8, anchors: &dyn Fn(&str) -> Option<(Vec3, f32)>, blockers: Vec<Aabb>) -> Result<(), ContentError>;
-    pub fn floor(&self) -> Option<u8>;
+    pub fn load_zone(&mut self, zone: &str, anchors: &dyn Fn(&str) -> Option<(Vec3, f32)>, blockers: Vec<Aabb>) -> Result<(), ContentError>;
+    pub fn zone(&self) -> Option<&str>;
+    pub fn zone_links(&self, zone: &str) -> Vec<ZoneLinkView>;          // ZoneLinkView { anchor, to, unlocked }, content order
+    pub fn zone_cleared(&self, zone: &str) -> bool;                       // its boss died this session
+    pub fn load_floor(&mut self, floor: u8, anchors, blockers) -> Result<(), ContentError>; // legacy: load_zone("tower/<floor>")
+    pub fn floor(&self) -> Option<u8>;                                    // legacy: n of a loaded "tower/<n>"
+    pub fn quests(&self) -> &QuestLog;                                    // QuestLog { active: Vec<ActiveQuest { id, counts }>, completed: Vec<String> }
+    pub fn quest_status(&self, quest: &str) -> QuestStatus;               // Locked | Available | Active | Ready | Done
     pub fn set_respawn_point(&mut self, pos: Vec3, yaw: f32);             // where RespawnPlayer puts the player
     pub fn inventory(&self) -> &[(String, u32)];                           // player trophies (name, copies), first pickup first
     pub fn item_totals(&self) -> ItemTotals;                              // current trophy bonus, stack cap applied
@@ -67,6 +75,9 @@ pub enum Command {
     StopAutoAttack { unit: EntityId },
     RespawnPlayer,
     Talk { unit: EntityId },                     // talk to a friendly NPC within loot_range_m (6 m)
+    AcceptQuest { quest: String },               // Available + within talk range of a living giver
+    TurnInQuest { quest: String },               // Ready + within talk range of a living giver
+    AbandonQuest { quest: String },              // drops an active quest and its progress
 }
 
 pub struct UnitState {
@@ -120,41 +131,71 @@ pub enum Event {
     PhaseChanged { unit, phase: u8 },
     Summoned { unit, summoner },
     Despawned { unit },
-    FloorLoaded { floor: u8 }, FloorCleared { floor: u8 },
+    ZoneLoaded { zone: String }, ZoneCleared { zone: String }, Unlocked { zone: String },
+    FloorLoaded { floor: u8 }, FloorCleared { floor: u8 },          // deprecated twins, tower zones only
+    QuestOffered { npc, quests: Vec<String> }, QuestAccepted { quest }, QuestProgress { quest, objective: usize, count, need },
+    QuestReady { quest }, QuestCompleted { quest },
 }
 ```
 
 `EntityId` here is a sim id (u64), not a Bevy `Entity`. The client keeps a mapping through the `SimUnit(EntityId)` component. Ids are never reused.
 
-## Contract with the client: unit keys and floors
+## Contract with the client: unit keys and zones
 
-- Player `senior_engineer`. Friendly: `intern`, `it_support`.
-- Trash: `meatproxy`, `vibe_junior`, `copilot_drone`, `scrum_master`, `agile_coach`, `middle_manager`, `sales_rep`, `account_manager`, `linkedin_influencer` (shown as "Network Influencer"), `growth_hacker`, `project_manager`, `product_owner`, `consultant`, `security_analyst`, `ai_ethicist`, `crypto_bro`, `chatbot_minion`, `unreviewed_pr`.
-- Mini-bosses (sole unit of `pack_6`): `hr_partner` (floor 2), `marketing_lead` (floor 3), `ciso` (floor 4). Not `boss`, so they can be stunned.
-- Bosses (`boss: true`): `vibe_coder` (1), `analyst` (2), `customer` (3), `vp_synergy` (4), `ceo` (5).
+- Player `senior_engineer`. Friendly: `intern`, `it_support`, `facilities_guy`, `barista`, `smoking_corner_dev` (quest givers: `intern`, `facilities_guy`, `barista`, `smoking_corner_dev`).
+- Trash: `meatproxy`, `vibe_junior`, `copilot_drone`, `scrum_master`, `agile_coach`, `middle_manager`, `sales_rep`, `account_manager`, `linkedin_influencer` (shown as "Network Influencer"), `growth_hacker`, `project_manager`, `product_owner`, `consultant`, `security_analyst`, `ai_ethicist`, `crypto_bro`, `chatbot_minion`, `unreviewed_pr`; campus `delivery_robot`, `scooter_exec`, `unpaid_ambassador`; data center `gpu_cultist`, `cooling_fan`, `token_counter`, `rogue_agent`, `overheated_rack` (add); lab `demo_presenter`, `vc_partner`, `prompt_whisperer`, `agi_hallucination` (add, named "AGI Prototype" like the boss).
+- Mini-bosses (sole unit of `pack_6`): `hr_partner` (tower/2), `marketing_lead` (tower/3), `ciso` (tower/4). Not `boss`, so they can be stunned.
+- Bosses (`boss: true`): `vibe_coder` (tower/1), `analyst` (tower/2), `customer` (tower/3), `vp_synergy` (tower/4), `ceo` (tower/5), `the_scheduler` (datacenter/1), `cooling_failure` (datacenter/2), `agi_prototype` (lab/2).
 - `UnitDef.title` is the nameplate subtitle ("Please Open a Ticket").
-- `content.floors[]`: `(id, name, level_range: (lo, hi), packs: [(anchor, units)], boss: (anchor, unit), friendly: [(anchor, unit)])`. Anchors used: `pack_1`..`pack_6`, `boss`, `npc_1`..`npc_3`.
+- `content.zones[]`: `(id, name, kind: Outdoor | Indoor, level_range: (lo, hi), packs: [(anchor, units)], boss: Option<(anchor, unit)>, friendly: [(anchor, unit)], links: [(anchor, to, requires: Option<Unlock>)])` with `Unlock = ZoneCleared(zone) | BossKilled(unit key of a zone boss) | QuestDone(quest)`.
+- Anchors a zone layout provides: `player_spawn` (client only), `graveyard` (respawn point; optional for the sim), `pack_1`..`pack_8`, `boss`, `npc_1`..`npc_6`, door anchors `door:<zone id>`; tower floors keep `elevator` / `elevator_exit`.
 
-| Floor | Name | Levels | Packs | Friendly |
-|---|---|---|---|---|
-| 1 | Open Space | 1-2 | pack_1..4 | npc_1 intern, npc_2 + npc_3 it_support |
-| 2 | Meeting Rooms | 3-4 | pack_1..6 (6 = hr_partner) | - |
-| 3 | Sales & Marketing | 5-6 | pack_1..6 (6 = marketing_lead) | - |
-| 4 | PMO | 7-8 | pack_1..6 (6 = ciso) | npc_1 it_support |
-| 5 | C-Level Penthouse | 9-10 | pack_1..5 | - |
+| Zone | Name | Levels | Packs | Boss | Friendly | Links (anchor -> zone, requires) |
+|---|---|---|---|---|---|---|
+| campus | Campus (outdoor) | 1-3 | pack_1..8 | - | npc_1 intern, npc_2 facilities_guy, npc_3 barista, npc_4 smoking_corner_dev | door:tower/1 -> tower/1; door:datacenter/1 -> datacenter/1 (ZoneCleared tower/3); door:lab/1 -> lab/1 (BossKilled ceo) |
+| tower/1 | Open Space | 1-2 | pack_1..4 | vibe_coder | npc_2 + npc_3 it_support | door:campus; elevator_exit -> tower/2 (ZoneCleared tower/1) |
+| tower/2 | Meeting Rooms | 3-4 | pack_1..6 (6 = hr_partner) | analyst | - | elevator_exit -> tower/3 (ZoneCleared tower/2) |
+| tower/3 | Sales & Marketing | 5-6 | pack_1..6 (6 = marketing_lead) | customer | - | elevator_exit -> tower/4 (ZoneCleared tower/3) |
+| tower/4 | PMO | 7-8 | pack_1..6 (6 = ciso) | vp_synergy | npc_1 it_support | elevator_exit -> tower/5 (ZoneCleared tower/4) |
+| tower/5 | C-Level Penthouse | 9-10 | pack_1..5 | ceo | - | elevator_exit -> campus |
+| datacenter/1 | Data Center: Hall A | 6-7 | pack_1..5 | the_scheduler | - | door:campus; door:datacenter/2 (ZoneCleared datacenter/1) |
+| datacenter/2 | Data Center: Hall B | 7-8 | pack_1..5 | cooling_failure | - | door:datacenter/1 |
+| lab/1 | Innovation Lab: Showroom | 10 | pack_1..5 | - | - | door:campus; door:lab/2 |
+| lab/2 | Innovation Lab: Rack Room | 10 | pack_1..3 | agi_prototype | - | door:lab/1 |
 
-## Floors
+## Zones
 
-`load_floor(floor, anchors, blockers)`:
+`load_zone(zone, anchors, blockers)`:
 
-1. Resolves every anchor through the callback first; an unknown floor or a missing anchor returns `ContentError::Invalid` and changes nothing.
+1. Resolves every anchor through the callback first (packs, the boss even if it is dead, friendlies); an unknown zone or a missing anchor returns `ContentError::Invalid` and changes nothing. `graveyard` is optional.
 2. Despawns every non-player unit (`Despawned` each; `unit(id)` becomes `None`; the player's target is cleared if it pointed at one) and replaces the blockers.
-3. Spawns the packs: unit `k` of a pack stands at `anchor + pack_offsets(n)[k]` (world XZ offsets, not rotated by the anchor yaw; slot 0 is the anchor itself) facing the anchor yaw. Packs in the first half of the list (`index * 2 < pack count`) get the low level of `level_range`, the rest the high level. Each pack gets its own `pack` id. The boss (own pack id) and friendlies keep their authored level. Floor spawns never respawn: killed trash stays dead until the floor is loaded again.
-4. Emits `FloorLoaded { floor }`. All of these events come out of the next `tick()`.
+3. Spawns the packs: unit `k` of a pack stands at `anchor + pack_offsets(n)[k]` (world XZ offsets, not rotated by the anchor yaw; slot 0 is the anchor itself) facing the anchor yaw. Packs in the first half of the list (`index * 2 < pack count`) get the low level of `level_range`, the rest the high level. Each pack gets its own `pack` id. The boss (own pack id) and friendlies keep their authored level. Zone spawns never respawn on their own.
+4. Sets the player's respawn point to `graveyard` when the layout has one (otherwise it stays where `set_respawn_point` put it).
+5. Emits `ZoneLoaded { zone }`, then `FloorLoaded { floor: n }` for `tower/<n>`. These events come out of the next `tick()`.
 
-The player keeps level, XP, HP and cooldowns across floors. `set_respawn_point(pos, yaw)` sets where `RespawnPlayer` revives the player (the elevator); call it after each `load_floor`. After `Respawned` for the player the client must move its body to `UnitState.pos`. When the player dies every enemy loses its threat and evades: trash walks home and heals, bosses also reset their phase and auras, summoned adds despawn when they get home.
+Per-session world state (kept in the `Sim`, survives zone loads and player deaths, gone with a new `Sim`):
 
-`FloorCleared { floor }` is emitted when the floor's boss dies (after its `LootDropped`).
+- A zone boss's death emits `ZoneCleared { zone }` (then `FloorCleared` for tower zones) once; that boss is never spawned again. Campus and lab/1 have no boss and never clear.
+- Trash: every pack unit has a slot (pack units numbered in content order). Killed slots stay empty when the player re-enters within `TRASH_RESPAWN_MS` (300 s of sim time) after leaving, or reloads the zone it is in; later the whole zone respawns fresh (and gives XP again).
+- Unlocks: after a zone clear, a zone-boss kill or a quest turn-in, every link whose `requires` became true opens; `Unlocked { zone }` is emitted once per target zone (for the first gated link into it). `zone_links` reports each exit with its current state; links without `requires` are always open. A hand-spawned (`spawn_unit`) boss is not a zone boss and unlocks nothing.
+
+The player keeps level, XP, HP, cooldowns, trophies and quests across zones. After `Respawned` for the player the client must move its body to `UnitState.pos`. When the player dies every enemy loses its threat and evades: trash walks home and heals, bosses also reset their phase and auras, summoned adds despawn when they get home.
+
+Event order on a zone boss kill: `Death`, `AiState Dead`, `XpGained`/`LevelUp`/`SpellLearned`, `LootDropped`, `ZoneCleared`, `FloorCleared` (tower), `QuestProgress`/`QuestReady` (ClearZone, then Kill objectives), `Unlocked`.
+
+`load_floor(n, ..)` is `load_zone("tower/<n>", ..)`, kept until the client switches; the `Floor*` events, `Sim::floor()` and `Content::floor()` go with it.
+
+## Quests
+
+`content.quests[]`: `(id, name, giver: (npc, zone), text, progress_text, done_text, objectives: [Kill(unit_key, n) | Loot(item, n) | Talk(npc_key) | ClearZone(zone)], reward: (xp, trophy: Option<item>), requires: Option<quest id>, level_min)`. Validation: the giver is a friendly spawned in its zone; Kill targets a hostile unit, Talk a friendly one, Loot an `items` entry, ClearZone a zone with a boss; `requires` names a quest listed earlier.
+
+- State is per player (`Sim::quests()` returns the player's log; the map is keyed by player id). Status: `Done` once turned in, `Active`/`Ready` while in the log, `Available` when `requires` is done and the player is at least `level_min`, otherwise `Locked`.
+- `Talk` to a giver counts `Talk(npc)` objectives first, then emits `QuestOffered { npc, quests }` (its Available and Ready quests, content order) when that list is not empty.
+- `AcceptQuest`: Available and within `loot_range_m` of a living giver unit, else ignored silently. Emits `QuestAccepted`. A zone already cleared counts for `ClearZone` and copies already carried count for `Loot` (capped at need); if that completes the quest, `QuestReady` follows.
+- Progress: `Kill` counts the player's own kills only (killer = player, DoTs included); `Loot` counts items the player picks up (after `Looted`); `ClearZone` counts the zone's first clear. Each increment emits `QuestProgress { quest, objective, count, need }` (capped at need); completing the last objective emits `QuestReady` once.
+- `TurnInQuest`: Ready and near a giver. Emits `QuestCompleted`, grants the trophy (silent pickup, like `grant_trophy`) and the XP (`XpGained`/`LevelUp`; no level-difference adjustment, nothing at the cap), then checks unlocks.
+- `AbandonQuest` removes the quest and its counts silently; it becomes Available again.
+- Nothing here uses the rng, so quests never change combat rolls.
 
 ## Levels and spells
 
@@ -169,15 +210,16 @@ The player keeps level, XP, HP and cooldowns across floors. `set_respawn_point(p
 `SpellDef`: `effect` plus `extra_effects: Vec<Effect>` (resolved in order), `target: Enemy | Caster` (default Enemy), `area: Option<(radius_m, allies)>`, `interruptible` (default true), `learn_level` (default 1), `yells`.
 
 - `target: Enemy` spells need a hostile, living, non-evading target and check range, facing (at start) and LoS; `Caster` spells target the caster. With `area` set, the target-side effects hit every living unit within `radius_m` of the caster on the caster's side (`allies: true`, caster included) or the other side.
-- Effects: `Damage { base, coefficient_pct, apply_aura?, consume_aura?, execute? }`, `Absorb`, `Interrupt { lockout_ms }`, `Heal { base, coefficient_pct }`, `Aura { aura, duration_ms }`, `RandomAura { auras, duration_ms }` (rng pick), `Dispel { count }` (removes up to `count` harmful auras, newest first, reason `Consumed`), `Lockout { lockout_ms, school? }` (locks `school`, or the school of the target's last cast spell; cancels a cast of that school), `Knockback { strength_m }`, `Teleport { distance_m }` (to `distance_m` in front of the caster's spawn point), `Summon { unit, count, max_alive }`, `ResetAllyThreat { radius_m }`, `ThreatSwap`, `ForwardLastSpell { pct }`, `Nothing`. `Summon`, `ResetAllyThreat` and `ThreatSwap` act once around the caster; the rest act on each target.
+- Effects: `Damage { base, coefficient_pct, apply_aura?, consume_aura?, execute? }`, `Absorb`, `Interrupt { lockout_ms }`, `Heal { base, coefficient_pct }`, `Aura { aura, duration_ms }`, `RandomAura { auras, duration_ms }` (rng pick), `Dispel { count }` (removes up to `count` harmful auras, newest first, reason `Consumed`), `Lockout { lockout_ms, school? }` (locks `school`, or the school of the target's last cast spell; cancels a cast of that school), `Knockback { strength_m }`, `Teleport { distance_m }` (to `distance_m` in front of the caster's spawn point), `Summon { unit, count, max_alive }`, `ResetAllyThreat { radius_m }`, `ThreatSwap`, `ForwardLastSpell { pct }`, `DrainMana { pct }` (removes `pct` percent of the target's max mana, no event), `Nothing`. `Summon`, `ResetAllyThreat` and `ThreatSwap` act once around the caster; the rest act on each target.
 - Only `Damage` and `ForwardLastSpell` roll `spell_hit_pct`; heals, auras, dispels, knockbacks and interrupts always land.
-- `AuraDef` flags (all default off): `stun`, `silence`, `periodic: (interval_ms, base, coefficient_pct, heal)`, `school` (of periodic and expiry damage), `cast_time_pct`, `damage_taken_pct`, `damage_done_pct`, `haste_pct` (all per stack), `max_stacks` (default 1), `spread_radius_m`, `expire_damage`, `stack_on_repeat_cast`.
+- `AuraDef` flags (all default off): `stun`, `silence`, `periodic: (interval_ms, base, coefficient_pct, heal)`, `school` (of periodic and expiry damage), `cast_time_pct`, `damage_taken_pct`, `damage_done_pct`, `haste_pct` (all per stack), `max_stacks` (default 1), `spread_radius_m`, `expire_damage`, `stack_on_repeat_cast`, `reflect`.
 - Re-applying an aura refreshes its duration; a stacking aura gains one stack (up to `max_stacks`) and `AuraApplied` is emitted again. Periodic and expiry amounts are snapshotted from the caster when applied. The first periodic tick comes one interval after application; a tick due on the expiry tick still lands.
 - Applying a harmful aura to an enemy that has no threat on the caster yet pulls it (threat 1), so a DoT aggroes immediately.
 - Stun: no casting (`Stunned`), no AI movement, melee, abilities or auto-attack swings; applying it cancels the current cast (`CastInterrupted { by: Some(source), lockout_ms: 0 }`) and the spell queue. Silence: no spellcasting (`Silenced`); auto attack continues. Bosses ignore stuns; a player spell that would stun a boss fails validation with `InvalidTarget` (Rubber Duck).
 - `expire_damage` (Deadline) hits the bearer when the aura runs out (`AuraRemoved Expired` first, then `Damage { spell: Some(applying spell) }`); a dispel (`Consumed`) or death prevents it.
 - `spread_radius_m` (git blame): when the bearer dies, a fresh copy goes to the nearest living enemy of the original caster within the radius that does not carry it yet.
 - `stack_on_repeat_cast` (Unread Spec): the bearer gains a stack each time it casts the same spell twice in a row.
+- `reflect` (Alignment Training): a hit with `spell: Some` aimed at the bearer from another unit hits the source instead, as `Damage { source: bearer, target: caster, spell }`, scaled by the bearer's damage-done and the caster's damage-taken auras. Auto attacks (`spell: None`) and melee still land. A reflected hit is not reflected again.
 - `ForwardLastSpell` (MeatProxy's Forwarded Reply): repeats the pre-absorb amount of the last damaging player spell that landed on the caster, at `pct` percent, as `Damage { spell: Some(Forwarded Reply) }` in that spell's school; does nothing if the player never hit it.
 - `Knockback`: direction from caster to target on XZ. Sim-owned units are moved immediately; for the player only the event is emitted and the client applies the impulse. `Teleport` sets the target's position (the player's too) and emits `Teleported`; the client must move the player body.
 - Death spells: `UnitDef.death_spell` is resolved by the corpse right after `Death` (Chatbot Minion's `Hallucinated Hotfix`, an area hit around it), emitting `CastSucceeded` from the corpse.

@@ -8,7 +8,7 @@
 
 use crate::arena::Colliders;
 use crate::camera::CameraShake;
-use crate::catalog::{self, IdlePose};
+use crate::catalog::IdlePose;
 use crate::collision::{nearest_free, to_core};
 use crate::combat_anim::CombatAnim;
 use crate::config::*;
@@ -41,6 +41,10 @@ pub struct SimUnit(pub EntityId);
 #[derive(Message, Clone)]
 pub struct CombatEvent(pub Event);
 
+/// The player spoke to a friendly unit (sim id) in reach; the quest dialog opens on it.
+#[derive(Message)]
+pub struct Talked(pub EntityId);
+
 /// Client-side feedback that has no sim event (e.g. loot click out of reach).
 #[derive(Message)]
 pub struct UiNotice(pub String);
@@ -65,6 +69,7 @@ impl Plugin for CombatPlugin {
         app.init_resource::<PendingCommands>()
             .add_message::<CombatEvent>()
             .add_message::<UiNotice>()
+            .add_message::<Talked>()
             .configure_sets(Update, SimReady.run_if(resource_exists::<CombatSim>))
             .configure_sets(PostStartup, SimReady.run_if(resource_exists::<CombatSim>))
             .configure_sets(
@@ -303,7 +308,7 @@ fn idle_pose(state: &UnitState, flow: &GameFlow) -> IdlePose {
         .anchors
         .iter()
         .find(|(name, p, _)| name.starts_with("npc_") && p.distance(at) < 0.5)
-        .and_then(|(name, ..)| catalog::npc_at(flow.floor, name));
+        .and_then(|(name, ..)| flow.npc_dressing(name));
     if let Some((_, pose)) = dressed {
         return pose;
     }
@@ -501,7 +506,7 @@ fn interact_input(
     mut target: ResMut<Target>,
     sim: Res<CombatSim>,
     mut pending: ResMut<PendingCommands>,
-    mut notices: MessageWriter<UiNotice>,
+    (mut notices, mut talked): (MessageWriter<UiNotice>, MessageWriter<Talked>),
     mut press: Local<Option<(Vec2, f32)>>,
     player: Single<(&Transform, &SimUnit), With<Player>>,
     units: Query<(Entity, &Transform, &Unit)>,
@@ -565,6 +570,7 @@ fn interact_input(
             notices.write(UiNotice("You are too far away to talk to them.".into()));
         } else {
             pending.0.push(Command::Talk { unit: su.0 });
+            talked.write(Talked(su.0));
         }
     } else if state.lootable {
         if far {

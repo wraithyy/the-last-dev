@@ -671,12 +671,18 @@ fn combat_sfx(
             Event::SpellLearned { unit, .. } if *unit == player => {
                 out.write(Sfx::new(Snd::SpellLearned).after(1.2));
             }
-            Event::FloorCleared { .. } => {
+            Event::ZoneCleared { zone } => {
                 out.write(Sfx::new(Snd::FloorCleared));
-                out.write(Sfx::new(Snd::ElevatorDing).after(0.9));
-                out.write(Sfx::new(Snd::ElevatorDoor).after(1.1));
+                // Only tower floors have an elevator that opens on the clear.
+                if zone.starts_with("tower/") {
+                    out.write(Sfx::new(Snd::ElevatorDing).after(0.9));
+                    out.write(Sfx::new(Snd::ElevatorDoor).after(1.1));
+                }
             }
-            Event::FloorLoaded { .. } => {
+            Event::QuestCompleted { .. } => {
+                out.write(Sfx::new(Snd::SpellLearned));
+            }
+            Event::ZoneLoaded { .. } => {
                 // The first load happens at startup, long before any gesture.
                 let seen_before = std::mem::replace(&mut *first_floor, true);
                 if seen_before {

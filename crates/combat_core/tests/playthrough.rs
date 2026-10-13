@@ -1,12 +1,13 @@
-//! Headless playthrough: a scripted "competent player" clears whole floors.
+//! Headless playthrough: a scripted "competent player" clears whole zones and does quests.
 //!
-//! Balance gate: every floor at its max level without dying. Golden: floor 1 from level 1.
+//! Balance gate: every zone at its max level without dying; the campus quest chain from level 1.
+//! Golden: tower/1 from level 1.
 //! Regenerate the golden after an intentional change:
 //! `UPDATE_GOLDEN=1 cargo test -p combat_core --test playthrough`
 
 mod common;
 
-use combat_core::{Command, Event, Sim, SpellId, Vec3};
+use combat_core::{Command, Event, QuestStatus, Sim, SpellId, TRASH_RESPAWN_MS, Vec3, ms_to_ticks};
 use common::*;
 use std::fmt::Write as _;
 use std::path::PathBuf;
@@ -19,8 +20,10 @@ const CAFFEINE: SpellId = SpellId(8);
 const DUCK: SpellId = SpellId(9);
 const POSTMORTEM: SpellId = SpellId(10);
 const BY_HAND: SpellId = SpellId(11);
-/// Casts not worth a kick: self-stuns and the Ethics Review that does nothing.
-const NO_KICK: [SpellId; 3] = [SpellId(112), SpellId(150), SpellId(154)];
+/// Casts not worth a kick: self-stuns, the Ethics Review that does nothing, a coin-flip demo.
+const NO_KICK: [SpellId; 4] = [SpellId(112), SpellId(150), SpellId(154), SpellId(180)];
+/// The AGI's telegraph for its spell reflect window.
+const ALIGNMENT: SpellId = SpellId(187);
 const PACK_SPACING: f32 = 70.0;
 
 /// Packs on a straight corridor toward -Z, the boss at the end, NPCs off to the side.
@@ -57,6 +60,8 @@ struct Bot {
     log: String,
     report: Report,
     in_boss: bool,
+    /// Loot every corpse after a pull (quest runs only; the golden predates looting).
+    looting: bool,
 }
 
 fn yaw_to(from: Vec3, to: Vec3) -> f32 {
@@ -64,7 +69,7 @@ fn yaw_to(from: Vec3, to: Vec3) -> f32 {
 }
 
 impl Bot {
-    fn new(floor: u8, level: u8, seed: u64) -> Bot {
+    fn new(zone: &str, level: u8, seed: u64) -> Bot {
         let mut sim = Sim::new(content(), seed);
         // The balance gate and golden pin fight timing, which wandering would shift.
         sim.set_wandering(false);
@@ -72,17 +77,18 @@ impl Bot {
         let player = sim.spawn_player(start, 0.0);
         sim.set_player_level(level);
         sim.set_respawn_point(start, 0.0);
-        if let Err(e) = sim.load_floor(floor, &anchor, Vec::new()) {
-            panic!("load_floor {floor}: {e}");
+        if let Err(e) = sim.load_zone(zone, &anchor, Vec::new()) {
+            panic!("load_zone {zone}: {e}");
         }
         Bot {
             sim,
             player,
             pos: start,
             target: None,
-            log: format!("# floor {floor} playthrough, seed {seed}, start level {level}\n"),
+            log: format!("# {zone} playthrough, seed {seed}, start level {level}\n"),
             report: Report::default(),
             in_boss: false,
+            looting: false,
         }
     }
 
@@ -124,7 +130,7 @@ impl Bot {
                 }
                 Event::Teleported { unit, pos } if *unit == self.player => self.pos = *pos,
                 Event::Death { unit, .. } if *unit == self.player => self.report.died = true,
-                Event::FloorCleared { .. } => self.report.cleared = true,
+                Event::ZoneCleared { .. } => self.report.cleared = true,
                 _ => {}
             }
             let _ = writeln!(self.log, "{}", log_line(&self.sim, now, e));
@@ -181,6 +187,21 @@ impl Bot {
         let Some(t) = self.target.and_then(|t| self.sim.unit(t)).cloned() else {
             return;
         };
+        // Spell reflect (or its telegraph): stop casting at it and let Nitpick do the work.
+        let reflecting = t.auras.iter().any(|a| a.key == "alignment_training")
+            || t.cast.is_some_and(|c| c.spell == ALIGNMENT);
+        if reflecting {
+            if me.cast.is_some() {
+                self.sim.push(Command::StopCasting {
+                    caster: self.player,
+                });
+            }
+            let hp_pct = me.hp * 100 / me.max_hp.max(1);
+            if hp_pct < 50 && self.ready(ROLLBACK) {
+                self.cast(ROLLBACK);
+            }
+            return;
+        }
         if let Some(c) = t.cast
             && c.interruptible
             && !NO_KICK.contains(&c.spell)
@@ -286,6 +307,9 @@ impl Bot {
             me.mana * 100 / me.max_mana.max(1),
             (self.sim.now().0 - t0) / 30,
         ));
+        if self.looting {
+            self.loot_near(at);
+        }
         if boss {
             self.report.boss_hp_left = Some((self.me().hp, self.me().max_hp));
         } else {
@@ -293,8 +317,88 @@ impl Bot {
         }
     }
 
-    fn run(mut self, floor: u8) -> (Report, String) {
-        let packs = self.sim.content().floor(floor).map_or(0, |f| f.packs.len());
+    fn loot_near(&mut self, at: Vec3) {
+        let corpses: Vec<(u64, Vec3)> = self
+            .sim
+            .units()
+            .filter(|u| u.lootable && combat_core::distance(u.pos, at) < 40.0)
+            .map(|u| (u.id, u.pos))
+            .collect();
+        for (id, pos) in corpses {
+            self.pos = Vec3::new(pos.x, 0.0, pos.z + 1.0);
+            self.tick();
+            self.sim.push(Command::Loot {
+                looter: self.player,
+                corpse: id,
+            });
+            self.tick();
+        }
+    }
+
+    /// Talks to every friendly NPC of the zone, turns in what is ready and accepts what is
+    /// available among `quests`.
+    fn visit_givers(&mut self, zone: &str, quests: &[&str]) {
+        let Some(z) = self.sim.content().zone(zone).cloned() else {
+            return;
+        };
+        for f in &z.friendly {
+            let Some((at, _)) = anchor(&f.anchor) else {
+                continue;
+            };
+            self.pos = Vec3::new(at.x, 0.0, at.z + 2.0);
+            self.tick();
+            let Some(npc) = self.sim.units().find(|u| u.key == f.unit).map(|u| u.id) else {
+                continue;
+            };
+            self.sim.push(Command::Talk { unit: npc });
+            self.tick();
+            for q in quests {
+                let giver = self.sim.content().quest(q).map(|d| d.giver.npc.clone());
+                if giver.as_deref() != Some(f.unit.as_str()) {
+                    continue;
+                }
+                let quest = q.to_string();
+                match self.sim.quest_status(q) {
+                    QuestStatus::Ready => self.sim.push(Command::TurnInQuest { quest }),
+                    QuestStatus::Available => self.sim.push(Command::AcceptQuest { quest }),
+                    _ => continue,
+                }
+                self.tick();
+            }
+        }
+    }
+
+    fn clear_packs(&mut self, zone: &str) {
+        let packs = self.sim.content().zone(zone).map_or(0, |z| z.packs.len());
+        for k in 1..=packs {
+            if self.report.died {
+                return;
+            }
+            if let Some((at, _)) = anchor(&format!("pack_{k}")) {
+                self.pull(at, false);
+            }
+        }
+    }
+
+    /// Walks out to another zone and back once the trash respawn timer has run out.
+    fn leave_and_return(&mut self, zone: &str, elsewhere: &str) {
+        for id in [elsewhere, zone] {
+            if let Err(e) = self.sim.load_zone(id, &anchor, Vec::new()) {
+                panic!("load_zone {id}: {e}");
+            }
+            self.tick();
+            if id == elsewhere {
+                for _ in 0..ms_to_ticks(TRASH_RESPAWN_MS) {
+                    self.tick();
+                }
+            }
+        }
+    }
+
+    fn run(mut self, zone: &str) -> (Report, String) {
+        let def = self.sim.content().zone(zone).cloned();
+        let packs = def.as_ref().map_or(0, |z| z.packs.len());
+        let has_boss = def.is_some_and(|z| z.boss.is_some());
         for k in 1..=packs {
             if self.report.died {
                 break;
@@ -304,6 +408,7 @@ impl Bot {
             }
         }
         if !self.report.died
+            && has_boss
             && let Some((at, _)) = anchor("boss")
         {
             self.rest(true);
@@ -314,42 +419,106 @@ impl Bot {
     }
 }
 
-/// Several seeds so the verdict does not hinge on one lucky crit/miss/loot stream.
+/// Several seeds so the verdict does not hinge on one lucky crit/miss/loot stream. Every zone
+/// with packs, at its max level; zones without a boss only need to be survived.
 #[test]
-fn every_floor_is_cleared_at_its_max_level() {
+fn every_zone_is_cleared_at_its_max_level() {
     let mut failures = Vec::new();
-    for seed in [7, 42, 1234] {
-        for floor in 1..=5u8 {
-            let max = match content().floor(floor) {
-                Some(f) => f.level_range.1,
-                None => panic!("no floor {floor}"),
-            };
-            let (r, log) = Bot::new(floor, max, seed).run(floor);
+    let mut lowest: Vec<(String, u32)> = Vec::new();
+    for z in content().zones {
+        let mut low = 100;
+        for seed in [7, 42, 1234] {
+            let max = z.level_range.1;
+            let (r, log) = Bot::new(&z.id, max, seed).run(&z.id);
             println!(
-                "seed {seed} floor {floor} at level {max}: boss fight min HP {}%, HP at kill {:?}, rests {}/{} pulls, after each pull {:?}",
-                r.boss_min_hp_pct, r.boss_hp_left, r.rests, r.pulls, r.after
+                "seed {seed} {} at level {max}: boss fight min HP {}%, HP at kill {:?}, rests {}/{} pulls, after each pull {:?}",
+                z.id, r.boss_min_hp_pct, r.boss_hp_left, r.rests, r.pulls, r.after
             );
-            if r.died || !r.cleared {
+            if z.boss.is_some() {
+                low = low.min(r.boss_min_hp_pct);
+            }
+            if r.died || (z.boss.is_some() && !r.cleared) {
                 let tail: Vec<&str> = log.lines().rev().take(60).collect();
                 failures.push(format!(
-                    "seed {seed} floor {floor}: {r:?}\n{}",
+                    "seed {seed} {}: {r:?}\n{}",
+                    z.id,
                     tail.into_iter().rev().collect::<Vec<_>>().join("\n")
                 ));
             }
             // "Competent player clears trash without resting every pull."
             if r.rests >= r.pulls {
                 failures.push(format!(
-                    "seed {seed} floor {floor}: rested after every pull ({r:?})"
+                    "seed {seed} {}: rested after every pull ({r:?})",
+                    z.id
                 ));
             }
         }
+        lowest.push((z.id.clone(), low));
     }
+    println!("lowest boss-fight HP % per zone over 3 seeds: {lowest:?}");
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+}
+
+/// Campus from level 1: visit every giver, clear the packs looting everything, hand in, and
+/// leave and return after the trash respawn timer until the campus chain is done.
+#[test]
+fn campus_quest_chain_from_level_one() {
+    // Human in the Loop is left out: its MeatProxies are spread over the campus and the tower.
+    const CAMPUS: [&str; 5] = [
+        "onboarding",
+        "badge_access_denied",
+        "coffee_run",
+        "fire_exit_strategy",
+        "content_moderation",
+    ];
+    for seed in [7, 42, 1234] {
+        let mut bot = Bot::new("campus", 1, seed);
+        bot.looting = true;
+        let mut rounds = 0;
+        while rounds < 6 && !bot.report.died {
+            rounds += 1;
+            bot.visit_givers("campus", &CAMPUS);
+            bot.clear_packs("campus");
+            bot.visit_givers("campus", &CAMPUS);
+            if CAMPUS
+                .iter()
+                .all(|q| bot.sim.quest_status(q) == QuestStatus::Done)
+            {
+                break;
+            }
+            bot.leave_and_return("campus", "tower/1");
+        }
+        let left: Vec<&str> = CAMPUS
+            .iter()
+            .copied()
+            .filter(|q| bot.sim.quest_status(q) != QuestStatus::Done)
+            .collect();
+        let me = bot.me();
+        println!(
+            "seed {seed}: campus chain in {rounds} clears, level {}, {} trophies, {} rests / {} pulls",
+            me.level,
+            me.inventory.len(),
+            bot.report.rests,
+            bot.report.pulls
+        );
+        assert!(!bot.report.died, "seed {seed}: died on the campus");
+        assert!(left.is_empty(), "seed {seed}: unfinished {left:?}");
+        assert!(
+            rounds <= 3,
+            "seed {seed}: {rounds} clears is too much farming"
+        );
+        // The campus is the tutorial: a fresh hire leaves it at level 3 and walks into tower/1
+        // (levels 1-2) slightly over-levelled, never at 4+ with the floor turned grey.
+        assert_eq!(
+            me.level, 3,
+            "seed {seed}: the campus should take a fresh hire to level 3"
+        );
+    }
 }
 
 #[test]
 fn floor_one_from_level_one_matches_golden() {
-    let (r, log) = Bot::new(1, 1, 7).run(1);
+    let (r, log) = Bot::new("tower/1", 1, 7).run("tower/1");
     assert!(r.cleared && !r.died, "{r:?}");
     assert!(r.level >= 2, "floor 1 should level the player: {r:?}");
     for beat in [

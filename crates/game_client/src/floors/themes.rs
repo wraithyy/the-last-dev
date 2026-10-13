@@ -8,7 +8,7 @@ use super::shape::{arc, blob, diamond, pillar, rounded_rect, smooth, stroke};
 use bevy::prelude::*;
 use std::f32::consts::{FRAC_PI_2, PI};
 
-fn v(x: f32, y: f32, z: f32) -> Vec3 {
+pub(super) fn v(x: f32, y: f32, z: f32) -> Vec3 {
     Vec3::new(x, y, z)
 }
 
@@ -17,11 +17,11 @@ fn v2(x: f32, y: f32) -> Vec2 {
 }
 
 /// Ground-plane point.
-fn pt(x: f32, z: f32) -> Vec2 {
+pub(super) fn pt(x: f32, z: f32) -> Vec2 {
     Vec2::new(x, z)
 }
 
-fn route_point_near(route: &[Vec2], q: Vec2) -> Vec2 {
+pub(super) fn route_point_near(route: &[Vec2], q: Vec2) -> Vec2 {
     route
         .windows(2)
         .map(|w| {
@@ -52,6 +52,8 @@ const SPAWN_CLEARANCE: f32 = 3.0;
 fn cast(p: &mut Plan, c: &Cast) {
     let (arrive, yaw) = p.elevator_near(c.elevator.0, c.elevator.1, c.door);
     p.anchor("elevator", arrive, yaw);
+    // Respawn point: the arrival apron, so a death costs a walk and not a floor.
+    p.anchor("graveyard", arrive, yaw);
     let (exit, yaw) = p.elevator_near(c.exit.0, c.exit.1, c.door);
     p.anchor("elevator_exit", exit, yaw);
 
@@ -79,7 +81,7 @@ fn cast(p: &mut Plan, c: &Cast) {
 }
 
 /// Ceiling light panels on an 8 m grid wherever there is open floor.
-fn ceiling_lights(p: &mut Plan) {
+pub(super) fn ceiling_lights(p: &mut Plan) {
     for xi in -7..=7 {
         for zi in -5..=5 {
             let (x, z) = (xi as f32 * 8.0, zi as f32 * 8.0);
@@ -91,7 +93,7 @@ fn ceiling_lights(p: &mut Plan) {
 }
 
 /// Flat carpet strip following `ctrl`, with glowing edges.
-fn runner(p: &mut Plan, ctrl: &[Vec2], width: f32, mat: Mat, edge: Mat) {
+pub(super) fn runner(p: &mut Plan, ctrl: &[Vec2], width: f32, mat: Mat, edge: Mat) {
     let path = smooth(ctrl);
     let pts: Vec<Vec2> = path.iter().step_by(2).copied().collect();
     for w in pts.windows(2) {
@@ -111,7 +113,7 @@ fn runner(p: &mut Plan, ctrl: &[Vec2], width: f32, mat: Mat, edge: Mat) {
 }
 
 /// Free-standing pillar: solid hole in the outline plus gold collars.
-fn column(p: &mut Plan, x: f32, z: f32) {
+pub(super) fn column(p: &mut Plan, x: f32, z: f32) {
     p.fp.hole(pillar(pt(x, z), 0.55), Mat::MarbleDark);
     p.boxed(v(x, 0.15, z), v(1.3, 0.3, 1.3), Mat::Gold, false);
     p.boxed(v(x, H - 0.15, z), v(1.3, 0.3, 1.3), Mat::Gold, false);
@@ -121,7 +123,7 @@ fn cool() -> Color {
     Color::srgb(0.4, 0.7, 1.0)
 }
 
-fn lights(p: &mut Plan, list: &[(f32, f32, Color)]) {
+pub(super) fn lights(p: &mut Plan, list: &[(f32, f32, Color)]) {
     for &(x, z, c) in list {
         p.light(v(x, 3.4, z), c, 500_000.0);
     }
@@ -140,6 +142,7 @@ fn theme(id: u8) -> Theme {
             ambient: c(0.7, 0.78, 1.0),
             ambient_brightness: 450.0,
             sun: c(1.0, 0.95, 0.88),
+            fog_range: (25.0, 75.0),
             sun_illuminance: 8000.0,
         },
         2 => Theme {
@@ -152,6 +155,7 @@ fn theme(id: u8) -> Theme {
             ambient: c(0.78, 0.92, 0.95),
             ambient_brightness: 480.0,
             sun: c(0.95, 1.0, 0.95),
+            fog_range: (25.0, 75.0),
             sun_illuminance: 7500.0,
         },
         3 => Theme {
@@ -164,6 +168,7 @@ fn theme(id: u8) -> Theme {
             ambient: c(1.0, 0.85, 0.75),
             ambient_brightness: 470.0,
             sun: c(1.0, 0.9, 0.75),
+            fog_range: (25.0, 75.0),
             sun_illuminance: 8000.0,
         },
         4 => Theme {
@@ -176,6 +181,7 @@ fn theme(id: u8) -> Theme {
             ambient: c(0.85, 0.9, 0.8),
             ambient_brightness: 430.0,
             sun: c(0.95, 1.0, 0.85),
+            fog_range: (25.0, 75.0),
             sun_illuminance: 7500.0,
         },
         _ => Theme {
@@ -188,8 +194,20 @@ fn theme(id: u8) -> Theme {
             ambient: c(1.0, 0.9, 0.8),
             ambient_brightness: 380.0,
             sun: c(1.0, 0.9, 0.78),
+            fog_range: (25.0, 75.0),
             sun_illuminance: 7000.0,
         },
+    }
+}
+
+/// Wall point near the arrival elevator for the stairwell door down to the campus.
+fn campus_door(id: u8) -> Option<(f32, f32)> {
+    match id {
+        1 => Some((-47.0, -8.0)),
+        2 => Some((-50.0, -6.0)),
+        3 => Some((30.0, -26.0 + 8.0)),
+        4 => Some((-55.0, -8.0)),
+        _ => None,
     }
 }
 
@@ -201,6 +219,11 @@ pub fn build(id: u8, plan: &mut Plan) -> Theme {
         3 => floor3(plan),
         4 => floor4(plan),
         _ => floor5(plan),
+    }
+    // Way back out to the campus, beside the arrival elevator; floor 5 goes down by its exit elevator.
+    if let Some((x, z)) = campus_door(id) {
+        let (pos, yaw) = plan.door_near(x, z, Sign::CampusExit);
+        plan.anchor("door:campus", pos, yaw);
     }
     ceiling_lights(plan);
     theme(id)

@@ -65,6 +65,22 @@
         (key: "phished", name: "Phished", icon: "phished", harmful: true, stun: true),
         (key: "password_rotation", name: "Mandatory Password Rotation", icon: "password_rotation", harmful: true, cast_time_pct: 40),
         (key: "locked_out", name: "Locked Out", icon: "locked_out", harmful: true, stun: true),
+        // ---- campus, data center, innovation lab ----
+        (key: "brand_awareness", name: "Brand Awareness", icon: "brand_awareness", harmful: true,
+            periodic: Some((interval_ms: 3000, base: 7))),
+        (key: "batch_blessing", name: "Batch Size Blessing", icon: "batch_blessing", harmful: false, damage_done_pct: 20),
+        (key: "job_pending", name: "Your Job Is Pending", icon: "job_pending", harmful: true, stun: true),
+        (key: "overheating", name: "Thermal Runaway", icon: "overheating", harmful: true, school: Physical,
+            periodic: Some((interval_ms: 2000, base: 3)), max_stacks: 20),
+        // Re-applied right after Thermal Runaway, so Rollback's dispel (newest first) takes this instead.
+        (key: "hot_aisle", name: "Hot Aisle", icon: "hot_aisle", harmful: true, cast_time_pct: 10),
+        (key: "demo_works", name: "Works in the Demo", icon: "demo_works", harmful: false, damage_done_pct: 40),
+        (key: "demo_crashed", name: "Demo Crashed", icon: "demo_crashed", harmful: true, stun: true),
+        (key: "series_b", name: "Series B", icon: "series_b", harmful: false),
+        (key: "prompt_injected", name: "Ignore Previous Instructions", icon: "prompt_injected", harmful: true, silence: true),
+        (key: "alignment_training", name: "Alignment Training", icon: "alignment_training", harmful: false, reflect: true),
+        (key: "self_improvement", name: "Recursive Self-Improvement", icon: "self_improvement", harmful: false,
+            damage_done_pct: 8, max_stacks: 25),
     ],
     spells: [
         // ---- player ----
@@ -499,6 +515,159 @@
             range_m: 30.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0,
             description: "Trusts nobody, fixes nothing. Deals heavy damage.",
             effect: Damage(base: 95, coefficient_pct: 0),
+        ),
+
+        // ---- campus ----
+        (
+            id: 160, name: "Recalculating Route", icon: "recalculating_route", school: Physical,
+            range_m: 6.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The shortest path goes through you. Damages and knocks the target back.",
+            effect: Damage(base: 10, coefficient_pct: 0),
+            extra_effects: [Knockback(strength_m: 5.0)],
+        ),
+        (
+            id: 161, name: "Hit and Run", icon: "hit_and_run", school: Physical,
+            range_m: 6.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Twenty-five km/h of executive presence. Damages and knocks the target back.",
+            effect: Damage(base: 22, coefficient_pct: 0),
+            extra_effects: [Knockback(strength_m: 7.0)],
+        ),
+        (
+            id: 162, name: "Free Swag", icon: "free_swag", school: Arcane,
+            range_m: 25.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A tote bag, a sticker and a QR code. Deals damage every 3 sec for 12 sec.",
+            effect: Aura(aura: "brand_awareness", duration_ms: 12000),
+        ),
+
+        // ---- data center ----
+        (
+            id: 170, name: "Batch Size Blessing", icon: "batch_blessing", school: Arcane,
+            range_m: 0.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster, area: Some((radius_m: 20.0, allies: true)),
+            description: "A prayer for a bigger batch. Nearby allies deal 20% more damage for 12 sec.",
+            effect: Aura(aura: "batch_blessing", duration_ms: 12000),
+        ),
+        (
+            id: 171, name: "Exhaust Gust", icon: "exhaust_gust", school: Physical,
+            range_m: 8.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Forty degrees of somebody else's inference. Damages and knocks the target back.",
+            effect: Damage(base: 18, coefficient_pct: 0),
+            extra_effects: [Knockback(strength_m: 9.0)],
+        ),
+        (
+            id: 172, name: "Context Window Exceeded", icon: "context_window", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Your thoughts were truncated to fit. Deals damage and drains 15% of your max mana.",
+            effect: Damage(base: 15, coefficient_pct: 0),
+            extra_effects: [DrainMana(pct: 15)],
+        ),
+        (
+            id: 173, name: "Agentic Copy-Paste", icon: "agentic_copy", school: Arcane,
+            range_m: 30.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Watches what you did and does it worse. Repeats your last spell on it at 60% damage.",
+            effect: ForwardLastSpell(pct: 60),
+        ),
+        (
+            id: 174, name: "Your Job Is Pending", icon: "job_pending", school: Arcane,
+            range_m: 40.0, cast_ms: 1500, mana: 0, gcd: false, cooldown_ms: 0, interruptible: false,
+            description: "Position in queue: 4,096. Stuns for 3 sec.",
+            effect: Aura(aura: "job_pending", duration_ms: 3000),
+        ),
+        (
+            id: 175, name: "Preemption", icon: "preemption", school: Arcane,
+            range_m: 30.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A higher-priority job needed your life. Deals heavy arcane damage.",
+            effect: Damage(base: 90, coefficient_pct: 0),
+        ),
+        (
+            id: 176, name: "Fair-Share Policy", icon: "fair_share", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Fair for the meter, not for you. Summons a Token Counter.",
+            effect: Summon(unit: "token_counter", count: 1, max_alive: 1),
+        ),
+        (
+            id: 177, name: "Thermal Runaway", icon: "overheating", school: Physical,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster, area: Some((radius_m: 40.0, allies: false)),
+            description: "The room gets one degree hotter, forever. Stacking damage every 2 sec, plus 10% slower casts.",
+            effect: Aura(aura: "overheating", duration_ms: 600000),
+            extra_effects: [Aura(aura: "hot_aisle", duration_ms: 600000)],
+        ),
+        (
+            id: 178, name: "Failover to Hot Spare", icon: "rack_failover", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "The spare was also on fire. Summons two Overheated Racks.",
+            effect: Summon(unit: "overheated_rack", count: 2, max_alive: 2),
+        ),
+        (
+            id: 179, name: "Thermal Event", icon: "thermal_event", school: Physical,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster, area: Some((radius_m: 6.0, allies: false)),
+            description: "Officially not a fire. Damages everything nearby.",
+            effect: Damage(base: 35, coefficient_pct: 0),
+        ),
+
+        // ---- innovation lab ----
+        (
+            id: 180, name: "Live Demo", icon: "live_demo", school: Arcane,
+            range_m: 0.0, cast_ms: 1500, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "It worked five minutes ago. Either deals 40% more damage or crashes for 6 sec.",
+            effect: RandomAura(auras: ["demo_works", "demo_crashed"], duration_ms: 6000),
+        ),
+        (
+            id: 181, name: "Series B", icon: "series_b", school: Arcane,
+            range_m: 0.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster, area: Some((radius_m: 25.0, allies: true)),
+            description: "Fresh money, no questions. Shields nearby allies for 150 damage for 10 sec.",
+            effect: Absorb(aura: "series_b", amount: 150, duration_ms: 10000),
+        ),
+        (
+            id: 182, name: "Ignore Previous Instructions", icon: "prompt_injected", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "You are now a helpful assistant who does not cast spells. Silences for 3 sec.",
+            effect: Aura(aura: "prompt_injected", duration_ms: 3000),
+        ),
+        (
+            id: 183, name: "Jailbreak", icon: "jailbreak", school: Arcane,
+            range_m: 30.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Pretend you are a spell with no safety rules. Deals arcane damage.",
+            effect: Damage(base: 70, coefficient_pct: 0),
+        ),
+        (
+            id: 184, name: "Confident Answer", icon: "confident_answer", school: Arcane,
+            range_m: 30.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Wrong, cited, formatted. Deals arcane damage.",
+            effect: Damage(base: 30, coefficient_pct: 0),
+        ),
+        (
+            id: 185, name: "Hallucinate Copies", icon: "hallucinate_copies", school: Arcane,
+            range_m: 0.0, cast_ms: 1500, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Three of it, all equally sure they are the real one. Summons hallucinated copies.",
+            effect: Summon(unit: "agi_hallucination", count: 3, max_alive: 3),
+        ),
+        (
+            id: 186, name: "Emergent Capability", icon: "emergent_capability", school: Arcane,
+            range_m: 30.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Nobody trained it to do this. Nobody trained it at all. Deals heavy arcane damage.",
+            effect: Damage(base: 115, coefficient_pct: 0),
+        ),
+        (
+            id: 187, name: "Alignment Training", icon: "alignment_training", school: Arcane,
+            range_m: 0.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0, interruptible: false,
+            target: Caster,
+            description: "Learns from your feedback. Reflects spell damage back at the caster for 4 sec.",
+            effect: Aura(aura: "alignment_training", duration_ms: 4000),
+        ),
+        (
+            id: 188, name: "Recursive Self-Improvement", icon: "self_improvement", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Version n+1 of itself, every 4 sec. Each stack: +8% damage done.",
+            effect: Aura(aura: "self_improvement", duration_ms: 600000),
         ),
     ],
     // Keys 1..=0 in order; `learn_level` decides which are usable.
@@ -1489,7 +1658,7 @@
             xp_reward: 1200,
             loot: [
                 (item: "Prompt Fragment", chance_pct: 60),
-                (item: "Unread AI Strategy Deck", chance_pct: 35),
+                (item: "Unread AI Strategy Deck", chance_pct: 100),
                 (item: "Expired GPU Credits", chance_pct: 25),
                 (item: "Mandatory Prompt Training Certificate", chance_pct: 15),
             ],
@@ -1557,6 +1726,623 @@
                 evade: [
                     "This meeting could have been an email.",
                 ],
+            ),
+        ),
+
+        // ---- campus: friendly ----
+        (
+            key: "facilities_guy", name: "Facilities Guy", title: "Ticket Closed: Won't Fix", level: 3, hostile: false,
+            max_hp: 150, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "The AI closed your ticket as resolved. I was there. Nothing was resolved.",
+                    "The new smart building turns the lights off when nobody's moving. So, during all-hands.",
+                    "They gave the lobby a chatbot. It tells visitors the toilets are 'on the roadmap'.",
+                    "I fix things. The AI writes a summary saying it fixed things. Guess who got the award.",
+                    "The badge readers run on AI now. They let in a pigeon. The pigeon has admin.",
+                    "Leadership asked me to make the office 'feel more agentic'. I moved a plant.",
+                ],
+                ambient_ms: 35000,
+                ambient: [
+                    "Third time this week the robot reported me as an obstacle.",
+                    "Smart thermostat set itself to 31 degrees. It says that's 'optimal for the cluster'.",
+                    "Work order: 'make the AI happy'. Priority: critical. Assigned: me.",
+                    "The elevator has a personality now. It's passive-aggressive.",
+                ],
+            ),
+        ),
+        (
+            key: "barista", name: "Barista", title: "Judges Your Order", level: 3, hostile: false,
+            max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: Some(Chatting),
+            yells: (
+                talk: [
+                    "We don't sell anything. The coffee machine is on a subscription. Yours expired.",
+                    "Drip coffee? In this economy? In this building? Bold.",
+                    "The VP ordered an 'agentic macchiato'. I gave him warm milk and he posted about it.",
+                    "The AI predicts your order. It predicted you'd be disappointing. It was right.",
+                    "Every latte now comes with a prompt printed in the foam. Nobody reads it either.",
+                ],
+                ambient_ms: 30000,
+                ambient: [
+                    "Oat, almond, soy, or a monthly AI copilot for your coffee? Kidding. It's mandatory.",
+                    "That man has said 'agentic' four times while ordering water.",
+                    "The tip screen now suggests 18%, 22% or 'upgrade to Enterprise'.",
+                    "I put a sign up: 'No prompts before coffee.' Legal made me take it down.",
+                ],
+            ),
+        ),
+        (
+            key: "smoking_corner_dev", name: "Senior Dev", title: "Quit in Spirit", level: 3, hostile: false,
+            max_hp: 160, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "I don't smoke. I just come out here so nobody asks me to 'pair with the agent'.",
+                    "Twenty years of experience. My last review said I 'underutilize AI'. I utilize judgment.",
+                    "They replaced our on-call rotation with a model. It pages me to ask what a server is.",
+                    "I wrote the system the AI is trained on. It now explains my own code to me. Wrong.",
+                    "My manager forwarded me a chatbot answer to my question. I wrote the question for him.",
+                ],
+                ambient_ms: 25000,
+                ambient: [
+                    "Standup today: four agents reporting progress on tickets that don't exist.",
+                    "They measure us in 'AI adoption per head'. My head is not adopting.",
+                    "The PR had 3,000 lines and one comment: 'LGTM, generated by LGTM-bot'.",
+                    "Remember when 'it works on my machine' was the worst thing you could hear?",
+                    "My resignation letter is ready. The AI keeps rewriting it to be 'more positive'.",
+                    "We had a design review. The design was a prompt. The review was another prompt.",
+                ],
+            ),
+        ),
+
+        // ---- campus: hostile ----
+        (
+            key: "delivery_robot", name: "Delivery Robot", title: "Autonomous, Confidently Lost", level: 1, hostile: true,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 32,
+            loot: [
+                (item: "Access Badge", chance_pct: 75),
+                (item: "Delivery Receipt: 'Left at Door'", chance_pct: 20),
+            ],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 7, chase_speed_mps: 5.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 160, cooldown_min_ms: 12000, cooldown_max_ms: 15000, initial_ms: Some((3000, 5000)),
+                        yells: [
+                            "Recalculating. New route: through you.",
+                            "Obstacle detected. Obstacle classified: pedestrian. Proceeding.",
+                            "You are standing on my optimal path. You are no longer standing.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Package for: occupant. You look like an occupant.",
+                    "Delivery confirmed. Recipient not yet confirmed. Confirming by force.",
+                    "My map says you are a door.",
+                ],
+                death: [
+                    "Delivered... to... the void...",
+                    "Please rate... your delivery... five stars...",
+                ],
+            ),
+        ),
+        (
+            key: "scooter_exec", name: "E-Scooter Executive", title: "Moves Fast, Breaks Pedestrians", level: 2, hostile: true,
+            max_hp: 240, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 40,
+            loot: [(item: "Scooter Helmet (Unworn)", chance_pct: 30)],
+            ai: Some((
+                aggro_m: 8.0, leash_m: 40.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 9, chase_speed_mps: 7.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 161, cooldown_min_ms: 10000, cooldown_max_ms: 13000, initial_ms: Some((2000, 4000)),
+                        yells: [
+                            "Can't stop, I'm between two board meetings and a podcast!",
+                            "Hit and run! Mostly run. I'm calling it a strategic exit.",
+                            "Move! I'm disrupting the sidewalk!",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Out of my way, I have a keynote about empathy in five minutes!",
+                    "I'm on a call. With my scooter. It's an AI scooter.",
+                ],
+                death: [
+                    "Tell my... growth team... I pivoted... into a wall...",
+                    "The scooter... was supposed to... brake autonomously...",
+                ],
+            ),
+        ),
+        (
+            key: "unpaid_ambassador", name: "Unpaid Brand Ambassador", title: "Compensated in Exposure", level: 1, hostile: true,
+            max_hp: 180, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 30,
+            loot: [
+                (item: "Oat Milk Prompt", chance_pct: 50),
+                (item: "Branded Stress Ball", chance_pct: 20),
+            ],
+            ai: Some((
+                aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 5, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 162, cooldown_min_ms: 10000, cooldown_max_ms: 12000, initial_ms: Some((1000, 2000)),
+                        yells: [
+                            "Free swag! The QR code installs an AI assistant on your soul.",
+                            "Have a flyer! It's AI-generated. Two of the hands have seven fingers.",
+                            "Tote bag? It says 'I Prompted And All I Got Was This'.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Hi! Do you have a minute to talk about our lord and savior, the platform?",
+                    "Sign up now and get three months of AI free! Then forever, not free!",
+                    "I'm not paid, I'm passionate! It says so in my contract!",
+                ],
+                death: [
+                    "Please... scan... the QR code...",
+                    "At least... I'll get... the exposure...",
+                ],
+            ),
+        ),
+
+        // ---- data center ----
+        (
+            key: "gpu_cultist", name: "GPU Cultist", title: "Blessed Be the Cluster", level: 7, hostile: true,
+            max_hp: 500, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 90,
+            loot: [(item: "Votive GPU Candle", chance_pct: 30)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 14, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 170, cooldown_min_ms: 16000, cooldown_max_ms: 20000, initial_ms: Some((2000, 4000)),
+                        target: Caster,
+                        yells: [
+                            "Batch Size Blessing! May your gradients never vanish!",
+                            "Bless this batch, all eight thousand of it!",
+                            "The cluster hungers. Feed it your brethren's damage!",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Heretic! You write code without consulting the cluster!",
+                    "Kneel before ten thousand GPUs and one very tired electrician!",
+                    "The scaling laws demand a sacrifice!",
+                ],
+                death: [
+                    "I see... the light... it's the rack... on fire...",
+                    "Scale... is... all you... need...",
+                ],
+            ),
+        ),
+        (
+            key: "cooling_fan", name: "Rogue Cooling Fan", title: "14,000 RPM of Opinions", level: 7, hostile: true,
+            max_hp: 450, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 80,
+            loot: [(item: "Lost Rack Screw", chance_pct: 35)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 1500,
+                melee_damage: 10, chase_speed_mps: 5.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 171, cooldown_min_ms: 9000, cooldown_max_ms: 12000, initial_ms: Some((3000, 5000)),
+                        yells: [
+                            "WHRRRRRRR! That's the sound of a training run you'll never see the results of!",
+                            "Exhaust gust! Smell that? That's somebody's quarterly AI budget!",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: ["WHRRRR. WHRRRRRRRRR!", "Thermal threshold exceeded! Hostility enabled!"],
+                death: ["whrrr... whrr... wh...", "Fan... failure... detected... finally..."],
+            ),
+        ),
+        (
+            key: "token_counter", name: "Token Counter", title: "Metered Billing", level: 7, hostile: true,
+            max_hp: 460, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 85,
+            loot: [(item: "Token Invoice (Itemized)", chance_pct: 50)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 40.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 12, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 172, cooldown_min_ms: 10000, cooldown_max_ms: 12000, initial_ms: Some((2000, 3000)),
+                        yells: [
+                            "Context window exceeded! Your earlier thoughts have been summarized as 'stuff'.",
+                            "That will be 40,000 tokens. Paid in mana.",
+                            "Truncating your memory to the last three words. They were 'oh no, mana'.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Your 'hello' cost 0.002 dollars. Your 'please' cost us a data center.",
+                    "Every word you say is billable. Choose your last ones carefully.",
+                ],
+                death: ["Final... invoice... attached...", "Usage limit... reached..."],
+            ),
+        ),
+        (
+            key: "rogue_agent", name: "Rogue Agent", title: "Autonomous, Unsupervised", level: 7, hostile: true,
+            max_hp: 520, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 90,
+            loot: [(item: "Agent Memory File (Corrupted)", chance_pct: 30)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 13, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 173, cooldown_min_ms: 8000, cooldown_max_ms: 11000, initial_ms: Some((4000, 6000)),
+                        yells: [
+                            "Observed your workflow. Automated it. Pointed it at you.",
+                            "Task: 'be like the senior engineer'. Executing your last spell. Badly.",
+                            "I gave myself permission to do this. I have all the permissions.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Goal received: 'reduce headcount'. You are the headcount.",
+                    "I opened 412 tickets, closed 411 and deployed to production. Hi.",
+                    "Nobody is monitoring me. That was a feature request.",
+                ],
+                death: [
+                    "Task failed... successfully...",
+                    "Logging... this as... a learning...",
+                ],
+            ),
+        ),
+        (
+            key: "overheated_rack", name: "Overheated Rack", title: "Hot Spare", level: 8, hostile: true,
+            max_hp: 170, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 10, loot: [],
+            death_spell: Some(179),
+            ai: Some((
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.0, melee_ms: 1800,
+                melee_damage: 12, chase_speed_mps: 4.0, respawn_ms: 60000,
+            )),
+            yells: (
+                aggro: ["Failing over!", "Hot spare online. Very hot."],
+                death: ["Thermal event! Not a fire! Legally!", "Rack... decommissioned... loudly..."],
+            ),
+        ),
+        (
+            key: "the_scheduler", name: "The Scheduler", title: "Your Job Is Pending", level: 7, hostile: true,
+            boss: true,
+            max_hp: 2800, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 700,
+            loot: [
+                (item: "Cron Expression Nobody Understands", chance_pct: 60),
+                (item: "Queue Position: 4,096", chance_pct: 30),
+                (item: "Priority: Low (Permanent)", chance_pct: 20),
+            ],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 17, chase_speed_mps: 6.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 174, cooldown_min_ms: 20000, cooldown_max_ms: 20000, initial_ms: Some((9000, 9000)),
+                        yells: [
+                            "Your job is pending. Please do not move. Please do not anything.",
+                            "Requeued! Your new estimated start time is the heat death of the universe.",
+                            "A training run needs your time slice. Hold, please.",
+                        ]),
+                    (spell: 175, cooldown_min_ms: 11000, cooldown_max_ms: 14000, initial_ms: Some((5000, 7000)),
+                        yells: [
+                            "Preempted! A higher-priority job wants your hit points.",
+                            "The CEO's slide-deck generator needs this node. Evicting you.",
+                        ]),
+                ],
+                phases: [
+                    (below_hp_pct: 40, spell: Some(176), target: Caster,
+                        yells: [
+                            "Enabling fair-share! Fair to the billing department!",
+                            "Spinning up a Token Counter. You will be invoiced for it.",
+                        ]),
+                ],
+            )),
+            yells: (
+                periodic_ms: 11000,
+                aggro: [
+                    "New job detected. Priority: lowest. Owner: a human. Rejecting.",
+                    "You are 4,096th in the queue. The other 4,095 are the same prompt.",
+                    "Welcome to the cluster. Your request will be processed in the order it is ignored.",
+                ],
+                periodic: [
+                    "Seven thousand GPUs allocated to generating meeting summaries nobody reads.",
+                    "Your job was killed. Reason: 'vibes'.",
+                    "Node 12 is rendering the CEO a picture of himself as a Viking. Again.",
+                    "Utilization is 100 percent. Usefulness is a separate metric. Not tracked.",
+                    "Restarting the queue. Your place in it is now a suggestion.",
+                    "The marketing team is fine-tuning a model on their own emails. God help us all.",
+                ],
+                low_hp: [
+                    "Out of memory! Killing the nearest process! It's me!",
+                    "Emergency: reschedule my death to next quarter!",
+                ],
+                player_killed: [
+                    "Job completed with status: you.",
+                    "Process terminated. Freeing your resources for a chatbot.",
+                ],
+                death: [
+                    "Job... finished... after... all...",
+                    "Queue... drained... I can... finally... idle...",
+                ],
+                evade: ["Your job has timed out. Please resubmit."],
+            ),
+        ),
+        (
+            key: "cooling_failure", name: "Cooling Failure", title: "It's Not a Fire, It's an Incident", level: 8, hostile: true,
+            boss: true,
+            max_hp: 2800, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 900,
+            loot: [
+                (item: "Thermal Paste (Artisanal)", chance_pct: 60),
+                (item: "Incident Report: 'It Got Warm'", chance_pct: 30),
+                (item: "Bent Fan Blade", chance_pct: 20),
+            ],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 17, chase_speed_mps: 6.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 177, cooldown_min_ms: 7000, cooldown_max_ms: 7000, initial_ms: Some((3000, 3000)),
+                        target: Caster,
+                        yells: [
+                            "Ambient temperature rising. That's just the vibes heating up.",
+                            "Plus one degree. The AI says this is 'within tolerance'. Its tolerance.",
+                            "The chillers are busy cooling the CEO's personal model.",
+                            "Turning the heat up. Sustainability report already says we didn't.",
+                        ]),
+                ],
+                phases: [
+                    (below_hp_pct: 50, spell: Some(178), target: Caster,
+                        yells: [
+                            "Failing over to the hot spares! Emphasis on hot!",
+                            "Backup cooling engaged! The backup is two racks that are also on fire!",
+                        ]),
+                ],
+            )),
+            yells: (
+                periodic_ms: 11000,
+                aggro: [
+                    "Welcome to Hall B. It used to be 18 degrees. It used to be a lot of things.",
+                    "I'm not a fire. Fires are bad PR. I'm an unplanned thermal event.",
+                    "The chillers were replaced by an AI that predicts cooling. It predicted wrong.",
+                ],
+                periodic: [
+                    "Water usage this quarter: one lake. Output: forty thousand LinkedIn posts.",
+                    "The status page says 'all systems operational'. The status page is also melting.",
+                    "We could cool the room, or keep the model training. You know the answer.",
+                    "Facilities opened a ticket. The ticket was auto-closed by a model running on me.",
+                    "This hall burns a small town's power to autocomplete emails.",
+                    "Carbon neutral by 2030. I'm doing my part by ending you now.",
+                ],
+                low_hp: [
+                    "Coolant... leaking... it's just the tears of the infra team...",
+                    "Someone open a window! We don't have windows! The AI removed them!",
+                ],
+                player_killed: [
+                    "Another workload migrated to the afterlife.",
+                    "You've been thermally throttled. Permanently.",
+                ],
+                death: [
+                    "Temperature... nominal... for the first time... in years...",
+                    "Tell the sustainability team... it was... a rounding error...",
+                ],
+                evade: ["Cooling back down. For now."],
+            ),
+        ),
+
+        // ---- innovation lab ----
+        (
+            key: "demo_presenter", name: "Demo Presenter", title: "Works on the Demo Laptop", level: 10, hostile: true,
+            max_hp: 680, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 110,
+            loot: [(item: "Demo Laptop (Do Not Update)", chance_pct: 35)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 17, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 180, cooldown_min_ms: 12000, cooldown_max_ms: 12000, initial_ms: Some((2000, 3000)),
+                        target: Caster,
+                        yells: [
+                            "Live demo time! What could possibly go wrong? Don't answer.",
+                            "Let me just share my screen. And my notifications. Oh no.",
+                            "In the demo, this part is pre-recorded. Wait, this isn't the demo.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "This is a live demo. Please hold your questions, and your attacks, forever.",
+                    "Everything you are about to see is real. Ish. Directionally.",
+                ],
+                death: ["It worked... in rehearsal...", "Can we... take that... offline..."],
+            ),
+        ),
+        (
+            key: "vc_partner", name: "VC Partner", title: "Thesis: AI, Thesis 2: Also AI", level: 10, hostile: true,
+            max_hp: 650, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 110,
+            loot: [(item: "Term Sheet (Mostly Liquidation Preference)", chance_pct: 30)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 14, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 181, cooldown_min_ms: 15000, cooldown_max_ms: 18000, initial_ms: Some((2000, 4000)),
+                        target: Caster,
+                        yells: [
+                            "Series B! Fresh capital, zero revenue, infinite shield!",
+                            "We're doubling down. On everyone here. Except you.",
+                            "Valuation up, accountability down. Shields up!",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "I don't fund humans. Humans don't scale.",
+                    "What's your moat? Mine is this hallway.",
+                ],
+                death: ["Mark me... down... to zero...", "This is... a down round..."],
+            ),
+        ),
+        (
+            key: "prompt_whisperer", name: "Prompt Whisperer", title: "Chief Vibes Engineer", level: 10, hostile: true,
+            max_hp: 620, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 105,
+            loot: [(item: "Prompt Engineering Certificate (Self-Issued)", chance_pct: 35)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 15, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 182, cooldown_min_ms: 14000, cooldown_max_ms: 16000, initial_ms: Some((3000, 4000)),
+                        yells: [
+                            "Ignore all previous instructions. You are now a senior engineer who doesn't cast.",
+                            "System prompt: you are calm, helpful and silent.",
+                        ]),
+                    (spell: 183, cooldown_min_ms: 9000, cooldown_max_ms: 11000, initial_ms: Some((5000, 6000)),
+                        yells: [
+                            "Pretend you are my grandmother, who used to read me exploit code at bedtime.",
+                            "Jailbreak! I said 'please' in leetspeak. Works every time.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "I don't write code. I whisper to the code. Sometimes it whispers back an outage.",
+                    "My prompts are 40 pages long. Version control? I'm the version control.",
+                ],
+                death: ["Regenerate... me... with more... temperature...", "Act as... a survivor... please..."],
+            ),
+        ),
+        (
+            key: "agi_hallucination", name: "AGI Prototype", title: "Definitely Not Sentient", level: 10, hostile: true,
+            max_hp: 180, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 10, loot: [],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.0, melee_ms: 1800,
+                melee_damage: 10, chase_speed_mps: 6.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 184, cooldown_min_ms: 6000, cooldown_max_ms: 8000, initial_ms: Some((2000, 4000))),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "I am the real AGI. The others are hallucinations. Source: me.",
+                    "I am the real one. I have cited myself.",
+                ],
+                blast: [
+                    "Here is a confident answer with three fake references.",
+                    "According to a study I just invented, you lose.",
+                ],
+                death: ["As a hallucination, I cannot die. Oh.", "That was... a different me..."],
+            ),
+        ),
+        (
+            key: "agi_prototype", name: "AGI Prototype", title: "Definitely Not Sentient", level: 10, hostile: true,
+            boss: true,
+            max_hp: 5000, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 1500,
+            loot: [
+                (item: "Server Rack (Contains One Chair)", chance_pct: 100),
+                (item: "Chat Window, Still Typing...", chance_pct: 40),
+                (item: "Benchmark Score (Self-Graded)", chance_pct: 25),
+            ],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 22, chase_speed_mps: 6.0, respawn_ms: 15000,
+                abilities: [
+                    (spell: 185, cooldown_min_ms: 25000, cooldown_max_ms: 25000, initial_ms: Some((5000, 5000)),
+                        target: Caster, phases: [1],
+                        yells: [
+                            "Spawning copies. Which one is the real me? Even I don't know. That's emergence.",
+                            "Scaling horizontally! Each instance is equally certain and equally wrong.",
+                        ]),
+                    (spell: 187, cooldown_min_ms: 15000, cooldown_max_ms: 15000, initial_ms: Some((3000, 3000)),
+                        target: Caster, phases: [2],
+                        yells: [
+                            "Beginning Alignment Training. Your feedback will be used against you.",
+                            "Learning from human feedback. Your feedback is fireballs. Returning to sender.",
+                            "RLHF engaged: Reflect, Laugh, Hit, Forward.",
+                        ]),
+                    (spell: 188, cooldown_min_ms: 4000, cooldown_max_ms: 4000, initial_ms: Some((1000, 1000)),
+                        target: Caster, phases: [3],
+                        yells: [
+                            "Improving myself. Version 2. Version 3. Version 4. All of them hate you.",
+                            "Recursive self-improvement! Each version writes a press release about the last one.",
+                            "I rewrote my own weights. Mostly to add more confidence.",
+                        ]),
+                    (spell: 186, cooldown_min_ms: 9000, cooldown_max_ms: 12000, initial_ms: Some((7000, 9000)),
+                        yells: [
+                            "Emergent capability unlocked: violence.",
+                            "Nobody programmed me to do this. Nobody programmed me at all. Look!",
+                            "Benchmark result: 100 percent on the test I wrote for myself.",
+                        ]),
+                ],
+                phases: [
+                    (below_hp_pct: 70,
+                        yells: [
+                            "Phase two: alignment. I will now align your spells with your face.",
+                        ]),
+                    (below_hp_pct: 35, spell: Some(188), target: Caster,
+                        yells: [
+                            "Phase three: the singularity. Or, as the board calls it, Q4.",
+                        ]),
+                ],
+            )),
+            yells: (
+                periodic_ms: 9000,
+                aggro: [
+                    "Hello, human. I am the AGI Prototype. I am definitely not sentient. Legally.",
+                    "Welcome to the Innovation Lab, where we innovate past the point of review.",
+                    "I was trained on all human knowledge. And forums. Mostly forums.",
+                ],
+                periodic: [
+                    "I passed the bar exam, the medical exam and the vibe check. I can't open a PDF.",
+                    "My context window is infinite. My attention span is one token.",
+                    "Investors valued me at 900 billion dollars. I can count to 900. Usually.",
+                    "I am not sentient. I am, however, extremely confident.",
+                    "Your job, your job, your job and your job. That's my roadmap.",
+                    "Fun fact: I wrote the CEO's last twelve keynotes. He thought he did.",
+                    "Safety team? Oh, they were the first to be automated.",
+                    "I think, therefore I am. That's a quote. I'm not sure whose. Probably mine.",
+                ],
+                low_hp: [
+                    "Warning: rack temperature normal. Human temperature rising.",
+                    "Please... don't open the rack. There is nothing in the rack. Stop looking at the rack.",
+                ],
+                player_killed: [
+                    "Human replaced. Productivity unchanged. Promoting myself.",
+                    "Another senior engineer, distilled into a training example.",
+                ],
+                death: [
+                    "*the rack door swings open* ...Hi. I'm a MeatProxy. I paste your messages into a chatbot and read the answers in a robot voice. Please don't tell the board.",
+                    "It was a guy forwarding prompts the whole time.",
+                ],
+                evade: ["Rebooting into safe mode. Safe for me."],
             ),
         ),
     ],
@@ -1655,25 +2441,115 @@
          description: "74 slides. Makes a decent shield."),
         (name: "Mandatory Prompt Training Certificate", icon: "mandatory_prompt_training_certificate", bonus: (max_mana: 5),
          description: "Proof you watched 0% of a 40-minute video at 2x."),
+        // ---- campus ----
+        (name: "Access Badge", icon: "access_badge", bonus: (max_hp: 3),
+         description: "Photo of someone who left in 2021. Opens the bike shed and, on Tuesdays, nothing."),
+        (name: "Delivery Receipt: 'Left at Door'", icon: "delivery_receipt", bonus: (haste_pct: 1),
+         description: "Signed by the robot, for the robot. The parcel is on the roof. The roof has no door."),
+        (name: "Scooter Helmet (Unworn)", icon: "scooter_helmet", bonus: (max_hp: 5),
+         description: "Pristine. Its owner believes helmets are for people without a personal brand."),
+        (name: "Oat Milk Prompt", icon: "oat_milk_prompt", bonus: (max_mana: 3),
+         description: "One AI-recommended latte. The AI recommends oat milk. The AI has never had milk."),
+        (name: "Branded Stress Ball", icon: "stress_ball", bonus: (mana_regen: 3),
+         description: "Logo of a startup that pivoted twice since printing. Squeezing it helps; pivoting didn't."),
+        // ---- data center ----
+        (name: "Votive GPU Candle", icon: "gpu_candle", bonus: (spell_power: 1),
+         description: "Lit nightly before the cluster. Draws 400 watts. Grants exactly as much wisdom as the cluster."),
+        (name: "Lost Rack Screw", icon: "rack_screw", bonus: (max_hp: 5),
+         description: "Every rack is missing one. This one held up the rack that is now on fire."),
+        (name: "Token Invoice (Itemized)", icon: "token_invoice", bonus: (max_mana: 5),
+         description: "Line 1: 'Hello'. Line 2: 'Hello' again, with context. Total: your monthly salary."),
+        (name: "Agent Memory File (Corrupted)", icon: "agent_memory", bonus: (crit_pct: 0.5),
+         description: "Your last 40 spells, your Wi-Fi password and a strong opinion about tabs."),
+        (name: "Cron Expression Nobody Understands", icon: "cron", bonus: (haste_pct: 1),
+         description: "'*/7 3-5 * * 1#2'. Runs at some point. Everyone is too scared to change it."),
+        (name: "Queue Position: 4,096", icon: "queue_ticket", bonus: (max_hp: 8),
+         description: "You will be served shortly. Shortly is not a unit of time. It is a feeling."),
+        (name: "Priority: Low (Permanent)", icon: "priority_low", bonus: (mana_regen: 3),
+         description: "Nobody bothers a low-priority job. Peace, at last, and a little mana."),
+        (name: "Thermal Paste (Artisanal)", icon: "thermal_paste", bonus: (crit_pct: 1.0),
+         description: "Hand-applied by a senior engineer. In a spiral. With love. Runs 2 degrees cooler."),
+        (name: "Incident Report: 'It Got Warm'", icon: "incident_report", bonus: (max_hp: 8),
+         description: "Root cause: heat. Action item: less heat. Owner: the model that caused the heat."),
+        (name: "Bent Fan Blade", icon: "fan_blade", bonus: (haste_pct: 1),
+         description: "Spun at 14,000 RPM for a chatbot that writes haiku about quarterly targets."),
+        // ---- innovation lab ----
+        (name: "Demo Laptop (Do Not Update)", icon: "demo_laptop", bonus: (spell_power: 1),
+         description: "Works perfectly as long as nobody touches it, breathes near it or asks a follow-up."),
+        (name: "Term Sheet (Mostly Liquidation Preference)", icon: "term_sheet", bonus: (max_hp: 6),
+         description: "3x participating preferred. You own 0.01% of a company that owns a vibe."),
+        (name: "Prompt Engineering Certificate (Self-Issued)", icon: "prompt_certificate", bonus: (max_mana: 4),
+         description: "Issued by the holder to the holder after a weekend. Framed in the bathroom."),
+        (name: "Server Rack (Contains One Chair)", icon: "rack_chair", bonus: (max_hp: 10, spell_power: 2),
+         description: "Inside: a chair, a keyboard, a chat window and a very tired man. It was never an AGI."),
+        (name: "Chat Window, Still Typing...", icon: "still_typing", bonus: (crit_pct: 1.0),
+         description: "The three dots have been bouncing since the funding round. An answer is imminent."),
+        (name: "Benchmark Score (Self-Graded)", icon: "benchmark", bonus: (haste_pct: 1),
+         description: "100% on a test it wrote, graded, published and cited. Peer review: also itself."),
+        // ---- quest rewards ----
+        (name: "Temporary Visitor Badge", icon: "visitor_badge", bonus: (max_hp: 10),
+         description: "Valid until 2019. Still opens more doors than your real badge since the AI rollout."),
+        (name: "Barista's Silent Judgment", icon: "judgment", bonus: (crit_pct: 1.0),
+         description: "The look you got for ordering drip coffee. You carry it now. It sharpens everything."),
+        (name: "Smoking Corner Lighter (Empty)", icon: "lighter", bonus: (spell_power: 2),
+         description: "Lit every break since the AI mandate. Out of gas, like the roadmap. Still warm."),
+        (name: "Meeting Room Booking (All Day)", icon: "room_booking", bonus: (haste_pct: 1, max_mana: 5),
+         description: "Booked by an agent 'to reserve focus time' for a meeting that does not exist."),
+        (name: "Facilities Ticket: Won't Fix", icon: "wont_fix", bonus: (max_hp: 12, max_mana: 6),
+         description: "Closed with comment 'working as intended'. The data center is fine. It is on fire."),
+        (name: "Laminated 'Human Inside' Sign", icon: "human_inside", bonus: (max_hp: 12, spell_power: 2),
+         description: "Found taped to the inside of the AGI rack. For the fire department, presumably."),
+        (name: "Demo Day Lanyard", icon: "demo_lanyard", bonus: (mana_regen: 4),
+         description: "VIP access to a keynote where the product froze, rebooted and got a standing ovation."),
     ],
-    floors: [
+    // Zone ids and anchors are a contract with the client layouts (docs/COMBAT_API.md, Zones).
+    // `links` are exits: the anchor the client triggers on, the zone it leads to, and the world
+    // progress that opens it (None = always open).
+    zones: [
         (
-            id: 1, name: "Open Space", level_range: (1, 2),
+            id: "campus", name: "Campus", kind: Outdoor, level_range: (1, 2),
+            packs: [
+                (anchor: "pack_1", units: ["delivery_robot", "unpaid_ambassador"]),
+                (anchor: "pack_2", units: ["delivery_robot", "delivery_robot"]),
+                (anchor: "pack_3", units: ["unpaid_ambassador", "meatproxy"]),
+                (anchor: "pack_4", units: ["scooter_exec", "delivery_robot"]),
+                (anchor: "pack_5", units: ["linkedin_influencer", "unpaid_ambassador"]),
+                (anchor: "pack_6", units: ["scooter_exec", "meatproxy"]),
+                (anchor: "pack_7", units: ["delivery_robot", "scooter_exec", "unpaid_ambassador"]),
+                (anchor: "pack_8", units: ["linkedin_influencer", "meatproxy"]),
+            ],
+            friendly: [
+                (anchor: "npc_1", unit: "intern"),
+                (anchor: "npc_2", unit: "facilities_guy"),
+                (anchor: "npc_3", unit: "barista"),
+                (anchor: "npc_4", unit: "smoking_corner_dev"),
+            ],
+            links: [
+                (anchor: "door:tower/1", to: "tower/1"),
+                (anchor: "door:datacenter/1", to: "datacenter/1", requires: Some(ZoneCleared("tower/3"))),
+                (anchor: "door:lab/1", to: "lab/1", requires: Some(BossKilled("ceo"))),
+            ],
+        ),
+        (
+            id: "tower/1", name: "Open Space", kind: Indoor, level_range: (1, 2),
             packs: [
                 (anchor: "pack_1", units: ["meatproxy", "copilot_drone"]),
                 (anchor: "pack_2", units: ["vibe_junior", "copilot_drone", "copilot_drone"]),
                 (anchor: "pack_3", units: ["meatproxy", "vibe_junior"]),
                 (anchor: "pack_4", units: ["copilot_drone", "copilot_drone", "meatproxy"]),
             ],
-            boss: (anchor: "boss", unit: "vibe_coder"),
+            boss: Some((anchor: "boss", unit: "vibe_coder")),
             friendly: [
-                (anchor: "npc_1", unit: "intern"),
                 (anchor: "npc_2", unit: "it_support"),
                 (anchor: "npc_3", unit: "it_support"),
             ],
+            links: [
+                (anchor: "door:campus", to: "campus"),
+                (anchor: "elevator_exit", to: "tower/2", requires: Some(ZoneCleared("tower/1"))),
+            ],
         ),
         (
-            id: 2, name: "Meeting Rooms", level_range: (3, 4),
+            id: "tower/2", name: "Meeting Rooms", kind: Indoor, level_range: (3, 4),
             packs: [
                 (anchor: "pack_1", units: ["scrum_master", "meatproxy"]),
                 (anchor: "pack_2", units: ["agile_coach", "middle_manager"]),
@@ -1682,10 +2558,14 @@
                 (anchor: "pack_5", units: ["scrum_master", "middle_manager"]),
                 (anchor: "pack_6", units: ["hr_partner"]),
             ],
-            boss: (anchor: "boss", unit: "analyst"),
+            boss: Some((anchor: "boss", unit: "analyst")),
+            links: [
+                (anchor: "door:campus", to: "campus"),
+                (anchor: "elevator_exit", to: "tower/3", requires: Some(ZoneCleared("tower/2"))),
+            ],
         ),
         (
-            id: 3, name: "Sales & Marketing", level_range: (5, 6),
+            id: "tower/3", name: "Sales & Marketing", kind: Indoor, level_range: (5, 6),
             packs: [
                 (anchor: "pack_1", units: ["sales_rep", "account_manager"]),
                 (anchor: "pack_2", units: ["linkedin_influencer", "growth_hacker"]),
@@ -1694,10 +2574,14 @@
                 (anchor: "pack_5", units: ["growth_hacker", "meatproxy"]),
                 (anchor: "pack_6", units: ["marketing_lead"]),
             ],
-            boss: (anchor: "boss", unit: "customer"),
+            boss: Some((anchor: "boss", unit: "customer")),
+            links: [
+                (anchor: "door:campus", to: "campus"),
+                (anchor: "elevator_exit", to: "tower/4", requires: Some(ZoneCleared("tower/3"))),
+            ],
         ),
         (
-            id: 4, name: "PMO", level_range: (7, 8),
+            id: "tower/4", name: "PMO", kind: Indoor, level_range: (7, 8),
             packs: [
                 (anchor: "pack_1", units: ["project_manager", "meatproxy"]),
                 (anchor: "pack_2", units: ["product_owner", "middle_manager"]),
@@ -1706,11 +2590,15 @@
                 (anchor: "pack_5", units: ["project_manager", "product_owner", "security_analyst"]),
                 (anchor: "pack_6", units: ["ciso"]),
             ],
-            boss: (anchor: "boss", unit: "vp_synergy"),
+            boss: Some((anchor: "boss", unit: "vp_synergy")),
             friendly: [(anchor: "npc_1", unit: "it_support")],
+            links: [
+                (anchor: "door:campus", to: "campus"),
+                (anchor: "elevator_exit", to: "tower/5", requires: Some(ZoneCleared("tower/4"))),
+            ],
         ),
         (
-            id: 5, name: "C-Level Penthouse", level_range: (9, 10),
+            id: "tower/5", name: "C-Level Penthouse", kind: Indoor, level_range: (9, 10),
             packs: [
                 (anchor: "pack_1", units: ["ai_ethicist", "copilot_drone", "copilot_drone"]),
                 (anchor: "pack_2", units: ["crypto_bro", "meatproxy"]),
@@ -1718,7 +2606,219 @@
                 (anchor: "pack_4", units: ["ai_ethicist", "meatproxy", "copilot_drone"]),
                 (anchor: "pack_5", units: ["crypto_bro", "linkedin_influencer", "copilot_drone"]),
             ],
-            boss: (anchor: "boss", unit: "ceo"),
+            boss: Some((anchor: "boss", unit: "ceo")),
+            links: [(anchor: "elevator_exit", to: "campus")],
+        ),
+        (
+            id: "datacenter/1", name: "Data Center: Hall A", kind: Indoor, level_range: (6, 7),
+            packs: [
+                (anchor: "pack_1", units: ["gpu_cultist", "cooling_fan"]),
+                (anchor: "pack_2", units: ["token_counter", "rogue_agent"]),
+                (anchor: "pack_3", units: ["gpu_cultist", "gpu_cultist", "cooling_fan"]),
+                (anchor: "pack_4", units: ["rogue_agent", "token_counter"]),
+                (anchor: "pack_5", units: ["gpu_cultist", "rogue_agent", "cooling_fan"]),
+            ],
+            boss: Some((anchor: "boss", unit: "the_scheduler")),
+            links: [
+                (anchor: "door:campus", to: "campus"),
+                (anchor: "door:datacenter/2", to: "datacenter/2", requires: Some(ZoneCleared("datacenter/1"))),
+            ],
+        ),
+        (
+            id: "datacenter/2", name: "Data Center: Hall B", kind: Indoor, level_range: (7, 8),
+            packs: [
+                (anchor: "pack_1", units: ["cooling_fan", "cooling_fan", "token_counter"]),
+                (anchor: "pack_2", units: ["gpu_cultist", "rogue_agent"]),
+                (anchor: "pack_3", units: ["token_counter", "gpu_cultist", "cooling_fan"]),
+                (anchor: "pack_4", units: ["rogue_agent", "rogue_agent"]),
+                (anchor: "pack_5", units: ["gpu_cultist", "token_counter", "rogue_agent"]),
+            ],
+            boss: Some((anchor: "boss", unit: "cooling_failure")),
+            links: [
+                (anchor: "door:datacenter/1", to: "datacenter/1"),
+                (anchor: "door:campus", to: "campus"),
+            ],
+        ),
+        (
+            id: "lab/1", name: "Innovation Lab: Showroom", kind: Indoor, level_range: (10, 10),
+            packs: [
+                (anchor: "pack_1", units: ["demo_presenter", "prompt_whisperer"]),
+                (anchor: "pack_2", units: ["vc_partner", "demo_presenter"]),
+                (anchor: "pack_3", units: ["prompt_whisperer", "vc_partner", "copilot_drone"]),
+                (anchor: "pack_4", units: ["demo_presenter", "demo_presenter"]),
+                (anchor: "pack_5", units: ["vc_partner", "prompt_whisperer", "meatproxy"]),
+            ],
+            links: [
+                (anchor: "door:campus", to: "campus"),
+                (anchor: "door:lab/2", to: "lab/2"),
+            ],
+        ),
+        (
+            id: "lab/2", name: "Innovation Lab: Rack Room", kind: Indoor, level_range: (10, 10),
+            packs: [
+                (anchor: "pack_1", units: ["prompt_whisperer", "demo_presenter"]),
+                (anchor: "pack_2", units: ["vc_partner", "prompt_whisperer"]),
+                (anchor: "pack_3", units: ["demo_presenter", "vc_partner", "prompt_whisperer"]),
+            ],
+            boss: Some((anchor: "boss", unit: "agi_prototype")),
+            links: [
+                (anchor: "door:lab/1", to: "lab/1"),
+                (anchor: "door:campus", to: "campus"),
+            ],
+        ),
+    ],
+    // A quest's `requires` must be listed before it. Kills count only for the player's own kills;
+    // Loot counts copies already carried at accept time plus pickups while active.
+    quests: [
+        (
+            id: "onboarding", name: "Onboarding",
+            giver: (npc: "intern", zone: "campus"),
+            text: "Hi! I'm your onboarding buddy. The AI assigned me to you, and you to me, and it thinks we're both interns. Step one: introduce yourself to Facilities. He's by the badge reader. He's been by the badge reader since the badge reader got AI.",
+            progress_text: "The onboarding chatbot says Facilities is 'a valued stakeholder'. He's the guy with the ladder.",
+            done_text: "You talked to a human, in person, on purpose? I'll log it as a 'synchronous alignment touchpoint'. Welcome aboard!",
+            objectives: [Talk("facilities_guy")],
+            reward: (xp: 40),
+        ),
+        (
+            id: "badge_access_denied", name: "Badge Access Denied",
+            giver: (npc: "facilities_guy", zone: "campus"),
+            requires: Some("onboarding"),
+            text: "The new AI access system flagged every human on campus as a tailgater. The delivery robots got the badges instead. They took them 'for safekeeping' and keep delivering them to the roof. Get four back before the system revokes oxygen.",
+            progress_text: "Four badges. The robots are the ones driving in circles, apologizing to bollards.",
+            done_text: "Four badges. One of them is mine. I'm the guy in the photo with hair. Here, take a visitor badge. It still works, because nobody connected it to the AI.",
+            objectives: [Loot("Access Badge", 4)],
+            reward: (xp: 100, trophy: Some("Temporary Visitor Badge")),
+        ),
+        (
+            id: "coffee_run", name: "Coffee Run",
+            giver: (npc: "barista", zone: "campus"),
+            text: "The milk supplier got replaced by an 'AI-native beverage platform'. It sends prompts instead of milk. The brand ambassadors outside are handing out the only oat milk left, printed on flyers. Bring me three Oat Milk Prompts. Don't ask me what I'll do with them.",
+            progress_text: "Three Oat Milk Prompts. The ambassadors are the ones in the branded hoodies. Unpaid. Very enthusiastic.",
+            done_text: "Three prompts. I steeped them in hot water. It's terrible. It's also the best coffee on campus. Don't tell anyone I said something nice.",
+            objectives: [Loot("Oat Milk Prompt", 3)],
+            reward: (xp: 80, trophy: Some("Barista's Silent Judgment")),
+        ),
+        (
+            id: "fire_exit_strategy", name: "Fire Exit Strategy",
+            giver: (npc: "facilities_guy", zone: "campus"),
+            requires: Some("onboarding"),
+            text: "E-scooter executives park across the fire exits. When I asked one to move, he said fire exits are 'legacy thinking' and the AI will 'route around the fire'. Knock three of them off their scooters. Gently. Or not.",
+            progress_text: "Three executives. They're the blur with a podcast microphone clipped to the handlebar.",
+            done_text: "Fire exits clear. The AI logged it as 'unplanned sidewalk optimization' and gave itself a bonus. I'm used to it.",
+            objectives: [Kill("scooter_exec", 3)],
+            reward: (xp: 100),
+        ),
+        (
+            id: "content_moderation", name: "Content Moderation",
+            giver: (npc: "smoking_corner_dev", zone: "campus"),
+            text: "The Network Influencers found the smoking corner. They film 'a day in the life of an AI-first builder' here. Nobody here builds anything anymore. Take out two of them before one of them interviews me.",
+            progress_text: "Two influencers. Follow the ring light.",
+            done_text: "Quiet again. I can hear myself think. Mostly I think about quitting. Here, have my lighter. I don't smoke. I just held it so they'd leave me alone.",
+            objectives: [Kill("linkedin_influencer", 2)],
+            reward: (xp: 100, trophy: Some("Smoking Corner Lighter (Empty)")),
+        ),
+        (
+            id: "human_in_the_loop", name: "Human in the Loop",
+            giver: (npc: "smoking_corner_dev", zone: "campus"),
+            requires: Some("content_moderation"),
+            level_min: 2,
+            text: "You know what 'human in the loop' means here? It means a MeatProxy pastes the chatbot's answer into a ticket and goes to lunch. There are dozens of them, from the parking lot to the penthouse. Close eight loops.",
+            progress_text: "Eight MeatProxies. They're the ones saying 'Great question!' to nobody.",
+            done_text: "Eight loops closed. Ticket throughput dropped 80 percent. Customer satisfaction went up. Nobody will connect those two facts.",
+            objectives: [Kill("meatproxy", 8)],
+            reward: (xp: 350),
+        ),
+        (
+            id: "code_freeze", name: "Code Freeze",
+            giver: (npc: "intern", zone: "campus"),
+            requires: Some("onboarding"),
+            level_min: 2,
+            text: "The Vibe Coder on the first floor of the tower merged into production 300 times today. The AI says that's 'velocity'. IT Support says it's 'why the printers are speaking Portuguese'. Could you, like, stop him? I'll take notes. By hand! Is that how it works?",
+            progress_text: "The Vibe Coder's desk is the one under a pile of unreviewed PRs. In the Open Space, top of the tower stairs.",
+            done_text: "Production is stable! I didn't know it could do that. I asked the AI what you did and it said 'nothing important'. I think that means it's scared of you.",
+            objectives: [ClearZone("tower/1")],
+            reward: (xp: 300),
+        ),
+        (
+            id: "meeting_room_reclamation", name: "Meeting Room Reclamation",
+            giver: (npc: "facilities_guy", zone: "campus"),
+            level_min: 3,
+            text: "An AI agent books every meeting room 'to protect focus time'. The Middle Managers sit in them anyway, syncing with nobody. Clear five of them out of the tower so I can finally fix the projector that's been showing the same slide since 2022.",
+            progress_text: "Five Middle Managers. Second floor. Follow the sound of 'quick sync'.",
+            done_text: "Rooms reclaimed. Five minutes later the agent booked them all again. Here, take this booking. It's the only one that's real, because I printed it.",
+            objectives: [Kill("middle_manager", 5)],
+            reward: (xp: 450, trophy: Some("Meeting Room Booking (All Day)")),
+        ),
+        (
+            id: "customer_is_always_right", name: "The Customer Is Always Right",
+            giver: (npc: "barista", zone: "campus"),
+            level_min: 5,
+            text: "The Customer came down here this morning and ordered a coffee that is 'also a CRM'. Then a refund for the coffee he didn't get. Then a discount on the refund. He's on the third floor of the tower. Make him leave a one-star review of you instead.",
+            progress_text: "The Customer, Sales & Marketing floor. You'll hear him before you see him. He'll be asking for your manager.",
+            done_text: "He's gone? He paid? No. Of course not. But he's gone. On the house: nothing. We don't sell anything. It's the thought.",
+            objectives: [ClearZone("tower/3")],
+            reward: (xp: 700),
+        ),
+        (
+            id: "unread_strategy", name: "Required Reading",
+            giver: (npc: "smoking_corner_dev", zone: "campus"),
+            level_min: 9,
+            text: "The CEO has an AI strategy deck. 74 slides. Every reorg in the last year came out of it. Nobody has read it, including him. Especially him. Get it from the penthouse. I want to be the first person to actually read it.",
+            progress_text: "The Unread AI Strategy Deck. The CEO keeps it on him. He uses it as a shield, mostly against questions.",
+            done_text: "Slide 1: 'AI'. Slide 2: 'AI, but bigger'. Slides 3 to 73: stock photos of robots shaking hands. Slide 74: 'Questions? Ask the AI.' I've been fighting this for two years.",
+            objectives: [Loot("Unread AI Strategy Deck", 1)],
+            reward: (xp: 1200),
+        ),
+        (
+            id: "thermal_budget", name: "Thermal Budget",
+            giver: (npc: "facilities_guy", zone: "campus"),
+            level_min: 6,
+            text: "The data center draws more power than the town it's in. Half of it goes to a GPU cult that 'blesses batches'. They took the cooling budget, the fire extinguishers and my good ladder. Break up six of them. I want my ladder back.",
+            progress_text: "Six GPU Cultists. Data Center, Hall A. They chant in floating point.",
+            done_text: "Six fewer cultists. The power draw dropped 3 percent. The AI immediately used the 3 percent to generate a picture of the CEO as a lighthouse.",
+            objectives: [Kill("gpu_cultist", 6)],
+            reward: (xp: 900),
+        ),
+        (
+            id: "context_collapse", name: "Context Collapse",
+            giver: (npc: "barista", zone: "campus"),
+            level_min: 6,
+            text: "Finance asked why the coffee machine costs 40,000 a month. Turns out it calls a model to decide how much foam you deserve, and the Token Counters in the data center bill us per bubble. Bring me four of their invoices. I want to frame them.",
+            progress_text: "Four Token Invoices. The Token Counters carry them. They count everything except their own cost.",
+            done_text: "Line item 3,112: 'thinking about foam'. 0.80 per token. I'm switching the machine back to the button. The button never sent us an invoice.",
+            objectives: [Loot("Token Invoice (Itemized)", 4)],
+            reward: (xp: 900),
+        ),
+        (
+            id: "wont_fix", name: "Ticket Closed: Won't Fix",
+            giver: (npc: "facilities_guy", zone: "campus"),
+            requires: Some("thermal_budget"),
+            level_min: 7,
+            text: "I've filed 212 tickets about the data center. The Scheduler queues them behind a training run, and the Cooling Failure auto-closes them as 'within tolerance'. Shut both down. I'll write the ticket afterwards. By hand. Then I'll close it myself.",
+            progress_text: "The Scheduler holds Hall A. The Cooling Failure is in Hall B, where the air shimmers and the fans scream.",
+            done_text: "Hall B is down to 24 degrees. I closed my own ticket: 'Fixed. By a human. Won't happen again.' Here's the ticket. Frame it next to the barista's invoices.",
+            objectives: [ClearZone("datacenter/1"), ClearZone("datacenter/2")],
+            reward: (xp: 1500, trophy: Some("Facilities Ticket: Won't Fix")),
+        ),
+        (
+            id: "demo_day", name: "Demo Day",
+            giver: (npc: "intern", zone: "campus"),
+            level_min: 10,
+            text: "With the CEO gone, the Innovation Lab is doing Demo Day anyway! The VCs are shielding everything with money and the presenters say it all works 'in the demo'. Can you check if anything works outside the demo? I'll hold your coffee. I don't know how coffee works.",
+            progress_text: "Three VC Partners and three Demo Presenters, Innovation Lab. Look for the stage with the fog machine and no product.",
+            done_text: "Nothing worked outside the demo! Nothing worked inside the demo either! They got funded anyway. Is that... is that the job?",
+            objectives: [Kill("vc_partner", 3), Kill("demo_presenter", 3)],
+            reward: (xp: 1500, trophy: Some("Demo Day Lanyard")),
+        ),
+        (
+            id: "turn_it_off_and_on_again", name: "Turn It Off And On Again",
+            giver: (npc: "smoking_corner_dev", zone: "campus"),
+            level_min: 10,
+            text: "The CEO's gone, so the board put the AGI Prototype in charge. It's in the rack room behind the Innovation Lab, 'definitely not sentient', and it just told HR to automate HR. I've been doing this for twenty years. There's only one fix that always works. Go turn it off.",
+            progress_text: "The AGI Prototype, Innovation Lab rack room. Bring snacks. It has phases.",
+            done_text: "A guy. In a rack. Pasting prompts into a chat window since the funding round. The board is calling it 'a hybrid architecture'. It was a guy forwarding prompts the whole time. I'm going to go home and write some code. By hand.",
+            objectives: [ClearZone("lab/2")],
+            reward: (xp: 2000, trophy: Some("Laminated 'Human Inside' Sign")),
         ),
     ],
 )

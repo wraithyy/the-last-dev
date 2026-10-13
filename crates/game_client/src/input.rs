@@ -13,6 +13,32 @@ pub struct Paused(pub bool);
 #[derive(Resource, Default)]
 pub struct TrophiesOpen(pub bool);
 
+/// Quest dialog (sim id of the giver), `~/jira` log (J) and map (N). Here for the same reason as
+/// `TrophiesOpen`: Esc closes them before it clears the target or pauses.
+#[derive(Resource, Default)]
+pub struct QuestWindows {
+    pub dialog: Option<combat_core::EntityId>,
+    pub log: bool,
+    pub map: bool,
+}
+
+impl QuestWindows {
+    /// Closes the topmost window; false when none was open.
+    pub fn close_one(&mut self) -> bool {
+        if self.dialog.take().is_some() {
+            true
+        } else if self.log {
+            self.log = false;
+            true
+        } else if self.map {
+            self.map = false;
+            true
+        } else {
+            false
+        }
+    }
+}
+
 /// Held-key state is overwritten every frame; `jump` and `mouse_yaw` are
 /// latched until a fixed tick consumes them, so no input is lost when a frame
 /// produces zero ticks.
@@ -56,6 +82,7 @@ impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Paused>()
             .init_resource::<TrophiesOpen>()
+            .init_resource::<QuestWindows>()
             .init_resource::<PlayerInput>()
             .init_resource::<MouseState>()
             .add_systems(

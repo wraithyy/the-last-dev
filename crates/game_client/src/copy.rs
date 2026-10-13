@@ -95,8 +95,28 @@ pub fn level_up_line(level: u8) -> String {
     format!("You reached level {level}. Your workload doubles.")
 }
 
-pub const VICTORY_TITLE: &str = "You defeated the CEO.";
-pub const VICTORY_SUBTITLE: &str = "The board replaced him with an AI.";
+pub const VICTORY_TITLE: &str = "It was a guy forwarding prompts the whole time.";
+pub const VICTORY_SUBTITLE: &str =
+    "The board calls it a hybrid architecture. The AGI asked for a raise.";
+
+/// The zone transition overlay.
+pub const LOADING_LINE: &str = "Loading next sprint...";
+
+/// One per transition, in order.
+pub const LOADING_TIPS: [&str; 12] = [
+    "Tip: The AI summarised this loading screen. The summary is 40% longer.",
+    "Tip: Every door on campus is guarded by a model that thinks you are a tailgater.",
+    "Tip: Yellow ! means a human still has a problem the AI could not close as 'working as intended'.",
+    "Tip: J opens your Jira. Nobody else will.",
+    "Tip: N opens the campus map, last updated by a human in 2021.",
+    "Tip: Mandatory prompt training is due Friday. It was written by the thing it trains you to prompt.",
+    "Tip: The chatbot rollout is 'on track'. The track is a circle.",
+    "Tip: Coffee Break (C) restores mana. The AI-native coffee machine restores nothing and bills per bubble.",
+    "Tip: If this screen takes too long, a consultant will be assigned to it.",
+    "Tip: Dying sends you to the graveyard, which HR renamed 'the re-onboarding zone'.",
+    "Tip: Locked doors list their requirements. The requirements were not generated, so they are correct.",
+    "Tip: The board measures AI adoption in tokens burned. Please do not turn the lights off on your way out.",
+];
 pub const VICTORY_PROMPT: &str = "Press R to start a new sprint.";
 
 /// End credits, rendered as a commit log.

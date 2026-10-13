@@ -1,6 +1,6 @@
 //! Third-person orbit camera: zoom, pitch clamp, snap-behind, wall clipping.
 
-use crate::arena::Colliders;
+use crate::arena::{CameraCeiling, Colliders};
 use crate::collision::to_core;
 use crate::config::*;
 use crate::input::{MouseState, Paused, PlayerInput};
@@ -194,6 +194,7 @@ fn clear_distance(origin: Vec3, dir: Vec3, max: f32, blockers: &[Aabb]) -> f32 {
 fn place_camera(
     time: Res<Time>,
     colliders: Res<Colliders>,
+    ceiling: Res<CameraCeiling>,
     mut shake: ResMut<CameraShake>,
     player: Single<&Transform, (With<Player>, Without<OrbitCamera>)>,
     cam: Single<(&mut OrbitCamera, &mut Transform)>,
@@ -213,7 +214,7 @@ fn place_camera(
     // Same idea against the ceiling; the slab is not a collider because it
     // must not block line of sight for combat.
     if dir.y > 1e-3 {
-        free = free.min((CAM_MAX_HEIGHT - focus.y) / dir.y);
+        free = free.min((ceiling.0 - focus.y) / dir.y);
     }
     let target = free.max(CAM_MIN_CLIP_DIST);
     // Snap in when a wall closes in fast (never show it), ease out when it clears.
@@ -254,7 +255,7 @@ mod tests {
     /// pointing at the wall, and reports how far the clipped distance jumps per 10 cm step.
     #[test]
     fn camera_distance_does_not_pop_along_a_curved_wall() {
-        let layout = crate::floors::build_floor(3);
+        let layout = crate::floors::build_zone("tower/3").unwrap_or_else(|| panic!("tower/3"));
         let boxes: Vec<Aabb> = layout
             .blockers
             .iter()

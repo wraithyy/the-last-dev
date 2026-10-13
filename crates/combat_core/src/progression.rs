@@ -120,7 +120,13 @@ impl Sim {
             return;
         }
         let amount = self.content.kill_xp(pl, ml, self.units[mob].state.xp);
-        if amount == 0 {
+        self.grant_xp(killer, amount);
+    }
+
+    /// Adds XP to the player at `killer` (kills, quest rewards) and runs the level-ups.
+    pub(crate) fn grant_xp(&mut self, killer: usize, amount: u32) {
+        let level = self.units[killer].state.level;
+        if amount == 0 || self.content.xp_to_next(level) == 0 {
             return;
         }
         let id = Self::id_of(killer);

@@ -12,6 +12,16 @@ use combat_core::Aabb;
 #[derive(Resource, Default)]
 pub struct Colliders(pub Vec<Aabb>);
 
+/// Highest the camera may go: just under the ceiling indoors, high above the campus outdoors.
+#[derive(Resource)]
+pub struct CameraCeiling(pub f32);
+
+impl Default for CameraCeiling {
+    fn default() -> Self {
+        Self(crate::config::CAM_MAX_HEIGHT)
+    }
+}
+
 const BACKDROP: Color = Color::srgb(0.03, 0.035, 0.06);
 
 pub struct ArenaPlugin;
@@ -19,6 +29,7 @@ pub struct ArenaPlugin;
 impl Plugin for ArenaPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Colliders>()
+            .init_resource::<CameraCeiling>()
             .insert_resource(GlobalAmbientLight {
                 color: Color::srgb(0.7, 0.78, 1.0),
                 brightness: 450.0,

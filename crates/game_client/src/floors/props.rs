@@ -360,3 +360,14 @@ pub fn exec_desk(p: &mut Plan, x: f32, z: f32, face: Face) {
         p.boxed(v(0.9, 0.9, 0.2), v(0.2, 0.3, 0.2), Mat::Gold, false);
     });
 }
+
+/// Park bench (slatted seat and back), facing +Z at yaw 0. Solid: it is knee-high.
+pub fn bench(p: &mut Plan, x: f32, z: f32, yaw: f32) {
+    p.framed(v(x, 0.0, z), yaw, |p| {
+        p.boxed(v(0.0, 0.45, 0.0), v(1.8, 0.08, 0.5), Mat::Wood, true);
+        p.boxed(v(0.0, 0.8, -0.22), v(1.8, 0.45, 0.06), Mat::Wood, false);
+        for sx in [-0.8, 0.8] {
+            p.boxed(v(sx, 0.22, 0.0), v(0.08, 0.44, 0.4), Mat::Metal, false);
+        }
+    });
+}

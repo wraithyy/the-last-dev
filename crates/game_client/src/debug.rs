@@ -2,6 +2,14 @@
 //! - `WOW_SCREENSHOT=<path.png>`: save the window after `WOW_SHOT_DELAY` seconds (default 4) and exit.
 //!   `WOW_SHOT_TIMES=t1,t2,..` instead saves one `<path>_<n>.png` per time (seconds since start).
 //! - `WOW_LINEUP=1|2`: bare stage with half of the cast in two rows (see `units.rs`); `0` leaves the stage empty.
+//! - `WOW_LINEUP=3`: only the campus/data center/lab units, three rows (use `WOW_CAM_DIST=20`).
+//!   `WOW_SHOT_SIZE=<w>x<h>` changes the target size (e.g. 2560x1080 for ultrawide checks).
+//! - `WOW_ZONE=<id>`: start in a zone (campus, tower/1..5, datacenter/1..2, lab/1..2), sim-backed and
+//!   playable, see `game.rs` (also `WOW_QUESTS`, `WOW_UNLOCK_ALL`); works with `WOW_TOPDOWN`
+//!   (140 frames the whole campus) and `WOW_PLAYER_AT=x,z,yaw`.
+//! - `WOW_JIRA=1`, `WOW_MAP=1`: open the `~/jira` log or the map at start.
+//! - `WOW_KILL_BOSS=<secs>`: the zone boss dies (as a player kill) that many seconds in.
+//! - `WOW_FPS=1`: log average frame time and drawn mesh count every 3 s (vsync caps the rate, so read the ms).
 //! - `WOW_HOVER_SLOT=<0-9>`: show that action slot's tooltip without a pointer.
 //!
 //! Floor, level and start-position hooks live in `game.rs`, the autofight bot in `combat.rs`.
@@ -26,6 +34,23 @@ use std::env;
 
 pub struct DebugPlugin;
 
+/// `WOW_SHOT_SIZE=<w>x<h>` (default 1280x720): size of the offscreen screenshot target.
+pub fn shot_size() -> (u32, u32) {
+    env::var("WOW_SHOT_SIZE")
+        .ok()
+        .and_then(|v| {
+            let (w, h) = v.split_once('x')?;
+            Some((w.trim().parse().ok()?, h.trim().parse().ok()?))
+        })
+        .filter(|&(w, h): &(u32, u32)| (320..=7680).contains(&w) && (240..=4320).contains(&h))
+        .unwrap_or((1280, 720))
+}
+
+/// True while screenshots go to the offscreen target (UI and plates use its size, not the window's).
+pub fn shooting() -> bool {
+    env::var_os("WOW_SCREENSHOT").is_some()
+}
+
 #[derive(Resource)]
 struct ShotPlan {
     path: String,
@@ -49,8 +74,8 @@ impl Plugin for DebugPlugin {
                 app.world_mut()
                     .resource_mut::<Assets<Image>>()
                     .add(Image::new_target_texture(
-                        1280,
-                        720,
+                        shot_size().0,
+                        shot_size().1,
                         TextureFormat::Rgba8UnormSrgb,
                         None,
                     ));
@@ -75,6 +100,9 @@ impl Plugin for DebugPlugin {
                     cam.set_yaw(0.0);
                 },
             );
+        }
+        if env::var("WOW_FPS").is_ok() {
+            app.add_systems(Update, log_frame_stats);
         }
         if env::var("WOW_TALK").is_ok() {
             app.add_systems(Update, talk_once.in_set(SimReady));
@@ -126,8 +154,34 @@ impl Plugin for DebugPlugin {
                 .in_set(SimReady),
             );
         }
+        if let Some(at) = env::var("WOW_KILL_BOSS")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+        {
+            app.add_systems(
+                Update,
+                (move |time: Res<Time>, mut sim: ResMut<CombatSim>, mut done: Local<bool>| {
+                    if *done || time.elapsed_secs() < at {
+                        return;
+                    }
+                    *done = true;
+                    let boss = sim.0.units().find(|u| u.boss && u.alive).map(|u| u.id);
+                    if let Some(id) = boss {
+                        sim.0.debug_kill(id);
+                    }
+                })
+                .in_set(SimReady),
+            );
+        }
         if env::var("WOW_TROPHIES").is_ok() {
             app.insert_resource(TrophiesOpen(true));
+        }
+        if env::var("WOW_JIRA").is_ok() || env::var("WOW_MAP").is_ok() {
+            app.insert_resource(crate::input::QuestWindows {
+                dialog: None,
+                log: env::var("WOW_JIRA").is_ok(),
+                map: env::var("WOW_MAP").is_ok(),
+            });
         }
         if env::var("WOW_AUTORUN").is_ok() {
             // Fixed pre-update runs after the per-frame input snapshot and before the sim consumes it.
@@ -185,6 +239,7 @@ fn talk_once(
     time: Res<Time>,
     sim: Res<CombatSim>,
     mut pending: ResMut<PendingCommands>,
+    mut talked: MessageWriter<crate::combat::Talked>,
     mut done: Local<bool>,
 ) {
     if *done || time.elapsed_secs() < 2.0 {
@@ -203,6 +258,34 @@ fn talk_once(
         .min_by(|a, b| dist(a).total_cmp(&dist(b)))
     {
         pending.0.push(Command::Talk { unit: npc.id });
+        talked.write(crate::combat::Talked(npc.id));
+    }
+}
+
+/// Average frame time and how many meshes the camera actually draws, for culling checks.
+fn log_frame_stats(
+    time: Res<Time>,
+    meshes: Query<
+        (
+            &ViewVisibility,
+            Option<&bevy::camera::visibility::VisibilityRange>,
+        ),
+        With<Mesh3d>,
+    >,
+    mut acc: Local<(f32, u32)>,
+) {
+    acc.0 += time.delta_secs();
+    acc.1 += 1;
+    if acc.0 >= 3.0 {
+        let drawn = meshes.iter().filter(|(v, _)| v.get()).count();
+        let ranged = meshes.iter().filter(|(_, r)| r.is_some()).count();
+        info!(
+            "frame stats: {:.2} ms/frame ({:.0} fps), {drawn} of {} meshes drawn ({ranged} with a visibility range)",
+            acc.0 / acc.1 as f32 * 1000.0,
+            acc.1 as f32 / acc.0,
+            meshes.iter().count(),
+        );
+        *acc = (0.0, 0);
     }
 }
 

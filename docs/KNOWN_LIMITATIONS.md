@@ -1,6 +1,6 @@
 # Known limitations
 
-Status after Phases 0-4 plus the playable five-floor tower (sim and client wired together). Remove an item once a test or verification covers it.
+Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) and quests, wired in sim and client. Remove an item once a test or verification covers it.
 
 ## Not implemented yet (planned)
 
@@ -15,7 +15,7 @@ Status after Phases 0-4 plus the playable five-floor tower (sim and client wired
 
 - The cast pose is the one-handed shoot clip held on its last frame, and backpedal plays the walk clip reversed. The hand glow position is tuned by eye, not bound to the fist bone.
 - Nameplates and floating numbers are screen-space UI nodes: they are culled by distance (40 m) and camera direction, not occluded by walls, and can overlap in tight packs.
-- Item loot keys without a dedicated file fall back to generated letter badges (see `hud::ICON_FILES`); every spell and aura has painted art.
+- Every spell, aura and trophy has a shipped icon (test `every_spell_aura_and_trophy_has_a_shipped_icon_file`); a key without a file would fall back to a generated letter badge.
 - The exit elevator doors and lamp are client-only overlays in front of the static dressing; they are not colliders.
 - Floor 1's sleeping IT Support comes from the catalog pose for that anchor (`catalog::npc_at`); the sim only knows one pose per unit kind. Mini-boss "ELITE" tags are a client list (`copy::is_elite`).
 - DoT-tick numbers are detected by a heuristic (damage from a spell without a direct-damage effect); the "EXECUTE!" pop is judged from the target's HP after the hit.
@@ -29,6 +29,19 @@ Status after Phases 0-4 plus the playable five-floor tower (sim and client wired
 - The player can steer while airborne (WoW allows only limited air control).
 - In RMB-steer mode the camera follows the interpolated character yaw, so it can lag the mouse by up to one 33 ms tick.
 - `FixedStepper` caps catch-up at 8 ticks per frame. Longer stalls drop the excess whole ticks.
+
+## Zones and quests
+
+- `load_floor`, `Sim::floor()`, `Content::floor()` and the `Floor*` events are deprecated twins of the zone API; the client uses only the zone API.
+- Doors are trigger boxes, not opening doors: walking into an unlocked one starts the fade, a locked one prints its reason (at most every 3 s). Arrival is in front of the door back to the zone you came from.
+- The map draws the layout's blockers as a top-down raster; it has no fog of war, and the zone tree is a static list of the content's zones.
+- Quest markers and the ticket dialog read `Sim::quests()` every frame; there is no quest sharing, no quest item highlighting on corpses and no waypoint arrow.
+- Debug hooks set quest states (`WOW_QUESTS`) without giving the items or kills, so a forced `ready` ticket can be turned in for free.
+- Trash respawns zone-wide: after `TRASH_RESPAWN_MS` away every killed pack unit comes back on re-entry; there is no per-unit timer and no respawn while the player stays in the zone. Respawned trash gives XP and loot again (quest items can be farmed this way, by design).
+- Quest failures (too far from the giver, wrong status) are silent, like `Talk` and `Loot`. Abandon emits no event; the UI reads `Sim::quests()`.
+- Quest state, trophies and world progress are per `Sim` (session only). Quest logs are keyed by player id, but commands act for the single player.
+- Loot objectives count pickups while active plus copies carried at accept time; turned-in quest items stay in the inventory (they are ordinary trophies with small bonuses).
+- `DrainMana` emits no event; the HUD sees the mana bar drop. Spell reflect (Alignment Training) also bounces DoT ticks of the player's spells.
 
 ## Debug bot
 
@@ -58,7 +71,7 @@ Status after Phases 0-4 plus the playable five-floor tower (sim and client wired
 - The Reorg teleport lands 4 m in front of the VP's spawn point regardless of the room layout.
 - Despawned units stay in the sim's unit vector (ids are never reused), so memory grows slowly with every floor load and summon.
 - Bosses are immune to stuns only; silence, slows and knockback flags are not distinguished.
-- Balance is verified by a scripted bot (`tests/playthrough.rs`: three seeds, each floor at its max level) that kills adds first, kicks interruptible casts and uses Rollback/Guardrails; a human who ignores mechanics will find floors 2 and 5 hard. Guardrails' absorb (100) does not scale with level.
+- Balance is verified by a scripted bot (`tests/playthrough.rs`: three seeds, each zone at its max level, plus the campus quest chain from level 1) that kills adds first, kicks interruptible casts and uses Rollback/Guardrails; a human who ignores mechanics will find floors 2 and 5 hard. Guardrails' absorb (100) does not scale with level.
 - Reject PR unlocks at level 2 and Guardrails at level 3 (swapped versus GAME_DESIGN.md) so the floor-1 boss interrupt is possible on floor 1.
 - Mini-bosses (`hr_partner`, `marketing_lead`, `ciso`) are mandatory pack_6 pulls in the sim; nothing marks them optional except that the floor clears on the boss alone.
 - `Command::Loot` failures (too far, not lootable) are silent: `CastError` has no loot variants. Corpses are always lootable, possibly with an empty loot list.

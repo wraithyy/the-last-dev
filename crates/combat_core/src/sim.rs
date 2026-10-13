@@ -5,16 +5,18 @@
 //! reused (despawned units stay in the vector, hidden from the public views).
 
 use crate::content::{
-    AuraDef, Content, ContentError, ItemTotals, School, SpellDef, SpellId, YELL_KINDS, YellKind,
-    ticks,
+    AuraDef, Content, ContentError, ItemTotals, Objective, School, SpellDef, SpellId, YELL_KINDS,
+    YellKind, ticks,
 };
 use crate::geom::{Aabb, Vec3, in_range};
 use crate::nav::{Nav, NavAgent};
+use crate::quests::QuestLog;
 use crate::rng::Rng;
 use crate::targeting::{EntityId, TargetCandidate, validate_target};
 use crate::time::{Tick, ticks_to_ms};
 use crate::types::*;
 use crate::wander::Wander;
+use crate::zones::{World, floor_number};
 use std::collections::BTreeMap;
 
 /// Friendly ambient chatter is only emitted while the player is this close.
@@ -100,6 +102,8 @@ pub(crate) struct Unit {
     pub summoner: Option<EntityId>,
     pub despawned: bool,
     pub floor_boss: bool,
+    /// Pack slot in the current zone (for the trash respawn timer); `None` for everything else.
+    pub zone_slot: Option<usize>,
     pub last_cast: Option<SpellId>,
     /// Last damaging player spell that landed on this unit: (pre-absorb amount, school).
     pub last_player_hit: Option<(u32, School)>,
@@ -123,6 +127,7 @@ pub(crate) struct SpawnOpts {
     pub respawns: bool,
     pub summoner: Option<EntityId>,
     pub floor_boss: bool,
+    pub zone_slot: Option<usize>,
 }
 
 pub struct Sim {
@@ -135,7 +140,10 @@ pub struct Sim {
     pub(crate) pending: Vec<Command>,
     pub(crate) events: Vec<Event>,
     pub(crate) player: Option<EntityId>,
-    pub(crate) floor: Option<u8>,
+    pub(crate) zone: Option<String>,
+    pub(crate) world: World,
+    /// Keyed by player id so a second player gets its own log.
+    pub(crate) quest_logs: BTreeMap<EntityId, QuestLog>,
     pub(crate) next_pack: u32,
     /// Earliest tick for the next throttled hostile yell, shared by all units.
     pub(crate) hostile_yell_next: u64,
@@ -156,7 +164,9 @@ impl Sim {
             pending: Vec::new(),
             events: Vec::new(),
             player: None,
-            floor: None,
+            zone: None,
+            world: World::default(),
+            quest_logs: BTreeMap::new(),
             next_pack: 1,
             hostile_yell_next: 0,
             seed,
@@ -187,6 +197,7 @@ impl Sim {
                 respawns: false,
                 summoner: None,
                 floor_boss: false,
+                zone_slot: None,
             },
         );
         self.player = Some(id);
@@ -215,6 +226,7 @@ impl Sim {
                 respawns: true,
                 summoner: None,
                 floor_boss: false,
+                zone_slot: None,
             },
         ))
     }
@@ -301,6 +313,7 @@ impl Sim {
             summoner: o.summoner,
             despawned: false,
             floor_boss: o.floor_boss,
+            zone_slot: o.zone_slot,
             last_cast: None,
             last_player_hit: None,
             wander: Wander::new(self.seed, id),
@@ -357,9 +370,9 @@ impl Sim {
         &self.content
     }
 
-    /// The floor loaded by `load_floor`, if any.
+    /// Legacy: the tower floor number of the loaded zone (`tower/<n>`), if any.
     pub fn floor(&self) -> Option<u8> {
-        self.floor
+        self.zone.as_deref().and_then(floor_number)
     }
 
     pub fn cooldown(&self, caster: EntityId, spell: SpellId) -> CooldownView {
@@ -480,6 +493,9 @@ impl Sim {
             Command::Loot { looter, corpse } => self.handle_loot(looter, corpse),
             Command::RespawnPlayer => self.respawn_player(),
             Command::Talk { unit } => self.talk(unit),
+            Command::AcceptQuest { quest } => self.accept_quest(&quest),
+            Command::TurnInQuest { quest } => self.turn_in_quest(&quest),
+            Command::AbandonQuest { quest } => self.abandon_quest(&quest),
         }
     }
 
@@ -519,13 +535,18 @@ impl Sim {
         self.events.push(Event::Looted {
             looter,
             corpse,
-            items,
+            items: items.clone(),
         });
+        if Some(looter) == self.player {
+            for it in &items {
+                self.quest_credit(|o| matches!(o, Objective::Loot(n, _) if n == it));
+            }
+        }
     }
 
     /// Stores the items and applies their bonuses at once. Current HP and mana scale up
     /// with the new maximum and never drop.
-    fn add_trophies(&mut self, i: usize, items: &[String]) {
+    pub(crate) fn add_trophies(&mut self, i: usize, items: &[String]) {
         for name in items {
             let inv = &mut self.units[i].state.inventory;
             match inv.iter_mut().find(|(n, _)| n == name) {
@@ -576,6 +597,20 @@ impl Sim {
         true
     }
 
+    /// Debug/test: kills a living hostile unit as if the player landed the killing blow (XP,
+    /// loot, zone clear, quest credit and unlocks all follow; events come out of the next tick).
+    /// False for unknown, dead or friendly units.
+    pub fn debug_kill(&mut self, id: EntityId) -> bool {
+        let Some(ti) = self
+            .index(id)
+            .filter(|&i| self.units[i].state.alive && self.units[i].state.hostile)
+        else {
+            return false;
+        };
+        self.die(ti, self.player);
+        true
+    }
+
     /// The player's trophies as (name, copies), first pickup first.
     pub fn inventory(&self) -> &[(String, u32)] {
         self.player
@@ -599,7 +634,10 @@ impl Sim {
         let (p, t) = (&self.units[pi], &self.units[ti]);
         let near = in_range(p.state.pos, t.state.pos, self.content.config.loot_range_m);
         if p.state.alive && t.state.alive && !t.despawned && !t.state.hostile && near {
+            let key = t.state.key.clone();
             self.request_yell(ti, YellKind::Talk);
+            self.quest_credit(|o| matches!(o, Objective::Talk(k) if *k == key));
+            self.offer_quests(ti);
         }
     }
 
@@ -1001,6 +1039,23 @@ impl Sim {
         if !t.state.alive || t.state.ai == Some(AiState::Evade) {
             return;
         }
+        // Reflected once: the caster cannot bounce it back even if it reflects too.
+        if spell.is_some()
+            && source != target
+            && self.has_aura_flag(ti, |a| a.reflect)
+            && self
+                .index(source)
+                .is_some_and(|si| !self.has_aura_flag(si, |a| a.reflect))
+        {
+            let hit = Hit {
+                spell,
+                amount,
+                crit,
+                combo,
+                school,
+            };
+            return self.deal_damage(target, source, hit);
+        }
         let amount = self.modified_damage(source, ti, amount);
         let mut absorbed = 0;
         let mut depleted: Vec<String> = Vec::new();
@@ -1125,11 +1180,7 @@ impl Sim {
             self.award_kill_xp(k, ti);
         }
         self.events.push(Event::LootDropped { corpse: id, items });
-        if self.units[ti].floor_boss
-            && let Some(floor) = self.floor
-        {
-            self.events.push(Event::FloorCleared { floor });
-        }
+        self.on_hostile_death(ti, killer);
     }
 
     // ---- per-tick upkeep ----

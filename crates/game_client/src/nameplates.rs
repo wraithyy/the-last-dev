@@ -29,6 +29,9 @@ struct Nameplate {
 }
 #[derive(Component)]
 struct PlateFill(EntityId);
+/// Quest giver marker ("!" / "?") on top of a friendly plate.
+#[derive(Component)]
+struct QuestMark(String);
 /// Name text and "LOOT" tag of a plate; `loot_fx` recolours and reveals them on lootable corpses.
 #[derive(Component)]
 pub struct PlateName(pub EntityId);
@@ -41,7 +44,9 @@ impl Plugin for NameplatePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (spawn_plates, place_plates).chain().in_set(SimReady),
+            (spawn_plates, place_plates, update_marks)
+                .chain()
+                .in_set(SimReady),
         );
     }
 }
@@ -85,6 +90,13 @@ fn spawn_plates(
             GlobalZIndex(5),
         ));
         root.with_children(|p| {
+            if !u.hostile {
+                p.spawn((
+                    QuestMark(u.key.clone()),
+                    label("", 34.0),
+                    TextColor(Color::NONE),
+                ));
+            }
             p.spawn(Node {
                 column_gap: px(4),
                 align_items: AlignItems::Center,
@@ -179,6 +191,8 @@ fn place_plates(
     let scale = ui_scale.0.max(0.01);
     let eye = cam_tf.translation();
     let forward = cam_tf.forward();
+    // The camera's target, which is the offscreen image during screenshots.
+    let view_h = cam.logical_viewport_size().map_or(window.height(), |v| v.y);
     for (e, plate, mut node, mut tf_ui, mut vis) in &mut plates {
         let Ok(tf) = transforms.get(plate.anchor) else {
             commands.entity(e).despawn();
@@ -199,7 +213,7 @@ fn place_plates(
         };
         vis.set_if_neq(Visibility::Inherited);
         node.left = px(screen.x / scale - PLATE_W / 2.0);
-        node.bottom = px((window.height() - screen.y) / scale);
+        node.bottom = px((view_h - screen.y) / scale);
         let targeted = target.0 == Some(plate.anchor);
         // Far plates shrink so a whole pack stays readable; the target stands out.
         let k = (1.1 - dist / 60.0).clamp(0.6, 1.0) * if targeted { 1.15 } else { 1.0 };
@@ -213,6 +227,21 @@ fn place_plates(
         let w = percent(pct);
         if node.width != w {
             node.width = w;
+        }
+    }
+}
+
+fn update_marks(
+    sim: Res<CombatSim>,
+    flow: Res<crate::game::GameFlow>,
+    mut marks: Query<(&QuestMark, &mut Text, &mut TextColor)>,
+) {
+    for (mark, mut text, mut color) in &mut marks {
+        let (glyph, c) =
+            crate::hud::giver_mark(&sim.0, &mark.0, &flow.zone).unwrap_or(("", Color::NONE));
+        crate::hud::set_text(&mut text, glyph);
+        if color.0 != c {
+            color.0 = c;
         }
     }
 }

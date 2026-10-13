@@ -307,6 +307,11 @@ impl Sim {
                 };
                 self.deal_damage(caster, Self::id_of(ti), hit);
             }
+            (Effect::DrainMana { pct }, Some(ti)) => {
+                let t = &mut self.units[ti].state;
+                let drain = (u64::from(t.max_mana) * u64::from(*pct) / 100) as u32;
+                t.mana = t.mana.saturating_sub(drain);
+            }
             _ => {}
         }
     }
@@ -361,6 +366,7 @@ impl Sim {
                     respawns: false,
                     summoner: Some(caster),
                     floor_boss: false,
+                    zone_slot: None,
                 },
             );
             self.events.push(Event::Summoned {

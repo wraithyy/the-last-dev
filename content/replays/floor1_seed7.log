@@ -1,4 +1,5 @@
-# floor 1 playthrough, seed 7, start level 1
+# tower/1 playthrough, seed 7, start level 1
+[00001] zone tower/1 loaded
 [00001] floor 1 loaded
 [00002] Senior Engineer auto attack on
 [00002] Senior Engineer swings at Copilot Drone
@@ -325,9 +326,9 @@
 [01794] Senior Engineer hits The Vibe Coder with melee for 11 (absorbed 0)
 [01795] Senior Engineer begins Code Review (2000 ms)
 [01831] The Vibe Coder casts Generate Pull Requests
-[01831] The Vibe Coder summons Unreviewed PR #16
+[01831] The Vibe Coder summons Unreviewed PR #15
 [01831] Unreviewed PR ai Chase
-[01831] The Vibe Coder summons Unreviewed PR #17
+[01831] The Vibe Coder summons Unreviewed PR #16
 [01831] Unreviewed PR ai Chase
 [01831] The Vibe Coder ai Attack
 [01831] The Vibe Coder swings at Senior Engineer
@@ -424,12 +425,14 @@
 [02327] Senior Engineer hits The Vibe Coder with Refactor for 162 (absorbed 0) COMBO
 [02327] Senior Engineer auto attack off
 [02327] The Vibe Coder dies (killer Senior Engineer)
+[02327] #15 despawns
 [02327] #16 despawns
-[02327] #17 despawns
 [02327] The Vibe Coder ai Dead
 [02327] Senior Engineer gains 250 xp
 [02327] The Vibe Coder drops ["Prompt Fragment", "Mechanical Keyboard with No Keycaps"]
+[02327] zone tower/1 cleared
 [02327] floor 1 cleared
+[02327] tower/2 unlocked
 [02327] Senior Engineer leaves combat
 [02327] The Vibe Coder leaves combat
 [02327] The Vibe Coder yells: But the AI said it was production-ready...

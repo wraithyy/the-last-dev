@@ -1,4 +1,4 @@
-//! Data-driven content: spells, auras, units, levels, floors and balance, parsed from RON.
+//! Data-driven content: spells, auras, units, levels, zones, quests and balance, parsed from RON.
 
 use crate::time::ms_to_ticks;
 use serde::Deserialize;
@@ -152,6 +152,9 @@ pub struct AuraDef {
     /// The bearer gains a stack whenever it casts the same spell twice in a row.
     #[serde(default)]
     pub stack_on_repeat_cast: bool,
+    /// Spell damage aimed at the bearer hits the caster instead (Alignment Training).
+    #[serde(default)]
+    pub reflect: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -241,6 +244,10 @@ pub enum Effect {
     ThreatSwap,
     /// Repeats the last damaging spell the player landed on the caster, at `pct` damage.
     ForwardLastSpell {
+        pct: u32,
+    },
+    /// Removes this percent of the target's max mana (Context Window Exceeded).
+    DrainMana {
         pct: u32,
     },
     Nothing,
@@ -610,20 +617,101 @@ pub struct PackDef {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct FloorSpawn {
+pub struct ZoneSpawn {
     pub anchor: String,
     pub unit: String,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+pub enum ZoneKind {
+    Outdoor,
+    Indoor,
+}
+
+/// World progress that opens a gated zone link.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub enum Unlock {
+    ZoneCleared(String),
+    /// The unit key of a zone boss; only its death as a zone boss counts.
+    BossKilled(String),
+    QuestDone(String),
+}
+
+/// An exit of a zone: the client's trigger anchor (`door:<zone>`, `elevator_exit`) and where it leads.
 #[derive(Clone, Debug, Deserialize)]
-pub struct FloorDef {
-    pub id: u8,
+pub struct ZoneLink {
+    pub anchor: String,
+    pub to: String,
+    #[serde(default)]
+    pub requires: Option<Unlock>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ZoneDef {
+    pub id: String,
     pub name: String,
+    pub kind: ZoneKind,
     pub level_range: (u8, u8),
     pub packs: Vec<PackDef>,
-    pub boss: FloorSpawn,
     #[serde(default)]
-    pub friendly: Vec<FloorSpawn>,
+    pub boss: Option<ZoneSpawn>,
+    #[serde(default)]
+    pub friendly: Vec<ZoneSpawn>,
+    #[serde(default)]
+    pub links: Vec<ZoneLink>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+pub enum Objective {
+    /// Unit key and count; only the player's own kills count.
+    Kill(String, u32),
+    /// Item name and count; copies already carried at accept count, items are not consumed on turn-in.
+    Loot(String, u32),
+    /// Talk to a friendly unit with this key.
+    Talk(String),
+    ClearZone(String),
+}
+
+impl Objective {
+    pub fn need(&self) -> u32 {
+        match self {
+            Objective::Kill(_, n) | Objective::Loot(_, n) => *n,
+            Objective::Talk(_) | Objective::ClearZone(_) => 1,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct QuestGiver {
+    pub npc: String,
+    pub zone: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct QuestReward {
+    pub xp: u32,
+    #[serde(default)]
+    pub trophy: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct QuestDef {
+    pub id: String,
+    pub name: String,
+    /// Accepted from and turned in to this NPC.
+    pub giver: QuestGiver,
+    /// Offer text, shown before accepting.
+    pub text: String,
+    /// Shown while the quest is active but not ready.
+    pub progress_text: String,
+    /// Shown on turn-in.
+    pub done_text: String,
+    pub objectives: Vec<Objective>,
+    pub reward: QuestReward,
+    #[serde(default)]
+    pub requires: Option<String>,
+    #[serde(default = "one")]
+    pub level_min: u8,
 }
 
 pub const MAX_ACTION_BAR: usize = 10;
@@ -637,7 +725,8 @@ pub struct Content {
     pub items: Vec<ItemDef>,
     pub action_bar: Vec<SpellId>,
     pub levels: Vec<LevelDef>,
-    pub floors: Vec<FloorDef>,
+    pub zones: Vec<ZoneDef>,
+    pub quests: Vec<QuestDef>,
 }
 
 impl Content {
@@ -674,8 +763,17 @@ impl Content {
         self.auras.iter().find(|a| a.key == key)
     }
 
-    pub fn floor(&self, id: u8) -> Option<&FloorDef> {
-        self.floors.iter().find(|f| f.id == id)
+    pub fn zone(&self, id: &str) -> Option<&ZoneDef> {
+        self.zones.iter().find(|z| z.id == id)
+    }
+
+    /// Legacy floor number: tower floor `n` is zone `tower/n`.
+    pub fn floor(&self, id: u8) -> Option<&ZoneDef> {
+        self.zone(&format!("tower/{id}"))
+    }
+
+    pub fn quest(&self, id: &str) -> Option<&QuestDef> {
+        self.quests.iter().find(|q| q.id == id)
     }
 
     pub fn max_level(&self) -> u8 {
@@ -835,23 +933,109 @@ impl Content {
                 }
             }
         }
-        for (i, f) in self.floors.iter().enumerate() {
-            if self.floors[..i].iter().any(|o| o.id == f.id) {
-                return bad(format!("duplicate floor {}", f.id));
+        self.validate_zones()?;
+        self.validate_quests()?;
+        Ok(())
+    }
+}
+
+impl Content {
+    fn validate_zones(&self) -> Result<(), ContentError> {
+        let bad = |m: String| Err(ContentError::Invalid(m));
+        for (i, z) in self.zones.iter().enumerate() {
+            if self.zones[..i].iter().any(|o| o.id == z.id) {
+                return bad(format!("duplicate zone {}", z.id));
             }
-            if f.level_range.0 > f.level_range.1 || f.level_range.0 == 0 {
-                return bad(format!("floor {} has a bad level range", f.id));
+            if z.level_range.0 > z.level_range.1 || z.level_range.0 == 0 {
+                return bad(format!("zone {} has a bad level range", z.id));
             }
-            let keys = f
+            let keys = z
                 .packs
                 .iter()
                 .flat_map(|p| p.units.iter())
-                .chain(std::iter::once(&f.boss.unit))
-                .chain(f.friendly.iter().map(|s| &s.unit));
+                .chain(z.boss.iter().map(|b| &b.unit))
+                .chain(z.friendly.iter().map(|s| &s.unit));
             for k in keys {
                 if self.unit_def(k).is_none() || *k == self.config.player_unit {
-                    return bad(format!("floor {} spawns invalid unit {k}", f.id));
+                    return bad(format!("zone {} spawns invalid unit {k}", z.id));
                 }
+            }
+            for l in &z.links {
+                if self.zone(&l.to).is_none() {
+                    return bad(format!("zone {} links to unknown zone {}", z.id, l.to));
+                }
+                if let Some(r) = &l.requires {
+                    self.validate_unlock(r)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_unlock(&self, r: &Unlock) -> Result<(), ContentError> {
+        let ok = match r {
+            Unlock::ZoneCleared(z) => self.zone(z).is_some_and(|z| z.boss.is_some()),
+            Unlock::BossKilled(k) => self
+                .zones
+                .iter()
+                .any(|z| z.boss.as_ref().is_some_and(|b| b.unit == *k)),
+            Unlock::QuestDone(q) => self.quest(q).is_some(),
+        };
+        if ok {
+            Ok(())
+        } else {
+            Err(ContentError::Invalid(format!(
+                "unlock {r:?} can never happen"
+            )))
+        }
+    }
+
+    fn validate_quests(&self) -> Result<(), ContentError> {
+        let bad = |m: String| Err(ContentError::Invalid(m));
+        for (i, q) in self.quests.iter().enumerate() {
+            if self.quests[..i].iter().any(|o| o.id == q.id) {
+                return bad(format!("duplicate quest {}", q.id));
+            }
+            let gives = self
+                .zone(&q.giver.zone)
+                .is_some_and(|z| z.friendly.iter().any(|f| f.unit == q.giver.npc));
+            if !gives || self.unit_def(&q.giver.npc).is_none_or(|u| u.hostile) {
+                return bad(format!(
+                    "quest {}: giver {} is not a friendly in {}",
+                    q.id, q.giver.npc, q.giver.zone
+                ));
+            }
+            if q.objectives.is_empty() || q.objectives.iter().any(|o| o.need() == 0) {
+                return bad(format!("quest {} needs objectives with counts", q.id));
+            }
+            for o in &q.objectives {
+                let ok = match o {
+                    Objective::Kill(k, _) => self.unit_def(k).is_some_and(|u| u.hostile),
+                    Objective::Loot(it, _) => self.item(it).is_some(),
+                    Objective::Talk(k) => self.unit_def(k).is_some_and(|u| !u.hostile),
+                    Objective::ClearZone(z) => self.zone(z).is_some_and(|z| z.boss.is_some()),
+                };
+                if !ok {
+                    return bad(format!("quest {}: impossible objective {o:?}", q.id));
+                }
+            }
+            if let Some(t) = &q.reward.trophy
+                && self.item(t).is_none()
+            {
+                return bad(format!("quest {} rewards unknown item {t}", q.id));
+            }
+            let chain_ok = q
+                .requires
+                .as_ref()
+                .is_none_or(|r| self.quests[..i].iter().any(|o| o.id == *r));
+            if !chain_ok {
+                return bad(format!(
+                    "quest {} requires a quest that is not listed before it",
+                    q.id
+                ));
+            }
+            if q.level_min == 0 || q.level_min > self.max_level() {
+                return bad(format!("quest {} level_min out of range", q.id));
             }
         }
         Ok(())
@@ -902,7 +1086,7 @@ mod tests {
             (p.max_hp, p.max_mana, p.spell_power, p.crit_pct),
             (300, 250, 20, 5)
         );
-        assert_eq!(c.floors.len(), 5);
+        assert_eq!(c.floor(5).map(|z| z.id.as_str()), Some("tower/5"));
     }
 
     #[test]

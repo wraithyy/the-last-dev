@@ -4,6 +4,8 @@
 
 use crate::anim::{Character, ModelKind, Paints};
 use crate::catalog::{self, IdlePose};
+use crate::combat_anim::CombatAnim;
+use crate::rigs::PrimRig;
 use bevy::prelude::*;
 use std::f32::consts::PI;
 
@@ -68,7 +70,18 @@ pub fn spawn_visual(
     pose: IdlePose,
 ) -> Entity {
     let vis = catalog::unit_visual(key);
-    commands
+    if let Some(kind) = catalog::primitive_rig(key) {
+        return commands
+            .spawn((
+                PrimRig(kind),
+                CombatAnim::default(),
+                pose,
+                Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
+                Visibility::default(),
+            ))
+            .id();
+    }
+    let e = commands
         .spawn((
             Character {
                 kind: ModelKind(vis.model),
@@ -79,7 +92,17 @@ pub fn spawn_visual(
             Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
             Visibility::default(),
         ))
-        .id()
+        .id();
+    if key == "scooter_exec" {
+        // Standing on his own scooter: the deck sits under the feet.
+        commands.spawn((
+            PrimRig("scooter"),
+            ChildOf(e),
+            Transform::default(),
+            Visibility::default(),
+        ));
+    }
+    e
 }
 
 /// `spawn_visual` plus the `Unit` mirror and per-character attachments.
@@ -140,21 +163,36 @@ fn spawn_lineup(mut commands: Commands, lineup: Res<Lineup>) {
     if lineup.0 == 0 {
         return;
     }
-    let keys: Vec<&'static str> = catalog::unit_keys()
-        .filter(|k| *k != "senior_engineer")
-        .collect();
+    // 3: only the campus, data center and lab units (everything after the tower cast), wider
+    // spaced because the rigs are big; WOW_CAM_DIST=20 frames them.
+    let new_only = lineup.0 >= 3;
+    let keys: Vec<&'static str> = if new_only {
+        catalog::unit_keys()
+            .skip_while(|k| *k != "ceo")
+            .skip(1)
+            .collect()
+    } else {
+        catalog::unit_keys()
+            .filter(|k| *k != "senior_engineer")
+            .collect()
+    };
     let half = keys.len().div_ceil(2);
-    let slice = if lineup.0 >= 2 {
+    let slice = if new_only {
+        &keys[..]
+    } else if lineup.0 >= 2 {
         &keys[half..]
     } else {
         &keys[..half]
     };
-    let per_row = slice.len().div_ceil(2);
+    let rows = if new_only { 3 } else { 2 };
+    let spacing = if new_only { 3.6 } else { 2.3 };
+    let per_row = slice.len().div_ceil(rows);
     for (i, key) in slice.iter().enumerate() {
         let (row, col) = (i / per_row, i % per_row);
         // The back row is shifted half a slot so nobody hides behind a neighbour.
-        let x = (col as f32 - (per_row as f32 - 1.0) / 2.0) * 2.3 + row as f32 * 1.15 - 0.6;
-        let z = -3.0 - row as f32 * 3.8;
+        let x = (col as f32 - (per_row as f32 - 1.0) / 2.0) * spacing + row as f32 * spacing / 2.0
+            - 0.6;
+        let z = -3.0 - row as f32 * if new_only { 4.6 } else { 3.8 };
         // Yaw PI faces +Z, towards the camera. No `Unit`, so lineup models are not targetable.
         spawn_visual(
             &mut commands,

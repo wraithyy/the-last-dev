@@ -168,6 +168,14 @@ pub fn legacy_ceo(c: &mut Content) {
         ai.abilities.retain(|a| a.spell == BLAST);
         ai.phases.clear();
     }
+    // The shipped CEO always drops the deck (a quest needs it); the legacy encounter rolled 35%.
+    for l in ceo
+        .loot
+        .iter_mut()
+        .filter(|l| l.item == "Unread AI Strategy Deck")
+    {
+        l.chance_pct = 35;
+    }
     for s in c.spells.iter_mut().filter(|s| s.id == BLAST) {
         if let Effect::Damage { base, .. } = &mut s.effect {
             *base = 45;
@@ -333,6 +341,19 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
         Event::Despawned { unit } => format!("#{unit} despawns"),
         Event::FloorLoaded { floor } => format!("floor {floor} loaded"),
         Event::FloorCleared { floor } => format!("floor {floor} cleared"),
+        Event::ZoneLoaded { zone } => format!("zone {zone} loaded"),
+        Event::ZoneCleared { zone } => format!("zone {zone} cleared"),
+        Event::Unlocked { zone } => format!("{zone} unlocked"),
+        Event::QuestOffered { npc, quests } => format!("{} offers {quests:?}", t(*npc)),
+        Event::QuestAccepted { quest } => format!("quest {quest} accepted"),
+        Event::QuestProgress {
+            quest,
+            objective,
+            count,
+            need,
+        } => format!("quest {quest} objective {objective}: {count}/{need}"),
+        Event::QuestReady { quest } => format!("quest {quest} ready"),
+        Event::QuestCompleted { quest } => format!("quest {quest} completed"),
     };
     format!("[{tick:05}] {body}")
 }

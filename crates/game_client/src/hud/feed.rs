@@ -322,6 +322,15 @@ fn possessive(sim: &CombatSim, id: EntityId) -> String {
     }
 }
 
+const QUEST_YELLOW: Color = Color::srgb(1.0, 0.85, 0.35);
+
+fn quest_name(sim: &CombatSim, id: &str) -> String {
+    sim.0
+        .content()
+        .quest(id)
+        .map_or_else(|| id.to_string(), |q| q.name.clone())
+}
+
 fn spell_name(sim: &CombatSim, id: combat_core::SpellId) -> String {
     sim.0
         .content()
@@ -626,13 +635,31 @@ fn collect_events(
                 "You have been reorganised to a new location.".into(),
                 Color::srgb(1.0, 0.6, 0.4),
             ),
-            Event::FloorCleared { floor } => push(
-                if *floor >= crate::floors::FLOOR_COUNT {
-                    format!("Floor {floor} cleared. The board is calling an emergency meeting.")
-                } else {
-                    format!("Floor {floor} cleared. The elevator is unlocked.")
-                },
+            Event::ZoneCleared { zone } => push(
+                format!(
+                    "{} cleared.",
+                    crate::game::zone_label(sim.0.content(), zone)
+                ),
                 Color::srgb(0.4, 1.0, 0.5),
+            ),
+            Event::Unlocked { zone } => push(
+                format!(
+                    "Access granted: {}.",
+                    crate::game::zone_label(sim.0.content(), zone)
+                ),
+                Color::srgb(1.0, 0.82, 0.3),
+            ),
+            Event::QuestAccepted { quest } => push(
+                format!("Ticket assigned to you: {}.", quest_name(&sim, quest)),
+                QUEST_YELLOW,
+            ),
+            Event::QuestReady { quest } => push(
+                format!("{}: ready for review.", quest_name(&sim, quest)),
+                QUEST_YELLOW,
+            ),
+            Event::QuestCompleted { quest } => push(
+                format!("Ticket closed: {}.", quest_name(&sim, quest)),
+                QUEST_YELLOW,
             ),
             Event::Looted { looter, items, .. } if Some(*looter) == me => {
                 for item in items {

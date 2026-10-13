@@ -82,7 +82,7 @@ pub enum AuraEnd {
     Death,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Command {
     /// The client owns player movement; it reports the result every tick before `tick()`.
     PlayerMoved {
@@ -118,6 +118,18 @@ pub enum Command {
     /// Talk to a friendly unit within `loot_range_m`; it answers with a `Yell` from its `talk` lines.
     Talk {
         unit: EntityId,
+    },
+    /// Accept an available quest; the player must be within talk range of a living giver.
+    AcceptQuest {
+        quest: String,
+    },
+    /// Hand in a ready quest at its giver (talk range): XP and trophy are granted.
+    TurnInQuest {
+        quest: String,
+    },
+    /// Drop an active quest and its progress; it can be accepted again.
+    AbandonQuest {
+        quest: String,
     },
 }
 
@@ -260,11 +272,46 @@ pub enum Event {
     Despawned {
         unit: EntityId,
     },
+    /// Deprecated: also emitted for `tower/<n>` zones until the client switches to zone events.
     FloorLoaded {
         floor: u8,
     },
+    /// Deprecated twin of `ZoneCleared` for `tower/<n>` zones.
     FloorCleared {
         floor: u8,
+    },
+    ZoneLoaded {
+        zone: String,
+    },
+    /// The zone's boss died (once per session; campus has no boss).
+    ZoneCleared {
+        zone: String,
+    },
+    /// The first gated link into `zone` just opened.
+    Unlocked {
+        zone: String,
+    },
+    /// Talking to a quest giver that has quests to offer or to take back (ids in content order).
+    QuestOffered {
+        npc: EntityId,
+        quests: Vec<String>,
+    },
+    QuestAccepted {
+        quest: String,
+    },
+    /// `objective` indexes `QuestDef::objectives`.
+    QuestProgress {
+        quest: String,
+        objective: usize,
+        count: u32,
+        need: u32,
+    },
+    /// Every objective is complete; turn it in at the giver.
+    QuestReady {
+        quest: String,
+    },
+    QuestCompleted {
+        quest: String,
     },
 }
 
