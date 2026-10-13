@@ -5,7 +5,7 @@
 use super::address::{self, Field};
 use super::session::LeaveRequest;
 use super::store::{self, Saved};
-use super::transport::{NetClient, NetState};
+use super::transport::{NetClient, NetState, WAKING};
 use super::world::NetWorld;
 use crate::hud::{
     ACCENT, ACCENT_WARM, DIM, HP_GREEN, KEY_RIM, KEY_TOP, KEY_TOP_HI, PANEL_EDGE, drop_shadow,
@@ -19,6 +19,10 @@ use bevy::prelude::*;
 const DEFAULT_NAME: &str = "Anonymous Dev";
 const PLACEHOLDER: Color = Color::srgb(0.38, 0.42, 0.5);
 const FAIL_RED: Color = Color::srgb(0.95, 0.35, 0.3);
+/// Characters a field box shows (JetBrains Mono at 16 px is about 9.6 px per glyph); the
+/// address box is narrower when the "This server" button sits next to it.
+const FIELD_CHARS: usize = 34;
+const FIELD_CHARS_BESIDE_BUTTON: usize = 20;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Intent {
@@ -89,7 +93,7 @@ impl Lobby {
             .as_ref()
             .and_then(|p| address::this_server_url(&p.protocol, &p.host));
         if self.address.is_empty() {
-            self.address = this_server.unwrap_or(saved.address);
+            self.address = initial_address(this_server, saved.address, DEFAULT_SERVER);
         }
         if self.name.is_empty() {
             self.name = saved.name;
@@ -97,10 +101,26 @@ impl Lobby {
     }
 }
 
+/// Build-time default server (`TLD_DEFAULT_SERVER`, e.g. a GitHub repo variable); CI passes
+/// an empty string when the variable is unset.
+const DEFAULT_SERVER: Option<&str> = option_env!("TLD_DEFAULT_SERVER");
+
+/// The server this page came from wins (LAN play), then the player's last address, then the
+/// build's default.
+fn initial_address(this_server: Option<String>, saved: String, default: Option<&str>) -> String {
+    let default = default.map(str::trim).filter(|d| !d.is_empty());
+    match (this_server, default) {
+        (Some(s), _) => s,
+        (None, Some(d)) if saved.trim().is_empty() => d.to_string(),
+        (None, _) => saved,
+    }
+}
+
 /// Text and colour for the status line.
 fn status_line(state: &NetState, notice: Option<&str>, in_room: bool) -> (String, Color) {
     match state {
         NetState::Connecting { .. } => ("Connecting...".into(), ACCENT_WARM),
+        NetState::Waking { .. } => (WAKING.into(), ACCENT_WARM),
         NetState::Connected if in_room => (
             "In the room. Share the code with your colleagues.".into(),
             HP_GREEN,
@@ -123,6 +143,17 @@ fn next_field(f: Field) -> Field {
         Field::Name => Field::Room,
         Field::Room => Field::Address,
     }
+}
+
+/// The end of `text` that fits in `max` characters, so the caret stays in view: long URLs
+/// scroll left instead of wrapping out of the box.
+fn tail(text: &str, max: usize) -> String {
+    let n = text.chars().count();
+    if n <= max {
+        return text.to_string();
+    }
+    let keep: String = text.chars().skip(n + 1 - max).collect();
+    format!("<{keep}")
 }
 
 /// Applies one editing key to a field's text.
@@ -154,6 +185,8 @@ struct FieldText(Field);
 struct RoomCodeText;
 #[derive(Component)]
 struct PlayersText;
+#[derive(Component)]
+struct ThisServerBtn;
 /// Shown only while in a room (true) or only outside one (false).
 #[derive(Component)]
 struct ShowWhenOnline(bool);
@@ -288,10 +321,10 @@ fn spawn_ui(mut commands: Commands) {
                             },
                             BorderColor::all(PANEL_EDGE),
                             BackgroundColor(Color::srgb(0.03, 0.035, 0.055)),
-                            children![(FieldText(field), label("", 16.0))],
+                            children![(FieldText(field), label("", 16.0), TextLayout::no_wrap())],
                         ));
                         if field == Field::Address && this_server {
-                            r.spawn((Btn::ThisServer, button("This server")));
+                            r.spawn((Btn::ThisServer, ThisServerBtn, button("This server")));
                         }
                     });
                 }
@@ -349,6 +382,7 @@ fn lobby_logic(
     mut shown_focus: Local<Option<Field>>,
     mut kb_seen: Local<String>,
     world: Option<Res<NetWorld>>,
+    this_server_btn: Query<(), With<ThisServerBtn>>,
 ) {
     // Esc unpauses (see targeting.rs), which also closes the lobby.
     if !paused.0 {
@@ -405,19 +439,17 @@ fn lobby_logic(
             lobby.address = url;
         }
         if pressed(Btn::Back) {
-            if matches!(net.state(), NetState::Connecting { .. }) {
+            if matches!(
+                net.state(),
+                NetState::Connecting { .. } | NetState::Waking { .. }
+            ) {
                 net.disconnect();
             }
             lobby.open = false;
             lobby.focus = None;
         }
         for (btn, intent) in [(Btn::Create, Intent::Create), (Btn::Join, Intent::Join)] {
-            if !pressed(btn)
-                || matches!(
-                    net.state(),
-                    NetState::Connecting { .. } | NetState::Connected
-                )
-            {
+            if !pressed(btn) || net.state().busy() {
                 continue;
             }
             let https = store::page().is_some_and(|p| p.https());
@@ -443,10 +475,18 @@ fn lobby_logic(
     for (FieldText(f), mut text, mut color) in &mut field_texts {
         let value = lobby.text(*f);
         let focused = lobby.focus == Some(*f);
+        let max = if *f == Field::Address && !this_server_btn.is_empty() {
+            FIELD_CHARS_BESIDE_BUTTON
+        } else {
+            FIELD_CHARS
+        };
         let (shown, tint) = match (value.is_empty(), focused) {
             (true, false) => (placeholder(*f).to_string(), PLACEHOLDER),
-            (_, true) => (format!("{value}{}", if caret { "_" } else { " " }), ACCENT),
-            _ => (value.to_string(), Color::WHITE),
+            (_, true) => (
+                format!("{}{}", tail(value, max - 1), if caret { "_" } else { " " }),
+                ACCENT,
+            ),
+            _ => (tail(value, max), Color::WHITE),
         };
         set_text(&mut text, &shown);
         color.0 = tint;
@@ -648,6 +688,10 @@ mod tests {
             since: Instant::now(),
         };
         assert_eq!(status_line(&connecting, None, false).0, "Connecting...");
+        let waking = NetState::Waking {
+            retry_at: Instant::now(),
+        };
+        assert_eq!(status_line(&waking, None, false).0, WAKING);
         assert!(
             status_line(&NetState::Connected, None, false)
                 .0
@@ -681,6 +725,35 @@ mod tests {
         edit(Field::Room, &mut s, &Key::Backspace, None);
         edit(Field::Room, &mut s, &Key::Backspace, None);
         assert_eq!(s, "");
+    }
+
+    #[test]
+    fn long_values_show_their_tail_on_one_line() {
+        assert_eq!(tail("abc", 5), "abc");
+        assert_eq!(tail("abcde", 5), "abcde");
+        let url = "wss://the-last-dev-server.onrender.com/ws";
+        let shown = tail(url, 20);
+        assert_eq!(shown.chars().count(), 20);
+        assert!(
+            shown.starts_with('<') && shown.ends_with("onrender.com/ws"),
+            "{shown}"
+        );
+    }
+
+    #[test]
+    fn address_prefill_order() {
+        let d = Some("wss://x.onrender.com");
+        assert_eq!(
+            initial_address(Some("ws://h/ws".into()), "a".into(), d),
+            "ws://h/ws"
+        );
+        assert_eq!(initial_address(None, "10.0.0.2".into(), d), "10.0.0.2");
+        assert_eq!(
+            initial_address(None, String::new(), d),
+            "wss://x.onrender.com"
+        );
+        assert_eq!(initial_address(None, String::new(), Some(" ")), "");
+        assert_eq!(initial_address(None, String::new(), None), "");
     }
 
     #[test]

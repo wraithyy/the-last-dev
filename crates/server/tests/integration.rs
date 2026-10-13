@@ -583,6 +583,59 @@ async fn teleporting_move_is_corrected() {
     s.shutdown().await;
 }
 
+/// A walking player reaches the others as 10 Hz `Positions`, not only in the 1 Hz snapshot.
+#[tokio::test]
+async fn remote_moves_arrive_as_positions_at_10hz() {
+    let s = start(cfg()).await;
+    let (mut a, code, _) = create(s.addr).await;
+    let (mut b, b_id) = join(s.addr, &code).await;
+    let (units, _) = snapshot(&mut b).await;
+    let start = units.iter().find(|u| u.id == b_id).unwrap().pos();
+    snapshot(&mut a).await;
+    drain_now(&mut a).await;
+    let t0 = tokio::time::Instant::now();
+    let mut arrivals: Vec<(f32, Vec3)> = Vec::new();
+    let mut last_sent = start;
+    for seq in 1..=30u32 {
+        // 5 m/s in 50 ms steps, along a line that stays near the spawn.
+        let k = seq as f32 * 0.25;
+        last_sent = Vec3::new(start.x + (k % 3.0) - 1.5, start.y, start.z);
+        b.send(enc(&ClientMsg::Move {
+            pos: last_sent,
+            facing: 0.0,
+            moving: true,
+            jumping: false,
+            seq,
+        }))
+        .await
+        .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        for m in drain_now(&mut a).await {
+            if let ServerMsg::Positions { units, .. } = m
+                && let Some((_, cm, _)) = units.iter().find(|u| u.0 == b_id)
+            {
+                arrivals.push((t0.elapsed().as_secs_f32(), net_proto::from_cm(*cm)));
+            }
+        }
+    }
+    assert!(
+        arrivals.len() >= 10,
+        "{} Positions in 1.5 s",
+        arrivals.len()
+    );
+    let gap = arrivals
+        .windows(2)
+        .map(|w| w[1].0 - w[0].0)
+        .fold(0.0f32, f32::max);
+    assert!(gap < 0.35, "largest gap {gap} s");
+    let (_, last) = arrivals.last().unwrap();
+    assert!(
+        (last.x - last_sent.x).abs() < 1.0,
+        "{last:?} vs {last_sent:?}"
+    );
+    s.shutdown().await;
+}
+
 #[tokio::test]
 async fn garbage_frames_strike_out() {
     let s = start(cfg()).await;
@@ -634,6 +687,81 @@ async fn idle_connections_are_closed() {
     let (mut ws, _, _) = create(s.addr).await;
     assert_eq!(expect_closed(&mut ws).await, Some(CloseCode::Away));
     s.shutdown().await;
+}
+
+#[tokio::test]
+async fn ping_frames_do_not_keep_a_connection_alive() {
+    let s = start(Config {
+        idle_timeout: Duration::from_millis(400),
+        ..cfg()
+    })
+    .await;
+    let (mut ws, _, _) = create(s.addr).await;
+    let mut tick = tokio::time::interval(Duration::from_millis(100));
+    let closed = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            tokio::select! {
+                _ = tick.tick() => { let _ = ws.send(Message::Ping(Vec::new().into())).await; }
+                m = ws.next() => match m {
+                    Some(Ok(Message::Close(f))) => return f.map(|f| f.code),
+                    Some(Ok(_)) => {}
+                    _ => return None,
+                },
+            }
+        }
+    })
+    .await
+    .expect("idle close despite pings");
+    assert_eq!(closed, Some(CloseCode::Away));
+    s.shutdown().await;
+}
+
+#[tokio::test]
+async fn forwarded_for_connections_are_capped_per_client_ip() {
+    let s = start(Config {
+        per_ip_conns: 2,
+        trust_forwarded_for: true,
+        // Hand-built: parsing would clear this, the handler must not rely on that alone.
+        lan_exempt: true,
+        ..cfg()
+    })
+    .await;
+    let xff = |ip: &'static str| [("x-forwarded-for", ip)];
+    let _a = connect_with(s.addr, "", &xff("203.0.113.1")).await.unwrap();
+    let _b = connect_with(s.addr, "", &xff("203.0.113.1")).await.unwrap();
+    assert!(connect_with(s.addr, "", &xff("203.0.113.1")).await.is_err());
+    // Another client behind the same proxy is unaffected; a private hop is not exempt.
+    let _c = connect_with(s.addr, "", &xff("203.0.113.2")).await.unwrap();
+    let _p1 = connect_with(s.addr, "", &xff("10.0.0.5")).await.unwrap();
+    let _p2 = connect_with(s.addr, "", &xff("10.0.0.5")).await.unwrap();
+    assert!(connect_with(s.addr, "", &xff("10.0.0.5")).await.is_err());
+    // Dropping a connection frees its slot.
+    drop(_a);
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(connect_with(s.addr, "", &xff("203.0.113.1")).await.is_ok());
+    s.shutdown().await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn binary_exits_zero_on_sigterm() {
+    let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_the-last-dev-server"))
+        .args(["--bind", "127.0.0.1:0", "--web-dir", "/nonexistent-web-dir"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    // The handler is installed shortly after start; a signal before that kills the process.
+    tokio::time::sleep(Duration::from_millis(1_500)).await;
+    let sent = std::process::Command::new("kill")
+        .args(["-TERM", &child.id().to_string()])
+        .status()
+        .unwrap();
+    assert!(sent.success());
+    let status = tokio::task::spawn_blocking(move || child.wait().unwrap())
+        .await
+        .unwrap();
+    assert_eq!(status.code(), Some(0));
 }
 
 #[tokio::test]

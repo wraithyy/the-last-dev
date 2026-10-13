@@ -5,13 +5,16 @@
 //! WebSocket messages, so no length prefix is needed. `decode` checks size, version and
 //! trailing bytes, then validates the message: a peer's bytes are untrusted.
 
-use combat_core::{AiState, Command, Content, EntityId, Event, MAX_PLAYERS, UnitState, Vec3};
+use combat_core::{
+    AiState, AuraView, Command, Content, CooldownView, EntityId, Event, MAX_PLAYERS, QuestLog,
+    SpellId, UnitState, Vec3,
+};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 1;
+pub const PROTOCOL_VERSION: u16 = 2;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -67,12 +70,18 @@ pub enum ClientMsg {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum ServerMsg {
+    /// Followed in the same tick by a full `Snapshot` (units, HP, auras with their timers).
+    /// Carries the per-player and per-room state that snapshots do not: the joiner's own quest
+    /// log and the zones the group has cleared or unlocked.
     Welcome {
         you: EntityId,
         room: String,
         zone: Option<String>,
         seed: u64,
         players: Vec<PlayerInfo>,
+        quests: QuestSnap,
+        cleared: Vec<String>,
+        unlocked: Vec<String>,
     },
     RoomCreated {
         code: String,
@@ -95,6 +104,24 @@ pub enum ServerMsg {
         tick: u64,
         units: Vec<UnitSnap>,
         players: Vec<PlayerSnap>,
+    },
+    /// Units that moved or turned since the last `Positions` (10 Hz, between snapshots):
+    /// id, position in centimetres, yaw in 1/256 turns (see `UnitSnap`).
+    Positions {
+        tick: u64,
+        units: Vec<(EntityId, [i32; 3], u8)>,
+    },
+    /// Full aura lists with timers for units that just gained an aura (`AuraApplied` carries
+    /// no duration). Snapshots carry the same per unit.
+    Auras {
+        units: Vec<(EntityId, Vec<AuraSnap>)>,
+    },
+    /// The caster's own cooldowns after one of its casts, from the sim: the GCD and every
+    /// action-bar spell still cooling down, as (spell, remaining ms, total ms).
+    Cooldowns {
+        tick: u64,
+        gcd: (u32, u32),
+        spells: Vec<(SpellId, u32, u32)>,
     },
     /// The server rejected the move with this `seq`; the client snaps to `pos` and replays
     /// its later inputs.
@@ -237,6 +264,103 @@ pub struct UnitSnap {
     pub target: Option<EntityId>,
     /// `UnitSnap::ALIVE` etc.
     pub flags: u8,
+    pub auras: Vec<AuraSnap>,
+}
+
+/// One aura with its timer; the name and icon come from `key_idx` into `Content::auras`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuraSnap {
+    pub key_idx: u16,
+    pub remaining_ms: u32,
+    pub total_ms: u32,
+    pub stacks: u8,
+    pub absorb: Option<u32>,
+}
+
+impl AuraSnap {
+    pub fn from_view(a: &AuraView, content: &Content) -> Option<AuraSnap> {
+        let key_idx = content.auras.iter().position(|d| d.key == a.key)?;
+        Some(AuraSnap {
+            key_idx: u16::try_from(key_idx).ok()?,
+            remaining_ms: a.remaining_ms,
+            total_ms: a.total_ms,
+            stacks: a.stacks,
+            absorb: a.absorb_remaining,
+        })
+    }
+
+    pub fn to_view(&self, content: &Content) -> Option<AuraView> {
+        let d = content.auras.get(usize::from(self.key_idx))?;
+        Some(AuraView {
+            key: d.key.clone(),
+            name: d.name.clone(),
+            icon: d.icon.clone(),
+            harmful: d.harmful,
+            remaining_ms: self.remaining_ms,
+            total_ms: self.total_ms,
+            absorb_remaining: self.absorb,
+            stacks: self.stacks,
+        })
+    }
+}
+
+/// A player's quest log on the wire: (quest id, objective counts) in accept order, then the
+/// completed ids in turn-in order.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QuestSnap {
+    pub active: Vec<(String, Vec<u32>)>,
+    pub completed: Vec<String>,
+}
+
+impl QuestSnap {
+    pub fn from_log(log: &QuestLog) -> QuestSnap {
+        QuestSnap {
+            active: log
+                .active
+                .iter()
+                .map(|q| (q.id.clone(), q.counts.clone()))
+                .collect(),
+            completed: log.completed.clone(),
+        }
+    }
+
+    pub fn to_log(&self) -> QuestLog {
+        QuestLog {
+            active: self
+                .active
+                .iter()
+                .map(|(id, counts)| combat_core::ActiveQuest {
+                    id: id.clone(),
+                    counts: counts.clone(),
+                })
+                .collect(),
+            completed: self.completed.clone(),
+        }
+    }
+}
+
+/// The `Cooldowns` payload for `spells` as `cooldown` reports them.
+pub fn cooldowns_msg(
+    tick: u64,
+    spells: impl IntoIterator<Item = SpellId>,
+    cooldown: impl Fn(SpellId) -> CooldownView,
+) -> ServerMsg {
+    let mut gcd = (0, 0);
+    let mut list = Vec::new();
+    for spell in spells {
+        let v = cooldown(spell);
+        if v.gcd_remaining_ms > 0 {
+            gcd = (v.gcd_remaining_ms, v.gcd_total_ms);
+        }
+        if v.cd_remaining_ms > 0 && list.len() < MAX_LIST_LEN {
+            list.push((spell, v.cd_remaining_ms, v.cd_total_ms));
+        }
+    }
+    ServerMsg::Cooldowns {
+        tick,
+        gcd,
+        spells: list,
+    }
 }
 
 impl UnitSnap {
@@ -256,7 +380,7 @@ impl UnitSnap {
             id: u.id,
             key_idx: u16::try_from(key_idx).ok()?,
             level: u.level,
-            pos_cm: [cm(u.pos.x), cm(u.pos.y), cm(u.pos.z)],
+            pos_cm: pos_cm(u.pos),
             facing: quantize_yaw(u.yaw),
             hp: u.hp,
             max_hp: u.max_hp,
@@ -268,17 +392,22 @@ impl UnitSnap {
                 | flag(u.lootable, Self::LOOTABLE)
                 | flag(u.ai == Some(AiState::Evade), Self::EVADING)
                 | flag(u.auto_attack, Self::AUTO_ATTACK),
+            auras: u
+                .auras
+                .iter()
+                .filter_map(|a| AuraSnap::from_view(a, content))
+                .take(MAX_LIST_LEN)
+                .collect(),
         })
     }
 
     pub fn pos(&self) -> Vec3 {
-        let [x, y, z] = self.pos_cm;
-        Vec3::new(x as f32 / 100.0, y as f32 / 100.0, z as f32 / 100.0)
+        from_cm(self.pos_cm)
     }
 
     /// Yaw in radians, in `[0, 2*pi)`.
     pub fn yaw(&self) -> f32 {
-        f32::from(self.facing) * std::f32::consts::TAU / 256.0
+        yaw_from_byte(self.facing)
     }
 
     pub fn has(&self, flag: u8) -> bool {
@@ -313,7 +442,22 @@ fn cm(m: f32) -> i32 {
     (m * 100.0).round() as i32
 }
 
-fn quantize_yaw(yaw: f32) -> u8 {
+/// A position as the integer centimetres snapshots and `Positions` carry.
+pub fn pos_cm(p: Vec3) -> [i32; 3] {
+    [cm(p.x), cm(p.y), cm(p.z)]
+}
+
+pub fn from_cm([x, y, z]: [i32; 3]) -> Vec3 {
+    Vec3::new(x as f32 / 100.0, y as f32 / 100.0, z as f32 / 100.0)
+}
+
+/// Yaw in radians, in `[0, 2*pi)`, from 1/256 turns.
+pub fn yaw_from_byte(facing: u8) -> f32 {
+    f32::from(facing) * std::f32::consts::TAU / 256.0
+}
+
+/// Yaw as 1/256 turns.
+pub fn quantize_yaw(yaw: f32) -> u8 {
     let turns = (yaw / std::f32::consts::TAU).rem_euclid(1.0);
     ((turns * 256.0).round() as u32 % 256) as u8
 }
@@ -416,13 +560,33 @@ impl Msg for ServerMsg {
                 room,
                 zone,
                 players,
+                quests,
+                cleared,
+                unlocked,
                 ..
             } => {
+                let ids = |v: &[String]| {
+                    v.len() <= MAX_LIST_LEN && v.iter().all(|q| q.len() <= MAX_QUEST_ID_BYTES)
+                };
                 short(room)
                     && zone.as_deref().is_none_or(short)
                     && players.len() <= MAX_PLAYERS
                     && players.iter().all(|p| short(&p.name))
+                    && quests.active.len() <= MAX_LIST_LEN
+                    && quests
+                        .active
+                        .iter()
+                        .all(|(q, c)| q.len() <= MAX_QUEST_ID_BYTES && c.len() <= MAX_LIST_LEN)
+                    && ids(&quests.completed)
+                    && ids(cleared)
+                    && ids(unlocked)
             }
+            ServerMsg::Positions { units, .. } => units.len() <= MAX_SNAPSHOT_UNITS,
+            ServerMsg::Auras { units } => {
+                units.len() <= MAX_SNAPSHOT_UNITS
+                    && units.iter().all(|(_, a)| a.len() <= MAX_LIST_LEN)
+            }
+            ServerMsg::Cooldowns { spells, .. } => spells.len() <= MAX_LIST_LEN,
             ServerMsg::RoomCreated { code } => short(code),
             ServerMsg::Error { text, .. } => short(text),
             ServerMsg::PlayerJoined(p) => short(&p.name),
@@ -433,10 +597,9 @@ impl Msg for ServerMsg {
                 return events.iter().try_for_each(check_event).map(|_| self);
             }
             ServerMsg::Snapshot { units, players, .. } => {
-                if units.len() > MAX_SNAPSHOT_UNITS || players.len() > MAX_PLAYERS {
-                    return Err(ProtoError::TooMany);
-                }
-                true
+                units.len() <= MAX_SNAPSHOT_UNITS
+                    && players.len() <= MAX_PLAYERS
+                    && units.iter().all(|u| u.auras.len() <= MAX_LIST_LEN)
             }
             ServerMsg::MoveCorrection { pos, .. } => {
                 return finite(&[pos.x, pos.y, pos.z]).map(|_| self);
@@ -690,6 +853,13 @@ mod tests {
             max_hp: 1440,
             target: Some(1),
             flags: UnitSnap::ALIVE | UnitSnap::IN_COMBAT,
+            auras: vec![AuraSnap {
+                key_idx: 2,
+                remaining_ms: 4_500,
+                total_ms: 8_000,
+                stacks: 2,
+                absorb: Some(30),
+            }],
         };
         vec![
             ServerMsg::Welcome {
@@ -698,6 +868,33 @@ mod tests {
                 zone: Some("campus".into()),
                 seed: 42,
                 players: vec![p.clone()],
+                quests: QuestSnap {
+                    active: vec![("q_intro".into(), vec![1, 0])],
+                    completed: vec!["q_first".into()],
+                },
+                cleared: vec!["tower/3".into()],
+                unlocked: vec!["datacenter/1".into()],
+            },
+            ServerMsg::Positions {
+                tick: 101,
+                units: vec![(5, [150, 0, -32_400], 201), (1, [-20, 35, 0], 0)],
+            },
+            ServerMsg::Auras {
+                units: vec![(
+                    5,
+                    vec![AuraSnap {
+                        key_idx: 0,
+                        remaining_ms: 900,
+                        total_ms: 1_000,
+                        stacks: 1,
+                        absorb: None,
+                    }],
+                )],
+            },
+            ServerMsg::Cooldowns {
+                tick: 102,
+                gcd: (1_200, 1_500),
+                spells: vec![(SpellId(3), 5_000, 8_000)],
             },
             ServerMsg::RoomCreated {
                 code: "MERGE-CONFLICT-42".into(),
@@ -1008,7 +1205,7 @@ mod tests {
             }],
         };
         assert_eq!(roundtrip(&loot), Err(ProtoError::TooMany));
-        let crowd = ServerMsg::Welcome {
+        let welcome = |players: usize, cleared: usize| ServerMsg::Welcome {
             you: 1,
             room: "r".into(),
             zone: None,
@@ -1018,10 +1215,26 @@ mod tests {
                     id: 1,
                     name: "a".into()
                 };
-                MAX_PLAYERS + 1
+                players
             ],
+            quests: QuestSnap::default(),
+            cleared: vec!["z".into(); cleared],
+            unlocked: Vec::new(),
         };
-        assert_eq!(roundtrip(&crowd), Err(ProtoError::TooMany));
+        assert!(roundtrip(&welcome(1, 1)).is_ok());
+        assert_eq!(
+            roundtrip(&welcome(MAX_PLAYERS + 1, 0)),
+            Err(ProtoError::TooMany)
+        );
+        assert_eq!(
+            roundtrip(&welcome(1, MAX_LIST_LEN + 1)),
+            Err(ProtoError::TooMany)
+        );
+        let flood = ServerMsg::Positions {
+            tick: 1,
+            units: vec![(1, [0, 0, 0], 0); MAX_SNAPSHOT_UNITS + 1],
+        };
+        assert_eq!(roundtrip(&flood), Err(ProtoError::TooMany));
         assert_eq!(ErrorKind::CannotJoin.message(), "Cannot join that room.");
     }
 
@@ -1057,5 +1270,55 @@ mod tests {
             sim.content().config.player_unit
         );
         assert_eq!(quantize_yaw(-std::f32::consts::FRAC_PI_2), 192);
+        assert_eq!(from_cm(pos_cm(u.pos)), s.pos());
+        assert!((yaw_from_byte(s.facing) - s.yaw()).abs() < 1e-6);
+    }
+
+    #[test]
+    fn auras_quests_and_cooldowns_convert_through_content() {
+        let Ok(content) = Content::from_ron(include_str!("../../../content/game.ron")) else {
+            panic!("content")
+        };
+        let Some(def) = content.auras.get(1) else {
+            panic!("no auras")
+        };
+        let view = AuraView {
+            key: def.key.clone(),
+            name: def.name.clone(),
+            icon: def.icon.clone(),
+            harmful: def.harmful,
+            remaining_ms: 3_000,
+            total_ms: 6_000,
+            absorb_remaining: None,
+            stacks: 1,
+        };
+        let Some(snap) = AuraSnap::from_view(&view, &content) else {
+            panic!("aura not in content")
+        };
+        assert_eq!(snap.key_idx, 1);
+        assert_eq!(snap.to_view(&content), Some(view));
+        let log = QuestLog {
+            active: vec![combat_core::ActiveQuest {
+                id: "q".into(),
+                counts: vec![2],
+            }],
+            completed: vec!["done".into()],
+        };
+        assert_eq!(QuestSnap::from_log(&log).to_log(), log);
+        let msg = cooldowns_msg(7, [SpellId(1), SpellId(2)], |s| CooldownView {
+            gcd_remaining_ms: 900,
+            gcd_total_ms: 1_500,
+            cd_remaining_ms: if s == SpellId(2) { 4_000 } else { 0 },
+            cd_total_ms: 6_000,
+            usable: Ok(()),
+        });
+        assert_eq!(
+            msg,
+            ServerMsg::Cooldowns {
+                tick: 7,
+                gcd: (900, 1_500),
+                spells: vec![(SpellId(2), 4_000, 6_000)],
+            }
+        );
     }
 }

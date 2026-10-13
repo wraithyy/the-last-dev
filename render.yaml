@@ -1,0 +1,34 @@
+# Render Blueprint for the co-op server (docs/SERVER.md, "Deploy on Render").
+# Free instances sleep after about 15 minutes without traffic and take 30-60 s to wake;
+# the web client retries a wss:// server for up to 60 s while it wakes.
+services:
+  - type: web
+    name: the-last-dev-server
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    # Client-only changes do not rebuild the server.
+    buildFilter:
+      paths:
+        - Cargo.toml
+        - Cargo.lock
+        - Dockerfile
+        - content/**
+        - crates/combat_core/**
+        - crates/net_proto/**
+        - crates/server/**
+    envVars:
+      - key: TLD_ALLOWED_ORIGINS
+        value: https://wraithyy.github.io
+      # Render's proxy IPs are not fixed; it appends the client IP to X-Forwarded-For and the
+      # service is reachable only through it, so the right-most entry is trustworthy.
+      - key: TLD_TRUST_FORWARDED_FOR
+        value: "1"
+      # Redundant with TLD_TRUST_FORWARDED_FOR (the server forces it off), but explicit: a private
+      # right-most X-Forwarded-For hop must never exempt clients from the per-IP limits.
+      - key: TLD_NO_LAN_EXEMPT
+        value: "1"
+      - key: RUST_LOG
+        value: info

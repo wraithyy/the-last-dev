@@ -16,12 +16,38 @@ use tokio::sync::OwnedSemaphorePermit;
 use tokio::time::{Instant, timeout, timeout_at};
 
 use crate::AppState;
-use crate::abuse::{client_ip, is_lan};
+use crate::abuse::{ConnGuard, client_ip, is_lan};
 use crate::limiter::TokenBucket;
 use crate::rooms::{CANNOT_JOIN, JoinError, Joined, SendResult, code_tag};
 use crate::serve::Lease;
 
 const SEND_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// The close to send after a failed read, or None when the peer is simply gone. A client that
+/// exits drops its TCP connection, often without a close handshake; that is not an attack and
+/// must not be reported as an oversized or malformed message.
+pub fn read_error_close(e: &tungstenite::Error) -> Option<(u16, &'static str)> {
+    use tungstenite::error::ProtocolError;
+    match e {
+        tungstenite::Error::Capacity(_) => Some((1009, "message too large")),
+        tungstenite::Error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => None,
+        tungstenite::Error::Protocol(_) | tungstenite::Error::Utf8(_) => {
+            Some((1002, "malformed frame"))
+        }
+        _ => None,
+    }
+}
+
+fn classify(e: axum::Error) -> Option<(u16, &'static str)> {
+    let inner = e.into_inner();
+    let close = inner
+        .downcast_ref::<tungstenite::Error>()
+        .and_then(read_error_close);
+    if close.is_none() {
+        tracing::debug!(error = %inner, "websocket read ended");
+    }
+    close
+}
 
 /// Browsers send `Origin` on WebSocket upgrades and let any page open a socket to any host, so
 /// without this check a malicious site could drive a visitor's connection to a LAN/localhost
@@ -78,7 +104,25 @@ pub async fn ws_handler(
         tracing::warn!(peer = %peer.ip(), "rejected websocket upgrade: origin not allowed");
         return (StatusCode::FORBIDDEN, "origin not allowed").into_response();
     }
-    let ip = client_ip(peer.ip(), &headers, &st.cfg.trusted_proxies);
+    let ip = client_ip(
+        peer.ip(),
+        &headers,
+        &st.cfg.trusted_proxies,
+        st.cfg.trust_forwarded_for,
+    );
+    // Behind a proxy the TCP-level lease skipped the per-IP cap (every client shares the
+    // proxy's address); apply it to the resolved client IP instead.
+    let ip_guard = if !lease.counts_ip() && limited(&st, ip) {
+        match st.ip_conns.acquire(ip) {
+            Some(g) => Some(g),
+            None => {
+                tracing::warn!(%ip, "per-IP connection cap reached");
+                return (StatusCode::TOO_MANY_REQUESTS, "too many connections").into_response();
+            }
+        }
+    } else {
+        None
+    };
     // Held for the whole connection lifetime; this is the global connection cap.
     let Ok(permit) = st.conns.clone().try_acquire_owned() else {
         return (
@@ -90,7 +134,7 @@ pub async fn ws_handler(
     let max = st.cfg.max_message_bytes;
     ws.max_message_size(max)
         .max_frame_size(max)
-        .on_upgrade(move |socket| connection(socket, st, ip, permit, lease))
+        .on_upgrade(move |socket| connection(socket, st, ip, (permit, ip_guard), lease))
 }
 
 async fn close(socket: &mut WebSocket, code: u16, reason: &'static str) {
@@ -124,7 +168,9 @@ async fn reject(socket: &mut WebSocket, kind: ErrorKind, code: u16, reason: &'st
 
 /// Whether per-IP limits apply to this client.
 fn limited(st: &AppState, ip: IpAddr) -> bool {
-    !(st.cfg.lan_exempt && is_lan(ip))
+    // lan_exempt is forced off with trust_forwarded_for at parse time; checked again so a
+    // hand-built Config cannot exempt clients whose address a header chose.
+    !(st.cfg.lan_exempt && !st.cfg.trust_forwarded_for && is_lan(ip))
 }
 
 enum Recv {
@@ -141,7 +187,7 @@ async fn recv(socket: &mut WebSocket, until: Instant, bucket: &mut TokenBucket) 
         let msg = match timeout_at(until, socket.recv()).await {
             Err(_) => return Recv::Timeout,
             Ok(None) => return Recv::End(None),
-            Ok(Some(Err(_))) => return Recv::End(Some((1009, "message too large or malformed"))),
+            Ok(Some(Err(e))) => return Recv::End(classify(e)),
             Ok(Some(Ok(m))) => m,
         };
         if !bucket.try_take() {
@@ -165,7 +211,7 @@ async fn connection(
     mut socket: WebSocket,
     st: Arc<AppState>,
     ip: IpAddr,
-    _permit: OwnedSemaphorePermit,
+    _held: (OwnedSemaphorePermit, Option<ConnGuard>),
     _lease: Arc<Lease>,
 ) {
     let limited = limited(&st, ip);
@@ -344,15 +390,19 @@ async fn pump(
             incoming = timeout_at(deadline, socket.recv()) => match incoming {
                 Err(_) => return Some((1001, "idle timeout")),
                 Ok(None) => return None,
-                // Oversized messages and malformed frames surface here.
-                Ok(Some(Err(_))) => return Some((1009, "message too large or malformed")),
+                // Oversized messages, malformed frames and dropped peers surface here.
+                Ok(Some(Err(e))) => return classify(e),
                 Ok(Some(Ok(msg))) => {
-                    deadline = Instant::now() + idle;
                     if !bucket.try_take() {
                         return Some((1008, "rate limit exceeded"));
                     }
                     let b = match msg {
-                        Message::Binary(b) => b,
+                        // Only real traffic keeps a connection alive; control frames are free
+                        // to send and would otherwise pin a slot forever.
+                        Message::Binary(b) => {
+                            deadline = Instant::now() + idle;
+                            b
+                        }
                         Message::Text(_) => return Some((1003, "binary frames only")),
                         Message::Ping(_) | Message::Pong(_) => continue,
                         Message::Close(_) => return None,
@@ -427,6 +477,26 @@ mod tests {
             &hdrs(Some("https://wraithyy.github.io.evil.example"), "h:1"),
             &allow
         ));
+    }
+
+    #[test]
+    fn dropped_peers_are_not_malformed_messages() {
+        use tungstenite::error::{CapacityError, ProtocolError};
+        let reset = tungstenite::Error::Protocol(ProtocolError::ResetWithoutClosingHandshake);
+        assert_eq!(read_error_close(&reset), None);
+        assert_eq!(
+            read_error_close(&tungstenite::Error::ConnectionClosed),
+            None
+        );
+        let io = std::io::Error::from(std::io::ErrorKind::ConnectionReset);
+        assert_eq!(read_error_close(&tungstenite::Error::Io(io)), None);
+        let big = tungstenite::Error::Capacity(CapacityError::MessageTooLong {
+            size: 9,
+            max_size: 1,
+        });
+        assert_eq!(read_error_close(&big).map(|c| c.0), Some(1009));
+        let bad = tungstenite::Error::Protocol(ProtocolError::UnmaskedFrameFromClient);
+        assert_eq!(read_error_close(&bad).map(|c| c.0), Some(1002));
     }
 
     #[test]

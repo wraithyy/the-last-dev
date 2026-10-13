@@ -752,6 +752,20 @@ impl Sim {
         true
     }
 
+    /// Debug/test: applies aura `key` to a living unit as if the unit cast it on itself (the
+    /// `AuraApplied` event and the unit state follow on the next tick). False for unknown or
+    /// dead units and unknown auras.
+    pub fn debug_apply_aura(&mut self, id: EntityId, key: &str, duration_ms: u32) -> bool {
+        let Some(ti) = self.index(id).filter(|&i| self.units[i].state.alive) else {
+            return false;
+        };
+        if self.content.aura(key).is_none() {
+            return false;
+        }
+        self.apply_aura(ti, key, duration_ms, None, id, None);
+        true
+    }
+
     /// The player's trophies as (name, copies), first pickup first.
     pub fn inventory(&self) -> &[(String, u32)] {
         self.first_player_index()

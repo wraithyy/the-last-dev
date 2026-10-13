@@ -118,6 +118,9 @@ pub const LOADING_TIPS: [&str; 12] = [
     "Tip: The board measures AI adoption in tokens burned. Please do not turn the lights off on your way out.",
 ];
 pub const VICTORY_PROMPT: &str = "Press R to start a new sprint.";
+/// The server owns an online run, so R does nothing there.
+pub const VICTORY_PROMPT_ONLINE: &str =
+    "Restart is offline only. Leave the room to start a new sprint.";
 
 /// End credits, rendered as a commit log.
 pub const CREDITS: [&str; 7] = [

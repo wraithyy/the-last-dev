@@ -2,9 +2,10 @@
 //! units exist, where, HP) and `Events` (everything between snapshots). It implements
 //! `SimRead`, so the HUD, nameplates, VFX and audio read it exactly like the offline sim.
 //!
-//! The server sends no per-tick positions, so other units move along a buffer of snapshot
-//! positions rendered `INTERP_DELAY_S` plus one snapshot interval in the past. The local
-//! player is predicted: its body moves at once and `MoveCorrection` shifts it.
+//! Other units move along a buffer of `Positions` (10 Hz) and snapshot positions, rendered
+//! `INTERP_DELAY_S` plus one update interval in the past. The local player is predicted: its
+//! body moves at once and `MoveCorrection` shifts it. Aura timers and the server tick count
+//! down locally between the server's updates.
 
 use crate::combat::SimRead;
 use bevy::prelude::Resource;
@@ -13,7 +14,9 @@ use combat_core::{
     ItemTotals, Objective, QuestLog, QuestStatus, SpellId, TICK_HZ, Tick, UnitState, Unlock, Vec3,
     ZoneLinkView,
 };
-use net_proto::{PlayerInfo, PlayerSnap, UnitSnap};
+use net_proto::{
+    AuraSnap, PlayerInfo, PlayerSnap, QuestSnap, UnitSnap, from_cm, sanitize_name, yaw_from_byte,
+};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
 /// Extra render delay on top of the snapshot interval, to absorb network jitter.
@@ -22,8 +25,12 @@ pub const INTERP_DELAY_S: f64 = 0.1;
 const INTERP_SAMPLES: usize = 6;
 /// Moves remembered for corrections; at 15 Hz this is several seconds of round trip.
 const MOVE_HISTORY: usize = 64;
-/// Until two snapshots arrive, assume the documented 1 s cadence.
-const DEFAULT_SNAPSHOT_INTERVAL_S: f64 = 1.0;
+/// Until two `Positions` frames arrive, assume the server's 10 Hz cadence.
+const DEFAULT_UPDATE_INTERVAL_S: f64 = 0.1;
+/// Gaps longer than this between two `Positions` frames mean nobody moved, not a slow link.
+const MAX_UPDATE_GAP_S: f64 = 0.5;
+/// The locally advanced tick never runs further than this ahead of the last server frame.
+const MAX_TICK_LEAD_S: f64 = 2.0;
 
 pub fn lerp(a: Vec3, b: Vec3, t: f32) -> Vec3 {
     Vec3::new(
@@ -48,9 +55,20 @@ pub struct Interp {
 }
 
 impl Interp {
-    pub fn push(&mut self, t: f64, pos: Vec3, yaw: f32) {
-        if self.samples.back().is_some_and(|(last, ..)| t <= *last) {
-            self.samples.clear();
+    /// `step` is the expected update interval. A unit that stood still sent nothing for a
+    /// while; its old sample is repeated one step before the new one, so it starts walking
+    /// from there instead of gliding over the whole silent gap.
+    pub fn push(&mut self, t: f64, pos: Vec3, yaw: f32, step: f64) {
+        match self.samples.back().copied() {
+            Some((last, ..)) if t < last => self.samples.clear(),
+            // Two frames handled at the same clock reading: the newer one wins.
+            Some((last, ..)) if t == last => {
+                self.samples.pop_back();
+            }
+            Some((last, p, y)) if t - last > step * 1.5 => {
+                self.samples.push_back(((t - step).max(last), p, y));
+            }
+            _ => {}
         }
         self.samples.push_back((t, pos, yaw));
         while self.samples.len() > INTERP_SAMPLES {
@@ -142,8 +160,11 @@ pub struct NetWorld {
     players: Vec<EntityId>,
     units: BTreeMap<EntityId, UnitState>,
     interp: HashMap<EntityId, Interp>,
-    snapshot_interval: f64,
-    last_snapshot_at: Option<f64>,
+    update_interval: f64,
+    last_positions_at: Option<f64>,
+    /// Last server tick and when it arrived, for advancing `tick` between frames.
+    tick_at: (u64, f64),
+    last_advance: Option<f64>,
     quests: QuestLog,
     cleared: BTreeSet<String>,
     bosses_killed: BTreeSet<String>,
@@ -173,8 +194,10 @@ impl NetWorld {
             players: Vec::new(),
             units: BTreeMap::new(),
             interp: HashMap::new(),
-            snapshot_interval: DEFAULT_SNAPSHOT_INTERVAL_S,
-            last_snapshot_at: None,
+            update_interval: DEFAULT_UPDATE_INTERVAL_S,
+            last_positions_at: None,
+            tick_at: (0, 0.0),
+            last_advance: None,
             quests: QuestLog::default(),
             cleared: BTreeSet::new(),
             bosses_killed: BTreeSet::new(),
@@ -198,13 +221,82 @@ impl NetWorld {
         w
     }
 
+    /// The `Welcome` state snapshots do not carry: this player's quest log and the zones the
+    /// group cleared or opened before the join.
+    pub fn apply_welcome(&mut self, quests: &QuestSnap, cleared: &[String], unlocked: &[String]) {
+        self.quests = quests.to_log();
+        self.cleared.extend(cleared.iter().cloned());
+        self.unlocked.extend(unlocked.iter().cloned());
+    }
+
+    fn server_tick(&mut self, tick: u64, now: f64) {
+        if tick >= self.tick_at.0 {
+            self.tick_at = (tick, now);
+        }
+        self.tick = self.tick.max(tick);
+    }
+
+    /// Replaces a unit's auras with the server's list (timers included).
+    fn set_auras(&mut self, id: EntityId, list: &[AuraSnap]) {
+        let content = &self.content;
+        let Some(u) = self.units.get_mut(&id) else {
+            return;
+        };
+        u.auras = list.iter().filter_map(|a| a.to_view(content)).collect();
+        let has = |f: fn(&combat_core::AuraDef) -> bool| {
+            u.auras.iter().any(|a| content.aura(&a.key).is_some_and(f))
+        };
+        u.stunned = has(|d| d.stun);
+        u.silenced = has(|d| d.silence);
+    }
+
+    pub fn apply_auras(&mut self, units: &[(EntityId, Vec<AuraSnap>)]) {
+        for (id, list) in units {
+            self.set_auras(*id, list);
+        }
+    }
+
+    /// Authoritative cooldowns of this player's spells after a cast (server tick `tick`).
+    pub fn apply_cooldowns(&mut self, tick: u64, gcd: (u32, u32), spells: &[(SpellId, u32, u32)]) {
+        self.gcd = (tick + ms_to_ticks(gcd.0), gcd.1);
+        self.cooldowns = spells
+            .iter()
+            .map(|(s, left, total)| (*s, (tick + ms_to_ticks(*left), *total)))
+            .collect();
+    }
+
+    /// 10 Hz movement of the units that moved; the snapshot keeps everything else.
+    pub fn apply_positions(&mut self, tick: u64, units: &[(EntityId, [i32; 3], u8)], now: f64) {
+        if let Some(last) = self.last_positions_at
+            && now - last < MAX_UPDATE_GAP_S
+        {
+            self.update_interval = smooth_interval(self.update_interval, now - last);
+        }
+        self.last_positions_at = Some(now);
+        self.server_tick(tick, now);
+        let step = self.update_interval;
+        for (id, cm, facing) in units {
+            if *id == self.you || !self.units.contains_key(id) {
+                continue;
+            }
+            self.interp.entry(*id).or_default().push(
+                now,
+                from_cm(*cm),
+                yaw_from_byte(*facing),
+                step,
+            );
+        }
+    }
+
     pub fn add_player(&mut self, p: &PlayerInfo) {
-        self.names.insert(p.id, p.name.clone());
+        // A modified or compromised server must not feed arbitrary text into the HUD.
+        let name = sanitize_name(&p.name, u32::try_from(p.id).unwrap_or(0));
+        if let Some(u) = self.units.get_mut(&p.id) {
+            u.name.clone_from(&name);
+        }
+        self.names.insert(p.id, name);
         if !self.players.contains(&p.id) {
             self.players.push(p.id);
-        }
-        if let Some(u) = self.units.get_mut(&p.id) {
-            u.name.clone_from(&p.name);
         }
     }
 
@@ -287,11 +379,8 @@ impl NetWorld {
         players: &[PlayerSnap],
         now: f64,
     ) {
-        if let Some(last) = self.last_snapshot_at {
-            self.snapshot_interval = smooth_interval(self.snapshot_interval, now - last);
-        }
-        self.last_snapshot_at = Some(now);
-        self.tick = self.tick.max(tick);
+        self.server_tick(tick, now);
+        let step = self.update_interval;
         let listed: BTreeSet<EntityId> = units.iter().map(|s| s.id).collect();
         self.units.retain(|id, _| listed.contains(id));
         self.interp.retain(|id, _| listed.contains(id));
@@ -309,8 +398,9 @@ impl NetWorld {
                 self.interp
                     .entry(s.id)
                     .or_default()
-                    .push(now, s.pos(), s.yaw());
+                    .push(now, s.pos(), s.yaw(), step);
             }
+            self.set_auras(s.id, &s.auras);
             let Some(u) = self.units.get_mut(&s.id) else {
                 continue;
             };
@@ -348,9 +438,26 @@ impl NetWorld {
         }
     }
 
-    /// Moves every remote unit to its interpolated position for render time `now`.
+    /// Moves every remote unit to its interpolated position for render time `now`, and runs
+    /// the clocks the server only corrects now and then: aura timers and the tick that
+    /// cooldowns count against.
     pub fn advance(&mut self, now: f64) {
-        let t = now - (INTERP_DELAY_S + self.snapshot_interval);
+        let since = (now - self.tick_at.1).clamp(0.0, MAX_TICK_LEAD_S);
+        self.tick = self
+            .tick
+            .max(self.tick_at.0 + (since * f64::from(TICK_HZ)) as u64);
+        let dt_ms = self
+            .last_advance
+            .map_or(0, |last| ((now - last).max(0.0) * 1000.0) as u32);
+        self.last_advance = Some(now);
+        if dt_ms > 0 {
+            for u in self.units.values_mut() {
+                for a in u.auras.iter_mut().filter(|a| a.total_ms > 0) {
+                    a.remaining_ms = a.remaining_ms.saturating_sub(dt_ms);
+                }
+            }
+        }
+        let t = now - (INTERP_DELAY_S + self.update_interval);
         for (id, interp) in &self.interp {
             if *id == self.you {
                 continue;
@@ -363,7 +470,7 @@ impl NetWorld {
     }
 
     pub fn receive_events(&mut self, tick: u64, events: Vec<Event>, now: f64) {
-        self.tick = self.tick.max(tick);
+        self.server_tick(tick, now);
         for ev in &events {
             self.apply_event(ev, now);
         }
@@ -644,8 +751,8 @@ impl SimRead for NetWorld {
     fn players(&self) -> &[EntityId] {
         &self.players
     }
-    /// An approximation from this client's own events: the HUD greys and sweeps slots
-    /// with it, the server still decides.
+    /// From the server's `Cooldowns` after each cast (estimated from content until it
+    /// arrives); the HUD greys and sweeps slots with it, the server still decides.
     fn cooldown(&self, caster: EntityId, spell: SpellId) -> CooldownView {
         let def = self.content.spell(spell);
         let (cd_end, cd_total) = self.cooldowns.get(&spell).copied().unwrap_or((0, 0));
@@ -774,6 +881,19 @@ impl SimRead for NetWorld {
 mod tests {
     use super::*;
 
+    #[test]
+    fn server_names_are_sanitised_again_on_arrival() {
+        let content = Content::from_ron(include_str!("../../../../content/game.ron")).unwrap();
+        let mut w = NetWorld::new(content, 1, "R".into(), &[]);
+        for (id, raw, want) in [(7, "Bob", "Bob"), (8, "<b>evil\u{202e}</b>", "Intern-8")] {
+            w.add_player(&PlayerInfo {
+                id,
+                name: raw.into(),
+            });
+            assert_eq!(w.name_of(id), Some(want));
+        }
+    }
+
     fn v(x: f32, z: f32) -> Vec3 {
         Vec3::new(x, 0.0, z)
     }
@@ -782,8 +902,8 @@ mod tests {
     fn interpolation_blends_holds_ends_and_resets() {
         let mut i = Interp::default();
         assert!(i.sample(0.0).is_none());
-        i.push(1.0, v(0.0, 0.0), 0.0);
-        i.push(2.0, v(10.0, 0.0), 1.0);
+        i.push(1.0, v(0.0, 0.0), 0.0, 1.0);
+        i.push(2.0, v(10.0, 0.0), 1.0, 1.0);
         let Some((p, yaw)) = i.sample(1.5) else {
             panic!("no sample")
         };
@@ -793,8 +913,23 @@ mod tests {
         i.reset(3.0, v(-4.0, 0.0), 0.0);
         assert_eq!(i.sample(2.5).map(|s| s.0.x), Some(-4.0));
         // An out-of-order stamp restarts the buffer instead of producing a backwards segment.
-        i.push(1.0, v(7.0, 0.0), 0.0);
+        i.push(1.0, v(7.0, 0.0), 0.0, 1.0);
         assert_eq!(i.sample(5.0).map(|s| s.0.x), Some(7.0));
+    }
+
+    #[test]
+    fn a_unit_that_starts_walking_after_a_pause_does_not_glide() {
+        let mut i = Interp::default();
+        i.push(0.0, v(0.0, 0.0), 0.0, 0.1);
+        // Silent for 5 s, then a step at 10 Hz.
+        i.push(5.0, v(0.7, 0.0), 0.0, 0.1);
+        i.push(5.1, v(1.4, 0.0), 0.0, 0.1);
+        assert_eq!(i.sample(4.85).map(|s| s.0.x), Some(0.0));
+        let Some((mid, _)) = i.sample(4.95) else {
+            panic!("no sample")
+        };
+        assert!((mid.x - 0.35).abs() < 1e-4, "{mid:?}");
+        assert!((i.sample(5.05).map_or(0.0, |s| s.0.x) - 1.05).abs() < 1e-4);
     }
 
     #[test]

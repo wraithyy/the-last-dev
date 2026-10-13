@@ -1,0 +1,6 @@
+# The server image needs only the workspace manifests, crates/ and content/.
+*
+!Cargo.toml
+!Cargo.lock
+!crates/
+!content/

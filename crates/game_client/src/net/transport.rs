@@ -6,7 +6,33 @@ use bevy::prelude::*;
 use std::time::Duration;
 
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+/// A sleeping free-tier host (Render) may hold the upgrade while it boots.
+pub const SECURE_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 pub const UNREACHABLE: &str = "Server unreachable";
+/// How long a `wss://` server gets to wake up from a cold start before the dial fails.
+pub const WAKE_WINDOW: Duration = Duration::from_secs(60);
+pub const WAKE_RETRY_DELAY: Duration = Duration::from_secs(2);
+pub const WAKING: &str = "The server is waking up (free tier). Retrying...";
+
+fn secure(url: &str) -> bool {
+    url.starts_with("wss://")
+}
+
+pub fn connect_timeout(url: &str) -> Duration {
+    if secure(url) {
+        SECURE_CONNECT_TIMEOUT
+    } else {
+        CONNECT_TIMEOUT
+    }
+}
+
+/// Free hosts sleep when idle and refuse or stall the first dial while they boot. A `wss://`
+/// dial (a hosted server; LAN servers are plain `ws://`) that never opened is retried until
+/// `WAKE_WINDOW` has passed since the first attempt. Other failures (a bad address, no TLS in
+/// this build) carry their own reason and fail at once.
+pub fn wake_retry(url: &str, reason: &str, since_first: Duration) -> bool {
+    secure(url) && reason.starts_with(UNREACHABLE) && since_first + WAKE_RETRY_DELAY < WAKE_WINDOW
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum NetState {
@@ -14,6 +40,10 @@ pub enum NetState {
     Disconnected,
     Connecting {
         since: Instant,
+    },
+    /// Between dials of a cold-starting server (`wake_retry`).
+    Waking {
+        retry_at: Instant,
     },
     Connected,
     Failed {
@@ -43,8 +73,16 @@ impl NetState {
         }
     }
 
-    pub fn timed_out(&self, elapsed: Duration) -> bool {
-        matches!(self, NetState::Connecting { .. }) && elapsed >= CONNECT_TIMEOUT
+    pub fn timed_out(&self, elapsed: Duration, limit: Duration) -> bool {
+        matches!(self, NetState::Connecting { .. }) && elapsed >= limit
+    }
+
+    /// Dialing or waiting to redial: the lobby must not start another attempt.
+    pub fn busy(&self) -> bool {
+        matches!(
+            self,
+            NetState::Connecting { .. } | NetState::Waking { .. } | NetState::Connected
+        )
     }
 }
 
@@ -53,6 +91,8 @@ impl NetState {
 pub struct NetClient {
     state: NetState,
     conn: Option<backend::Conn>,
+    /// The URL being dialed and when its first attempt started, for cold-start retries.
+    dial: Option<(String, Instant)>,
 }
 
 impl NetClient {
@@ -62,6 +102,11 @@ impl NetClient {
 
     /// `url` is a full `ws://` or `wss://` URL (see `address::normalize`). Replaces any open connection.
     pub fn connect(&mut self, url: &str) {
+        self.dial = Some((url.to_string(), Instant::now()));
+        self.open(url);
+    }
+
+    fn open(&mut self, url: &str) {
         self.conn = None;
         match backend::open(url) {
             Ok(conn) => {
@@ -76,6 +121,7 @@ impl NetClient {
 
     pub fn disconnect(&mut self) {
         self.conn = None;
+        self.dial = None;
         self.state = NetState::Disconnected;
     }
 
@@ -86,32 +132,68 @@ impl NetClient {
 
     /// Drains pending transport events and advances `state`. Call once per frame.
     pub fn poll(&mut self) -> Vec<NetEvent> {
+        if let NetState::Waking { retry_at } = self.state {
+            if Instant::now() >= retry_at
+                && let Some((url, _)) = self.dial.clone()
+            {
+                self.open(&url);
+            }
+            return Vec::new();
+        }
         let mut events = self
             .conn
             .as_ref()
             .map(backend::Conn::drain)
             .unwrap_or_default();
-        for e in &events {
-            self.state = self.state.apply(e);
-        }
+        let url = self.dial.as_ref().map_or("", |(u, _)| u.as_str());
         if let NetState::Connecting { since } = self.state
-            && self.state.timed_out(since.elapsed())
+            && self.state.timed_out(since.elapsed(), connect_timeout(url))
         {
             events.push(NetEvent::Error(UNREACHABLE.to_string()));
-            self.state = NetState::Failed {
-                reason: UNREACHABLE.to_string(),
+        }
+        let since_first = self.dial.as_ref().map(|(_, t)| t.elapsed());
+        let mut out = Vec::with_capacity(events.len());
+        for e in events {
+            let failed = match &e {
+                NetEvent::Error(r) | NetEvent::Closed { reason: r } => Some(r.as_str()),
+                _ => None,
             };
+            if matches!(self.state, NetState::Connecting { .. })
+                && let (Some(reason), Some(since_first)) = (failed, since_first)
+                && wake_retry(url, reason, since_first)
+            {
+                // The session never saw this socket open, so it sees nothing of the retry.
+                self.state = NetState::Waking {
+                    retry_at: Instant::now() + WAKE_RETRY_DELAY,
+                };
+                self.conn = None;
+                return out;
+            }
+            self.state = self.state.apply(&e);
+            out.push(e);
         }
         if matches!(self.state, NetState::Failed { .. }) {
             self.conn = None;
         }
-        events
+        out
+    }
+}
+
+/// Closes the socket cleanly before the process exits (a dropped resource may never run).
+pub fn close_on_exit(mut exit: MessageReader<AppExit>, mut client: ResMut<NetClient>) {
+    if exit.read().count() > 0 && client.conn.is_some() {
+        client.disconnect();
     }
 }
 
 pub fn pump_net(mut client: ResMut<NetClient>, mut out: MessageWriter<NetEvent>) {
     // Skip the mutable borrow while offline so change detection stays quiet.
-    if client.conn.is_none() && !matches!(client.state, NetState::Connecting { .. }) {
+    if client.conn.is_none()
+        && !matches!(
+            client.state,
+            NetState::Connecting { .. } | NetState::Waking { .. }
+        )
+    {
         return;
     }
     for e in client.poll() {
@@ -133,11 +215,15 @@ mod backend {
     /// Short read timeout so the one thread can interleave reads, writes and the stop flag.
     const TICK: Duration = Duration::from_millis(50);
 
+    /// How long dropping a connection waits for the close handshake to go out.
+    const CLOSE_WAIT: Duration = Duration::from_millis(300);
+
     pub struct Conn {
         out: Sender<Vec<u8>>,
         // Mutex only because Receiver is not Sync and Bevy resources must be.
         events: Mutex<Receiver<NetEvent>>,
         stop: Arc<AtomicBool>,
+        thread: Option<std::thread::JoinHandle<()>>,
     }
 
     impl Conn {
@@ -156,6 +242,13 @@ mod backend {
     impl Drop for Conn {
         fn drop(&mut self) {
             self.stop.store(true, Ordering::Relaxed);
+            // On app exit the process ends right after this drop; without the wait the thread
+            // dies before its close frame leaves and the server sees a reset connection.
+            let Some(t) = self.thread.take() else { return };
+            let until = std::time::Instant::now() + CLOSE_WAIT;
+            while !t.is_finished() && std::time::Instant::now() < until {
+                std::thread::sleep(Duration::from_millis(5));
+            }
         }
     }
 
@@ -164,7 +257,7 @@ mod backend {
         let (ev_tx, events) = mpsc::channel();
         let stop = Arc::new(AtomicBool::new(false));
         let (thread_url, thread_stop) = (url.to_string(), stop.clone());
-        std::thread::Builder::new()
+        let thread = std::thread::Builder::new()
             .name("net-ws".into())
             .spawn(move || {
                 let ev = match session(&thread_url, &ev_tx, &out_rx, &thread_stop) {
@@ -178,6 +271,7 @@ mod backend {
             out,
             events: Mutex::new(events),
             stop,
+            thread: Some(thread),
         })
     }
 
@@ -445,9 +539,64 @@ mod tests {
 
     #[test]
     fn timeout_applies_only_while_connecting() {
-        assert!(!connecting().timed_out(Duration::from_secs(4)));
-        assert!(connecting().timed_out(CONNECT_TIMEOUT));
-        assert!(!NetState::Connected.timed_out(Duration::from_secs(60)));
+        assert!(!connecting().timed_out(Duration::from_secs(4), CONNECT_TIMEOUT));
+        assert!(connecting().timed_out(CONNECT_TIMEOUT, CONNECT_TIMEOUT));
+        assert!(!NetState::Connected.timed_out(Duration::from_secs(60), CONNECT_TIMEOUT));
+        assert_eq!(connect_timeout("ws://h:7777/ws"), CONNECT_TIMEOUT);
+        assert_eq!(connect_timeout("wss://h/ws"), SECURE_CONNECT_TIMEOUT);
+    }
+
+    #[test]
+    fn cold_start_retries_only_hosted_unreachable_servers_within_the_window() {
+        let wss = "wss://tld.onrender.com/ws";
+        let s = Duration::from_secs;
+        assert!(wake_retry(wss, UNREACHABLE, s(0)));
+        assert!(wake_retry(wss, UNREACHABLE, s(50)));
+        // The last retry must still fit in the window.
+        assert!(!wake_retry(wss, UNREACHABLE, s(58)));
+        assert!(!wake_retry(wss, UNREACHABLE, WAKE_WINDOW));
+        // LAN servers (ws://) and specific failures fail at once.
+        assert!(!wake_retry("ws://10.0.0.2:7777/ws", UNREACHABLE, s(0)));
+        assert!(!wake_retry(wss, "This build has no TLS for wss://.", s(0)));
+        assert!(
+            NetState::Waking {
+                retry_at: Instant::now()
+            }
+            .busy()
+        );
+        assert!(!NetState::Disconnected.busy());
+    }
+
+    /// Dropping the client (as app exit does) sends a close frame instead of resetting the
+    /// TCP connection, which the server would otherwise see as a broken peer.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn dropping_the_client_closes_the_socket_cleanly() {
+        let Ok(listener) = std::net::TcpListener::bind("127.0.0.1:0") else {
+            panic!("bind")
+        };
+        let port = listener.local_addr().map(|a| a.port()).unwrap_or_default();
+        let server = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().ok()?;
+            let mut ws = tungstenite::accept(stream).ok()?;
+            loop {
+                match ws.read() {
+                    Ok(tungstenite::Message::Close(_)) => return Some(true),
+                    Ok(_) => {}
+                    Err(_) => return Some(false),
+                }
+            }
+        });
+        let mut client = NetClient::default();
+        client.connect(&format!("ws://127.0.0.1:{port}/ws"));
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while *client.state() != NetState::Connected && Instant::now() < deadline {
+            client.poll();
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(*client.state(), NetState::Connected);
+        drop(client);
+        assert_eq!(server.join().ok().flatten(), Some(true));
     }
 
     #[cfg(not(target_arch = "wasm32"))]

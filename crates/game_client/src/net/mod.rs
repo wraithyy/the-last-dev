@@ -53,6 +53,7 @@ impl Plugin for NetPlugin {
                 PreUpdate,
                 (transport::pump_net, session::run_session).chain(),
             )
+            .add_systems(Last, transport::close_on_exit)
             .add_plugins((lobby::LobbyPlugin, party::PartyPlugin, emotes::EmotePlugin));
     }
 }

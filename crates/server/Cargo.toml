@@ -25,6 +25,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time",
 tower = { version = "0.5", default-features = false, features = ["util"] }
 tower-http = { version = "0.6", default-features = false, features = ["fs"] }
 tracing = "0.1"
+# Already in the tree through axum's ws feature; only to classify its read errors.
+tungstenite = { version = "0.29", default-features = false }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]

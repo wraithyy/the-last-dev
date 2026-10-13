@@ -47,10 +47,16 @@ async fn healthz(
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
 ) -> Response {
-    let ip = client_ip(peer.ip(), &headers, &st.cfg.trusted_proxies);
+    let ip = client_ip(
+        peer.ip(),
+        &headers,
+        &st.cfg.trusted_proxies,
+        st.cfg.trust_forwarded_for,
+    );
     // A loopback peer that forwards for someone (an untrusted local proxy) is not the operator.
-    let forwarded =
-        !st.cfg.trusted_proxies.contains(&peer.ip()) && headers.contains_key("x-forwarded-for");
+    let forwarded = !st.cfg.trust_forwarded_for
+        && !st.cfg.trusted_proxies.contains(&peer.ip())
+        && headers.contains_key("x-forwarded-for");
     if !(st.cfg.healthz_details || (ip.is_loopback() && !forwarded)) {
         return ([(CONTENT_TYPE, "text/plain")], "ok").into_response();
     }

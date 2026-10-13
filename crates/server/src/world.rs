@@ -21,9 +21,14 @@ const BODY_HEIGHT: f32 = 1.8;
 const HALF_X: f32 = 72.0;
 const HALF_Z: f32 = 54.0;
 const BOUNDS_MARGIN: f32 = 1.0;
-/// Jump apex plus the tallest prop a player can step up onto, generously.
-const MAX_Y: f32 = 8.0;
-const MIN_Y: f32 = -1.0;
+/// The server owns height: zones are flat floors at y = 0, so a claimed y only has to fit the
+/// jump arc (`JUMP_SPEED^2 / 2 GRAVITY` = 1.28 m in the client) plus slack. A larger window
+/// would let a client lift itself over walls, because blockers are tested at the claimed y.
+const MAX_Y: f32 = 1.5;
+const MIN_Y: f32 = -0.1;
+/// Boxes shrink by this for the movement segment test, so sliding along a wall or rounding a
+/// corner at the body radius never grazes it through float noise.
+const SEGMENT_MARGIN: f32 = 0.05;
 
 type P3 = [f32; 3];
 
@@ -109,7 +114,7 @@ impl ZoneGeom {
         self.arrivals.get(from).copied()
     }
 
-    /// Inside the zone's walls and at a height a body can reach.
+    /// Inside the zone's walls and at a height a jump can reach from the floor.
     pub fn in_bounds(&self, p: Vec3) -> bool {
         let [x0, x1, z0, z1] = self.bounds;
         (x0..=x1).contains(&p.x) && (z0..=z1).contains(&p.z) && (MIN_Y..=MAX_Y).contains(&p.y)
@@ -122,6 +127,47 @@ impl ZoneGeom {
             .iter()
             .any(|b| in_xz(b, p) && b.max.y > p.y + STEP_HEIGHT && b.min.y < p.y + BODY_HEIGHT)
     }
+}
+
+impl ZoneGeom {
+    /// The straight move from `a` to `b` crosses a box the body cannot pass: no tunnelling
+    /// through a thin wall between two legal positions. A box low enough to step onto or jump
+    /// over at the higher end's height does not count.
+    pub fn segment_blocked(&self, a: Vec3, b: Vec3) -> bool {
+        let (lo, hi) = (a.y.min(b.y), a.y.max(b.y));
+        self.blockers.iter().any(|bx| {
+            bx.max.y > hi + STEP_HEIGHT
+                && bx.min.y < lo + BODY_HEIGHT
+                && segment_hits_xz(bx, a, b, SEGMENT_MARGIN)
+        })
+    }
+}
+
+/// Slab test of the segment `a`-`b` against the box's interior in the xz plane, shrunk by
+/// `margin` on every side.
+fn segment_hits_xz(bx: &Aabb, a: Vec3, b: Vec3, margin: f32) -> bool {
+    let (mut t0, mut t1) = (0.0f32, 1.0f32);
+    for (start, delta, min, max) in [
+        (a.x, b.x - a.x, bx.min.x + margin, bx.max.x - margin),
+        (a.z, b.z - a.z, bx.min.z + margin, bx.max.z - margin),
+    ] {
+        if min >= max {
+            return false;
+        }
+        if delta.abs() < 1e-6 {
+            if start <= min || start >= max {
+                return false;
+            }
+            continue;
+        }
+        let (ta, tb) = ((min - start) / delta, (max - start) / delta);
+        t0 = t0.max(ta.min(tb));
+        t1 = t1.min(ta.max(tb));
+        if t0 >= t1 {
+            return false;
+        }
+    }
+    true
 }
 
 pub fn in_xz(b: &Aabb, p: Vec3) -> bool {
@@ -221,6 +267,8 @@ mod tests {
         assert!(campus.arrival("tower/1").is_some());
         assert!(!campus.in_bounds(Vec3::new(500.0, 0.0, 0.0)));
         assert!(!campus.in_bounds(Vec3::new(0.0, 50.0, 0.0)));
+        assert!(!campus.in_bounds(Vec3::new(0.0, 7.0, 0.0)));
+        assert!(campus.in_bounds(Vec3::new(0.0, 1.28, 0.0)));
         let wall = campus.blockers.iter().find(|b| b.max.y > 2.0).unwrap();
         let inside = Vec3::new(
             (wall.min.x + wall.max.x) / 2.0,
@@ -228,6 +276,38 @@ mod tests {
             (wall.min.z + wall.max.z) / 2.0,
         );
         assert!(campus.blocked(inside));
+    }
+
+    #[test]
+    fn segments_through_thin_walls_are_blocked() {
+        let wall = Aabb {
+            min: Vec3::new(-0.1, 0.0, -5.0),
+            max: Vec3::new(0.1, 3.0, 5.0),
+        };
+        let crate_box = Aabb {
+            min: Vec3::new(4.0, 0.0, -1.0),
+            max: Vec3::new(5.0, 0.25, 1.0),
+        };
+        let g = ZoneGeom {
+            anchors: HashMap::new(),
+            blockers: vec![wall, crate_box],
+            triggers: HashMap::new(),
+            arrivals: HashMap::new(),
+            bounds: [-10.0, 10.0, -10.0, 10.0],
+        };
+        let p = |x: f32, z: f32| Vec3::new(x, 0.0, z);
+        // Both ends are legal, the line between them is not.
+        assert!(!g.blocked(p(-0.5, 0.0)) && !g.blocked(p(0.5, 0.0)));
+        assert!(g.segment_blocked(p(-0.5, 0.0), p(0.5, 0.0)));
+        // Around the end of the wall, along it, and over a step-height crate are fine.
+        assert!(!g.segment_blocked(p(-0.5, 5.5), p(0.5, 5.5)));
+        assert!(!g.segment_blocked(p(-0.5, -4.0), p(-0.5, 4.0)));
+        assert!(!g.segment_blocked(p(3.5, 0.0), p(5.5, 0.0)));
+        // A jump does not clear a 3 m wall.
+        let air = Vec3::new(0.5, 1.2, 0.0);
+        assert!(g.segment_blocked(p(-0.5, 0.0), air));
+        assert!(segment_hits_xz(&wall, p(0.0, -9.0), p(0.0, 9.0), 0.0));
+        assert!(!segment_hits_xz(&wall, p(0.3, -9.0), p(0.3, 9.0), 0.0));
     }
 
     #[test]

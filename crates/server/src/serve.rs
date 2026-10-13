@@ -33,6 +33,14 @@ pub struct Lease {
     _ip: Option<ConnGuard>,
 }
 
+impl Lease {
+    /// False when the TCP-level per-IP cap was skipped (proxy peer), so the WebSocket handler
+    /// must apply the cap to the forwarded client IP instead.
+    pub fn counts_ip(&self) -> bool {
+        self._ip.is_some()
+    }
+}
+
 // 'unsafe-inline' scripts/styles: web/index.html has inline <script> blocks and a <style>.
 // 'wasm-unsafe-eval' lets the wasm client compile. Upgrade path: serve a sha256 per inline
 // script computed from index.html at startup and drop 'unsafe-inline' from script-src.
@@ -81,8 +89,9 @@ pub async fn serve(
         };
         // Behind a trusted proxy every client shares the proxy's address, so only the
         // global caps can apply there. LAN peers are exempt on a LAN server.
-        let exempt =
-            st.cfg.trusted_proxies.contains(&peer.ip()) || (st.cfg.lan_exempt && is_lan(peer.ip()));
+        let exempt = st.cfg.trust_forwarded_for
+            || st.cfg.trusted_proxies.contains(&peer.ip())
+            || (st.cfg.lan_exempt && is_lan(peer.ip()));
         let ip = if exempt {
             None
         } else {

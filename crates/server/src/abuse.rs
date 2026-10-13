@@ -52,9 +52,15 @@ pub fn is_lan(ip: IpAddr) -> bool {
 
 /// The real client address: the socket peer, unless the peer is a trusted proxy, in which case
 /// the right-most `X-Forwarded-For` entry that is not itself a trusted proxy (earlier entries are
-/// client-controlled and spoofable).
-pub fn client_ip(peer: IpAddr, headers: &HeaderMap, trusted: &[IpAddr]) -> IpAddr {
-    if !trusted.contains(&peer) {
+/// client-controlled and spoofable). With `trust_any_peer` (`--trust-forwarded-for`) every peer
+/// counts as the platform proxy, so the right-most entry, the one that proxy appended, wins.
+pub fn client_ip(
+    peer: IpAddr,
+    headers: &HeaderMap,
+    trusted: &[IpAddr],
+    trust_any_peer: bool,
+) -> IpAddr {
+    if !trust_any_peer && !trusted.contains(&peer) {
         return peer;
     }
     let hops: Vec<&str> = headers
@@ -328,17 +334,27 @@ mod tests {
         );
         // Untrusted peer: header ignored.
         assert_eq!(
-            client_ip(ip("198.51.100.1"), &h, &[proxy]),
+            client_ip(ip("198.51.100.1"), &h, &[proxy], false),
             ip("198.51.100.1")
         );
         // Right-most untrusted entry wins; the spoofed left entry is ignored.
         assert_eq!(
-            client_ip(proxy, &h, &[proxy, ip("10.0.0.2")]),
+            client_ip(proxy, &h, &[proxy, ip("10.0.0.2")], false),
             ip("203.0.113.9")
         );
         let mut bad = HeaderMap::new();
         bad.insert("x-forwarded-for", "garbage".parse().unwrap());
-        assert_eq!(client_ip(proxy, &bad, &[proxy]), proxy);
-        assert_eq!(client_ip(proxy, &HeaderMap::new(), &[proxy]), proxy);
+        assert_eq!(client_ip(proxy, &bad, &[proxy], false), proxy);
+        assert_eq!(client_ip(proxy, &HeaderMap::new(), &[proxy], false), proxy);
+        // Platform mode (Render): any peer is the proxy and its appended right-most entry wins.
+        let render_edge = ip("10.201.3.4");
+        assert_eq!(client_ip(render_edge, &h, &[], true), ip("10.0.0.2"));
+        let mut one = HeaderMap::new();
+        one.insert("x-forwarded-for", "6.6.6.6, 203.0.113.9".parse().unwrap());
+        assert_eq!(client_ip(render_edge, &one, &[], true), ip("203.0.113.9"));
+        assert_eq!(
+            client_ip(render_edge, &HeaderMap::new(), &[], true),
+            render_edge
+        );
     }
 }

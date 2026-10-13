@@ -3,7 +3,7 @@
 //! `rooms.rs` drives it through `new`, `on_join`, `on_leave`, `on_message` and `tick` (30 Hz)
 //! and delivers the returned frames; nothing here touches sockets or awaits.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::hash::{BuildHasher, Hasher, RandomState};
 use std::sync::Arc;
 
@@ -12,8 +12,9 @@ use combat_core::{
     Aabb, Audience as SimAudience, Command, EntityId, Event, Sim, Vec3, pack_offsets,
 };
 use net_proto::{
-    ClientMsg, ErrorKind, MAX_EVENTS_PER_FRAME, MAX_SNAPSHOT_UNITS, PlayerInfo, PlayerSnap,
-    ProtoError, ServerMsg, UnitSnap, encode, sanitize_name,
+    AuraSnap, ClientMsg, ErrorKind, MAX_EVENTS_PER_FRAME, MAX_SNAPSHOT_UNITS, PlayerInfo,
+    PlayerSnap, ProtoError, QuestSnap, ServerMsg, UnitSnap, cooldowns_msg, encode, pos_cm,
+    quantize_yaw, sanitize_name,
 };
 use tokio::time::Instant;
 
@@ -40,6 +41,15 @@ const JITTER_M: f32 = 1.0;
 /// At most this much movement may be buffered (a lag spike delivering a burst of moves).
 const MAX_BURST_S: f32 = 1.0;
 const SNAPSHOT_EVERY_TICKS: u64 = 30;
+/// `Positions` cadence: 10 Hz, so remote units render about 0.2 s behind instead of 1.1 s.
+const POSITIONS_EVERY_TICKS: u64 = 3;
+/// A knockback lets a stunned player's body slide for this long after the event.
+const KNOCK_WINDOW_S: f32 = 1.0;
+/// Float noise a stunned player's reports may carry (a facing-only update, a stop flag).
+const STUNNED_SLACK_M: f32 = 0.05;
+/// One player alone in an exit takes the group along only after this long and only out of
+/// combat, so a single griefer cannot yank everyone else through a door mid-fight.
+const EXIT_DWELL: std::time::Duration = std::time::Duration::from_secs(3);
 
 struct Member {
     eid: EntityId,
@@ -52,6 +62,10 @@ struct Member {
     /// Set once the player stood outside every exit trigger: arriving (or being placed by a
     /// pack formation) inside one must not bounce the group straight back.
     armed: bool,
+    /// When this player began standing in an open exit trigger (armed and alive).
+    exit_since: Option<Instant>,
+    /// Metres of knockback still allowed while stunned, and when it was granted.
+    knock: (f32, Instant),
 }
 
 impl Member {
@@ -60,6 +74,8 @@ impl Member {
         self.budget = JITTER_M;
         self.last_move = Instant::now();
         self.armed = false;
+        self.exit_since = None;
+        self.knock = (0.0, self.last_move);
     }
 }
 
@@ -73,6 +89,8 @@ pub struct RoomState {
     joins: u32,
     snapshot_due: bool,
     pending: Vec<(Audience, Bytes)>,
+    /// Position and facing last sent per unit (`Positions` carries only changes).
+    sent_pos: HashMap<EntityId, ([i32; 3], u8)>,
 }
 
 fn frame(msg: &ServerMsg) -> Option<Bytes> {
@@ -91,6 +109,23 @@ pub fn cannot_join_frame() -> Option<Bytes> {
         kind: ErrorKind::CannotJoin,
         text: ErrorKind::CannotJoin.message().into(),
     })
+}
+
+/// Which exit, if any, the group takes: everyone alive is in one, or a lone dweller out of combat.
+fn exit_choice(
+    living: usize,
+    ready: usize,
+    in_combat: bool,
+    dest: Option<String>,
+    dwelled: Option<String>,
+) -> Option<String> {
+    if living > 0 && ready == living {
+        dest
+    } else if in_combat {
+        None
+    } else {
+        dwelled
+    }
 }
 
 fn dist_xz(a: Vec3, b: Vec3) -> f32 {
@@ -115,6 +150,7 @@ impl RoomState {
             joins: 0,
             snapshot_due: false,
             pending: Vec::new(),
+            sent_pos: HashMap::new(),
         }
     }
 
@@ -177,6 +213,8 @@ impl RoomState {
                 budget: JITTER_M,
                 last_move: Instant::now(),
                 armed: false,
+                exit_since: None,
+                knock: (0.0, Instant::now()),
             },
         );
         self.broadcast(Some(player), &ServerMsg::PlayerJoined(info));
@@ -186,12 +224,46 @@ impl RoomState {
             zone: self.sim.zone().map(str::to_string),
             seed: self.seed,
             players: self.infos(),
+            quests: QuestSnap::from_log(self.sim.quests_of(eid)),
+            cleared: self.cleared_zones(),
+            unlocked: self.unlocked_zones(),
         };
         self.push(Audience::Only(player), &welcome);
         if let Some(s) = self.snapshot() {
             self.pending.push((Audience::Only(player), s));
         }
         true
+    }
+
+    fn cleared_zones(&self) -> Vec<String> {
+        let content = self.sim.content();
+        content
+            .zones
+            .iter()
+            .filter(|z| self.sim.zone_cleared(&z.id))
+            .map(|z| z.id.clone())
+            .collect()
+    }
+
+    /// Zones behind a gated link that has opened (the client keys its door state on these).
+    fn unlocked_zones(&self) -> Vec<String> {
+        let content = self.sim.content();
+        let gated: BTreeSet<String> = content
+            .zones
+            .iter()
+            .flat_map(|z| z.links.iter())
+            .filter(|l| l.requires.is_some())
+            .map(|l| l.to.clone())
+            .collect();
+        content
+            .zones
+            .iter()
+            .flat_map(|z| self.sim.zone_links(&z.id))
+            .filter(|l| l.unlocked && gated.contains(&l.to))
+            .map(|l| l.to)
+            .collect::<BTreeSet<String>>()
+            .into_iter()
+            .collect()
     }
 
     pub fn on_leave(&mut self, player: PlayerId) {
@@ -243,7 +315,10 @@ impl RoomState {
         let Some(m) = self.members.get_mut(&player) else {
             return;
         };
-        let alive = self.sim.unit(m.eid).is_some_and(|u| u.alive);
+        let (alive, stunned) = self
+            .sim
+            .unit(m.eid)
+            .map_or((false, false), |u| (u.alive, u.stunned));
         let now = Instant::now();
         let rate = RUN_SPEED_MPS * SPEED_SLACK;
         let cap = rate * MAX_BURST_S + JITTER_M;
@@ -252,12 +327,25 @@ impl RoomState {
         m.budget = (m.budget + rate * dt).min(cap.max(m.budget));
         m.last_move = now;
         let d = dist_xz(pos, m.pos);
+        // A stunned body only moves where a knockback throws it.
+        let knock = if now.duration_since(m.knock.1).as_secs_f32() <= KNOCK_WINDOW_S {
+            m.knock.0
+        } else {
+            0.0
+        };
+        let stun_ok = !stunned || d <= knock + STUNNED_SLACK_M;
         let ok = alive
+            && stun_ok
             && facing.is_finite()
             && d <= m.budget
-            && geom.is_some_and(|g| g.in_bounds(pos) && !g.blocked(pos));
+            && geom.is_some_and(|g| {
+                g.in_bounds(pos) && !g.blocked(pos) && !g.segment_blocked(m.pos, pos)
+            });
         if ok {
             m.budget -= d;
+            if stunned {
+                m.knock.0 = (m.knock.0 - d).max(0.0);
+            }
             m.pos = pos;
             let cmd = Command::PlayerMoved {
                 pos,
@@ -289,13 +377,97 @@ impl RoomState {
             routed.extend(self.sim.drain_events_routed());
         }
         self.route(&routed);
-        if self.snapshot_due || self.sim.now().0.is_multiple_of(SNAPSHOT_EVERY_TICKS) {
+        self.push_timers(&routed);
+        let now = self.sim.now().0;
+        if self.snapshot_due || now.is_multiple_of(SNAPSHOT_EVERY_TICKS) {
             self.snapshot_due = false;
             if let Some(s) = self.snapshot() {
                 self.pending.push((Audience::All, s));
             }
+            // The snapshot carried every position: the next `Positions` sends changes from here.
+            self.sent_pos = self
+                .sim
+                .units()
+                .map(|u| (u.id, (pos_cm(u.pos), quantize_yaw(u.yaw))))
+                .collect();
+        } else if now.is_multiple_of(POSITIONS_EVERY_TICKS) {
+            self.push_positions();
         }
         std::mem::take(&mut self.pending)
+    }
+
+    /// Units whose position or facing changed since they were last sent.
+    fn push_positions(&mut self) {
+        let mut units = Vec::new();
+        for u in self.sim.units() {
+            let now = (pos_cm(u.pos), quantize_yaw(u.yaw));
+            if self.sent_pos.get(&u.id) != Some(&now) {
+                self.sent_pos.insert(u.id, now);
+                units.push((u.id, now.0, now.1));
+            }
+        }
+        if units.is_empty() {
+            return;
+        }
+        units.truncate(MAX_SNAPSHOT_UNITS);
+        let msg = ServerMsg::Positions {
+            tick: self.sim.now().0,
+            units,
+        };
+        self.push(Audience::All, &msg);
+    }
+
+    /// Timers the events cannot carry: aura durations for units that just gained an aura,
+    /// and each caster's own cooldowns after its casts.
+    fn push_timers(&mut self, routed: &[(SimAudience, Event)]) {
+        let mut aura_targets = BTreeSet::new();
+        let mut casters = BTreeSet::new();
+        for (_, e) in routed {
+            match e {
+                Event::AuraApplied { target, .. } => {
+                    aura_targets.insert(*target);
+                }
+                Event::CastStarted { caster, .. }
+                | Event::CastSucceeded { caster, .. }
+                | Event::CastInterrupted { caster, .. } => {
+                    casters.insert(*caster);
+                }
+                _ => {}
+            }
+        }
+        if !aura_targets.is_empty() {
+            let content = self.sim.content();
+            let units: Vec<(EntityId, Vec<AuraSnap>)> = aura_targets
+                .iter()
+                .filter_map(|id| self.sim.unit(*id))
+                .map(|u| {
+                    let auras = u
+                        .auras
+                        .iter()
+                        .filter_map(|a| AuraSnap::from_view(a, content))
+                        .take(net_proto::MAX_LIST_LEN)
+                        .collect();
+                    (u.id, auras)
+                })
+                .collect();
+            self.broadcast(None, &ServerMsg::Auras { units });
+        }
+        let members: Vec<(PlayerId, EntityId)> = self
+            .members
+            .iter()
+            .filter(|(_, m)| casters.contains(&m.eid))
+            .map(|(p, m)| (*p, m.eid))
+            .collect();
+        for (player, eid) in members {
+            let content = self.sim.content();
+            let spells = content
+                .action_bar()
+                .iter()
+                .copied()
+                .chain(content.channel_spell().map(|s| s.id));
+            let msg = cooldowns_msg(self.sim.now().0, spells, |s| self.sim.cooldown(eid, s));
+            self.push(Audience::Only(player), &msg);
+        }
     }
 
     /// The sim moved a player itself (respawn, teleport): movement checks restart there.
@@ -310,7 +482,10 @@ impl RoomState {
             let pos = self.sim.unit(unit).map(|u| u.pos);
             if let (Some(m), Some(pos)) = (self.members.values_mut().find(|m| m.eid == unit), pos) {
                 match knock {
-                    Some(s) if s.is_finite() => m.budget += s.max(0.0),
+                    Some(s) if s.is_finite() => {
+                        m.budget += s.max(0.0);
+                        m.knock = (m.knock.0 + s.max(0.0), Instant::now());
+                    }
                     Some(_) => {}
                     None => m.resync(pos),
                 }
@@ -361,7 +536,8 @@ impl RoomState {
         }
     }
 
-    /// Any living member standing in the trigger of an open exit takes the whole group along.
+    /// The group travels when every living member stands in an open exit trigger, or when one
+    /// has stood in it for `EXIT_DWELL` and nobody is in combat. A solo player is the first case.
     /// True when the group travelled.
     fn check_exits(&mut self) -> bool {
         let Some(zone) = self.sim.zone().map(str::to_string) else {
@@ -376,15 +552,34 @@ impl RoomState {
             .into_iter()
             .filter_map(|l| geom.trigger(&l.anchor).map(|t| (*t, l.unlocked, l.to)))
             .collect();
-        let mut to = None;
+        let now = Instant::now();
+        let (mut living, mut ready, mut in_combat) = (0usize, 0usize, false);
+        let mut dest: Option<String> = None;
+        let mut dwelled: Option<String> = None;
         for m in self.members.values_mut() {
-            let alive = self.sim.unit(m.eid).is_some_and(|u| u.alive);
-            match exits.iter().find(|(t, _, _)| in_xz(t, m.pos)) {
-                None => m.armed = true,
-                Some((_, true, dest)) if m.armed && alive => to = Some(dest.clone()),
-                Some(_) => {}
+            let unit = self.sim.unit(m.eid);
+            let alive = unit.is_some_and(|u| u.alive);
+            if alive {
+                living += 1;
+                in_combat |= unit.is_some_and(|u| u.in_combat);
+            }
+            let hit = exits.iter().find(|(t, _, _)| in_xz(t, m.pos));
+            if hit.is_none() {
+                m.armed = true;
+            }
+            match hit {
+                Some((_, true, d)) if m.armed && alive => {
+                    ready += 1;
+                    dest = Some(d.clone());
+                    let since = *m.exit_since.get_or_insert(now);
+                    if now.duration_since(since) >= EXIT_DWELL {
+                        dwelled = Some(d.clone());
+                    }
+                }
+                _ => m.exit_since = None,
             }
         }
+        let to = exit_choice(living, ready, in_combat, dest, dwelled);
         to.is_some_and(|to| self.travel(&zone, &to))
     }
 
@@ -522,6 +717,270 @@ mod tests {
         );
     }
 
+    fn mv(pos: Vec3, seq: u32) -> ClientMsg {
+        ClientMsg::Move {
+            pos,
+            facing: 0.0,
+            moving: true,
+            jumping: false,
+            seq,
+        }
+    }
+
+    fn corrections(out: &[(Audience, Bytes)], to: PlayerId) -> Vec<u32> {
+        msgs(out, to)
+            .iter()
+            .filter_map(|m| match m {
+                ServerMsg::MoveCorrection { seq, .. } => Some(*seq),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stunned_players_cannot_walk() {
+        let mut s = room();
+        s.on_join(0, "a");
+        s.tick();
+        let eid = eid_of(&s, 0);
+        assert!(s.sim.debug_apply_aura(eid, "standup", 5_000));
+        s.tick();
+        assert!(s.sim.unit(eid).unwrap().stunned);
+        tokio::time::advance(std::time::Duration::from_secs(1)).await;
+        let start = s.members[&0].pos;
+        s.on_message(0, mv(Vec3::new(start.x + 0.5, start.y, start.z), 1));
+        // Turning on the spot (or a stop flag) is not walking.
+        s.on_message(0, mv(start, 2));
+        assert_eq!(corrections(&s.tick(), 0), [1]);
+        // A knockback may throw the stunned body that far.
+        s.members.get_mut(&0).unwrap().knock = (2.0, Instant::now());
+        s.on_message(0, mv(Vec3::new(start.x + 1.5, start.y, start.z), 3));
+        assert!(corrections(&s.tick(), 0).is_empty());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn moves_through_thin_walls_are_corrected() {
+        let mut s = room();
+        s.on_join(0, "a");
+        s.tick();
+        let g = s.world.zone("campus").unwrap();
+        // A tall, thin wall with walkable ground on both sides of its middle.
+        let found = g.blockers.iter().find_map(|b| {
+            let (w, d) = (b.max.x - b.min.x, b.max.z - b.min.z);
+            let c = Vec3::new((b.min.x + b.max.x) / 2.0, 0.0, (b.min.z + b.max.z) / 2.0);
+            let off = w.min(d) / 2.0 + 0.5;
+            let (a, z) = if w < d {
+                (
+                    Vec3::new(c.x - off, 0.0, c.z),
+                    Vec3::new(c.x + off, 0.0, c.z),
+                )
+            } else {
+                (
+                    Vec3::new(c.x, 0.0, c.z - off),
+                    Vec3::new(c.x, 0.0, c.z + off),
+                )
+            };
+            let legal = |p: Vec3| g.in_bounds(p) && !g.blocked(p);
+            (b.max.y > 2.5 && w.min(d) < 1.0 && w.max(d) > 3.0 && legal(a) && legal(z))
+                .then_some((a, z))
+        });
+        let (a, z) = found.expect("campus has a thin wall");
+        s.members.get_mut(&0).unwrap().pos = a;
+        tokio::time::advance(std::time::Duration::from_secs(1)).await;
+        s.on_message(0, mv(z, 1));
+        assert_eq!(corrections(&s.tick(), 0), [1]);
+        assert_eq!(s.members[&0].pos, a);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn claimed_height_cannot_lift_a_player_over_a_wall() {
+        let mut s = room();
+        s.on_join(0, "a");
+        s.tick();
+        let g = s.world.zone("campus").unwrap();
+        let found = g.blockers.iter().find_map(|b| {
+            let (w, d) = (b.max.x - b.min.x, b.max.z - b.min.z);
+            let c = Vec3::new((b.min.x + b.max.x) / 2.0, 0.0, (b.min.z + b.max.z) / 2.0);
+            let off = w.min(d) / 2.0 + 0.5;
+            let (a, z) = if w < d {
+                (
+                    Vec3::new(c.x - off, 0.0, c.z),
+                    Vec3::new(c.x + off, 0.0, c.z),
+                )
+            } else {
+                (
+                    Vec3::new(c.x, 0.0, c.z - off),
+                    Vec3::new(c.x, 0.0, c.z + off),
+                )
+            };
+            let legal = |p: Vec3| g.in_bounds(p) && !g.blocked(p);
+            (b.max.y > 2.5 && w.min(d) < 1.0 && w.max(d) > 3.0 && legal(a) && legal(z))
+                .then_some((a, z))
+        });
+        let (a, z) = found.expect("campus has a thin wall");
+        s.members.get_mut(&0).unwrap().pos = a;
+        tokio::time::advance(std::time::Duration::from_secs(1)).await;
+        for (seq, y) in [(1, 7.0), (2, 1.4)] {
+            s.on_message(0, mv(Vec3::new(z.x, y, z.z), seq));
+        }
+        assert_eq!(corrections(&s.tick(), 0), [1, 2]);
+        assert_eq!(s.members[&0].pos, a);
+        // An ordinary jump apex on open ground is still accepted.
+        let up = Vec3::new(a.x, 1.28, a.z);
+        s.on_message(0, mv(up, 3));
+        assert!(corrections(&s.tick(), 0).is_empty());
+        assert_eq!(s.members[&0].pos, up);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn moving_units_go_out_as_positions_between_snapshots() {
+        let mut s = room();
+        s.on_join(0, "a");
+        s.sim.set_wandering(false);
+        // Run past the join snapshot to a full snapshot, which resets the change tracking.
+        while !s.sim.now().0.is_multiple_of(SNAPSHOT_EVERY_TICKS) || s.sim.now().0 == 0 {
+            s.tick();
+        }
+        let eid = eid_of(&s, 0);
+        let start = s.members[&0].pos;
+        let to = Vec3::new(start.x + 0.5, start.y, start.z);
+        s.on_message(0, mv(to, 1));
+        let mut seen = Vec::new();
+        for _ in 0..POSITIONS_EVERY_TICKS * 2 {
+            for m in msgs(&s.tick(), 0) {
+                if let ServerMsg::Positions { units, .. } = m {
+                    seen.push(units);
+                }
+            }
+        }
+        // Once with the new spot, then nothing for a unit that stood still.
+        let mine: Vec<_> = seen.iter().flatten().filter(|u| u.0 == eid).collect();
+        assert_eq!(mine.len(), 1, "{seen:?}");
+        assert_eq!(mine[0].1, pos_cm(to));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn auras_and_cooldowns_carry_their_timers() {
+        let mut s = room();
+        s.on_join(0, "a");
+        s.on_join(1, "b");
+        s.tick();
+        let mob = s
+            .sim
+            .units()
+            .find(|u| u.hostile && u.alive && !u.boss)
+            .map(|u| u.id)
+            .unwrap();
+        assert!(s.sim.debug_apply_aura(mob, "review_fatigue", 8_000));
+        let out = s.tick();
+        let auras = msgs(&out, 1).into_iter().find_map(|m| match m {
+            ServerMsg::Auras { units } => Some(units),
+            _ => None,
+        });
+        let units = auras.expect("Auras frame");
+        let (id, list) = &units[0];
+        assert_eq!(*id, mob);
+        assert_eq!(list[0].total_ms, 8_000);
+        assert!((7_900..=8_000).contains(&list[0].remaining_ms), "{list:?}");
+
+        // The caster alone hears about its cooldowns.
+        let eid = eid_of(&s, 0);
+        let coffee = s.sim.content().channel_spell().unwrap().id;
+        // Coffee is only allowed below full mana.
+        s.sim.set_player_mana(10);
+        s.on_message(
+            0,
+            ClientMsg::Cmd(Command::Cast {
+                caster: eid,
+                spell: coffee,
+            }),
+        );
+        let out = s.tick();
+        let started = msgs(&out, 0).iter().any(|m| {
+            matches!(m, ServerMsg::Events { events, .. }
+                if events.iter().any(|e| matches!(e, Event::CastStarted { .. } | Event::CastSucceeded { .. })))
+        });
+        assert!(started, "coffee break did not start");
+        assert!(
+            msgs(&out, 0)
+                .iter()
+                .any(|m| matches!(m, ServerMsg::Cooldowns { .. }))
+        );
+        assert!(
+            !msgs(&out, 1)
+                .iter()
+                .any(|m| matches!(m, ServerMsg::Cooldowns { .. }))
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn late_joiner_gets_its_own_log_zone_state_and_aura_timers() {
+        let mut s = room();
+        s.on_join(0, "a");
+        s.tick();
+        assert!(
+            s.sim
+                .debug_set_quest("onboarding", combat_core::QuestStatus::Active)
+        );
+        let door = *s
+            .world
+            .zone("campus")
+            .unwrap()
+            .trigger("door:tower/1")
+            .unwrap();
+        s.members.get_mut(&0).unwrap().pos = Vec3::new(
+            (door.min.x + door.max.x) / 2.0,
+            0.0,
+            (door.min.z + door.max.z) / 2.0,
+        );
+        s.tick();
+        assert_eq!(s.sim.zone(), Some("tower/1"));
+        let boss = s
+            .sim
+            .units()
+            .find(|u| u.boss && u.alive)
+            .map(|u| u.id)
+            .unwrap();
+        assert!(s.sim.debug_kill(boss));
+        let mob = s
+            .sim
+            .units()
+            .find(|u| u.hostile && u.alive && !u.boss)
+            .map(|u| u.id)
+            .unwrap();
+        assert!(s.sim.debug_apply_aura(mob, "review_fatigue", 8_000));
+        for _ in 0..30 {
+            s.tick();
+        }
+        assert!(s.on_join(1, "late"));
+        let out = s.tick();
+        let m = msgs(&out, 1);
+        let ServerMsg::Welcome {
+            quests,
+            cleared,
+            unlocked,
+            zone,
+            ..
+        } = &m[0]
+        else {
+            panic!("{:?}", m[0])
+        };
+        assert_eq!(zone.as_deref(), Some("tower/1"));
+        assert_eq!(
+            quests,
+            &QuestSnap::default(),
+            "the joiner's log is its own, fresh"
+        );
+        assert_eq!(cleared, &["tower/1".to_string()]);
+        assert!(unlocked.contains(&"tower/2".to_string()), "{unlocked:?}");
+        let ServerMsg::Snapshot { units, .. } = &m[1] else {
+            panic!("{:?}", m[1])
+        };
+        let aura = &units.iter().find(|u| u.id == mob).unwrap().auras[0];
+        assert_eq!(aura.total_ms, 8_000);
+        assert!((6_500..8_000).contains(&aura.remaining_ms), "{aura:?}");
+    }
+
     #[tokio::test(start_paused = true)]
     async fn walking_into_an_open_door_moves_the_group() {
         let mut s = room();
@@ -539,8 +998,11 @@ mod tests {
             0.0,
             (door.min.z + door.max.z) / 2.0,
         );
-        // Test shortcut: place the player as if it had walked there.
+        // Test shortcut: place the players as if they had walked there. One alone is not enough.
         s.members.get_mut(&0).unwrap().pos = centre;
+        s.tick();
+        assert_eq!(s.sim.zone(), Some("campus"));
+        s.members.get_mut(&1).unwrap().pos = centre;
         let out = s.tick();
         assert_eq!(s.sim.zone(), Some("tower/1"));
         // Arrivals start disarmed: standing in the back door does not bounce the group.
@@ -571,6 +1033,42 @@ mod tests {
             .unwrap()
             .0;
         assert!(dist_xz(s.members[&0].pos, arrival) < 4.0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn lone_dweller_moves_the_group_after_three_seconds() {
+        let mut s = room();
+        s.on_join(0, "a");
+        s.on_join(1, "b");
+        s.tick();
+        let door = *s
+            .world
+            .zone("campus")
+            .unwrap()
+            .trigger("door:tower/1")
+            .unwrap();
+        s.members.get_mut(&0).unwrap().pos = Vec3::new(
+            (door.min.x + door.max.x) / 2.0,
+            0.0,
+            (door.min.z + door.max.z) / 2.0,
+        );
+        s.tick();
+        tokio::time::advance(std::time::Duration::from_millis(2_500)).await;
+        s.tick();
+        assert_eq!(s.sim.zone(), Some("campus"));
+        tokio::time::advance(std::time::Duration::from_millis(600)).await;
+        s.tick();
+        assert_eq!(s.sim.zone(), Some("tower/1"));
+    }
+
+    #[test]
+    fn combat_blocks_the_lone_dweller_but_not_the_whole_group() {
+        let to = || Some("tower/1".to_string());
+        assert_eq!(exit_choice(2, 1, false, to(), to()), to());
+        assert_eq!(exit_choice(2, 1, true, to(), to()), None);
+        assert_eq!(exit_choice(2, 2, true, to(), None), to());
+        assert_eq!(exit_choice(2, 1, false, to(), None), None);
+        assert_eq!(exit_choice(0, 0, false, None, None), None);
     }
 
     #[tokio::test(start_paused = true)]

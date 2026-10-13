@@ -25,7 +25,7 @@ use bevy::prelude::*;
 use combat_core::{Command, EntityId, Event};
 use net_proto::{
     ClientMsg, ErrorKind, MAX_RAW_NAME_BYTES, PROTOCOL_VERSION, ServerMsg, decode, encode,
-    is_player_command,
+    is_player_command, parse_room_code,
 };
 use std::sync::OnceLock;
 
@@ -84,6 +84,11 @@ pub enum Outcome {
     Lost,
     /// The handshake never completed; the lobby already shows why.
     Failed,
+}
+
+/// A room code the server sent, accepted only if it parses.
+fn checked_code(code: &str) -> Option<String> {
+    parse_room_code(code).ok()
 }
 
 pub fn advance(phase: Phase, step: &Step) -> (Phase, Outcome) {
@@ -273,15 +278,21 @@ pub fn run_session(
                         room,
                         zone,
                         players,
+                        quests,
+                        cleared,
+                        unlocked,
                         ..
                     } => {
                         let (phase, outcome) = advance(session.phase, &Step::Welcome);
                         session.phase = phase;
                         if outcome == Outcome::EnterRoom {
                             info!("joined room as {you}, {} player(s)", players.len());
-                            let world =
+                            let mut world =
                                 NetWorld::new(sim.0.content().clone(), you, room.clone(), &players);
-                            lobby.room.clone_from(&room);
+                            world.apply_welcome(&quests, &cleared, &unlocked);
+                            if let Some(code) = checked_code(&room) {
+                                lobby.room = code;
+                            }
                             switch.go_online(you, room, zone);
                             fresh = Some(world);
                         }
@@ -289,8 +300,11 @@ pub fn run_session(
                     }
                     ServerMsg::Error { kind, .. } => Step::Error(kind),
                     ServerMsg::RoomCreated { code } => {
-                        info!("room created: {code}");
-                        lobby.room = code;
+                        // The code ends up in the clipboard; only a well-formed one may.
+                        if let Some(code) = checked_code(&code) {
+                            info!("room created: {code}");
+                            lobby.room = code;
+                        }
                         continue;
                     }
                     other => {
@@ -374,14 +388,18 @@ fn apply(
             units,
             players,
         } => world.apply_snapshot(tick, &units, &players, clock()),
+        ServerMsg::Positions { tick, units } => world.apply_positions(tick, &units, clock()),
+        ServerMsg::Auras { units } => world.apply_auras(&units),
+        ServerMsg::Cooldowns { tick, gcd, spells } => world.apply_cooldowns(tick, gcd, &spells),
         ServerMsg::MoveCorrection { seq, pos } => world.correct_move(seq, pos, body_pos),
         ServerMsg::Emoted { player, emote } => world.push_presentation(Event::Yell {
             unit: player,
             text: emote.text().into(),
         }),
         ServerMsg::PlayerJoined(p) => {
-            log.write(LogLineMsg(format!("{} joined the room.", p.name), LOG_GREY));
             world.add_player(&p);
+            let name = world.name_of(p.id).unwrap_or("A colleague");
+            log.write(LogLineMsg(format!("{name} joined the room."), LOG_GREY));
         }
         ServerMsg::PlayerLeft { id } => {
             let name = world.name_of(id).unwrap_or("A colleague").to_string();
@@ -427,6 +445,15 @@ pub fn auto_connect(mut lobby: ResMut<Lobby>, mut client: ResMut<NetClient>) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn server_room_codes_must_parse_before_use() {
+        let good = net_proto::room_code_from_bytes(&[3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+        assert_eq!(super::checked_code(&good), Some(good));
+        for bad in ["", "rm -rf /", "MERGE-CONFLICT-7K3M9QZ\n", &"A".repeat(500)] {
+            assert_eq!(super::checked_code(bad), None, "{bad:?}");
+        }
+    }
+
     use super::*;
 
     #[test]

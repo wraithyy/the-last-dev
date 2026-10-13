@@ -31,6 +31,10 @@ pub struct Config {
     pub allowed_origins: Vec<String>,
     /// Reverse proxies whose `X-Forwarded-For` is believed.
     pub trusted_proxies: Vec<IpAddr>,
+    /// Believe the right-most `X-Forwarded-For` entry from any peer. Only for platforms whose
+    /// proxy IPs are not fixed (Render) and where the server is reachable solely through that
+    /// proxy; otherwise any client could pick its own IP for the per-IP limits.
+    pub trust_forwarded_for: bool,
     pub healthz_details: bool,
     /// Max time to receive a full HTTP request head (slowloris).
     pub header_read_timeout: Duration,
@@ -65,6 +69,7 @@ impl Default for Config {
             outbound_queue: 64,
             allowed_origins: Vec::new(),
             trusted_proxies: Vec::new(),
+            trust_forwarded_for: false,
             healthz_details: false,
             header_read_timeout: Duration::from_secs(10),
             handshake_timeout: Duration::from_secs(2),
@@ -83,15 +88,16 @@ pub const HELP: &str = "the-last-dev-server
 USAGE: the-last-dev-server [--bind ADDR] [--web-dir DIR] [--content FILE] [--max-rooms N]
                            [--max-players-per-room N] [--max-conns N]
                            [--allowed-origin ORIGIN]... [--trusted-proxy IP]...
-                           [--healthz-details] [--per-ip-conns N]
+                           [--trust-forwarded-for] [--healthz-details] [--per-ip-conns N]
                            [--per-ip-rooms-per-min N] [--per-ip-failed-joins N]
                            [--no-lan-exempt]
 
 Each flag also has an environment variable: TLD_BIND, TLD_WEB_DIR, TLD_CONTENT,
 TLD_MAX_ROOMS, TLD_MAX_PLAYERS_PER_ROOM, TLD_MAX_CONNS, TLD_ALLOWED_ORIGINS
-(comma list), TLD_TRUSTED_PROXIES (comma list), TLD_HEALTHZ_DETAILS=1,
-TLD_PER_IP_CONNS, TLD_PER_IP_ROOMS_PER_MIN, TLD_PER_IP_FAILED_JOINS,
-TLD_NO_LAN_EXEMPT=1. Flags win. Per-IP limits: 0 disables.
+(comma list), TLD_TRUSTED_PROXIES (comma list), TLD_TRUST_FORWARDED_FOR=1,
+TLD_HEALTHZ_DETAILS=1, TLD_PER_IP_CONNS, TLD_PER_IP_ROOMS_PER_MIN,
+TLD_PER_IP_FAILED_JOINS, TLD_NO_LAN_EXEMPT=1. Flags win. Per-IP limits: 0 disables.
+Without --bind/TLD_BIND, PORT (set by hosts like Render) binds 0.0.0.0:$PORT.
 Defaults: 0.0.0.0:7777, ./web, embedded content, 50, 5, 200, per-IP 16 / 6 / 10.";
 
 fn truthy(v: &str) -> bool {
@@ -110,6 +116,13 @@ impl Config {
         args: &[String],
     ) -> Result<Option<Self>, String> {
         let mut c = Self::default();
+        if let Some(port) = env("PORT") {
+            let port: u16 = port
+                .trim()
+                .parse()
+                .map_err(|_| "invalid value for PORT: expected a port number".to_string())?;
+            c.bind = SocketAddr::from(([0, 0, 0, 0], port));
+        }
         let apply = |c: &mut Self, flag: &str, v: &str| -> Result<(), String> {
             let bad = |what: &str| format!("invalid value for {flag}: {what}");
             match flag {
@@ -167,6 +180,7 @@ impl Config {
             }
         }
         c.healthz_details = env("TLD_HEALTHZ_DETAILS").is_some_and(|v| truthy(&v));
+        c.trust_forwarded_for = env("TLD_TRUST_FORWARDED_FOR").is_some_and(|v| truthy(&v));
         c.lan_exempt = !env("TLD_NO_LAN_EXEMPT").is_some_and(|v| truthy(&v));
 
         let mut cli_lists = Vec::new();
@@ -180,6 +194,10 @@ impl Config {
                 }
                 "--no-lan-exempt" => {
                     c.lan_exempt = false;
+                    continue;
+                }
+                "--trust-forwarded-for" => {
+                    c.trust_forwarded_for = true;
                     continue;
                 }
                 _ => {}
@@ -204,6 +222,10 @@ impl Config {
                 cli_lists.push(f.to_string());
             }
             apply(&mut c, f, &v)?;
+        }
+        // A private right-most X-Forwarded-For hop would otherwise exempt every client.
+        if c.trust_forwarded_for {
+            c.lan_exempt = false;
         }
         Ok(Some(c))
     }
@@ -231,6 +253,52 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(c.content.as_deref(), Some(std::path::Path::new("x.ron")));
+    }
+
+    #[test]
+    fn port_env_and_forwarded_for_trust() {
+        let env = |k: &str| match k {
+            "PORT" => Some("10000".to_string()),
+            "TLD_TRUST_FORWARDED_FOR" => Some("1".to_string()),
+            _ => None,
+        };
+        let c = Config::parse(env, &[]).unwrap().unwrap();
+        assert_eq!(c.bind, SocketAddr::from(([0, 0, 0, 0], 10000)));
+        assert!(c.trust_forwarded_for);
+        // An explicit bind wins over PORT.
+        let both = |k: &str| match k {
+            "PORT" => Some("10000".to_string()),
+            "TLD_BIND" => Some("127.0.0.1:9".to_string()),
+            _ => None,
+        };
+        assert_eq!(Config::parse(both, &[]).unwrap().unwrap().bind.port(), 9);
+        let c = Config::parse(env, &s(&["--bind", "127.0.0.1:8"]))
+            .unwrap()
+            .unwrap();
+        assert_eq!(c.bind.port(), 8);
+        let c = Config::parse(|_| None, &s(&["--trust-forwarded-for"]))
+            .unwrap()
+            .unwrap();
+        assert!(c.trust_forwarded_for && c.bind.port() == 7777);
+        assert!(
+            !Config::parse(|_| None, &[])
+                .unwrap()
+                .unwrap()
+                .trust_forwarded_for
+        );
+        let bad = |k: &str| (k == "PORT").then(|| "http".to_string());
+        assert!(Config::parse(bad, &[]).is_err());
+    }
+
+    #[test]
+    fn trusting_forwarded_for_disables_lan_exemption() {
+        let env = |k: &str| (k == "TLD_TRUST_FORWARDED_FOR").then(|| "1".to_string());
+        assert!(!Config::parse(env, &[]).unwrap().unwrap().lan_exempt);
+        let c = Config::parse(|_| None, &s(&["--trust-forwarded-for"]))
+            .unwrap()
+            .unwrap();
+        assert!(!c.lan_exempt);
+        assert!(Config::parse(|_| None, &[]).unwrap().unwrap().lan_exempt);
     }
 
     #[test]

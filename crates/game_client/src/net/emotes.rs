@@ -3,15 +3,19 @@
 //! a speech bubble over the speaker and a combat-log line.
 //!
 //! Touch UIs open the menu with `ToggleEmoteMenu` or send a phrase with `EmoteRequest`.
+//! While the menu is open, 1-0 pick a phrase and Esc or G close it; those key presses are
+//! consumed in `PreUpdate`, so the action bar and the pause menu never see them.
 
 use super::session::send;
 use super::transport::NetClient;
 use super::world::NetWorld;
-use crate::combat::{CombatEvent, SimUnit};
+use crate::combat::{CAST_KEYS, CombatEvent, SimUnit};
 use crate::hud::{ACCENT, KEY_RIM, KEY_TOP, KEY_TOP_HI, PANEL_EDGE, label, panel_bg, vgrad};
 use crate::input::{Paused, TextFocus};
 use crate::player::Player;
+use bevy::input::InputSystems;
 use bevy::prelude::*;
+use bevy::ui::UiSystems;
 use combat_core::Event;
 use net_proto::{ClientMsg, Emote};
 
@@ -37,7 +41,11 @@ impl Plugin for EmotePlugin {
         app.add_message::<EmoteRequest>()
             .add_message::<ToggleEmoteMenu>()
             .add_systems(Startup, spawn_menu)
-            .add_systems(Update, (menu_input, send_emotes).chain());
+            .add_systems(
+                PreUpdate,
+                menu_input.after(InputSystems).after(UiSystems::Focus),
+            )
+            .add_systems(Update, send_emotes);
     }
 }
 
@@ -63,7 +71,7 @@ fn spawn_menu(mut commands: Commands) {
         ))
         .with_children(|p| {
             p.spawn((label("~/emotes", 15.0), TextColor(ACCENT)));
-            for e in Emote::ALL {
+            for (i, e) in Emote::ALL.into_iter().enumerate() {
                 p.spawn((
                     Button,
                     EmoteButton(e),
@@ -75,14 +83,37 @@ fn spawn_menu(mut commands: Commands) {
                     },
                     BorderColor::all(KEY_RIM),
                     vgrad(KEY_TOP_HI, KEY_TOP),
-                    children![label(e.command(), 13.0)],
+                    children![label(format!("{} {}", slot_key(i), e.command()), 13.0)],
                 ));
             }
         });
 }
 
+/// Key label of emote slot `i`: the number row, 0 last.
+fn slot_key(i: usize) -> usize {
+    (i + 1) % 10
+}
+
+/// What one frame's keys do to the menu: whether it is open afterwards and which emote
+/// slot was picked. `digit` is the slot of a just-pressed number key.
+pub fn menu_keys(
+    open: bool,
+    toggle: bool,
+    esc: bool,
+    digit: Option<usize>,
+) -> (bool, Option<usize>) {
+    if !open {
+        return (toggle, None);
+    }
+    match digit {
+        Some(slot) if slot < Emote::ALL.len() => (false, Some(slot)),
+        _ if toggle || esc => (false, None),
+        _ => (true, None),
+    }
+}
+
 fn menu_input(
-    keys: Res<ButtonInput<KeyCode>>,
+    mut keys: ResMut<ButtonInput<KeyCode>>,
     paused: Res<Paused>,
     focus: Res<TextFocus>,
     mut toggles: MessageReader<ToggleEmoteMenu>,
@@ -94,8 +125,26 @@ fn menu_input(
     if toggles.read().count() % 2 == 1 {
         open = !open;
     }
-    if !paused.0 && !focus.0 && keys.just_pressed(KeyCode::KeyG) {
-        open = !open;
+    if !paused.0 && !focus.0 {
+        let digit = CAST_KEYS.iter().position(|k| keys.any_just_pressed(*k));
+        let was_open = open;
+        let (now_open, pick) = menu_keys(
+            open,
+            keys.just_pressed(KeyCode::KeyG),
+            keys.just_pressed(KeyCode::Escape),
+            digit,
+        );
+        if was_open {
+            // Consumed: the action bar must not cast and Esc must not open the pause menu.
+            for k in CAST_KEYS.iter().flatten() {
+                keys.clear_just_pressed(*k);
+            }
+            keys.clear_just_pressed(KeyCode::Escape);
+        }
+        if let Some(e) = pick.and_then(|i| Emote::ALL.get(i)) {
+            requests.write(EmoteRequest(*e));
+        }
+        open = now_open;
     }
     for (i, b) in &buttons {
         if *i == Interaction::Pressed {
@@ -135,5 +184,26 @@ fn send_emotes(
                 text: e.text().into(),
             }));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn open_menu_swallows_number_keys_and_closes_on_esc_or_g() {
+        // Closed: digits are the action bar's, G opens.
+        assert_eq!(menu_keys(false, false, false, Some(0)), (false, None));
+        assert_eq!(menu_keys(false, true, false, None), (true, None));
+        assert_eq!(menu_keys(false, false, true, None), (false, None));
+        // Open: a digit picks that phrase and closes; 0 is the tenth slot.
+        assert_eq!(menu_keys(true, false, false, Some(0)), (false, Some(0)));
+        assert_eq!(menu_keys(true, false, false, Some(9)), (false, Some(9)));
+        assert_eq!(menu_keys(true, true, false, None), (false, None));
+        assert_eq!(menu_keys(true, false, true, None), (false, None));
+        assert_eq!(menu_keys(true, false, false, None), (true, None));
+        assert_eq!(slot_key(0), 1);
+        assert_eq!(slot_key(9), 0);
     }
 }

@@ -850,8 +850,9 @@ fn update_victory(
     sim: SimView,
     mut flow: ResMut<GameFlow>,
     mut screen: Single<&mut Node, With<VictoryScreen>>,
-    mut prompt: Single<&mut TextColor, With<VictoryPrompt>>,
+    mut prompt: Single<(&mut Text, &mut TextColor), (With<VictoryPrompt>, Without<VictoryStats>)>,
     mut stats: Single<&mut Text, With<VictoryStats>>,
+    mode: Res<GameMode>,
 ) {
     if let Some(left) = flow.victory_in.as_mut() {
         *left -= time.delta_secs();
@@ -878,9 +879,19 @@ fn update_victory(
     } else {
         Display::None
     };
-    // Terminal-cursor blink on the restart prompt.
+    let line = if mode.is_online() {
+        copy::VICTORY_PROMPT_ONLINE
+    } else {
+        copy::VICTORY_PROMPT
+    };
+    set_text(&mut prompt.0, line);
+    // Terminal-cursor blink on the restart prompt; the online hint is not an action, so it stays dim.
     let on = (time.elapsed_secs() * 2.0).fract() < 0.6;
-    prompt.0 = ACCENT.with_alpha(if on { 1.0 } else { 0.35 });
+    prompt.1.0 = if mode.is_online() {
+        DIM
+    } else {
+        ACCENT.with_alpha(if on { 1.0 } else { 0.35 })
+    };
 }
 
 /// A fresh sim (level 1, campus); the Bevy player entity is kept and relinked.
