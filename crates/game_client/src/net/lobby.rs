@@ -171,6 +171,25 @@ fn edit(field: Field, text: &mut String, key: &Key, typed: Option<&str>) {
     }
 }
 
+/// Native: winit is the only text source. Web: the hidden input is the single source of truth, so
+/// keys that reached winit (canvas had DOM focus) are applied to the input and focus moves back to
+/// it; keys the input already received are ignored here to avoid applying them twice.
+#[cfg(not(target_arch = "wasm32"))]
+fn edit_field(lobby: &mut Lobby, field: Field, key: &Key, typed: Option<&str>) {
+    edit(field, lobby.text_mut(field), key, typed);
+}
+
+#[cfg(target_arch = "wasm32")]
+fn edit_field(lobby: &mut Lobby, field: Field, key: &Key, typed: Option<&str>) {
+    use super::soft_keyboard as kb;
+    if kb::has_focus() {
+        return;
+    }
+    let mut text = kb::value().unwrap_or_else(|| lobby.text(field).to_string());
+    edit(field, &mut text, key, typed);
+    kb::show(&text);
+}
+
 #[derive(Component)]
 struct CoopMenu;
 #[derive(Component)]
@@ -420,7 +439,7 @@ fn lobby_logic(
                 *shown_focus = None;
             }
         }
-        // On the web the hidden input receives typing, so winit never sees these keys.
+        // Enter/Tab come from winit; text edits go through edit_field (see there for the web).
         for e in keys.read() {
             let Some(field) = lobby.focus else { continue };
             if e.state != ButtonState::Pressed {
@@ -429,7 +448,7 @@ fn lobby_logic(
             match &e.logical_key {
                 Key::Enter => lobby.focus = None,
                 Key::Tab => lobby.focus = Some(next_field(field)),
-                key => edit(field, lobby.text_mut(field), key, e.text.as_deref()),
+                key => edit_field(&mut lobby, field, key, e.text.as_deref()),
             }
         }
         if pressed(Btn::ThisServer)

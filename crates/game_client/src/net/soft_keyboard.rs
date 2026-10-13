@@ -73,6 +73,20 @@ pub fn value() -> Option<String> {
     with(|k| k.input.value())
 }
 
+/// True while the hidden input holds DOM focus, i.e. the browser feeds it the typed text.
+pub fn has_focus() -> bool {
+    with(|k| {
+        let active = web_sys::window()
+            .and_then(|w| w.document())
+            .and_then(|d| d.active_element());
+        active.is_some_and(|a| {
+            let el: &web_sys::Element = k.input.as_ref();
+            a == *el
+        })
+    })
+    .unwrap_or(false)
+}
+
 pub fn set_value(value: &str) {
     with(|k| k.input.set_value(value));
 }

@@ -80,6 +80,10 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 
 ## Touch and PWA
 
+- Web lobby text fields: a hidden HTML input is the text source. Keys typed in the same frame as the
+  click that focuses a field can be lost (only reproducible with scripted input, not at human
+  typing speed). Real DOM inputs overlaid on the Bevy fields would remove the race.
+
 - Touch layout is verified only with Chrome touch emulation; real iOS Safari (fullscreen on Add to Home Screen, audio unlock, safe-area insets) is untested.
 - A keycap tap casts on press, so a long press shows the tooltip while the spell has already fired.
 - Touch taps on HUD panels without a `Button`/`Interaction` (windows, dialogs) can still reach target picking, same as mouse clicks.
