@@ -2,10 +2,13 @@
 //! (icon, tint, sweep, seconds) is derived from the sim's `CooldownView`.
 
 use super::{BAR_BG, BRONZE, GOLD, IconCache, fmt_secs, label, set_text};
-use crate::combat::{CombatSim, PendingCommands, SimReady, SimUnit, cast_slot};
+use crate::combat::{
+    CombatSim, PendingCommands, SimReady, SimUnit, UiNotice, cast_slot, toggle_auto_attack,
+};
 use crate::config::*;
 use crate::input::Paused;
 use crate::player::Player;
+use crate::targeting::Target;
 use bevy::prelude::*;
 use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
@@ -20,6 +23,9 @@ const KEY_CODES: [KeyCode; 4] = [
 ];
 const TINT_MANA: Color = Color::srgba(0.1, 0.2, 0.95, 0.5);
 const TINT_RANGE: Color = Color::srgba(0.85, 0.1, 0.1, 0.5);
+const ATTACK_ICON: &str = "nitpick";
+const ATTACK_PULSE: Color = Color::srgb(1.0, 0.35, 0.2);
+const SWING_BAR: Color = Color::srgb(0.95, 0.85, 0.5);
 const PRESS: Color = Color::srgba(1.0, 1.0, 1.0, 0.35);
 
 /// Radial clock-wipe overlay; see `assets/shaders/cooldown_sweep.wgsl`.
@@ -51,6 +57,13 @@ enum Part {
 struct SlotPart(usize, Part);
 #[derive(Component)]
 struct Tooltip;
+/// The Attack (auto attack) button, left of slot 1.
+#[derive(Component)]
+struct AttackButton;
+#[derive(Component)]
+struct AttackIcon;
+#[derive(Component)]
+struct AttackSwing;
 
 pub struct ActionBarPlugin;
 
@@ -58,7 +71,13 @@ impl Plugin for ActionBarPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_bar).add_systems(
             Update,
-            (click_slots, update_slots, update_tooltip)
+            (
+                click_slots,
+                click_attack,
+                update_slots,
+                update_attack,
+                update_tooltip,
+            )
                 .chain()
                 .in_set(SimReady),
         );
@@ -66,7 +85,7 @@ impl Plugin for ActionBarPlugin {
 }
 
 fn spawn_bar(mut commands: Commands, mut materials: ResMut<Assets<CooldownMaterial>>) {
-    let n = KEY_LABELS.len();
+    let n = KEY_LABELS.len() + 1;
     let width = n as f32 * ACTION_SLOT + (n as f32 - 1.0) * ACTION_GAP + 16.0;
     commands
         .spawn((
@@ -85,6 +104,54 @@ fn spawn_bar(mut commands: Commands, mut materials: ResMut<Assets<CooldownMateri
             BackgroundColor(super::PANEL),
         ))
         .with_children(|bar| {
+            bar.spawn((
+                AttackButton,
+                Button,
+                Node {
+                    width: px(ACTION_SLOT),
+                    height: px(ACTION_SLOT),
+                    border: UiRect::all(px(2)),
+                    border_radius: BorderRadius::all(px(4)),
+                    margin: UiRect::right(px(ACTION_GAP)),
+                    ..default()
+                },
+                BorderColor::all(BRONZE),
+                BackgroundColor(BAR_BG),
+            ))
+            .with_children(|b| {
+                b.spawn((
+                    AttackIcon,
+                    ImageNode::default(),
+                    Node {
+                        position_type: PositionType::Absolute,
+                        width: percent(100),
+                        height: percent(100),
+                        ..default()
+                    },
+                ));
+                b.spawn((
+                    AttackSwing,
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: px(0),
+                        bottom: px(0),
+                        height: px(4),
+                        width: percent(0),
+                        display: Display::None,
+                        ..default()
+                    },
+                    BackgroundColor(SWING_BAR),
+                ));
+                b.spawn((
+                    label("T", 12.0),
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: px(1),
+                        right: px(3),
+                        ..default()
+                    },
+                ));
+            });
             for (i, key) in KEY_LABELS.iter().enumerate() {
                 bar.spawn((
                     Slot(i),
@@ -180,6 +247,64 @@ fn click_slots(
         if *interaction == Interaction::Pressed {
             cast_slot(&sim.0, &mut pending, player.0, *i);
         }
+    }
+}
+
+fn click_attack(
+    paused: Res<Paused>,
+    sim: Res<CombatSim>,
+    target: Res<Target>,
+    mut pending: ResMut<PendingCommands>,
+    mut notices: MessageWriter<UiNotice>,
+    player: Single<&SimUnit, With<Player>>,
+    button: Single<&Interaction, (With<AttackButton>, Changed<Interaction>)>,
+) {
+    if !paused.0 && **button == Interaction::Pressed {
+        toggle_auto_attack(
+            &sim.0,
+            &mut pending,
+            &mut notices,
+            player.0,
+            target.0.is_some(),
+        );
+    }
+}
+
+/// Border flashes while auto attack is on, like WoW's attack icon; the thin bar shows the swing timer.
+fn update_attack(
+    time: Res<Time>,
+    sim: Res<CombatSim>,
+    assets: Res<AssetServer>,
+    mut icons: ResMut<IconCache>,
+    player: Single<&SimUnit, With<Player>>,
+    mut button: Single<&mut BorderColor, With<AttackButton>>,
+    mut icon: Single<&mut ImageNode, With<AttackIcon>>,
+    mut swing: Single<(&mut Node, &mut BackgroundColor), With<AttackSwing>>,
+) {
+    let handle = icons.get(&assets, ATTACK_ICON);
+    if icon.image != handle {
+        icon.image = handle;
+    }
+    let state = sim.0.unit(player.0);
+    let on = state.is_some_and(|u| u.auto_attack);
+    **button = BorderColor::all(if on {
+        let k = 0.5 + 0.5 * (time.elapsed_secs() * 7.0).sin();
+        BRONZE.mix(&ATTACK_PULSE, k)
+    } else {
+        BRONZE
+    });
+    let swing_ms = state
+        .and_then(|u| sim.0.content().unit_def(&u.key))
+        .and_then(|d| d.auto_attack.as_ref())
+        .map_or(0, |a| a.swing_ms);
+    let (node, _) = &mut *swing;
+    match state {
+        Some(u) if on && swing_ms > 0 && u.swing_remaining_ms > 0 => {
+            node.display = Display::Flex;
+            let done = 1.0 - (u.swing_remaining_ms as f32 / swing_ms as f32).clamp(0.0, 1.0);
+            node.width = percent(100.0 * done);
+        }
+        _ => node.display = Display::None,
     }
 }
 

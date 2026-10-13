@@ -5,14 +5,17 @@ mod collision;
 mod combat;
 mod combat_anim;
 mod config;
+mod copy;
 mod debug;
 mod floating_text;
 mod hud;
 mod input;
 mod player;
+mod presentation;
 mod targeting;
 mod units;
 mod vfx;
+mod yell;
 
 use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
@@ -61,7 +64,9 @@ fn main() {
             anim::AnimPlugin,
             combat::CombatPlugin,
             vfx::VfxPlugin,
+            presentation::PresentationPlugin,
             floating_text::FloatingTextPlugin,
+            yell::YellPlugin,
             debug::DebugPlugin,
         ))
         .run();

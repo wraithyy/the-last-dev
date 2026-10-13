@@ -3,6 +3,7 @@
 use super::{BAR_BG, BRONZE, GOLD, IconCache, asset_key, label, set_text};
 use crate::combat::{CombatEvent, CombatSim, PendingCommands, SimReady, UiNotice};
 use crate::config::*;
+use crate::copy;
 use bevy::prelude::*;
 use combat_core::{AuraEnd, Command, EntityId, Event, School};
 use std::collections::VecDeque;
@@ -123,6 +124,10 @@ fn spawn_feed(mut commands: Commands) {
                 TextColor(Color::srgb(0.9, 0.2, 0.2)),
             ));
             c.spawn((
+                label("Your role has been backfilled by an AI agent.", 16.0),
+                TextColor(Color::srgb(0.75, 0.7, 0.7)),
+            ));
+            c.spawn((
                 RespawnButton,
                 Button,
                 Node {
@@ -133,7 +138,7 @@ fn spawn_feed(mut commands: Commands) {
                 },
                 BorderColor::all(GOLD),
                 BackgroundColor(Color::srgb(0.25, 0.1, 0.1)),
-                children![label("Release / Respawn", 20.0)],
+                children![label("Release / Re-onboard", 20.0)],
             ));
         });
     commands
@@ -201,7 +206,7 @@ fn who(sim: &CombatSim, id: EntityId) -> String {
     }
 }
 
-/// "You" / "AI Evangelist" at the start of a sentence.
+/// "You" / "CEO" at the start of a sentence.
 fn subject(sim: &CombatSim, id: EntityId) -> String {
     let w = who(sim, id);
     if w == "you" { "You".into() } else { w }
@@ -220,6 +225,15 @@ fn spell_name(sim: &CombatSim, id: combat_core::SpellId) -> String {
         .content()
         .spell(id)
         .map_or_else(|| "a spell".into(), |d| d.name.clone())
+}
+
+/// "Nitpick" for the player; sim data is the source of truth for the name.
+fn auto_attack_name(sim: &CombatSim, id: EntityId) -> String {
+    sim.0
+        .unit(id)
+        .and_then(|u| sim.0.content().unit_def(&u.key))
+        .and_then(|d| d.auto_attack.as_ref())
+        .map_or_else(|| "attack".into(), |a| a.name.clone())
 }
 
 fn school_name(s: School) -> &'static str {
@@ -254,6 +268,7 @@ fn collect_events(
     mut log: ResMut<CombatLog>,
     mut banner: ResMut<ErrorBanner>,
     mut loot: ResMut<LootState>,
+    mut xp_gains: Local<usize>,
 ) {
     let me = sim.0.player();
     let mut push = |text: String, color: Color| {
@@ -292,6 +307,10 @@ fn collect_events(
                         spell_name(&sim, *s),
                         school_name(*school),
                     ),
+                    None if Some(*source) == me => format!(
+                        "Your {} {verb} {victim} for {amount}.",
+                        auto_attack_name(&sim, *source)
+                    ),
                     None => format!("{} {verb} {victim} for {amount}.", subject(&sim, *source)),
                 };
                 if *absorbed > 0 {
@@ -308,6 +327,41 @@ fn collect_events(
                     Color::srgb(1.0, 0.95, 0.7)
                 };
                 push(line, color);
+            }
+            Event::Miss {
+                source,
+                target,
+                spell,
+            } => {
+                let line = match spell {
+                    Some(s) if Some(*target) == me => format!(
+                        "You resist {} {}.",
+                        possessive(&sim, *source),
+                        spell_name(&sim, *s)
+                    ),
+                    Some(s) if Some(*source) == me => format!(
+                        "{} resists your {}.",
+                        who(&sim, *target),
+                        spell_name(&sim, *s)
+                    ),
+                    Some(s) => format!(
+                        "{} resists {} {}.",
+                        who(&sim, *target),
+                        possessive(&sim, *source),
+                        spell_name(&sim, *s)
+                    ),
+                    None if Some(*source) == me => format!(
+                        "Your {} misses {}.",
+                        auto_attack_name(&sim, *source),
+                        who(&sim, *target)
+                    ),
+                    None => format!(
+                        "{} attack misses {}.",
+                        possessive(&sim, *source),
+                        who(&sim, *target)
+                    ),
+                };
+                push(line, Color::srgb(0.8, 0.8, 0.85));
             }
             Event::CastStarted { caster, spell, .. } if Some(*caster) != me => push(
                 format!(
@@ -368,9 +422,17 @@ fn collect_events(
                 },
                 Color::srgb(0.9, 0.9, 0.9),
             ),
-            Event::XpGained { unit, amount } if Some(*unit) == me => push(
-                format!("You gain {amount} experience."),
-                Color::srgb(0.75, 0.45, 1.0),
+            Event::XpGained { unit, amount } if Some(*unit) == me => {
+                push(
+                    format!("You gain {amount} experience."),
+                    Color::srgb(0.75, 0.45, 1.0),
+                );
+                push(copy::xp_quip(*xp_gains).into(), Color::srgb(0.5, 0.4, 0.6));
+                *xp_gains += 1;
+            }
+            Event::Yell { unit, text } => push(
+                format!("{} yells: {text}", who(&sim, *unit)),
+                copy::YELL_RED,
             ),
             Event::Looted { looter, items, .. } if Some(*looter) == me => {
                 for item in items {
@@ -378,7 +440,7 @@ fn collect_events(
                 }
                 if items.is_empty() {
                     push(
-                        "You find nothing to loot.".into(),
+                        "You find nothing to loot. The AI already expensed it.".into(),
                         Color::srgb(0.7, 0.7, 0.7),
                     );
                 } else {
@@ -497,5 +559,6 @@ fn update_xp(sim: Res<CombatSim>, mut fill: Single<&mut Node, With<XpFill>>) {
         .player()
         .and_then(|id| sim.0.unit(id))
         .map_or(0, |u| u.xp);
-    fill.width = percent((100.0 * xp as f32 / XP_BAR_MAX as f32).clamp(0.0, 100.0));
+    let max = sim.0.content().config.xp_per_level.max(1);
+    fill.width = percent((100.0 * xp as f32 / max as f32).clamp(0.0, 100.0));
 }

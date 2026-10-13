@@ -35,13 +35,16 @@ pub struct H {
 }
 
 impl H {
-    /// Player at the origin facing -Z; AI Evangelist at `(0, 0, mob_z)`.
+    /// Player at the origin facing -Z; CEO at `(0, 0, mob_z)`.
     pub fn new(seed: u64, mob_z: f32, tweak: impl FnOnce(&mut Content)) -> H {
         let mut c = content();
+        // Rules tests assert exact outcomes; miss tests opt in through `tweak`.
+        c.config.white_hit_pct = 100;
+        c.config.spell_hit_pct = 100;
         tweak(&mut c);
         let mut sim = Sim::new(c, seed);
         let player = sim.spawn_player(Vec3::new(0.0, 0.0, 0.0), 0.0);
-        let mob = match sim.spawn_unit("ai_evangelist", Vec3::new(0.0, 0.0, mob_z), 0.0) {
+        let mob = match sim.spawn_unit("ceo", Vec3::new(0.0, 0.0, mob_z), 0.0) {
             Ok(id) => id,
             Err(e) => panic!("spawn failed: {e}"),
         };

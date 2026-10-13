@@ -16,7 +16,7 @@
 - **Phase 0 (done in this run)**: workspace, toolchain pin, native and wasm builds, check scripts, web shell.
 - **Phase 1 (done in this run)**: office arena, WoW-style movement and camera, jump, AABB collision, Tab and click targeting, geometry readout in the HUD (range, facing, LoS).
 - **Phase 2**: `combat_core` sim: entity state, commands, events, spells, GCD, cooldowns, cast timers, spell queue, mana, auras, shield, interrupt and lockout, seeded RNG. Tests come first.
-- **Phase 3**: AI Evangelist state machine, threat, leash, Hallucination Blast, death, loot, respawn, deterministic replay.
+- **Phase 3**: CEO boss state machine, threat, leash, Hallucination Blast, death, loot, respawn, deterministic replay.
 - **Phase 4**: action bar, cast bars, floating combat text, combat log, VFX, procedural animation.
 - **Phase 5**: browser validation, profiling, documentation.
 

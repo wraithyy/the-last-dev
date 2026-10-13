@@ -59,9 +59,8 @@ fn spawn_player(mut commands: Commands) {
             vy: 0.0,
         },
         Character {
-            kind: ModelKind::Mage,
+            kind: ModelKind::Engineer,
             scale: PLAYER_MODEL_SCALE,
-            tint: None,
         },
         Transform::from_translation(pos),
         Visibility::default(),

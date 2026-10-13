@@ -16,7 +16,7 @@ use crate::units::Unit;
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use combat_core::{Command, Content, EntityId, Event, Sim};
+use combat_core::{CastError, Command, Content, EntityId, Event, Sim};
 
 #[derive(Resource)]
 pub struct CombatSim(pub Sim);
@@ -78,7 +78,10 @@ impl Plugin for CombatPlugin {
                 )
                     .in_set(SimReady),
             )
-            .add_systems(Update, (cast_keys, loot_input).in_set(SimReady));
+            .add_systems(
+                Update,
+                (cast_keys, auto_attack_key, loot_input).in_set(SimReady),
+            );
         if std::env::var_os("WOW_AUTOFIGHT").is_some() {
             app.init_resource::<AutoFight>()
                 .add_systems(Update, (autofight, log_events).in_set(SimReady));
@@ -93,15 +96,6 @@ fn create_sim(mut commands: Commands, mut exit: MessageWriter<AppExit>) {
             error!("embedded content/game.ron is invalid: {err:?}");
             exit.write(AppExit::error());
         }
-    }
-}
-
-/// Maps the placeholder units from `units.rs` onto sim unit keys.
-fn unit_key(unit: &Unit) -> Option<&'static str> {
-    match unit.name {
-        "AI Evangelist" => Some("ai_evangelist"),
-        "Intern" => Some("intern"),
-        _ => None,
     }
 }
 
@@ -121,10 +115,7 @@ fn spawn_sim_units(
         .entity(player_entity)
         .insert((SimUnit(id), CombatAnim::default()));
     for (entity, tf, unit) in &units {
-        let Some(key) = unit_key(unit) else {
-            warn!("unit {:?} has no sim definition", unit.name);
-            continue;
-        };
+        let key = unit.key;
         let yaw = yaw_of(tf);
         match sim.0.spawn_unit(key, to_core(tf.translation), yaw) {
             Ok(id) => {
@@ -134,7 +125,10 @@ fn spawn_sim_units(
                     .unit(id)
                     .is_some_and(|u| u32::from(u.level) != unit.level)
                 {
-                    warn!("level mismatch for {key}: scene {} vs sim data", unit.level);
+                    warn!(
+                        "level mismatch for {} ({key}): scene {} vs sim data",
+                        unit.name, unit.level
+                    );
                 }
                 commands.entity(entity).insert((
                     SimUnit(id),
@@ -257,8 +251,11 @@ fn apply_anim_events(
     for ev in events {
         match ev {
             Event::CastSucceeded { caster, .. } => bump(*caster, |a| a.cast_release_seq += 1),
+            // The player's auto attack is a ranged spell-style gesture, not a melee chop.
+            Event::MeleeSwing { attacker, .. } if *attacker == player_id => {
+                bump(*attacker, |a| a.cast_release_seq += 1);
+            }
             Event::MeleeSwing { attacker, .. } => bump(*attacker, |a| a.attack_seq += 1),
-            Event::Damage { target, .. } => bump(*target, |a| a.hit_seq += 1),
             _ => {}
         }
     }
@@ -316,7 +313,46 @@ pub fn cast_slot(sim: &Sim, pending: &mut PendingCommands, caster: EntityId, slo
     }
 }
 
-/// Right-click (without steering drag) or F on a lootable corpse in reach.
+/// Shared by the T key and the Attack button.
+pub fn toggle_auto_attack(
+    sim: &Sim,
+    pending: &mut PendingCommands,
+    notices: &mut MessageWriter<UiNotice>,
+    unit: EntityId,
+    has_target: bool,
+) {
+    if sim.unit(unit).is_some_and(|u| u.auto_attack) {
+        pending.0.push(Command::StopAutoAttack { unit });
+    } else if has_target {
+        pending.0.push(Command::StartAutoAttack { unit });
+    } else {
+        // The sim ignores a start without a target silently.
+        notices.write(UiNotice(CastError::NoTarget.message().into()));
+    }
+}
+
+fn auto_attack_key(
+    keys: Res<ButtonInput<KeyCode>>,
+    paused: Res<Paused>,
+    sim: Res<CombatSim>,
+    target: Res<Target>,
+    mut pending: ResMut<PendingCommands>,
+    mut notices: MessageWriter<UiNotice>,
+    player: Single<&SimUnit, With<Player>>,
+) {
+    if !paused.0 && keys.just_pressed(KeyCode::KeyT) {
+        toggle_auto_attack(
+            &sim.0,
+            &mut pending,
+            &mut notices,
+            player.0,
+            target.0.is_some(),
+        );
+    }
+}
+
+/// Right-click (without steering drag) on a living hostile starts auto attack;
+/// on a lootable corpse in reach, or F on the target, it loots.
 fn loot_input(
     keys: Res<ButtonInput<KeyCode>>,
     buttons: Res<ButtonInput<MouseButton>>,
@@ -325,7 +361,7 @@ fn loot_input(
     camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
     colliders: Res<Colliders>,
     paused: Res<Paused>,
-    target: Res<Target>,
+    mut target: ResMut<Target>,
     sim: Res<CombatSim>,
     mut pending: ResMut<PendingCommands>,
     mut notices: MessageWriter<UiNotice>,
@@ -338,6 +374,7 @@ fn loot_input(
         return;
     }
     let mut corpse: Option<Entity> = None;
+    let mut clicked = false;
     if buttons.just_pressed(MouseButton::Right) {
         *press = window.cursor_position().map(|c| (c, 0.0));
     }
@@ -351,6 +388,7 @@ fn loot_input(
         && travel <= CLICK_DRAG_THRESHOLD
     {
         corpse = pick_unit(cursor, *camera, &colliders.0, &units);
+        clicked = true;
     }
     if keys.just_pressed(KeyCode::KeyF) {
         corpse = target.0;
@@ -359,7 +397,20 @@ fn loot_input(
     let Ok(su) = sim_units.get(entity) else {
         return;
     };
-    if !sim.0.unit(su.0).is_some_and(|u| !u.alive && u.lootable) {
+    let Some(state) = sim.0.unit(su.0) else {
+        return;
+    };
+    if state.alive {
+        if clicked && state.hostile {
+            // SetTarget is pushed by tick_sim before pending commands, so the start sees the new target.
+            target.0 = Some(entity);
+            pending
+                .0
+                .push(Command::StartAutoAttack { unit: player.1.0 });
+        }
+        return;
+    }
+    if !state.lootable {
         return;
     }
     let (player_tf, player_su) = *player;
@@ -393,9 +444,15 @@ fn autofight(
     units: Query<(Entity, &Unit)>,
 ) {
     state.elapsed += time.delta_secs();
-    // (time, action): slot index to cast, or None to select the hostile unit.
-    const SCRIPT: [(f32, Option<usize>); 4] =
-        [(0.5, None), (1.0, Some(0)), (3.4, Some(1)), (6.2, Some(2))];
+    // (time, action): slot index to cast, None to select the hostile unit, or AUTO to start auto attack.
+    const AUTO: Option<usize> = Some(usize::MAX);
+    const SCRIPT: [(f32, Option<usize>); 5] = [
+        (0.5, None),
+        (0.7, AUTO),
+        (1.0, Some(0)),
+        (3.4, Some(1)),
+        (6.2, Some(2)),
+    ];
     let Some(&(at, action)) = SCRIPT.get(state.step) else {
         return;
     };
@@ -407,6 +464,7 @@ fn autofight(
         None => {
             target.0 = units.iter().find(|(_, u)| u.hostile).map(|(e, _)| e);
         }
+        Some(usize::MAX) => pending.0.push(Command::StartAutoAttack { unit: player.0 }),
         Some(slot) => cast_slot(&sim.0, &mut pending, player.0, slot),
     }
 }

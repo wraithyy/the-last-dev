@@ -6,12 +6,14 @@ pub const WINDOW_TITLE: &str = "World of Workcraft";
 
 // Arena (metres). The floor spans [-ARENA_HALF, ARENA_HALF] on X and Z.
 pub const ARENA_HALF: f32 = 20.0;
-pub const WALL_HEIGHT: f32 = 4.0;
+/// Also the ceiling height: the ceiling slab sits on top of the walls.
+pub const WALL_HEIGHT: f32 = 4.5;
 pub const WALL_THICKNESS: f32 = 0.5;
 
 // Player
 // Far enough from the south wall that the default camera distance is not clipped.
-pub const PLAYER_SPAWN: [f32; 3] = [0.0, 0.0, 10.0];
+// The CEO (z = -8) stays outside its 12 m aggro range from here.
+pub const PLAYER_SPAWN: [f32; 3] = [0.0, 0.0, 8.0];
 pub const PLAYER_RADIUS: f32 = 0.4;
 pub const PLAYER_HEIGHT: f32 = 1.8;
 /// Eye height used as ray origin for LoS and camera collision.
@@ -26,8 +28,8 @@ pub const STEP_HEIGHT: f32 = 0.3;
 /// Radians of yaw per pixel of mouse travel.
 pub const MOUSE_YAW_SENS: f32 = 0.005;
 
-/// KayKit characters are ~2.0 units tall at scale 1; this brings the Mage to PLAYER_HEIGHT.
-pub const PLAYER_MODEL_SCALE: f32 = 0.85;
+/// Kenney characters are 2.7 units tall at scale 1; this brings them to PLAYER_HEIGHT.
+pub const PLAYER_MODEL_SCALE: f32 = PLAYER_HEIGHT / 2.7;
 /// Tolerance for "standing on the ground" when deciding if a jump is allowed.
 pub const GROUND_EPSILON: f32 = 1e-3;
 
@@ -39,9 +41,10 @@ pub const CAM_RADIUS: f32 = 0.3;
 /// Never pull the camera closer than this, so it stays out of the head mesh.
 pub const CAM_MIN_CLIP_DIST: f32 = 0.8;
 pub const CAM_MIN_DIST: f32 = 2.0;
-pub const CAM_MAX_DIST: f32 = 25.0;
-pub const CAM_START_DIST: f32 = 9.0;
-pub const CAM_START_PITCH: f32 = 0.35;
+pub const CAM_MAX_DIST: f32 = 20.0;
+/// WoW-like default: roughly 10 m behind, shallow pitch so the corridor stays in view.
+pub const CAM_START_DIST: f32 = 10.5;
+pub const CAM_START_PITCH: f32 = 0.22;
 pub const CAM_PITCH_LIMIT: f32 = 80.0 * PI / 180.0;
 pub const CAM_ORBIT_SENS: f32 = 0.005;
 pub const CAM_ZOOM_STEP: f32 = 1.5;
@@ -51,6 +54,8 @@ pub const CAM_ZOOM_PIXELS_PER_LINE: f32 = 40.0;
 pub const CAM_FOLLOW_RATE: f32 = 12.0;
 pub const CAM_SNAP_BEHIND_RATE: f32 = 4.0;
 pub const CAM_MIN_HEIGHT: f32 = 0.2;
+/// Keeps the camera (and its near plane) below the ceiling slab.
+pub const CAM_MAX_HEIGHT: f32 = WALL_HEIGHT - 0.4;
 pub const CAM_FOCUS_HEIGHT: f32 = 1.5;
 
 // Input
@@ -61,18 +66,16 @@ pub const CLICK_DRAG_THRESHOLD: f32 = 4.0;
 pub const RING_INNER: f32 = 0.85;
 pub const RING_OUTER: f32 = 1.05;
 pub const RING_HEIGHT: f32 = 0.03;
-pub const PICK_SPHERE_RADIUS: f32 = 1.1;
-pub const PICK_SPHERE_HEIGHT: f32 = 1.2;
+pub const PICK_SPHERE_RADIUS: f32 = 1.2;
+pub const PICK_SPHERE_HEIGHT: f32 = 1.3;
 
 // Combat bridge
 pub const SIM_SEED: u64 = 0x5EED_0000_C0DE;
 /// Client-side pre-check so an out-of-reach loot click gives feedback instead of silence.
 pub const LOOT_RANGE: f32 = 5.0;
-/// Display ceiling for the XP bar; the sim only exposes a running total.
-pub const XP_BAR_MAX: u32 = 400;
 
 // HUD layout (logical px)
-pub const FRAME_W: f32 = 230.0;
+pub const FRAME_W: f32 = 270.0;
 pub const FRAME_BAR_H: f32 = 18.0;
 pub const PORTRAIT_SIZE: f32 = 64.0;
 pub const ACTION_SLOT: f32 = 56.0;
@@ -88,16 +91,17 @@ pub const CAST_FLASH_SECS: f32 = 0.45;
 pub const ERROR_TEXT_SECS: f32 = 2.0;
 pub const FLOAT_TEXT_SECS: f32 = 1.4;
 pub const FLOAT_TEXT_RISE: f32 = 60.0;
-pub const FLOAT_TEXT_ANCHOR_Y: f32 = 2.3;
+/// Above the 2.7 m CEO's head; the 1.8 m player gets a generous gap.
+pub const FLOAT_TEXT_ANCHOR_Y: f32 = 2.9;
 pub const FLOAT_TEXT_SIZE: f32 = 22.0;
 pub const FLOAT_TEXT_CRIT_SIZE: f32 = 34.0;
 
 // VFX
 pub const PROJECTILE_SPEED: f32 = 40.0;
 pub const PROJECTILE_RADIUS: f32 = 0.22;
-pub const PROJECTILE_ORIGIN_Y: f32 = 1.3;
+pub const PROJECTILE_ORIGIN_Y: f32 = 1.25;
 pub const PROJECTILE_TARGET_Y: f32 = 1.2;
-pub const HAND_GLOW_POS: [f32; 3] = [0.0, 1.15, -0.75];
+pub const HAND_GLOW_POS: [f32; 3] = [0.0, 1.2, -0.8];
 pub const HAND_GLOW_RADIUS: f32 = 0.16;
 pub const SHIELD_RADIUS: f32 = 1.25;
 pub const SHIELD_CENTER_Y: f32 = 0.95;

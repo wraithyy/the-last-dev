@@ -9,18 +9,34 @@
   html, body { margin: 0; height: 100%; overflow: hidden; background: #101216; color: #ccd; font-family: system-ui, sans-serif; }
   #bevy { display: block; width: 100%; height: 100%; outline: none; }
   #status { position: fixed; top: 12px; left: 12px; font-size: 14px; opacity: .8; white-space: pre-wrap; pointer-events: none; }
+  #tip { position: fixed; top: 38px; left: 12px; font-size: 13px; font-style: italic; opacity: .6; max-width: 70ch; pointer-events: none; }
   #status.error { color: #ff8080; opacity: 1; font-size: 16px; max-width: 80ch; }
 </style>
 </head>
 <body>
 <canvas id="bevy" tabindex="0"></canvas>
 <div id="status">Loading…</div>
+<div id="tip"></div>
 <script type="module">
 const canvas = document.getElementById('bevy');
 const status = document.getElementById('status');
+const tip = document.getElementById('tip');
+const TIPS = [
+  'Tip: Every task is now an AI task.',
+  'Loading synergy...',
+  'Downloading 38 MB of thought leadership...',
+  'Tip: If the model is wrong, the prompt was wrong. If the prompt was right, you were wrong.',
+  'Generating quarterly AI roadmap (hallucinated)...',
+  'Tip: Guardrails are what slow innovation down. Use them anyway.',
+];
+let tipIndex = 0;
+tip.textContent = TIPS[0];
+const tipTimer = setInterval(() => { tipIndex = (tipIndex + 1) % TIPS.length; tip.textContent = TIPS[tipIndex]; }, 3000);
+const hideTips = () => { clearInterval(tipTimer); tip.hidden = true; };
 const CONTROL_FLOW = 'Using exceptions for control flow';
 
 const fail = (msg) => {
+  hideTips();
   status.className = 'error';
   status.textContent = msg;
   status.hidden = false;
@@ -77,8 +93,9 @@ if (!document.createElement('canvas').getContext('webgl2')) {
     const { default: init } = await import('./pkg/game_client.js');
     await init({ module_or_path: await download('./pkg/game_client_bg.wasm') });
     status.hidden = true;
+    hideTips();
   } catch (e) {
-    if (isControlFlow(e)) status.hidden = true;
+    if (isControlFlow(e)) { status.hidden = true; hideTips(); }
     else fail('Failed to start the game: ' + (e && e.message || e) + '\nDid you run scripts/build-web.sh?');
   }
 }

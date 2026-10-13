@@ -52,6 +52,12 @@ pub struct Config {
     pub pushback_max: u8,
     pub crit_damage_pct: u32,
     pub loot_range_m: f32,
+    /// XP needed per level; the HUD bar maximum.
+    pub xp_per_level: u32,
+    /// Chance for white attacks (player auto attack, enemy melee) to hit.
+    pub white_hit_pct: u32,
+    /// Chance for damaging spells to hit; self-buffs and interrupts always hit.
+    pub spell_hit_pct: u32,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -147,6 +153,57 @@ pub struct AiDef {
     pub ability: Option<AiAbility>,
 }
 
+/// Ranged "wand" attack that swings on its own timer while a target is held.
+#[derive(Clone, Debug, Deserialize)]
+pub struct AutoAttackDef {
+    pub name: String,
+    pub range_m: f32,
+    pub swing_ms: u32,
+    pub damage_min: u32,
+    pub damage_max: u32,
+}
+
+/// Monster-yell lines per trigger; empty lists (the default) mean the unit stays silent.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct YellDef {
+    /// Interval between periodic yells while in combat; 0 disables them.
+    pub periodic_ms: u32,
+    pub aggro: Vec<String>,
+    pub periodic: Vec<String>,
+    pub blast: Vec<String>,
+    pub low_hp: Vec<String>,
+    pub player_killed: Vec<String>,
+    pub death: Vec<String>,
+    pub evade: Vec<String>,
+}
+
+/// Declaration order is priority order (lowest wins when several fire in one tick).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum YellKind {
+    Death,
+    PlayerKilled,
+    LowHp,
+    Blast,
+    Aggro,
+    Evade,
+    Periodic,
+}
+
+impl YellDef {
+    pub(crate) fn lines(&self, k: YellKind) -> &[String] {
+        match k {
+            YellKind::Death => &self.death,
+            YellKind::PlayerKilled => &self.player_killed,
+            YellKind::LowHp => &self.low_hp,
+            YellKind::Blast => &self.blast,
+            YellKind::Aggro => &self.aggro,
+            YellKind::Evade => &self.evade,
+            YellKind::Periodic => &self.periodic,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct UnitDef {
     pub key: String,
@@ -163,6 +220,10 @@ pub struct UnitDef {
     pub xp_reward: u32,
     pub loot: Vec<LootEntry>,
     pub ai: Option<AiDef>,
+    #[serde(default)]
+    pub auto_attack: Option<AutoAttackDef>,
+    #[serde(default)]
+    pub yells: YellDef,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -237,6 +298,13 @@ impl Content {
         if let Some(id) = self.action_bar.iter().find(|id| self.spell(**id).is_none()) {
             return bad(format!("action bar references unknown spell {}", id.0));
         }
+        let c = &self.config;
+        if c.white_hit_pct > 100 || c.spell_hit_pct > 100 {
+            return bad("hit chance above 100%".to_string());
+        }
+        if c.xp_per_level == 0 {
+            return bad("xp_per_level must be positive".to_string());
+        }
         if self.unit_def(&self.config.player_unit).is_none() {
             return bad(format!(
                 "player unit {} not defined",
@@ -244,6 +312,11 @@ impl Content {
             ));
         }
         for u in &self.units {
+            if let Some(aa) = &u.auto_attack
+                && (aa.swing_ms == 0 || aa.damage_min > aa.damage_max || aa.range_m <= 0.0)
+            {
+                return bad(format!("unit {} has an invalid auto attack", u.key));
+            }
             if let Some(ab) = u.ai.as_ref().and_then(|a| a.ability.as_ref()) {
                 if self.spell(ab.spell).is_none() {
                     return bad(format!("unit {} uses unknown spell {}", u.key, ab.spell.0));
@@ -278,6 +351,7 @@ mod tests {
         let cr = c.spell(SpellId(1)).unwrap();
         assert_eq!((cr.cast_ms, cr.mana, cr.range_m as u32), (2000, 35, 30));
         assert_eq!(c.action_bar().len(), 4);
+        assert_eq!(c.config.xp_per_level, 400);
         let icons: Vec<&str> = c
             .action_bar()
             .iter()
@@ -301,6 +375,15 @@ mod tests {
         assert_eq!(c.gcd_ms(25), 1200);
         assert_eq!(c.gcd_ms(100), 1000);
         assert_eq!(c.gcd_ms(1000), 1000);
+    }
+
+    #[test]
+    fn rejects_hit_chance_above_100() {
+        let broken = SRC.replace("spell_hit_pct: 96", "spell_hit_pct: 101");
+        assert!(matches!(
+            Content::from_ron(&broken),
+            Err(ContentError::Invalid(_))
+        ));
     }
 
     #[test]

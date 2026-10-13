@@ -87,6 +87,21 @@ fn line(sim: &Sim, tick: u64, e: &Event) -> String {
         Event::MeleeSwing { attacker, target } => {
             format!("{} swings at {}", t(*attacker), t(*target))
         }
+        Event::Miss {
+            source,
+            target,
+            spell: s,
+        } => format!(
+            "{} misses {} with {}",
+            t(*source),
+            t(*target),
+            s.map_or_else(|| "melee".to_string(), |s| spell(sim, s)),
+        ),
+        Event::AutoAttackToggled { unit, on } => format!(
+            "{} auto attack {}",
+            t(*unit),
+            if *on { "on" } else { "off" }
+        ),
         Event::AuraApplied { target, key } => format!("{} gains {key}", t(*target)),
         Event::AuraRemoved {
             target,
@@ -111,6 +126,7 @@ fn line(sim: &Sim, tick: u64, e: &Event) -> String {
             items,
         } => format!("{} loots {} {items:?}", t(*looter), t(*corpse)),
         Event::Respawned { unit } => format!("{} respawns", t(*unit)),
+        Event::Yell { unit, text } => format!("{} yells: {text}", t(*unit)),
     };
     format!("[{tick:05}] {body}")
 }
@@ -191,7 +207,7 @@ impl Script {
 fn run_scenario(seed: u64) -> String {
     let mut sim = Sim::new(content(), seed);
     let player = sim.spawn_player(Vec3::new(0.0, 0.0, 0.0), 0.0);
-    let mob = match sim.spawn_unit("ai_evangelist", Vec3::new(0.0, 0.0, -20.0), 0.0) {
+    let mob = match sim.spawn_unit("ceo", Vec3::new(0.0, 0.0, -20.0), 0.0) {
         Ok(id) => id,
         Err(e) => panic!("{e}"),
     };
@@ -210,6 +226,8 @@ fn run_scenario(seed: u64) -> String {
         caster: player,
         spell: CR,
     });
+    // Refused silently: the intern is friendly, so no toggle event appears.
+    sim.push(Command::StartAutoAttack { unit: player });
     let mut respawned = false;
     while sim.now().0 < MAX_TICKS && !respawned {
         if sim.now().0 == 1 {
@@ -217,6 +235,7 @@ fn run_scenario(seed: u64) -> String {
                 unit: player,
                 target: Some(mob),
             });
+            sim.push(Command::StartAutoAttack { unit: player });
         }
         if sim.now().0 >= 2 {
             script.act(&mut sim, player, mob);
@@ -249,14 +268,17 @@ fn scenario_log_contains_every_spec_beat() {
         "failed Code Review: Invalid target.",
         "begins Code Review (2000 ms)",
         "COMBO",
+        "Senior Engineer auto attack on",
+        "Senior Engineer auto attack off",
+        "Senior Engineer misses CEO",
         "gains guardrails",
         "Hallucination Blast for 0 (absorbed 45)",
         "casts Reject PR",
         "interrupted by Senior Engineer (lockout 4000 ms)",
-        "AI Evangelist dies",
+        "CEO dies",
         "gains 120 xp",
-        "loots AI Evangelist",
-        "AI Evangelist respawns",
+        "loots CEO",
+        "CEO respawns",
     ] {
         assert!(log.contains(beat), "missing beat {beat:?} in:\n{log}");
     }

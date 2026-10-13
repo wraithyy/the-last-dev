@@ -4,7 +4,11 @@ A satirical single-player 3D browser RPG with WotLK-style tab-target combat, set
 
 Play it: https://wraithyy.github.io/world-of-workcraft/
 
-Status: **Phases 0-4** are playable: office arena with animated CC0 models, WoW-style movement and camera, tab-target combat with four spells, the AI Evangelist encounter (aggro, melee, interruptible Hallucination Blast, evade, death, loot, respawn) and a WoW-style HUD. See [docs/PLAN.md](docs/PLAN.md), [docs/COMBAT_API.md](docs/COMBAT_API.md), [docs/FORMULAS.md](docs/FORMULAS.md) and [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
+## The satire
+
+The whole game is a long, loving roast of corporations that push AI onto every task for no reason. You play a Senior Engineer ("Legacy Cost Center") who is sent to fight the **CEO** ("Chief AI Visionary"), a boss who yells AI buzzwords at you in WoW monster-yell style (red chat line plus a speech bubble over his head), casts Hallucination Blast, and drops loot such as the Unread AI Strategy Deck, Expired GPU Credits and the Mandatory Prompt Training Certificate. The **AI-Native Intern** ("Prompt Engineer") stands in the corner. When you die your role is backfilled by an AI agent; the loading screen, pause overlay and XP messages keep the joke going. All text is original; no real companies or people are named.
+
+Status: **Phases 0-4** are playable: office arena with animated CC0 models, WoW-style movement and camera, tab-target combat with four spells, the CEO encounter (aggro, melee, interruptible Hallucination Blast, evade, death, loot, respawn, monster yells with speech bubbles), a WoW-style HUD, a ranged auto attack (Nitpick) with miss/resist feedback, and damage numbers that land with the projectile. See [docs/PLAN.md](docs/PLAN.md), [docs/COMBAT_API.md](docs/COMBAT_API.md), [docs/FORMULAS.md](docs/FORMULAS.md) and [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ## Requirements
 
@@ -38,6 +42,8 @@ Status: **Phases 0-4** are playable: office arena with animated CC0 models, WoW-
 | Mouse wheel | Zoom |
 | Tab | Cycle nearby hostile targets (front arc first) |
 | Left click | Select unit |
+| Right-click (no drag) on a hostile | Target it and start auto attack (Nitpick) |
+| T / Attack button | Toggle auto attack on the current target |
 | 1-4 | Code Review, Refactor, Guardrails, Reject PR (or click the action bar) |
 | F / right-click corpse | Loot |
 | F3 | Debug overlay (range, facing, LoS) |
@@ -65,11 +71,11 @@ docs/                 plan, version choices, known limitations
 
 ## Debug hooks (native, env-gated)
 
-`WOW_SCREENSHOT=path.png` (with `WOW_SHOT_DELAY`) saves an offscreen shot and exits, `WOW_PLAYER_AT=x,z,yaw_deg` teleports the player, `WOW_AUTORUN=1` holds forward, and `WOW_AUTOFIGHT=1` targets the enemy, casts on a timer and logs sim events.
+`WOW_SCREENSHOT=path.png` (with `WOW_SHOT_DELAY`) saves an offscreen shot and exits, `WOW_PLAYER_AT=x,z,yaw_deg` teleports the player, `WOW_AUTORUN=1` holds forward, and `WOW_AUTOFIGHT=1` targets the enemy, starts auto attack, casts on a timer and logs sim events.
 
 ## Credits
 
-3D models by Kay Lousberg (KayKit, CC0). Spell icons from game-icons.net by Lorc and Skoll (CC BY 3.0). Full list: [assets/CREDITS.md](assets/CREDITS.md).
+3D models by Kenney (Blocky Characters, Furniture Kit; CC0). Spell and attack icons from game-icons.net by Lorc, Skoll and Delapouite (CC BY 3.0). Full list: [assets/CREDITS.md](assets/CREDITS.md).
 
 ## Verification status (2026-10-12)
 

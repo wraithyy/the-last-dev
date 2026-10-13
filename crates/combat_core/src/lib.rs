@@ -4,6 +4,7 @@
 //! server, and deliberately has no engine (Bevy) dependency.
 
 mod ai;
+mod auto_attack;
 pub mod content;
 pub mod geom;
 mod rng;
@@ -13,8 +14,8 @@ pub mod time;
 pub mod types;
 
 pub use content::{
-    AiAbility, AiDef, ApplyAura, AuraDef, Config, ConsumeAura, Content, ContentError, Effect,
-    LootEntry, School, SpellDef, SpellId, UnitDef,
+    AiAbility, AiDef, ApplyAura, AuraDef, AutoAttackDef, Config, ConsumeAura, Content,
+    ContentError, Effect, LootEntry, School, SpellDef, SpellId, UnitDef, YellDef,
 };
 pub use geom::{Aabb, Vec3, distance, forward, in_range, is_facing, line_of_sight};
 pub use sim::Sim;

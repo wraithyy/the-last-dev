@@ -10,6 +10,9 @@
         pushback_max: 2,
         crit_damage_pct: 150,
         loot_range_m: 6.0,
+        xp_per_level: 400,
+        white_hit_pct: 95,
+        spell_hit_pct: 96,
     ),
     auras: [
         (key: "code_smell", name: "Code Smell", icon: "code_smell", harmful: true),
@@ -19,7 +22,7 @@
         (
             id: 1, name: "Code Review", icon: "code_review", school: Arcane,
             range_m: 30.0, cast_ms: 2000, mana: 35, gcd: true, cooldown_ms: 0,
-            description: "Deals arcane damage and marks the target with Code Smell for 12 sec.",
+            description: "Reads the code nobody, human or AI, actually read. Deals arcane damage and applies Code Smell for 12 sec.",
             effect: Damage(
                 base: 65, coefficient_pct: 70,
                 apply_aura: Some((aura: "code_smell", duration_ms: 12000)),
@@ -29,7 +32,7 @@
         (
             id: 2, name: "Refactor", icon: "refactor", school: Arcane,
             range_m: 30.0, cast_ms: 2500, mana: 55, gcd: true, cooldown_ms: 0,
-            description: "Deals heavy arcane damage. Consumes Code Smell for +35% damage.",
+            description: "Rewrites whatever the AI generated last sprint. Deals heavy arcane damage. Consumes Code Smell for +35% damage.",
             effect: Damage(
                 base: 95, coefficient_pct: 85,
                 apply_aura: None,
@@ -39,19 +42,19 @@
         (
             id: 3, name: "Guardrails", icon: "guardrails", school: Arcane,
             range_m: 0.0, cast_ms: 0, mana: 40, gcd: true, cooldown_ms: 30000,
-            description: "Absorbs the next 100 damage for up to 10 sec.",
+            description: "The thing leadership calls 'slowing down innovation'. Absorbs the next 100 damage for up to 10 sec.",
             effect: Absorb(aura: "guardrails", amount: 100, duration_ms: 10000),
         ),
         (
             id: 4, name: "Reject PR", icon: "reject_pr", school: Arcane,
             range_m: 25.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 20000,
-            description: "Interrupts the target's spellcasting and locks arcane spells for 4 sec.",
+            description: "No, the 4,000-line AI pull request is not 'basically done'. Interrupts spellcasting and locks arcane spells for 4 sec.",
             effect: Interrupt(lockout_ms: 4000),
         ),
         (
             id: 5, name: "Hallucination Blast", icon: "hallucination_blast", school: Arcane,
             range_m: 25.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0,
-            description: "Confidently wrong. Deals arcane damage.",
+            description: "Confidently wrong, now at enterprise scale. Deals arcane damage.",
             effect: Damage(base: 45, coefficient_pct: 0, apply_aura: None, consume_aura: None),
         ),
     ],
@@ -62,21 +65,72 @@
             max_hp: 300, max_mana: 250, spell_power: 20, crit_pct: 5, haste_pct: 0,
             mana_regen_per_5s_ooc: 100, mana_regen_per_5s_combat: 25,
             xp_reward: 0, loot: [], ai: None,
+            auto_attack: Some((
+                name: "Nitpick", range_m: 25.0, swing_ms: 1800,
+                damage_min: 9, damage_max: 14,
+            )),
         ),
         (
-            key: "ai_evangelist", name: "AI Evangelist", level: 3, hostile: true,
+            key: "ceo", name: "CEO", level: 3, hostile: true,
             max_hp: 900, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_ooc: 0, mana_regen_per_5s_combat: 0,
             xp_reward: 120,
-            loot: [(item: "Prompt Fragment", chance_pct: 60)],
+            loot: [
+                (item: "Prompt Fragment", chance_pct: 60),
+                (item: "Unread AI Strategy Deck", chance_pct: 35),
+                (item: "Expired GPU Credits", chance_pct: 25),
+                (item: "Mandatory Prompt Training Certificate", chance_pct: 15),
+            ],
             ai: Some((
                 aggro_m: 12.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 14, chase_speed_mps: 6.0, respawn_ms: 15000,
                 ability: Some((spell: 5, cooldown_min_ms: 8000, cooldown_max_ms: 12000)),
             )),
+            yells: (
+                periodic_ms: 9000,
+                aggro: [
+                    "You there! Why aren't you using AI yet?",
+                    "Finally, someone to demo our AI transformation on!",
+                    "Stop coding by hand. That is so 2023.",
+                    "Welcome! Today's agenda: AI. Tomorrow's agenda: also AI.",
+                ],
+                periodic: [
+                    "AI is not a tool. AI is a lifestyle.",
+                    "Our new strategy is simple: AI. Questions? Ask the AI.",
+                    "Every team must ship three AI features by Friday. Nobody asked how.",
+                    "I replaced our roadmap with a prompt. Velocity is up 400 percent.",
+                    "Senior engineers are a legacy cost center.",
+                    "The board loves the word agentic. Say it with me.",
+                    "Why hire ten people when one chatbot can be confidently wrong for free?",
+                    "Code review? The model reviewed itself. It approved.",
+                    "We are not cutting jobs. We are right-sizing humans.",
+                    "If AI cannot do it, it is not a real problem.",
+                    "Our AI has no feelings, no salary and no weekends. Be more like our AI.",
+                ],
+                blast: [
+                    "Behold: our new AI strategy deck!",
+                    "Mandatory all-hands! Attendance is tracked!",
+                    "Synergize THIS!",
+                ],
+                low_hp: [
+                    "Impossible! The AI said this quarter would be flawless!",
+                    "Get me the consultants! The expensive ones!",
+                ],
+                player_killed: [
+                    "See? Instantly replaced by a prompt.",
+                    "Another headcount optimized.",
+                ],
+                death: [
+                    "But... the slide deck... promised... ROI...",
+                    "Tell the board... it was a pivot...",
+                ],
+                evade: [
+                    "This meeting could have been an email.",
+                ],
+            ),
         ),
         (
-            key: "intern", name: "Intern", level: 1, hostile: false,
+            key: "intern", name: "AI-Native Intern", level: 1, hostile: false,
             max_hp: 40, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_ooc: 0, mana_regen_per_5s_combat: 0,
             xp_reward: 0, loot: [], ai: None,

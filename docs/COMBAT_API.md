@@ -11,6 +11,7 @@ pub struct SpellId(pub u32);              // Copy, Eq, Hash, Debug
 pub enum School { Physical, Arcane }
 
 pub struct Content { /* spells, units, config */ }
+// content.config.xp_per_level (400) is the XP bar maximum; also white_hit_pct (95) and spell_hit_pct (96).
 impl Content {
     pub fn from_ron(src: &str) -> Result<Content, ContentError>;
     pub fn spell(&self, id: SpellId) -> Option<&SpellDef>;   // SpellDef: id, name, icon (asset key), school, range_m, cast_ms, mana, gcd: bool, cooldown_ms, description
@@ -22,7 +23,7 @@ impl Sim {
     pub fn new(content: Content, seed: u64) -> Sim;
     pub fn set_blockers(&mut self, blockers: Vec<Aabb>);
     pub fn spawn_player(&mut self, pos: Vec3, yaw: f32) -> EntityId;
-    pub fn spawn_unit(&mut self, unit_key: &str, pos: Vec3, yaw: f32) -> Result<EntityId, ContentError>; // "ai_evangelist", "intern"
+    pub fn spawn_unit(&mut self, unit_key: &str, pos: Vec3, yaw: f32) -> Result<EntityId, ContentError>; // "ceo", "intern"
     pub fn push(&mut self, cmd: Command);    // applied at the start of the next tick
     pub fn tick(&mut self) -> Vec<Event>;    // advance exactly one 1/30 s tick
     pub fn now(&self) -> Tick;
@@ -42,6 +43,8 @@ pub enum Command {
     Cast { caster: EntityId, spell: SpellId },   // validates now, or queues if within the queue window
     StopCasting { caster: EntityId },
     Loot { looter: EntityId, corpse: EntityId },
+    StartAutoAttack { unit: EntityId },          // targets the unit's current target
+    StopAutoAttack { unit: EntityId },
     RespawnPlayer,
 }
 
@@ -54,6 +57,8 @@ pub struct UnitState {
     pub auras: Vec<AuraView>,                        // AuraView { key, name, icon, harmful, remaining_ms, total_ms, absorb_remaining: Option<u32> }
     pub ai: Option<AiState>,                         // Idle | Chase | Attack | Casting | Evade | Dead
     pub lootable: bool, pub respawn_in_ms: Option<u32>, pub xp: u32,
+    pub auto_attack: bool,                           // auto attack enabled
+    pub swing_remaining_ms: u32,                     // ms to the next swing; 0 when off or ready and waiting
 }
 
 pub enum CastError { NoTarget, InvalidTarget, Dead, OutOfRange, NotFacing, NoLineOfSight, NotEnoughMana, OnCooldown, OnGcd, AlreadyCasting, SchoolLocked, Moving, NotInterruptible, NothingToInterrupt }
@@ -66,7 +71,9 @@ pub enum Event {
     CastInterrupted { caster: EntityId, spell: SpellId, by: Option<EntityId>, lockout_ms: u32 },
     CastQueued { caster: EntityId, spell: SpellId },
     Damage { source: EntityId, target: EntityId, spell: Option<SpellId>, amount: u32, absorbed: u32, crit: bool, combo: bool, school: School },
-    MeleeSwing { attacker: EntityId, target: EntityId },
+    MeleeSwing { attacker: EntityId, target: EntityId },   // enemy melee and player auto attack (ranged too)
+    Miss { source: EntityId, target: EntityId, spell: Option<SpellId> },   // None = white attack ("Miss"), Some = spell ("Resist")
+    AutoAttackToggled { unit: EntityId, on: bool },
     AuraApplied { target: EntityId, key: String },
     AuraRemoved { target: EntityId, key: String, reason: AuraEnd },   // Expired | Consumed | Depleted | Death
     EnterCombat { unit: EntityId }, LeaveCombat { unit: EntityId },
@@ -75,6 +82,7 @@ pub enum Event {
     XpGained { unit: EntityId, amount: u32 },
     LootDropped { corpse: EntityId, items: Vec<String> },
     Looted { looter: EntityId, corpse: EntityId, items: Vec<String> },
+    Yell { unit: EntityId, text: String },   // boss shout, see "Yells" below
     Respawned { unit: EntityId },
 }
 ```
@@ -100,3 +108,16 @@ Additions to the signatures above (no names removed or renamed):
 - A corpse is always `lootable` after death; `LootDropped.items` / `Looted.items` may be empty. `Command::Loot` outside `loot_range_m` or on a non-corpse is silently ignored.
 - Hostile units die with `ai: Some(AiState::Dead)`; the player has `ai: None`. `Command::RespawnPlayer` on a living player is ignored.
 - Damage to a unit in `AiState::Evade` is dropped entirely (no `Damage` event, no threat, no aura).
+- Auto attack ("Nitpick", `UnitDef.auto_attack`: range 25 m, 1800 ms, 9..=14 Physical, crits with the unit's crit chance) swings when enabled and the current target exists, is hostile, alive, not evading, in range, in the facing cone and in LoS, and the attacker is not casting a cast-time spell. Otherwise a ready swing just waits (no event, no error). Moving is allowed. It uses no GCD, generates threat like damage and starts combat. A swing emits `MeleeSwing`, then `Damage { spell: None }` or `Miss { spell: None }`; both consume the swing timer. The timer persists across stop/start.
+- `StartAutoAttack` with no target, a friendly, dead or unknown target, a dead unit or a unit without an auto attack is ignored silently: no event, no state change (there is no spell to emit `CastFailed` for). Starting while already on emits nothing.
+- Auto attack turns off (emitting `AutoAttackToggled { on: false }`) on `StopAutoAttack`, on `SetTarget` to a different target or `None` (re-selecting the same target keeps it on), on target death, on attacker death and on respawn. `AutoAttackToggled` is emitted only when the state really changes. The HUD reads `UnitState.auto_attack` and `swing_remaining_ms`.
+- `Miss` replaces `Damage` for that attack: damaging spells (including the enemy Hallucination Blast) and white attacks (player auto attack, enemy melee) roll `spell_hit_pct` / `white_hit_pct`. Absorb and Interrupt never roll. A missed spell still emits `CastSucceeded` first and spends mana, GCD and cooldown, but applies no aura, consumes no Code Smell (no combo) and generates no threat. Roll order: hit, then crit; absorb applies after a hit.
+- `content.config.xp_per_level` (400) is the XP bar maximum for the client.
+
+## Yells
+
+`UnitDef.yells` (RON, serde default = silent): `periodic_ms` plus line lists `aggro`, `periodic`, `blast`, `low_hp`, `player_killed`, `death`, `evade`. A unit yells via `Event::Yell { unit, text }`, emitted at the end of the tick (after `Death`/`EnterCombat`/`CastStarted` of that tick).
+
+- Triggers: entering combat; every `periodic_ms` while in combat and alive; starting its AI ability cast; hp first dropping to <= 30% (re-armed when hp is back above 30%, e.g. respawn or evade heal); killing the player; its own death; starting evade.
+- At most one yell per unit per tick. Priority: death > player_killed > low_hp > blast > aggro > evade > periodic. Any emitted yell restarts the periodic timer.
+- Lines cycle round-robin per unit and trigger; the combat rng is never consumed, so yells cannot change hit/miss/crit outcomes.

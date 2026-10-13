@@ -137,6 +137,11 @@ fn place_camera(
     if dir.y < -1e-3 {
         free = free.min((CAM_MIN_HEIGHT - focus.y) / dir.y);
     }
+    // Same idea against the ceiling; the slab is not a collider because it
+    // must not block line of sight for combat.
+    if dir.y > 1e-3 {
+        free = free.min((CAM_MAX_HEIGHT - focus.y) / dir.y);
+    }
     let target = free.max(CAM_MIN_CLIP_DIST);
     // Snap in when clipped (never show the wall), ease out when it clears.
     cam.dist = if target < cam.dist {

@@ -116,7 +116,7 @@ fn spawn_misc(mut commands: Commands) {
         },
         children![(
             label(
-                "W/S move  A/D turn  Q/E strafe  RMB steer  LMB orbit  Wheel zoom  Space jump  Tab target  1-4 cast  F loot  F3 debug  Esc clear/menu",
+                "W/S move  A/D turn  Q/E strafe  RMB steer  LMB orbit  Wheel zoom  Space jump  Tab target  RMB-click attack  T auto attack  1-4 cast  F loot  F3 debug  Esc clear/menu",
                 12.0,
             ),
             TextColor(Color::srgba(1.0, 1.0, 1.0, 0.45)),
@@ -126,7 +126,7 @@ fn spawn_misc(mut commands: Commands) {
         DevText,
         Node {
             position_type: PositionType::Absolute,
-            top: px(110),
+            top: px(150),
             left: px(12),
             padding: UiRect::all(px(6)),
             display: Display::None,
@@ -148,7 +148,10 @@ fn spawn_misc(mut commands: Commands) {
         },
         GlobalZIndex(50),
         BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
-        children![label("Paused - press Esc to resume", 32.0)],
+        children![label(
+            "Paused - the AI is regenerating your sprint. Press Esc to resume.",
+            32.0
+        )],
     ));
 }
 

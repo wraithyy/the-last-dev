@@ -8,13 +8,26 @@ Simplified, WotLK-inspired rules for gameplay feel. They are **not** Blizzard's 
 raw      = base + floor(spell_power * coefficient_pct / 100)
 combo    : if the spell consumes an aura present on the target
              raw = floor(raw * (100 + bonus_pct) / 100)   // Refactor on Code Smell: +35%
-crit     : roll below(100) < crit_pct   (rolled on every damage spell, crit or not)
+hit      : roll below(100) < spell_hit_pct (96); first roll, a miss ends the spell before anything below
+crit     : roll below(100) < crit_pct   (rolled on every hit, crit or not)
              raw = floor(raw * crit_damage_pct / 100)       // 150%
 absorbed = min(raw, shield left)       // shields apply in application order
 amount   = raw - absorbed              // Event::Damage.amount; absorbed is reported separately
 ```
 
-Code Review at 20 spell power: 65 + 14 = 79. Refactor: 95 + 17 = 112, with Code Smell 151. Spells always hit (no miss/resist). Enemy melee is a flat `melee_damage`, physical, no crit roll.
+Code Review at 20 spell power: 65 + 14 = 79. Refactor: 95 + 17 = 112, with Code Smell 151. Enemy melee is a flat `melee_damage`, physical, no crit roll.
+
+## Hit, miss and auto attack
+
+```
+spell hit  : below(100) < spell_hit_pct (96)   damaging spells, incl. Hallucination Blast; miss = "Resist"
+white hit  : below(100) < white_hit_pct (95)   player auto attack and enemy melee;       miss = "Miss"
+always hit : Absorb (Guardrails) and Interrupt (Reject PR) never roll
+```
+
+A missed spell still spends mana, starts its cooldown and GCD, and reports `CastSucceeded`; it deals no damage, applies no aura, does not consume Code Smell and generates no threat (so it does not pull or start combat). Absorb is applied after the hit roll.
+
+Auto attack "Nitpick" (unit field `auto_attack`): range 25 m, swing 1800 ms (54 ticks), damage `U[9, 14]` physical, crit with the unit's `crit_pct` at `crit_damage_pct`. Roll order per swing: hit, crit, damage. The timer is not reset by stopping and restarting. A ready swing waits while the attacker is casting a cast-time spell, the target is out of range, outside the facing cone, out of LoS or evading.
 
 ## GCD and haste
 
@@ -46,3 +59,5 @@ Senior Engineer: 100 mana per 5 s out of combat, 25 in combat. A unit is in comb
 Threat = full pre-absorb damage dealt (minimum 1) to the enemy; initial aggro adds 1. Target = highest threat, ties to the lowest unit id; dead units drop out of the table. Heals generate no threat (no heals exist yet). Empty table while engaged, or distance from spawn > `leash_m`, starts Evade: cast cancelled, harmful auras removed, threat dropped, walk home at chase speed, heal to full on arrival, damage ignored meanwhile.
 
 Hallucination Blast: first cast `U[8000, 12000]` ms after the pull, then re-rolled `U[8000, 12000]` ms at each cast start. A school lockout blocks the attempt until it ends.
+
+Yells are presentation-only: line selection is a per-trigger round-robin cursor and never draws from the rng (see COMBAT_API.md, Yells).

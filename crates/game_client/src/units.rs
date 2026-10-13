@@ -7,6 +7,8 @@ use std::f32::consts::PI;
 
 #[derive(Component)]
 pub struct Unit {
+    /// Sim unit key; separate from the display name so a rename cannot break the sim link.
+    pub key: &'static str,
     pub name: &'static str,
     pub level: u32,
     pub hostile: bool,
@@ -20,15 +22,16 @@ struct Halo;
 
 impl Plugin for UnitsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (spawn_evangelist, spawn_intern))
+        app.add_systems(Startup, (spawn_ceo, spawn_intern))
             .add_systems(Update, hide_dead_halos);
     }
 }
 
-const EVANGELIST_SCALE: f32 = 1.05;
-const INTERN_SCALE: f32 = 0.75;
+/// Kenney characters are 2.7 units tall at scale 1: the CEO towers over the 1.8 m player.
+const CEO_SCALE: f32 = 1.0;
+const INTERN_SCALE: f32 = 0.6;
 
-fn spawn_evangelist(
+fn spawn_ceo(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -43,16 +46,15 @@ fn spawn_evangelist(
     commands
         .spawn((
             Unit {
-                name: "AI Evangelist",
+                key: "ceo",
+                name: "CEO",
                 level: 3,
                 hostile: true,
                 alive: true,
             },
             Character {
-                kind: ModelKind::Rogue,
-                scale: EVANGELIST_SCALE,
-                // Purple glow so the silhouette reads as hostile.
-                tint: Some(LinearRgba::rgb(0.25, 0.04, 0.4)),
+                kind: ModelKind::Ceo,
+                scale: CEO_SCALE,
             },
             Transform::from_xyz(0.0, 0.0, -8.0).with_rotation(Quat::from_rotation_y(PI)),
             Visibility::default(),
@@ -61,7 +63,7 @@ fn spawn_evangelist(
             c.spawn((
                 Mesh3d(meshes.add(Torus::new(0.2, 0.3))),
                 MeshMaterial3d(halo),
-                Transform::from_xyz(0.0, 2.65, 0.0),
+                Transform::from_xyz(0.0, 3.05, 0.0),
                 Halo,
             ));
         });
@@ -70,15 +72,15 @@ fn spawn_evangelist(
 fn spawn_intern(mut commands: Commands) {
     commands.spawn((
         Unit {
-            name: "Intern",
+            key: "intern",
+            name: "AI-Native Intern",
             level: 1,
             hostile: false,
             alive: true,
         },
         Character {
-            kind: ModelKind::Barbarian,
+            kind: ModelKind::Intern,
             scale: INTERN_SCALE,
-            tint: None,
         },
         Transform::from_xyz(-6.0, 0.0, 8.0),
         Visibility::default(),

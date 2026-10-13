@@ -5,6 +5,7 @@
 use crate::combat::{CombatEvent, CombatSim, SimReady, SimUnit};
 use crate::config::*;
 use crate::player::Player;
+use crate::presentation::PresentEvent;
 use bevy::prelude::*;
 use combat_core::{EntityId, Event};
 
@@ -43,13 +44,20 @@ fn entity_of(units: &Query<(Entity, &SimUnit)>, id: EntityId) -> Option<Entity> 
 
 fn spawn_texts(
     mut commands: Commands,
-    mut events: MessageReader<CombatEvent>,
+    mut raw: MessageReader<CombatEvent>,
+    mut present: MessageReader<PresentEvent>,
     sim: Res<CombatSim>,
     player: Single<&SimUnit, With<Player>>,
     units: Query<(Entity, &SimUnit)>,
     mut counter: Local<usize>,
 ) {
-    for CombatEvent(ev) in events.read() {
+    // Interrupts show immediately; Damage/Miss arrive via the presentation queue (at impact).
+    let interrupts = raw
+        .read()
+        .map(|CombatEvent(ev)| ev)
+        .filter(|ev| matches!(ev, Event::CastInterrupted { .. }));
+    let presented = present.read().map(|PresentEvent(ev)| ev);
+    for ev in interrupts.chain(presented) {
         let (target, specs) = match ev {
             Event::Damage {
                 target,
@@ -122,6 +130,19 @@ fn spawn_texts(
                     offset: Vec2::ZERO,
                 }],
             ),
+            Event::Miss { target, spell, .. } => {
+                let stagger = STAGGER[*counter % STAGGER.len()];
+                *counter += 1;
+                (
+                    *target,
+                    vec![Spec {
+                        text: if spell.is_some() { "Resist" } else { "Miss" }.into(),
+                        size: 20.0,
+                        color: Color::srgb(0.85, 0.85, 0.9),
+                        offset: Vec2::new(stagger, 0.0),
+                    }],
+                )
+            }
             _ => continue,
         };
         let Some(anchor) = entity_of(&units, target) else {

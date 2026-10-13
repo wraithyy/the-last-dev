@@ -5,13 +5,15 @@ use super::{
 };
 use crate::combat::{CombatEvent, CombatSim, SimReady, SimUnit};
 use crate::config::*;
+use crate::copy;
 use crate::player::Player;
 use crate::targeting::Target;
 use bevy::prelude::*;
 use combat_core::{AuraView, CastError, CastView, EntityId, Event};
 
-const FRAME_H: f32 = 92.0;
-const FRAME_TOP: f32 = 12.0;
+const FRAME_H: f32 = 104.0;
+// Leaves room for the controls hint line above the frames.
+const FRAME_TOP: f32 = 26.0;
 const FRAME_GAP: f32 = 14.0;
 const CASTING: Color = Color::srgb(1.0, 0.72, 0.1);
 const UNINTERRUPTIBLE: Color = Color::srgb(0.55, 0.55, 0.58);
@@ -31,6 +33,7 @@ enum Pool {
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
 enum Field {
     Name,
+    Title,
     Level,
     Initial,
     Hp,
@@ -206,7 +209,23 @@ fn spawn_frame(commands: &mut Commands, who: Who, left: f32) {
                         ..default()
                     })
                     .with_children(|row| {
-                        row.spawn((TextOf(who, Field::Name), label("", 14.0), TextColor::WHITE));
+                        row.spawn(Node {
+                            flex_direction: FlexDirection::Column,
+                            min_width: px(0),
+                            ..default()
+                        })
+                        .with_children(|names| {
+                            names.spawn((
+                                TextOf(who, Field::Name),
+                                label("", 14.0),
+                                TextColor::WHITE,
+                            ));
+                            names.spawn((
+                                TextOf(who, Field::Title),
+                                label("", 11.0),
+                                TextColor(Color::srgb(0.75, 0.62, 0.3)),
+                            ));
+                        });
                         row.spawn((
                             Node {
                                 width: px(22),
@@ -498,6 +517,7 @@ fn update_frames(
                     Color::srgb(0.35, 1.0, 0.4)
                 };
             }
+            Field::Title => set_text(&mut text, copy::title_for(&u.key)),
             Field::Level => set_text(&mut text, &u.level.to_string()),
             Field::Initial => {
                 set_text(&mut text, &u.name.chars().next().unwrap_or('?').to_string())

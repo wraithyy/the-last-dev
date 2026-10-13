@@ -8,7 +8,7 @@ use std::f32::consts::PI;
 
 /// Content tweak: no enemy ability, harmless melee, huge HP (a damage sponge).
 fn sponge(c: &mut Content) {
-    let m = def_mut(c, "ai_evangelist");
+    let m = def_mut(c, "ceo");
     m.max_hp = 1_000_000_000;
     if let Some(ai) = m.ai.as_mut() {
         ai.ability = None;
@@ -97,7 +97,7 @@ fn gcd_cooldown_cast_and_mana_are_distinct_timers() {
 fn melee_timer_is_independent_of_spell_timers() {
     let mut h = H::new(1, -2.0, |c| {
         def_mut(c, "senior_engineer").max_hp = 10_000;
-        if let Some(ai) = def_mut(c, "ai_evangelist").ai.as_mut() {
+        if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
             ai.ability = None;
         }
     });
@@ -227,7 +227,7 @@ fn mana_regenerates_fast_out_of_combat_and_slow_in_combat() {
     let delta = |mob_z: f32, damage: u32| {
         let mut h = H::new(1, mob_z, |c| {
             drain(c);
-            if let Some(ai) = def_mut(c, "ai_evangelist").ai.as_mut() {
+            if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
                 ai.melee_damage = damage;
                 ai.ability = None;
             }
@@ -323,7 +323,7 @@ fn standing_still_reports_do_not_cancel_the_cast() {
 #[test]
 fn incoming_damage_pushes_the_cast_back_at_most_twice() {
     let mut h = H::new(1, -2.0, |c| {
-        if let Some(ai) = def_mut(c, "ai_evangelist").ai.as_mut() {
+        if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
             ai.melee_ms = 500;
             ai.melee_damage = 10;
             ai.ability = None;
@@ -347,7 +347,7 @@ fn incoming_damage_pushes_the_cast_back_at_most_twice() {
 // ---- interrupt and lockout ----
 
 fn caster_mob(c: &mut Content) {
-    if let Some(ai) = def_mut(c, "ai_evangelist").ai.as_mut() {
+    if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
         ai.ability.iter_mut().for_each(|a| {
             a.cooldown_min_ms = 100;
             a.cooldown_max_ms = 100;
@@ -549,7 +549,7 @@ fn crit_deals_150_percent_and_is_seeded() {
 #[test]
 fn guardrails_absorbs_then_depletes() {
     let mut h = H::new(1, -2.0, |c| {
-        if let Some(ai) = def_mut(c, "ai_evangelist").ai.as_mut() {
+        if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
             ai.melee_damage = 60;
             ai.ability = None;
         }
@@ -662,7 +662,7 @@ fn chase_speed_is_about_6_m_per_s() {
 fn leash_makes_the_enemy_evade_heal_and_ignore_damage() {
     let mut h = H::new(1, -20.0, |c| {
         def_mut(c, "senior_engineer").max_mana = 1000;
-        if let Some(ai) = def_mut(c, "ai_evangelist").ai.as_mut() {
+        if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
             ai.ability = None;
         }
     });
@@ -722,7 +722,7 @@ fn leash_makes_the_enemy_evade_heal_and_ignore_damage() {
 
 fn one_shot(c: &mut Content) {
     def_mut(c, "senior_engineer").spell_power = 100_000;
-    if let Some(ai) = def_mut(c, "ai_evangelist").ai.as_mut() {
+    if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
         ai.ability = None;
     }
 }
@@ -731,7 +731,7 @@ fn one_shot(c: &mut Content) {
 fn death_grants_xp_drops_loot_and_respawns_after_15_seconds() {
     let mut h = H::new(1, -20.0, |c| {
         one_shot(c);
-        def_mut(c, "ai_evangelist").loot[0].chance_pct = 100;
+        def_mut(c, "ceo").loot[0].chance_pct = 100;
     });
     h.target(h.mob);
     h.cast(CR);
@@ -803,7 +803,7 @@ fn loot_drop_follows_configured_probability() {
     for (chance, expect) in [(0, 0), (100, 1)] {
         let mut h = H::new(3, -20.0, |c| {
             one_shot(c);
-            def_mut(c, "ai_evangelist").loot[0].chance_pct = chance;
+            def_mut(c, "ceo").loot[0].chance_pct = chance;
         });
         h.target(h.mob);
         h.cast(CR);
@@ -819,7 +819,7 @@ fn loot_drop_follows_configured_probability() {
 #[test]
 fn player_death_resets_the_encounter_and_respawn_restores_the_player() {
     let mut h = H::new(1, -2.0, |c| {
-        if let Some(ai) = def_mut(c, "ai_evangelist").ai.as_mut() {
+        if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
             ai.melee_damage = 1000;
             ai.ability = None;
         }
@@ -915,7 +915,7 @@ fn drive(sim: &mut combat_core::Sim, player: u64, mob: u64) {
 fn final_state(frames_us: &[u64]) -> (String, u64) {
     let mut sim = combat_core::Sim::new(content(), 99);
     let player = sim.spawn_player(Vec3::default(), 0.0);
-    let mob = match sim.spawn_unit("ai_evangelist", Vec3::new(0.0, 0.0, -15.0), 0.0) {
+    let mob = match sim.spawn_unit("ceo", Vec3::new(0.0, 0.0, -15.0), 0.0) {
         Ok(id) => id,
         Err(e) => panic!("{e}"),
     };
@@ -964,7 +964,7 @@ fn unknown_spell_ids_are_ignored() {
 fn evading_target_is_invalid_and_completing_cast_spends_no_mana() {
     let mut h = H::new(1, -20.0, |c| {
         def_mut(c, "senior_engineer").max_mana = 1000;
-        if let Some(ai) = def_mut(c, "ai_evangelist").ai.as_mut() {
+        if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
             ai.ability = None;
         }
     });
@@ -1000,7 +1000,7 @@ fn evading_target_is_invalid_and_completing_cast_spends_no_mana() {
     // Cast started on a fresh pull, target starts evading before completion.
     let mut h = H::new(1, -20.0, |c| {
         def_mut(c, "senior_engineer").max_mana = 1000;
-        if let Some(ai) = def_mut(c, "ai_evangelist").ai.as_mut() {
+        if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
             ai.ability = None;
             ai.leash_m = 10.0;
         }
@@ -1042,7 +1042,7 @@ fn one_hit_depletes_every_exhausted_absorb_aura() {
                 duration_ms: 10_000,
             };
         }
-        if let Some(ai) = def_mut(c, "ai_evangelist").ai.as_mut() {
+        if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
             ai.melee_damage = 60;
             ai.ability = None;
         }
@@ -1063,7 +1063,7 @@ fn one_hit_depletes_every_exhausted_absorb_aura() {
     });
     let mut sim = combat_core::Sim::new(c, 1);
     let player = sim.spawn_player(Vec3::default(), 0.0);
-    let _mob = sim.spawn_unit("ai_evangelist", Vec3::new(0.0, 0.0, -2.0), 0.0);
+    let _mob = sim.spawn_unit("ceo", Vec3::new(0.0, 0.0, -2.0), 0.0);
     sim.push(Command::Cast {
         caster: player,
         spell: GR,
@@ -1095,7 +1095,7 @@ fn one_hit_depletes_every_exhausted_absorb_aura() {
 #[test]
 fn death_of_a_casting_unit_emits_cast_interrupted() {
     let mut h = H::new(1, -2.0, |c| {
-        if let Some(ai) = def_mut(c, "ai_evangelist").ai.as_mut() {
+        if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
             ai.melee_damage = 1000;
             ai.ability = None;
         }

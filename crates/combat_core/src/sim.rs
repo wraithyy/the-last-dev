@@ -3,7 +3,9 @@
 //! All timers are integer ticks derived from content milliseconds; nothing
 //! here reads a wall clock or frame time. Unit ids are `index + 1`.
 
-use crate::content::{AuraDef, Content, ContentError, Effect, School, SpellDef, SpellId, ticks};
+use crate::content::{
+    AuraDef, Content, ContentError, Effect, School, SpellDef, SpellId, YellKind, ticks,
+};
 use crate::geom::{Aabb, Vec3, in_range};
 use crate::rng::Rng;
 use crate::targeting::{EntityId, TargetCandidate, validate_target};
@@ -46,12 +48,20 @@ pub(crate) struct Unit {
     /// BTreeMap keeps tie-breaks (lowest id wins) deterministic.
     pub threat: BTreeMap<EntityId, u32>,
     pub melee_next: u64,
+    /// Persists across toggles so stop/start cannot reset the swing timer.
+    pub swing_next: u64,
     pub ability_next: u64,
     pub auras: Vec<AuraRt>,
     /// Mana regen remainder, in 1/150 mana (5 s = 150 ticks).
     pub regen_acc: u32,
     pub respawn_at: Option<u64>,
     pub loot: Vec<String>,
+    /// Highest-priority yell requested this tick; flushed once at end of tick.
+    pub yell_pending: Option<YellKind>,
+    /// Round-robin cursor per `YellKind`.
+    pub yell_cursor: [usize; 7],
+    pub yell_periodic_next: u64,
+    pub yell_low_done: bool,
 }
 
 /// One resolved damage instance, before absorbs.
@@ -135,6 +145,8 @@ impl Sim {
             lootable: false,
             respawn_in_ms: None,
             xp: if d.hostile { d.xp_reward } else { 0 },
+            auto_attack: false,
+            swing_remaining_ms: 0,
         };
         self.units.push(Unit {
             state,
@@ -150,11 +162,16 @@ impl Sim {
             moving: false,
             threat: BTreeMap::new(),
             melee_next: 0,
+            swing_next: 0,
             ability_next: 0,
             auras: Vec::new(),
             regen_acc: 0,
             respawn_at: None,
             loot: Vec::new(),
+            yell_pending: None,
+            yell_cursor: [0; 7],
+            yell_periodic_next: 0,
+            yell_low_done: false,
         });
         Ok(id)
     }
@@ -222,10 +239,12 @@ impl Sim {
         }
         self.update_casts();
         self.run_queue();
+        self.update_auto_attack();
         self.update_ai();
         self.update_auras();
         self.update_regen();
         self.update_combat_flags();
+        self.flush_yells();
         self.sync_views();
         std::mem::take(&mut self.events)
     }
@@ -280,6 +299,9 @@ impl Sim {
             Command::SetTarget { unit, target } => {
                 let valid = target.is_none_or(|t| self.index(t).is_some());
                 if let (Some(i), true) = (self.index(unit), valid) {
+                    if self.units[i].state.target != target {
+                        self.set_auto_attack(i, false);
+                    }
                     self.units[i].state.target = target;
                 }
             }
@@ -288,6 +310,12 @@ impl Sim {
                 if let Some(i) = self.index(caster) {
                     self.units[i].queued = None;
                     self.cancel_cast(i, None, 0);
+                }
+            }
+            Command::StartAutoAttack { unit } => self.start_auto_attack(unit),
+            Command::StopAutoAttack { unit } => {
+                if let Some(i) = self.index(unit) {
+                    self.set_auto_attack(i, false);
                 }
             }
             Command::Loot { looter, corpse } => self.handle_loot(looter, corpse),
@@ -339,6 +367,7 @@ impl Sim {
         if self.units[i].state.alive {
             return;
         }
+        self.set_auto_attack(i, false);
         let u = &mut self.units[i];
         u.state.alive = true;
         u.state.hp = u.state.max_hp;
@@ -587,6 +616,15 @@ impl Sim {
                 if self.units[ti].state.ai == Some(AiState::Evade) {
                     return;
                 }
+                // Hit roll first, so a miss neither consumes Code Smell nor applies an aura.
+                if !self.rng.chance_pct(self.content.config.spell_hit_pct) {
+                    self.events.push(Event::Miss {
+                        source: caster,
+                        target: Self::id_of(ti),
+                        spell: Some(spell.id),
+                    });
+                    return;
+                }
                 let sp = self.content.units[self.units[ci].def].spell_power;
                 let crit_pct = self.content.units[self.units[ci].def].crit_pct;
                 let mut amount =
@@ -773,6 +811,12 @@ impl Sim {
             self.remove_aura(ti, &k, AuraEnd::Death);
         }
         self.cancel_cast(ti, None, 0);
+        self.set_auto_attack(ti, false);
+        for o in 0..self.units.len() {
+            if self.units[o].state.target == Some(id) {
+                self.set_auto_attack(o, false);
+            }
+        }
         let u = &mut self.units[ti];
         u.state.alive = false;
         u.state.hp = 0;
@@ -781,6 +825,12 @@ impl Sim {
         u.threat.clear();
         u.state.target = None;
         self.events.push(Event::Death { unit: id, killer });
+        self.request_yell(ti, YellKind::Death);
+        if self.player == Some(id)
+            && let Some(k) = killer.and_then(|k| self.index(k))
+        {
+            self.request_yell(k, YellKind::PlayerKilled);
+        }
         for other in &mut self.units {
             other.threat.remove(&id);
         }
@@ -852,12 +902,67 @@ impl Sim {
                 };
             if now_in != u.state.in_combat {
                 self.units[i].state.in_combat = now_in;
+                if now_in && Some(id) != player {
+                    self.reset_periodic_yell(i);
+                    self.request_yell(i, YellKind::Aggro);
+                }
                 self.events.push(if now_in {
                     Event::EnterCombat { unit: id }
                 } else {
                     Event::LeaveCombat { unit: id }
                 });
             }
+        }
+    }
+
+    fn reset_periodic_yell(&mut self, i: usize) {
+        let ms = self.content.units[self.units[i].def].yells.periodic_ms;
+        self.units[i].yell_periodic_next = self.now + ticks(ms);
+    }
+
+    pub(crate) fn request_yell(&mut self, i: usize, kind: YellKind) {
+        if self.content.units[self.units[i].def]
+            .yells
+            .lines(kind)
+            .is_empty()
+        {
+            return;
+        }
+        let p = &mut self.units[i].yell_pending;
+        *p = Some(p.map_or(kind, |old| old.min(kind)));
+    }
+
+    /// Emits at most one yell per unit per tick; runs after all triggers of the tick.
+    fn flush_yells(&mut self) {
+        for i in 0..self.units.len() {
+            let def = &self.content.units[self.units[i].def];
+            let periodic_ms = def.yells.periodic_ms;
+            let u = &self.units[i];
+            if u.state.alive {
+                let low = u64::from(u.state.hp) * 100 <= u64::from(u.state.max_hp) * 30;
+                if !low {
+                    self.units[i].yell_low_done = false;
+                } else if !u.yell_low_done {
+                    self.units[i].yell_low_done = true;
+                    self.request_yell(i, YellKind::LowHp);
+                }
+                let u = &self.units[i];
+                if periodic_ms > 0 && u.state.in_combat && self.now >= u.yell_periodic_next {
+                    self.request_yell(i, YellKind::Periodic);
+                }
+            }
+            let Some(kind) = self.units[i].yell_pending.take() else {
+                continue;
+            };
+            let lines = self.content.units[self.units[i].def].yells.lines(kind);
+            let cur = &mut self.units[i].yell_cursor[kind as usize];
+            let text = lines[*cur % lines.len()].clone();
+            *cur += 1;
+            self.reset_periodic_yell(i);
+            self.events.push(Event::Yell {
+                unit: Self::id_of(i),
+                text,
+            });
         }
     }
 
@@ -890,6 +995,11 @@ impl Sim {
                     })
                 })
                 .collect();
+            u.state.swing_remaining_ms = if u.state.auto_attack {
+                ticks_to_ms(u.swing_next.saturating_sub(now)) as u32
+            } else {
+                0
+            };
             u.state.respawn_in_ms = u
                 .respawn_at
                 .filter(|_| !u.state.alive)

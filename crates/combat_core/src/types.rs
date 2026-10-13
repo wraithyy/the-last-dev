@@ -98,6 +98,14 @@ pub enum Command {
         looter: EntityId,
         corpse: EntityId,
     },
+    /// Enables the unit's auto attack on its current target; ignored (no event) if
+    /// there is no valid hostile living target or the unit has no auto attack.
+    StartAutoAttack {
+        unit: EntityId,
+    },
+    StopAutoAttack {
+        unit: EntityId,
+    },
     RespawnPlayer,
 }
 
@@ -142,6 +150,16 @@ pub enum Event {
         attacker: EntityId,
         target: EntityId,
     },
+    /// A white attack (`spell: None`) or damaging spell failed its hit roll.
+    Miss {
+        source: EntityId,
+        target: EntityId,
+        spell: Option<SpellId>,
+    },
+    AutoAttackToggled {
+        unit: EntityId,
+        on: bool,
+    },
     AuraApplied {
         target: EntityId,
         key: String,
@@ -177,6 +195,11 @@ pub enum Event {
         looter: EntityId,
         corpse: EntityId,
         items: Vec<String>,
+    },
+    /// Boss shout; line choice is round-robin per trigger and never touches the rng.
+    Yell {
+        unit: EntityId,
+        text: String,
     },
     Respawned {
         unit: EntityId,
@@ -226,6 +249,9 @@ pub struct UnitState {
     pub respawn_in_ms: Option<u32>,
     /// Hostile units: XP awarded on kill. Player: accumulated XP.
     pub xp: u32,
+    pub auto_attack: bool,
+    /// Time until the next auto swing; 0 when off or ready and waiting.
+    pub swing_remaining_ms: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -1,6 +1,6 @@
 //! Enemy behaviour: idle -> aggro -> chase -> attack/cast -> evade -> respawn.
 
-use crate::content::{AiDef, School, ticks};
+use crate::content::{AiDef, School, YellKind, ticks};
 use crate::geom::{Vec3, distance, line_of_sight};
 use crate::sim::{Hit, Sim};
 use crate::targeting::EntityId;
@@ -154,6 +154,14 @@ impl Sim {
                 attacker: src,
                 target: dst,
             });
+            if !self.rng.chance_pct(self.content.config.white_hit_pct) {
+                self.events.push(Event::Miss {
+                    source: src,
+                    target: dst,
+                    spell: None,
+                });
+                return;
+            }
             let hit = Hit {
                 spell: None,
                 amount: ai.melee_damage,
@@ -184,6 +192,7 @@ impl Sim {
             .range_inclusive(ab.cooldown_min_ms, ab.cooldown_max_ms);
         self.units[i].ability_next = self.now + ticks(ms);
         self.start_cast(i, &spell, Some(Self::id_of(ti)));
+        self.request_yell(i, YellKind::Blast);
         true
     }
 
@@ -202,6 +211,7 @@ impl Sim {
         u.threat.clear();
         u.state.target = None;
         self.set_ai(i, AiState::Evade);
+        self.request_yell(i, YellKind::Evade);
     }
 
     fn evade_step(&mut self, i: usize, ai: &AiDef) {

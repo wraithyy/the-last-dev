@@ -8,9 +8,10 @@ use crate::combat::{CombatEvent, CombatSim, SimReady, SimUnit};
 use crate::combat_anim::CombatAnim;
 use crate::config::*;
 use crate::player::Player;
+use crate::presentation::{AUTO_ATTACK_COLOR, PresentEvent, PresentQueue};
 use crate::units::Unit;
 use bevy::prelude::*;
-use combat_core::{EntityId, Event};
+use combat_core::{EntityId, Event, SpellId};
 use std::f32::consts::FRAC_PI_2;
 
 pub struct VfxPlugin;
@@ -53,6 +54,16 @@ struct Telegraph(EntityId);
 struct Projectile {
     target: EntityId,
     color: Color,
+    /// Presentation events held until this projectile lands.
+    ticket: u64,
+}
+
+/// The projectile launched by the latest swing/cast, so its Damage/Miss can be held for impact.
+struct Launch {
+    source: EntityId,
+    target: EntityId,
+    spell: Option<SpellId>,
+    ticket: u64,
 }
 
 /// Expanding, fading one-shot (impact flash, interrupt burst, death fade).
@@ -174,6 +185,10 @@ fn spawn_from_events(
     sim: Res<CombatSim>,
     assets: Res<VfxAssets>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    player: Single<&SimUnit, With<Player>>,
+    mut queue: ResMut<PresentQueue>,
+    mut present: MessageWriter<PresentEvent>,
+    mut launch: Local<Option<Launch>>,
     units: Query<(&SimUnit, &Transform)>,
 ) {
     for CombatEvent(ev) in events.read() {
@@ -189,21 +204,50 @@ fn spawn_from_events(
                 let Some((_, rgb3)) = PROJECTILE_SPELLS.iter().find(|(k, _)| *k == def.icon) else {
                     continue;
                 };
-                let Some(from) = unit_pos(units.iter(), *caster) else {
-                    continue;
-                };
-                let color = rgb(*rgb3);
-                let material = materials.add(glow(color.with_alpha(0.95)));
-                commands.spawn((
-                    Projectile {
-                        target: *target,
-                        color,
-                    },
-                    Mesh3d(assets.sphere.clone()),
-                    MeshMaterial3d(material),
-                    Transform::from_translation(from + Vec3::Y * PROJECTILE_ORIGIN_Y)
-                        .with_scale(Vec3::splat(PROJECTILE_RADIUS)),
-                ));
+                launch_projectile(
+                    &mut commands,
+                    &assets,
+                    &mut materials,
+                    &mut queue,
+                    &mut launch,
+                    &units,
+                    (*caster, *target, Some(*spell)),
+                    rgb(*rgb3),
+                );
+            }
+            // Only the player's auto attack is ranged; enemy melee needs no projectile.
+            Event::MeleeSwing { attacker, target } if *attacker == player.0 => {
+                launch_projectile(
+                    &mut commands,
+                    &assets,
+                    &mut materials,
+                    &mut queue,
+                    &mut launch,
+                    &units,
+                    (*attacker, *target, None),
+                    rgb(AUTO_ATTACK_COLOR),
+                );
+            }
+            Event::Damage {
+                source,
+                target,
+                spell,
+                ..
+            }
+            | Event::Miss {
+                source,
+                target,
+                spell,
+            } => {
+                let held = launch.as_ref().is_some_and(|l| {
+                    l.source == *source && l.target == *target && l.spell == *spell
+                });
+                match launch.take().filter(|_| held) {
+                    Some(l) => queue.hold(l.ticket, ev.clone()),
+                    None => {
+                        present.write(PresentEvent(ev.clone()));
+                    }
+                }
             }
             Event::CastInterrupted { caster, .. } => {
                 if let Some(at) = unit_pos(units.iter(), *caster) {
@@ -234,17 +278,60 @@ fn spawn_from_events(
     }
 }
 
+/// Spawns the orb and remembers it, so the Damage/Miss that follows is held until impact.
+fn launch_projectile(
+    commands: &mut Commands,
+    assets: &VfxAssets,
+    materials: &mut Assets<StandardMaterial>,
+    queue: &mut PresentQueue,
+    launch: &mut Option<Launch>,
+    units: &Query<(&SimUnit, &Transform)>,
+    (source, target, spell): (EntityId, EntityId, Option<SpellId>),
+    color: Color,
+) {
+    let Some(from) = unit_pos(units.iter(), source) else {
+        return;
+    };
+    let ticket = queue.ticket();
+    let material = materials.add(glow(color.with_alpha(0.95)));
+    commands.spawn((
+        Projectile {
+            target,
+            color,
+            ticket,
+        },
+        Mesh3d(assets.sphere.clone()),
+        MeshMaterial3d(material),
+        Transform::from_translation(from + Vec3::Y * PROJECTILE_ORIGIN_Y)
+            .with_scale(Vec3::splat(PROJECTILE_RADIUS)),
+    ));
+    *launch = Some(Launch {
+        source,
+        target,
+        spell,
+        ticket,
+    });
+}
+
 fn move_projectiles(
     mut commands: Commands,
     time: Res<Time>,
     assets: Res<VfxAssets>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut queue: ResMut<PresentQueue>,
+    mut present: MessageWriter<PresentEvent>,
     units: Query<(&SimUnit, &Transform), Without<Projectile>>,
     mut orbs: Query<(Entity, &Projectile, &mut Transform)>,
 ) {
+    let mut land = |orb: &Projectile| {
+        for ev in queue.release(orb.ticket) {
+            present.write(PresentEvent(ev));
+        }
+    };
     for (entity, orb, mut tf) in &mut orbs {
         let Some(dest) = unit_pos(units.iter(), orb.target) else {
             commands.entity(entity).despawn();
+            land(orb);
             continue;
         };
         let dest = dest + Vec3::Y * PROJECTILE_TARGET_Y;
@@ -252,6 +339,7 @@ fn move_projectiles(
         let to = dest - tf.translation;
         if to.length() <= step.max(0.05) {
             commands.entity(entity).despawn();
+            land(orb);
             spawn_transient(
                 &mut commands,
                 &assets,
