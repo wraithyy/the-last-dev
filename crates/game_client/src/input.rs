@@ -1,6 +1,7 @@
 //! Raw devices -> one per-frame snapshot that the fixed-step simulation consumes.
 
 use crate::config::{CLICK_DRAG_THRESHOLD, MOUSE_YAW_SENS};
+use crate::keybinds::{Action, Keybinds};
 use bevy::input::InputSystems;
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::prelude::*;
@@ -153,21 +154,22 @@ pub(crate) fn collect_input(
     mouse: Res<MouseState>,
     paused: Res<Paused>,
     text_focus: Res<TextFocus>,
+    binds: Res<Keybinds>,
     mut input: ResMut<PlayerInput>,
 ) {
     if paused.0 || text_focus.0 {
         *input = PlayerInput::default();
         return;
     }
-    let axis = |pos: KeyCode, neg: KeyCode| {
-        f32::from(u8::from(keys.pressed(pos))) - f32::from(u8::from(keys.pressed(neg)))
+    let axis = |pos: Action, neg: Action| {
+        f32::from(u8::from(binds.held(&keys, pos))) - f32::from(u8::from(binds.held(&keys, neg)))
     };
-    let mut forward = axis(KeyCode::KeyW, KeyCode::KeyS);
+    let mut forward = axis(Action::Forward, Action::Backward);
     if mouse.left && mouse.right {
         forward = 1.0;
     }
-    let ad = axis(KeyCode::KeyD, KeyCode::KeyA);
-    let qe = axis(KeyCode::KeyE, KeyCode::KeyQ);
+    let ad = axis(Action::TurnRight, Action::TurnLeft);
+    let qe = axis(Action::StrafeRight, Action::StrafeLeft);
     // WoW: while RMB steers the character, A/D strafe instead of turning.
     let (turn, strafe) = if mouse.right {
         (0.0, qe + ad)
@@ -177,7 +179,7 @@ pub(crate) fn collect_input(
     input.forward = forward;
     input.strafe = strafe.clamp(-1.0, 1.0);
     input.turn = turn;
-    input.jump |= keys.just_pressed(KeyCode::Space);
+    input.jump |= binds.just(&keys, Action::Jump);
     if mouse.right {
         input.mouse_yaw -= motion.delta.x * MOUSE_YAW_SENS;
     }

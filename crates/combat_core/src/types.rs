@@ -3,6 +3,7 @@
 use crate::content::{IdlePose, School, SpellId};
 use crate::geom::Vec3;
 use crate::targeting::{EntityId, TargetError};
+use crate::telegraph::TelegraphShape;
 use serde::{Deserialize, Serialize};
 
 /// Who an event is for, see `Sim::drain_events_routed`.
@@ -143,6 +144,62 @@ pub enum Command {
     AbandonQuest {
         quest: String,
     },
+    /// Equip a piece of gear from the bag (the old piece goes back to the bag).
+    Equip {
+        item: String,
+    },
+    /// Move the piece in `slot` (`Slot::index`) to the bag.
+    Unequip {
+        slot: u8,
+    },
+    /// Buy from a vendor within `vendor_range_m`.
+    Buy {
+        vendor: EntityId,
+        item: String,
+    },
+    Sell {
+        vendor: EntityId,
+        item: String,
+    },
+    /// Buy back something sold this session at its sell price.
+    Buyback {
+        vendor: EntityId,
+        item: String,
+    },
+    /// Drink a consumable from the bag or trigger an equipped piece's on-use perk.
+    UseItem {
+        item: String,
+    },
+}
+
+/// Why an item command did nothing; routed to the player.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ItemError {
+    TooFar,
+    NotEnoughSp,
+    BagFull,
+    NotForSale,
+    NotInBag,
+    CannotEquip,
+    CannotUse,
+    NotReady,
+    Dead,
+}
+
+impl ItemError {
+    pub fn message(self) -> &'static str {
+        match self {
+            ItemError::TooFar => "Procurement only talks to you in person. Walk closer.",
+            ItemError::NotEnoughSp => "Not enough Story Points. Have you tried estimating higher?",
+            ItemError::BagFull => "Your bag is full. So is your calendar.",
+            ItemError::NotForSale => "That is not in stock. Expected delivery: 3-6 weeks.",
+            ItemError::NotInBag => "You don't have that. Check the other laptop.",
+            ItemError::CannotEquip => "That's not something you can wear to the office.",
+            ItemError::CannotUse => "Nothing happens. Like most initiatives.",
+            ItemError::NotReady => "Not ready yet. It's still in code review.",
+            ItemError::Dead => "You are dead. Equipment is the least of your problems.",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -223,14 +280,17 @@ pub enum Event {
         unit: EntityId,
         amount: u32,
     },
+    /// One member's roll on a kill: items (trophies, gear, junk) and Story Points.
     LootDropped {
         corpse: EntityId,
         items: Vec<String>,
+        sp: u32,
     },
     Looted {
         looter: EntityId,
         corpse: EntityId,
         items: Vec<String>,
+        sp: u32,
     },
     /// Boss shout; line choice is round-robin per trigger and never touches the rng.
     Yell {
@@ -332,6 +392,51 @@ pub enum Event {
     QuestCompleted {
         quest: String,
     },
+    /// A ground telegraph of `spell` will land `resolve_ms` from now on whoever of the other
+    /// side is inside `shape` at `pos` (cones and lines open along `facing`, a yaw). `cover`
+    /// lists the safe spots (radius in the spell's `TelegraphDef`), usually empty.
+    TelegraphStarted {
+        id: u32,
+        source: EntityId,
+        spell: SpellId,
+        shape: TelegraphShape,
+        pos: Vec3,
+        facing: f32,
+        resolve_ms: u32,
+        cover: Vec<Vec3>,
+    },
+    /// The telegraph landed (its damage events follow) or, with `landed: false`, was dropped
+    /// because its source reset.
+    TelegraphResolved {
+        id: u32,
+        landed: bool,
+    },
+    /// The owner's full economy state after any change (routed to that player only).
+    Bag {
+        unit: EntityId,
+        sp: u32,
+        bag: Vec<String>,
+        equipped: Vec<String>,
+        buyback: Vec<String>,
+    },
+    /// Equipped gear in slot order ("" = empty), for everyone: it is visible on the model.
+    GearChanged {
+        unit: EntityId,
+        equipped: Vec<String>,
+    },
+    /// A gear perk, set bonus or consumable fired.
+    Proc {
+        unit: EntityId,
+        item: String,
+    },
+    ItemError {
+        reason: ItemError,
+    },
+    /// An on-use item started its cooldown (routed to the owner).
+    ItemCooldown {
+        item: String,
+        ms: u32,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -394,6 +499,14 @@ pub struct UnitState {
     pub idle_pose: Option<IdlePose>,
     /// Player trophies as (item name, copies) in first-pickup order; empty for other units.
     pub inventory: Vec<(String, u32)>,
+    /// Player Story Points.
+    pub sp: u32,
+    /// Player bag (gear, junk, consumables), one entry per item.
+    pub bag: Vec<String>,
+    /// Player gear by `Slot::index`, "" for an empty slot; empty for non-players.
+    pub equipped: Vec<String>,
+    /// Items sold this session, oldest first.
+    pub buyback: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

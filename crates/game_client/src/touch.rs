@@ -8,6 +8,7 @@ use crate::camera::OrbitCamera;
 use crate::config::CAM_ORBIT_SENS;
 use crate::hud::{ACCENT, KEY_RIM, KEY_TOP, KeyHint, label};
 use crate::input::{Paused, PlayerInput, collect_input};
+use crate::keybinds::{Action, Keybinds};
 use crate::targeting::{Target, pick_unit};
 use crate::units::Unit;
 use bevy::input::InputSystems;
@@ -63,6 +64,9 @@ pub struct TouchState {
 
 #[derive(Component)]
 enum TouchButton {
+    /// Injects whatever key the action is currently bound to.
+    Act(Action),
+    /// Esc, which is not rebindable.
     Key(KeyCode),
     Jump,
 }
@@ -161,9 +165,10 @@ fn gestures(
     window: Single<&Window>,
     fresh_ui: Query<&Interaction, Changed<Interaction>>,
     colliders: Res<Colliders>,
-    camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
     units: Query<(Entity, &Transform, &Unit)>,
     mut st: ResMut<TouchState>,
+    binds: Res<Keybinds>,
     mut keys: ResMut<ButtonInput<KeyCode>>,
     mut input: ResMut<PlayerInput>,
     mut cam: Single<&mut OrbitCamera>,
@@ -254,8 +259,9 @@ fn gestures(
         };
         // A second tap on the current target is the touch "talk / loot / engage" (F).
         if target.0 == Some(picked) {
-            keys.press(KeyCode::KeyF);
-            st.release.push(KeyCode::KeyF);
+            let f = binds.key(Action::Interact);
+            keys.press(f);
+            st.release.push(f);
         }
         target.0 = Some(picked);
     }
@@ -269,6 +275,7 @@ fn gestures(
 fn press_buttons(
     buttons: Query<(&TouchButton, &Interaction), Changed<Interaction>>,
     paused: Res<Paused>,
+    binds: Res<Keybinds>,
     mut keys: ResMut<ButtonInput<KeyCode>>,
     mut input: ResMut<PlayerInput>,
     mut st: ResMut<TouchState>,
@@ -281,6 +288,11 @@ fn press_buttons(
             // Esc must work while paused (it resumes); movement must not.
             TouchButton::Jump if !paused.0 => input.jump = true,
             TouchButton::Jump => {}
+            TouchButton::Act(a) => {
+                let k = binds.key(*a);
+                keys.press(k);
+                st.release.push(k);
+            }
             TouchButton::Key(k) => {
                 keys.press(*k);
                 st.release.push(*k);
@@ -349,11 +361,11 @@ fn spawn_hud(mut commands: Commands) {
         ))
         .with_children(|p| {
             for (t, k) in [
-                ("T", KeyCode::KeyT),
-                ("C", KeyCode::KeyC),
-                ("F", KeyCode::KeyF),
+                ("T", Action::AutoAttack),
+                ("C", Action::Coffee),
+                ("F", Action::Interact),
             ] {
-                p.spawn(button(t, TouchButton::Key(k), 56.0, 56.0));
+                p.spawn(button(t, TouchButton::Act(k), 56.0, 56.0));
             }
             p.spawn(button("Jump", TouchButton::Jump, 120.0, 56.0));
         });
@@ -374,13 +386,13 @@ fn spawn_hud(mut commands: Commands) {
         ))
         .with_children(|p| {
             for (t, k) in [
-                ("J", KeyCode::KeyJ),
-                ("N", KeyCode::KeyN),
-                ("B", KeyCode::KeyB),
-                ("M", KeyCode::KeyM),
-                ("Esc", KeyCode::Escape),
+                ("J", TouchButton::Act(Action::QuestLog)),
+                ("N", TouchButton::Act(Action::Map)),
+                ("B", TouchButton::Act(Action::Trophies)),
+                ("M", TouchButton::Act(Action::Mute)),
+                ("Esc", TouchButton::Key(KeyCode::Escape)),
             ] {
-                p.spawn(button(t, TouchButton::Key(k), 52.0, 40.0));
+                p.spawn(button(t, k, 52.0, 40.0));
             }
         });
 }

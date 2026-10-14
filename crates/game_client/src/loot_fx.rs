@@ -84,8 +84,9 @@ fn track_empty(
     mut empty: ResMut<EmptyCorpses>,
 ) {
     for CombatEvent(e) in events.read() {
-        if let Event::LootDropped { corpse, items } = e
+        if let Event::LootDropped { corpse, items, sp } = e
             && items.is_empty()
+            && *sp == 0
         {
             empty.0.insert(*corpse);
         }
@@ -217,7 +218,7 @@ fn hover_cursor(
     empty: Res<EmptyCorpses>,
     colliders: Res<Colliders>,
     window: Single<(Entity, &Window), With<PrimaryWindow>>,
-    camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
     player: Single<&PlayerBody, With<Player>>,
     ui: Query<&Interaction>,
     units: Query<(Entity, &Transform, &Unit)>,

@@ -61,7 +61,12 @@ impl Plugin for YellPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (spawn_bubbles, place_bubbles).chain().in_set(SimReady),
+            (
+                spawn_bubbles,
+                place_bubbles.after(crate::nameplates::PlatePlacement),
+            )
+                .chain()
+                .in_set(SimReady),
         );
     }
 }
@@ -219,7 +224,8 @@ fn place_bubbles(
     time: Res<Time>,
     ui_scale: Res<UiScale>,
     window: Single<&Window>,
-    camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
+    plate_tops: Res<crate::nameplates::PlateTops>,
     transforms: Query<&Transform, Without<YellBubble>>,
     player: Query<&Transform, (With<Player>, Without<YellBubble>)>,
     sizes: Query<&ComputedNode, With<BubbleBody>>,
@@ -264,10 +270,14 @@ fn place_bubbles(
                 && s.y >= 0.0
                 && s.y <= win_h
         });
-        let Some(screen) = screen else {
+        let Some(mut screen) = screen else {
             hidden.push(entity);
             continue;
         };
+        // Above the plate's final (de-cluttered) position, not the raw head point.
+        if let Some(top) = plate_tops.0.get(&bubble.sim) {
+            screen.y = top - 2.0;
+        }
         // Physical size divided by the window factor is window-logical pixels. Until the
         // first layout pass a rough default keeps the bubble from being culled for a frame.
         let size = sizes

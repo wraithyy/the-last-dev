@@ -21,8 +21,12 @@ const PLACEHOLDER: Color = Color::srgb(0.38, 0.42, 0.5);
 const FAIL_RED: Color = Color::srgb(0.95, 0.35, 0.3);
 /// Characters a field box shows (JetBrains Mono at 16 px is about 9.6 px per glyph); the
 /// address box is narrower when the "This server" button sits next to it.
-const FIELD_CHARS: usize = 34;
-const FIELD_CHARS_BESIDE_BUTTON: usize = 20;
+const FIELD_CHARS: usize = 31;
+const FIELD_CHARS_BESIDE_BUTTON: usize = 17;
+/// Fallback glyph advance until the first measurement of a rendered field.
+const GLYPH_W: f32 = 9.6;
+/// Box border + horizontal padding: where the first glyph starts inside a field box.
+const TEXT_INSET: f32 = 10.0;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Intent {
@@ -43,6 +47,14 @@ pub struct Lobby {
     /// Local validation message; connection problems come from `NetState`.
     notice: Option<String>,
     loaded: bool,
+    /// Caret position (in chars) inside the focused field's text.
+    caret: usize,
+    /// First char of the focused field shown in the box; keeps the caret in view.
+    scroll: usize,
+    /// Set by clicks: DOM focus went to the canvas and must be pulled back to the hidden input.
+    refocus: bool,
+    /// Measured glyph advance in logical px (0 until a field has been laid out).
+    glyph_w: f32,
 }
 
 impl Lobby {
@@ -60,6 +72,15 @@ impl Lobby {
             Field::Name => &mut self.name,
             Field::Room => &mut self.room,
         }
+    }
+
+    /// Empties a field and focuses it with the caret at the start.
+    fn clear_field(&mut self, f: Field) {
+        self.text_mut(f).clear();
+        self.caret = 0;
+        self.scroll = 0;
+        self.focus = Some(f);
+        self.refocus = true;
     }
 
     /// A message for the status line (server errors, connection lost).
@@ -145,30 +166,81 @@ fn next_field(f: Field) -> Field {
     }
 }
 
-/// The end of `text` that fits in `max` characters, so the caret stays in view: long URLs
-/// scroll left instead of wrapping out of the box.
-fn tail(text: &str, max: usize) -> String {
-    let n = text.chars().count();
-    if n <= max {
-        return text.to_string();
-    }
-    let keep: String = text.chars().skip(n + 1 - max).collect();
-    format!("<{keep}")
+fn char_len(text: &str) -> usize {
+    text.chars().count()
 }
 
-/// Applies one editing key to a field's text.
-fn edit(field: Field, text: &mut String, key: &Key, typed: Option<&str>) {
-    match key {
-        Key::Backspace => {
-            text.pop();
+fn byte_at(text: &str, idx: usize) -> usize {
+    text.char_indices().nth(idx).map_or(text.len(), |(b, _)| b)
+}
+
+/// Inserts the accepted characters of `s` at the caret, up to the field limit.
+fn insert_at(field: Field, text: &mut String, caret: &mut usize, s: &str) {
+    let mut at = (*caret).min(char_len(text));
+    for c in s.chars().filter_map(|c| field.filter(c)) {
+        if char_len(text) >= field.max_len() {
+            break;
         }
+        text.insert(byte_at(text, at), c);
+        at += 1;
+    }
+    *caret = at;
+}
+
+/// Applies one editing key at the caret.
+fn edit(field: Field, text: &mut String, caret: &mut usize, key: &Key, typed: Option<&str>) {
+    let len = char_len(text);
+    *caret = (*caret).min(len);
+    match key {
+        Key::Backspace if *caret > 0 => {
+            *caret -= 1;
+            text.remove(byte_at(text, *caret));
+        }
+        Key::Delete if *caret < len => {
+            text.remove(byte_at(text, *caret));
+        }
+        Key::ArrowLeft => *caret = caret.saturating_sub(1),
+        Key::ArrowRight => *caret = (*caret + 1).min(len),
+        Key::Home => *caret = 0,
+        Key::End => *caret = len,
         Key::Character(_) | Key::Space => {
             if let Some(t) = typed {
-                field.push_str(text, t);
+                insert_at(field, text, caret, t);
             }
         }
         _ => {}
     }
+}
+
+/// New first visible char so the caret stays inside a `max`-column window. While scrolled, column
+/// 0 shows the `<` marker, so the caret may not sit on it.
+fn scroll_to(scroll: usize, caret: usize, len: usize, max: usize) -> usize {
+    if len <= max {
+        return 0;
+    }
+    let mut s = scroll;
+    if caret < s + usize::from(s > 0) {
+        s = caret.saturating_sub(1);
+    } else if caret > s + max {
+        s = caret - max;
+    }
+    s.min(len - max)
+}
+
+/// The visible slice for a window starting at `scroll`, with `<` marking hidden text on the left.
+fn window(text: &str, scroll: usize, max: usize) -> String {
+    let mut out: String = text.chars().skip(scroll).take(max).collect();
+    if scroll > 0 {
+        out.replace_range(..byte_at(&out, 1), "<");
+    }
+    out
+}
+
+/// Caret for a click `x` px right of the first glyph: nearest gap, never on the `<` marker.
+fn caret_at_click(x: f32, glyph_w: f32, scroll: usize, len: usize, max: usize) -> usize {
+    let col = (x / glyph_w).round().max(0.0) as usize;
+    let lo = usize::from(scroll > 0);
+    (scroll + col.clamp(lo, max)).min(len)
 }
 
 /// Native: winit is the only text source. Web: the hidden input is the single source of truth, so
@@ -176,7 +248,9 @@ fn edit(field: Field, text: &mut String, key: &Key, typed: Option<&str>) {
 /// it; keys the input already received are ignored here to avoid applying them twice.
 #[cfg(not(target_arch = "wasm32"))]
 fn edit_field(lobby: &mut Lobby, field: Field, key: &Key, typed: Option<&str>) {
-    edit(field, lobby.text_mut(field), key, typed);
+    let mut caret = lobby.caret;
+    edit(field, lobby.text_mut(field), &mut caret, key, typed);
+    lobby.caret = caret;
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -186,8 +260,11 @@ fn edit_field(lobby: &mut Lobby, field: Field, key: &Key, typed: Option<&str>) {
         return;
     }
     let mut text = kb::value().unwrap_or_else(|| lobby.text(field).to_string());
-    edit(field, &mut text, key, typed);
+    let mut caret = lobby.caret;
+    edit(field, &mut text, &mut caret, key, typed);
     kb::show(&text);
+    kb::set_caret(caret);
+    lobby.caret = caret;
 }
 
 #[derive(Component)]
@@ -200,6 +277,12 @@ struct StatusText;
 struct FieldBox(Field);
 #[derive(Component)]
 struct FieldText(Field);
+/// Thin bar drawn at the caret; absolute so the text never shifts.
+#[derive(Component)]
+struct CaretBar(Field);
+/// "x" inside a field's right edge; blocks the field box beneath it from also seeing the click.
+#[derive(Component)]
+struct ClearBtn(Field);
 #[derive(Component)]
 struct RoomCodeText;
 #[derive(Component)]
@@ -232,7 +315,17 @@ impl Plugin for LobbyPlugin {
         app.insert_resource(lobby)
             .init_resource::<TextFocus>()
             .add_systems(Startup, spawn_ui)
-            .add_systems(Update, (lobby_logic, lobby_room, lobby_visuals).chain());
+            .add_systems(
+                Update,
+                (
+                    lobby_clicks,
+                    lobby_logic,
+                    lobby_fields,
+                    lobby_room,
+                    lobby_visuals,
+                )
+                    .chain(),
+            );
     }
 }
 
@@ -340,7 +433,40 @@ fn spawn_ui(mut commands: Commands) {
                             },
                             BorderColor::all(PANEL_EDGE),
                             BackgroundColor(Color::srgb(0.03, 0.035, 0.055)),
-                            children![(FieldText(field), label("", 16.0), TextLayout::no_wrap())],
+                            children![
+                                (FieldText(field), label("", 16.0), TextLayout::no_wrap()),
+                                (
+                                    CaretBar(field),
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        top: px(5),
+                                        width: px(2),
+                                        height: px(18),
+                                        ..default()
+                                    },
+                                    BackgroundColor(ACCENT),
+                                    Visibility::Hidden,
+                                ),
+                                (
+                                    Button,
+                                    ClearBtn(field),
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        right: px(4),
+                                        top: px(3),
+                                        width: px(22),
+                                        height: px(20),
+                                        justify_content: JustifyContent::Center,
+                                        align_items: AlignItems::Center,
+                                        border: UiRect::all(px(1)),
+                                        border_radius: BorderRadius::all(px(3)),
+                                        display: Display::None,
+                                        ..default()
+                                    },
+                                    BorderColor::all(KEY_RIM),
+                                    children![(label("x", 14.0), TextColor(DIM))],
+                                ),
+                            ],
                         ));
                         if field == Field::Address && this_server {
                             r.spawn((Btn::ThisServer, ThisServerBtn, button("This server")));
@@ -385,23 +511,84 @@ fn spawn_ui(mut commands: Commands) {
         });
 }
 
+/// Field and clear-button clicks: focus, caret placement, clearing.
+fn lobby_clicks(
+    mut lobby: ResMut<Lobby>,
+    windows: Query<&Window>,
+    touches: Res<Touches>,
+    fields: Query<
+        (&Interaction, &FieldBox, &ComputedNode, &UiGlobalTransform),
+        Changed<Interaction>,
+    >,
+    clears: Query<(&Interaction, &ClearBtn), Changed<Interaction>>,
+    this_server_btn: Query<(), With<ThisServerBtn>>,
+) {
+    if !lobby.open {
+        return;
+    }
+    let pointer = windows
+        .iter()
+        .find_map(Window::cursor_position)
+        .or_else(|| {
+            touches
+                .iter()
+                .next()
+                .map(bevy::input::touch::Touch::position)
+        });
+    for (i, FieldBox(f), node, tf) in &fields {
+        if *i != Interaction::Pressed {
+            continue;
+        }
+        let len = char_len(lobby.text(*f));
+        let max = max_chars(*f, !this_server_btn.is_empty());
+        let glyph_w = if lobby.glyph_w > 0.0 {
+            lobby.glyph_w
+        } else {
+            GLYPH_W
+        };
+        // Without a pointer position (touch not reported) the caret goes to the end.
+        // An unfocused field shows its text from the start.
+        let scroll = if lobby.focus == Some(*f) {
+            lobby.scroll
+        } else {
+            0
+        };
+        lobby.caret = pointer.map_or(len, |p| {
+            let left = (tf.translation.x - node.size.x / 2.0) * node.inverse_scale_factor;
+            caret_at_click(p.x - left - TEXT_INSET, glyph_w, scroll, len, max)
+        });
+        lobby.scroll = scroll;
+        lobby.focus = Some(*f);
+        lobby.refocus = true;
+    }
+    for (i, ClearBtn(f)) in &clears {
+        if *i == Interaction::Pressed {
+            lobby.clear_field(*f);
+        }
+    }
+}
+
+fn max_chars(f: Field, this_server_btn: bool) -> usize {
+    if f == Field::Address && this_server_btn {
+        FIELD_CHARS_BESIDE_BUTTON
+    } else {
+        FIELD_CHARS
+    }
+}
+
 fn lobby_logic(
-    time: Res<Time>,
     paused: Res<Paused>,
     mut lobby: ResMut<Lobby>,
     mut net: ResMut<NetClient>,
     mut text_focus: ResMut<TextFocus>,
     mut keys: MessageReader<KeyboardInput>,
     buttons: Query<(&Interaction, &Btn), Changed<Interaction>>,
-    fields: Query<(&Interaction, &FieldBox), Changed<Interaction>>,
     mut coop_menu: Single<&mut Node, (With<CoopMenu>, Without<LobbyRoot>)>,
     mut root: Single<&mut Node, (With<LobbyRoot>, Without<CoopMenu>)>,
-    mut field_texts: Query<(&FieldText, &mut Text, &mut TextColor), Without<StatusText>>,
     mut status: Single<(&mut Text, &mut TextColor), With<StatusText>>,
     mut shown_focus: Local<Option<Field>>,
     mut kb_seen: Local<String>,
     world: Option<Res<NetWorld>>,
-    this_server_btn: Query<(), With<ThisServerBtn>>,
 ) {
     // Esc unpauses (see targeting.rs), which also closes the lobby.
     if !paused.0 {
@@ -432,12 +619,10 @@ fn lobby_logic(
     }
 
     if lobby.open {
-        for (i, FieldBox(f)) in &fields {
-            if *i == Interaction::Pressed {
-                lobby.focus = Some(*f);
-                // The click moved DOM focus to the canvas; re-show pulls it back to the hidden input.
-                *shown_focus = None;
-            }
+        if lobby.refocus {
+            lobby.refocus = false;
+            // The click moved DOM focus to the canvas; re-show pulls it back to the hidden input.
+            *shown_focus = None;
         }
         // Enter/Tab come from winit; text edits go through edit_field (see there for the web).
         for e in keys.read() {
@@ -447,7 +632,11 @@ fn lobby_logic(
             }
             match &e.logical_key {
                 Key::Enter => lobby.focus = None,
-                Key::Tab => lobby.focus = Some(next_field(field)),
+                Key::Tab => {
+                    let next = next_field(field);
+                    lobby.focus = Some(next);
+                    lobby.caret = char_len(lobby.text(next));
+                }
                 key => edit_field(&mut lobby, field, key, e.text.as_deref()),
             }
         }
@@ -455,6 +644,7 @@ fn lobby_logic(
             && let Some(p) = store::page()
             && let Some(url) = address::this_server_url(&p.protocol, &p.host)
         {
+            lobby.caret = char_len(&url);
             lobby.address = url;
         }
         if pressed(Btn::Back) {
@@ -490,29 +680,74 @@ fn lobby_logic(
     sync_soft_keyboard(&mut lobby, &mut shown_focus, &mut kb_seen);
     text_focus.0 = lobby.open && lobby.focus.is_some();
 
-    let caret = ((time.elapsed_secs() * 2.0) as u32).is_multiple_of(2);
-    for (FieldText(f), mut text, mut color) in &mut field_texts {
-        let value = lobby.text(*f);
-        let focused = lobby.focus == Some(*f);
-        let max = if *f == Field::Address && !this_server_btn.is_empty() {
-            FIELD_CHARS_BESIDE_BUTTON
-        } else {
-            FIELD_CHARS
-        };
-        let (shown, tint) = match (value.is_empty(), focused) {
-            (true, false) => (placeholder(*f).to_string(), PLACEHOLDER),
-            (_, true) => (
-                format!("{}{}", tail(value, max - 1), if caret { "_" } else { " " }),
-                ACCENT,
-            ),
-            _ => (tail(value, max), Color::WHITE),
-        };
-        set_text(&mut text, &shown);
-        color.0 = tint;
-    }
     let (line, tint) = status_line(net.state(), lobby.notice.as_deref(), world.is_some());
     set_text(&mut status.0, &line);
     status.1.0 = tint;
+}
+
+/// Field text, caret bar and clear buttons.
+fn lobby_fields(
+    time: Res<Time>,
+    mut lobby: ResMut<Lobby>,
+    mut field_texts: Query<(&FieldText, &mut Text, &mut TextColor, &ComputedNode)>,
+    mut carets: Query<(&CaretBar, &mut Node, &mut Visibility), Without<ClearBtn>>,
+    mut clears: Query<(&ClearBtn, &mut Node), Without<CaretBar>>,
+    this_server_btn: Query<(), With<ThisServerBtn>>,
+) {
+    let beside = !this_server_btn.is_empty();
+    let blink = ((time.elapsed_secs() * 2.0) as u32).is_multiple_of(2);
+    for (FieldText(f), mut text, mut color, node) in &mut field_texts {
+        let value = lobby.text(*f);
+        let len = char_len(value);
+        let focused = lobby.focus == Some(*f);
+        let max = max_chars(*f, beside);
+        let (shown, tint) = match (value.is_empty(), focused) {
+            (true, false) => (placeholder(*f).to_string(), PLACEHOLDER),
+            (_, true) => (window(value, lobby.scroll.min(len), max), ACCENT),
+            _ => (window(value, 0, max), Color::WHITE),
+        };
+        // Only an unchanged text has a layout that matches it (one frame behind).
+        if !value.is_empty() && text.0 == shown && node.size.x > 0.0 {
+            let n = char_len(&shown) as f32;
+            lobby.glyph_w = node.size.x * node.inverse_scale_factor / n;
+        }
+        set_text(&mut text, &shown);
+        color.0 = tint;
+    }
+    if let Some(f) = lobby.focus {
+        let len = char_len(lobby.text(f));
+        lobby.caret = lobby.caret.min(len);
+        lobby.scroll = scroll_to(lobby.scroll, lobby.caret, len, max_chars(f, beside));
+    }
+    let glyph_w = if lobby.glyph_w > 0.0 {
+        lobby.glyph_w
+    } else {
+        GLYPH_W
+    };
+    for (CaretBar(f), mut node, mut vis) in &mut carets {
+        let on = lobby.focus == Some(*f) && blink;
+        let want = if on {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+        if *vis != want {
+            *vis = want;
+        }
+        // Absolute offsets start at the padding box, i.e. inside the border.
+        let col = lobby.caret.saturating_sub(lobby.scroll);
+        node.left = px(TEXT_INSET - 2.0 + col as f32 * glyph_w - 1.0);
+    }
+    for (ClearBtn(f), mut node) in &mut clears {
+        let want = if lobby.text(*f).is_empty() {
+            Display::None
+        } else {
+            Display::Flex
+        };
+        if node.display != want {
+            node.display = want;
+        }
+    }
 }
 
 /// Room code, member list and the in-room buttons.
@@ -609,7 +844,10 @@ fn sync_soft_keyboard(lobby: &mut Lobby, shown: &mut Option<Field>, seen: &mut S
     if lobby.focus != *shown {
         *shown = lobby.focus;
         match lobby.focus {
-            Some(f) => kb::show(lobby.text(f)),
+            Some(f) => {
+                kb::show(lobby.text(f));
+                kb::set_caret(lobby.caret);
+            }
             None => kb::hide(),
         }
         seen.clear();
@@ -622,12 +860,22 @@ fn sync_soft_keyboard(lobby: &mut Lobby, shown: &mut Option<Field>, seen: &mut S
     // input only when it changed, else push the field into it so winit edits are not overwritten.
     if raw != *seen {
         let clean = f.sanitize(&raw);
+        let raw_caret = kb::caret().unwrap_or_else(|| char_len(&raw));
+        let prefix: String = raw.chars().take(raw_caret).collect();
+        lobby.caret = char_len(&f.sanitize(&prefix)).min(char_len(&clean));
         if clean != raw {
             kb::set_value(&clean);
+            kb::set_caret(lobby.caret);
         }
         *lobby.text_mut(f) = clean;
     } else if raw != lobby.text(f) {
         kb::set_value(lobby.text(f));
+        kb::set_caret(lobby.caret);
+    } else if kb::has_focus()
+        && let Some(c) = kb::caret()
+    {
+        // Arrow keys and touch editing move the caret inside the input only.
+        lobby.caret = c.min(char_len(&raw));
     }
     seen.clear();
     seen.push_str(lobby.text(f));
@@ -731,32 +979,136 @@ mod tests {
         );
     }
 
-    #[test]
-    fn editing_filters_and_backspaces() {
-        let mut s = String::new();
-        edit(Field::Room, &mut s, &Key::Character("a".into()), Some("a"));
-        edit(Field::Room, &mut s, &Key::Character("!".into()), Some("!"));
-        edit(Field::Room, &mut s, &Key::Space, Some(" "));
-        edit(Field::Room, &mut s, &Key::Character("7".into()), Some("7"));
-        assert_eq!(s, "A-7");
-        edit(Field::Room, &mut s, &Key::Backspace, None);
-        assert_eq!(s, "A-");
-        edit(Field::Room, &mut s, &Key::Backspace, None);
-        edit(Field::Room, &mut s, &Key::Backspace, None);
-        assert_eq!(s, "");
+    fn typed(field: Field, text: &mut String, caret: &mut usize, key: Key, t: Option<&str>) {
+        edit(field, text, caret, &key, t);
     }
 
     #[test]
-    fn long_values_show_their_tail_on_one_line() {
-        assert_eq!(tail("abc", 5), "abc");
-        assert_eq!(tail("abcde", 5), "abcde");
-        let url = "wss://the-last-dev-server.onrender.com/ws";
-        let shown = tail(url, 20);
-        assert_eq!(shown.chars().count(), 20);
-        assert!(
-            shown.starts_with('<') && shown.ends_with("onrender.com/ws"),
-            "{shown}"
+    fn editing_filters_and_backspaces() {
+        let (mut s, mut c) = (String::new(), 0);
+        for t in ["a", "!", " ", "7"] {
+            typed(
+                Field::Room,
+                &mut s,
+                &mut c,
+                Key::Character(t.into()),
+                Some(t),
+            );
+        }
+        assert_eq!(s, "A-7");
+        typed(Field::Room, &mut s, &mut c, Key::Backspace, None);
+        assert_eq!(s, "A-");
+        for _ in 0..3 {
+            typed(Field::Room, &mut s, &mut c, Key::Backspace, None);
+        }
+        assert_eq!((s.as_str(), c), ("", 0));
+    }
+
+    #[test]
+    fn insert_and_delete_at_the_caret() {
+        let mut s = "abde".to_string();
+        let mut c = 2;
+        typed(
+            Field::Address,
+            &mut s,
+            &mut c,
+            Key::Character("c".into()),
+            Some("c"),
         );
+        assert_eq!((s.as_str(), c), ("abcde", 3));
+        typed(Field::Address, &mut s, &mut c, Key::Backspace, None);
+        assert_eq!((s.as_str(), c), ("abde", 2));
+        typed(Field::Address, &mut s, &mut c, Key::Delete, None);
+        assert_eq!((s.as_str(), c), ("abe", 2));
+        // Edges are no-ops.
+        c = 0;
+        typed(Field::Address, &mut s, &mut c, Key::Backspace, None);
+        c = 3;
+        typed(Field::Address, &mut s, &mut c, Key::Delete, None);
+        assert_eq!((s.as_str(), c), ("abe", 3));
+    }
+
+    #[test]
+    fn caret_keys_move_within_bounds() {
+        let mut s = "abc".to_string();
+        let mut c = 3;
+        typed(Field::Name, &mut s, &mut c, Key::ArrowRight, None);
+        assert_eq!(c, 3);
+        typed(Field::Name, &mut s, &mut c, Key::ArrowLeft, None);
+        assert_eq!(c, 2);
+        typed(Field::Name, &mut s, &mut c, Key::Home, None);
+        assert_eq!(c, 0);
+        typed(Field::Name, &mut s, &mut c, Key::ArrowLeft, None);
+        assert_eq!(c, 0);
+        typed(Field::Name, &mut s, &mut c, Key::End, None);
+        assert_eq!(c, 3);
+    }
+
+    #[test]
+    fn insert_respects_limit_and_filter_mid_text() {
+        let mut s = "a".repeat(Field::Name.max_len());
+        let mut c = 1;
+        insert_at(Field::Name, &mut s, &mut c, "z");
+        assert_eq!(s.len(), Field::Name.max_len());
+        let mut s = "ad".to_string();
+        let mut c = 1;
+        insert_at(Field::Name, &mut s, &mut c, "b!c");
+        assert_eq!((s.as_str(), c), ("abcd", 3));
+    }
+
+    #[test]
+    fn window_keeps_the_caret_in_view() {
+        let len = 60;
+        let max = 20;
+        // Caret at the end: scrolled to the tail.
+        let s = scroll_to(0, len, len, max);
+        assert_eq!(s, len - max);
+        // Moving left inside the window does not scroll.
+        assert_eq!(scroll_to(s, len - 5, len, max), s);
+        // Moving past the left edge scrolls just enough, leaving the marker column free.
+        assert_eq!(scroll_to(s, s, len, max), s - 1);
+        // Home returns to the start.
+        assert_eq!(scroll_to(s, 0, len, max), 0);
+        // Every caret position ends up visible and off the marker column.
+        let mut sc = 0;
+        for caret in (0..=len).chain((0..=len).rev()) {
+            sc = scroll_to(sc, caret, len, max);
+            let col = caret - sc;
+            assert!(
+                col <= max && (sc == 0 || col >= 1),
+                "caret {caret} scroll {sc}"
+            );
+        }
+        assert_eq!(scroll_to(5, 3, 10, 20), 0);
+    }
+
+    #[test]
+    fn window_text_marks_hidden_head() {
+        assert_eq!(window("abcdef", 0, 4), "abcd");
+        assert_eq!(window("abcdef", 2, 4), "<def");
+        assert_eq!(window("abc", 0, 5), "abc");
+    }
+
+    #[test]
+    fn click_lands_between_glyphs() {
+        assert_eq!(caret_at_click(0.0, 10.0, 0, 5, 20), 0);
+        assert_eq!(caret_at_click(24.0, 10.0, 0, 5, 20), 2);
+        assert_eq!(caret_at_click(26.0, 10.0, 0, 5, 20), 3);
+        assert_eq!(caret_at_click(-30.0, 10.0, 0, 5, 20), 0);
+        assert_eq!(caret_at_click(500.0, 10.0, 0, 5, 20), 5);
+        // Scrolled: offset by the hidden head, never onto the marker.
+        assert_eq!(caret_at_click(0.0, 10.0, 4, 30, 20), 5);
+        assert_eq!(caret_at_click(50.0, 10.0, 4, 30, 20), 9);
+    }
+
+    #[test]
+    fn clear_resets_text_and_caret() {
+        let mut l = lobby("10.0.0.2", "AB");
+        l.caret = 4;
+        l.scroll = 1;
+        l.clear_field(Field::Address);
+        assert!(l.address.is_empty() && l.room == "AB");
+        assert_eq!((l.caret, l.scroll, l.focus), (0, 0, Some(Field::Address)));
     }
 
     #[test]

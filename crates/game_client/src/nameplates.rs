@@ -13,6 +13,7 @@ use crate::targeting::Target;
 use crate::units::Unit;
 use bevy::prelude::*;
 use combat_core::EntityId;
+use std::collections::HashMap;
 
 const PLATE_W: f32 = 180.0;
 const PLATE_RANGE: f32 = 40.0;
@@ -28,6 +29,11 @@ struct Nameplate {
     anchor: Entity,
     sim: EntityId,
     height: f32,
+    /// Eased upward push (window px) that keeps this plate off its neighbours.
+    offset: f32,
+    /// Eased scale: distance and crowding shrink it.
+    k: f32,
+    placed: bool,
 }
 #[derive(Component)]
 struct PlateFill(EntityId);
@@ -44,9 +50,13 @@ pub struct NameplatePlugin;
 
 impl Plugin for NameplatePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.init_resource::<PlateTops>().add_systems(
             Update,
-            (spawn_plates, place_plates, update_marks)
+            (
+                spawn_plates,
+                place_plates.in_set(PlatePlacement),
+                update_marks,
+            )
                 .chain()
                 .in_set(SimReady),
         );
@@ -79,6 +89,9 @@ fn spawn_plates(
                 anchor,
                 sim: u.id,
                 height: head_height(&u.key) + PLATE_GAP,
+                offset: 0.0,
+                k: 1.0,
+                placed: false,
             },
             Node {
                 position_type: PositionType::Absolute,
@@ -178,20 +191,104 @@ fn spawn_plates(
     }
 }
 
+/// Screen rectangle of one plate before de-cluttering: bottom-centre anchor and size, window px.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct PlateBox {
+    x: f32,
+    /// Bottom edge, y grows downwards.
+    y: f32,
+    w: f32,
+    h: f32,
+}
+
+/// Upward push (px, never negative) per plate so no two rectangles overlap. `boxes` must be
+/// sorted by priority: the first plate never moves, later ones stack above whatever they hit.
+fn solve_stacks(boxes: &[PlateBox], gap: f32) -> Vec<f32> {
+    let mut offsets: Vec<f32> = Vec::with_capacity(boxes.len());
+    for (i, p) in boxes.iter().enumerate() {
+        let mut off = 0.0_f32;
+        // Offsets only grow, so n passes always settle n plates.
+        for _ in 0..=i {
+            let mut moved = false;
+            for (q, qoff) in boxes[..i].iter().zip(&offsets) {
+                let apart_x = (p.x - q.x).abs() >= (p.w + q.w) / 2.0;
+                let q_top = q.y - qoff - q.h;
+                let p_bottom = p.y - off;
+                let apart_y = p_bottom <= q_top - gap + 0.01 || p_bottom - p.h >= q.y - qoff + gap;
+                if !apart_x && !apart_y {
+                    // Stack above: with a shared anchor row the plate nearer the camera stays low.
+                    off = p.y - q_top + gap;
+                    moved = true;
+                }
+            }
+            if !moved {
+                break;
+            }
+        }
+        offsets.push(off);
+    }
+    offsets
+}
+
+/// Sort key: the target first, then nearest first in 2 m bands. Banding stops two units at
+/// almost the same distance from swapping places every frame; the entity index breaks ties.
+fn priority_key(targeted: bool, dist: f32, entity: Entity) -> (i32, u32) {
+    let band = if targeted {
+        i32::MIN
+    } else {
+        (dist / 2.0) as i32
+    };
+    (band, entity.index_u32())
+}
+
+/// Plates whose pushed-up offset exceeds this many plate heights are shrunk, then hidden.
+const SHRINK_AT: f32 = 1.5;
+const HIDE_AT: f32 = 3.5;
+/// Exponential rates (1/s) of the eased offset and scale.
+const OFFSET_RATE: f32 = 12.0;
+const SCALE_RATE: f32 = 10.0;
+/// Plate text is narrower than the `PLATE_W` box that holds it.
+const CONTENT_W: f32 = 130.0;
+const STACK_GAP_PX: f32 = 2.0;
+
+/// Screen y (window px, downwards) of the top edge of every visible plate, by sim id. Yell
+/// bubbles read it so they sit above the plate's final position rather than the raw head point.
+#[derive(Resource, Default)]
+pub struct PlateTops(pub HashMap<EntityId, f32>);
+
+/// Plate placement runs here; consumers that anchor to plates order themselves after it.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PlatePlacement;
+
+struct Candidate {
+    entity: Entity,
+    key: (i32, u32),
+    base_k: f32,
+    targeted: bool,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+}
+
 fn place_plates(
     mut commands: Commands,
     sim: SimView,
+    time: Res<Time>,
     target: Res<Target>,
     ui_scale: Res<UiScale>,
+    mut tops: ResMut<PlateTops>,
     window: Single<&Window>,
-    camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
     transforms: Query<&Transform, With<SimUnit>>,
     mut plates: Query<(
         Entity,
-        &Nameplate,
+        &mut Nameplate,
+        &ComputedNode,
         &mut Node,
         &mut UiTransform,
         &mut Visibility,
+        &mut GlobalZIndex,
     )>,
     mut fills: Query<(&PlateFill, &mut Node), Without<Nameplate>>,
 ) {
@@ -202,7 +299,10 @@ fn place_plates(
     let forward = cam_tf.forward();
     // The camera's target, which is the offscreen image during screenshots.
     let view_h = cam.logical_viewport_size().map_or(window.height(), |v| v.y);
-    for (e, plate, mut node, mut tf_ui, mut vis) in &mut plates {
+    let dt = time.delta_secs();
+    tops.0.clear();
+    let mut cands: Vec<Candidate> = Vec::new();
+    for (e, plate, computed, _, _, mut vis, _) in &mut plates {
         let Ok(tf) = transforms.get(plate.anchor) else {
             commands.entity(e).despawn();
             continue;
@@ -220,13 +320,77 @@ fn place_plates(
             vis.set_if_neq(Visibility::Hidden);
             continue;
         };
-        vis.set_if_neq(Visibility::Inherited);
-        node.left = px(screen.x / scale - PLATE_W / 2.0);
-        node.bottom = px((view_h - screen.y) / scale);
         let targeted = target.0 == Some(plate.anchor);
         // Far plates shrink so a whole pack stays readable; the target stands out.
-        let k = (1.1 - dist / 60.0).clamp(0.6, 1.0) * if targeted { 1.15 } else { 1.0 };
-        tf_ui.scale = Vec2::splat(k);
+        let base_k = (1.1 - dist / 60.0).clamp(0.6, 1.0) * if targeted { 1.15 } else { 1.0 };
+        // Physical size over the window factor is window px; before the first layout pass a
+        // rough size keeps the plate from stacking on top of itself for a frame.
+        let h = if computed.size().y > 1.0 {
+            computed.size().y / window.scale_factor()
+        } else {
+            30.0 * scale
+        };
+        cands.push(Candidate {
+            entity: e,
+            key: priority_key(targeted, dist, e),
+            base_k,
+            targeted,
+            x: screen.x,
+            y: screen.y,
+            w: CONTENT_W * scale * base_k,
+            h: h * base_k,
+        });
+    }
+
+    cands.sort_by_key(|c| c.key);
+    let boxes: Vec<PlateBox> = cands
+        .iter()
+        .map(|c| PlateBox {
+            x: c.x,
+            y: c.y,
+            w: c.w,
+            h: c.h,
+        })
+        .collect();
+    let goals = solve_stacks(&boxes, STACK_GAP_PX * scale);
+    let off_ease = 1.0 - (-OFFSET_RATE * dt).exp();
+    let k_ease = 1.0 - (-SCALE_RATE * dt).exp();
+    for (c, goal) in cands.iter().zip(goals) {
+        let Ok((_, mut plate, _, mut node, mut tf_ui, mut vis, mut z)) = plates.get_mut(c.entity)
+        else {
+            continue;
+        };
+        // The target is placed first, so it is never pushed; everyone else may crowd out.
+        let crowd = if c.targeted { 0.0 } else { goal / c.h.max(1.0) };
+        let want_k = if crowd > HIDE_AT {
+            0.0
+        } else if crowd > SHRINK_AT {
+            c.base_k * 0.75
+        } else {
+            c.base_k
+        };
+        if plate.placed {
+            plate.offset += (goal - plate.offset) * off_ease;
+            plate.k += (want_k - plate.k) * k_ease;
+        } else {
+            plate.offset = goal;
+            plate.k = want_k;
+            plate.placed = true;
+        }
+        if plate.k < 0.05 {
+            vis.set_if_neq(Visibility::Hidden);
+            continue;
+        }
+        vis.set_if_neq(Visibility::Inherited);
+        // The target's plate is drawn over any plate stacked next to it.
+        z.set_if_neq(GlobalZIndex(if c.targeted { 6 } else { 5 }));
+        node.left = px(c.x / scale - PLATE_W / 2.0);
+        node.bottom = px((view_h - c.y + plate.offset) / scale);
+        tf_ui.scale = Vec2::splat(plate.k);
+        // Scaling is about the centre, so the visible top edge sits half the shrink lower.
+        let h_unscaled = c.h / c.base_k;
+        let top = c.y - plate.offset - h_unscaled * (1.0 + plate.k) / 2.0;
+        tops.0.insert(plate.sim, top);
     }
     for (fill, mut node) in &mut fills {
         let pct = sim
@@ -251,5 +415,69 @@ fn update_marks(
         if color.0 != c {
             color.0 = c;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn b(x: f32, y: f32) -> PlateBox {
+        PlateBox {
+            x,
+            y,
+            w: 100.0,
+            h: 30.0,
+        }
+    }
+
+    fn overlap(a: &PlateBox, ao: f32, c: &PlateBox, co: f32) -> bool {
+        let (ay, cy) = (a.y - ao, c.y - co);
+        (a.x - c.x).abs() < (a.w + c.w) / 2.0 && ay - a.h < cy && cy - c.h < ay
+    }
+
+    #[test]
+    fn separate_plates_stay_put() {
+        let offs = solve_stacks(&[b(0.0, 300.0), b(400.0, 300.0), b(0.0, 100.0)], 2.0);
+        assert_eq!(offs, vec![0.0; 3]);
+    }
+
+    #[test]
+    fn first_plate_never_moves_and_the_rest_stack_above() {
+        let boxes = [
+            b(500.0, 300.0),
+            b(505.0, 300.0),
+            b(498.0, 305.0),
+            b(510.0, 296.0),
+        ];
+        let offs = solve_stacks(&boxes, 2.0);
+        assert_eq!(offs[0], 0.0);
+        for i in 0..boxes.len() {
+            for j in 0..i {
+                assert!(
+                    !overlap(&boxes[i], offs[i], &boxes[j], offs[j]),
+                    "{i} overlaps {j}: {offs:?}"
+                );
+            }
+        }
+        // Stacking only ever pushes up.
+        assert!(offs.iter().all(|o| *o >= 0.0));
+        assert!(offs[1] > 0.0 && offs[2] > offs[1] - 40.0);
+    }
+
+    #[test]
+    fn solving_is_deterministic_so_frames_do_not_jitter() {
+        let boxes = [b(500.0, 300.0), b(520.0, 310.0), b(480.0, 290.0)];
+        assert_eq!(solve_stacks(&boxes, 2.0), solve_stacks(&boxes, 2.0));
+    }
+
+    #[test]
+    fn target_sorts_first_and_distance_bands_are_stable() {
+        let e = Entity::from_raw_u32(9).unwrap();
+        let f = Entity::from_raw_u32(3).unwrap();
+        assert!(priority_key(true, 50.0, e) < priority_key(false, 1.0, f));
+        // 10.1 m and 10.9 m share a band: ordering falls to the entity index, not distance.
+        assert!(priority_key(false, 10.9, f) < priority_key(false, 10.1, e));
+        assert!(priority_key(false, 3.0, e) < priority_key(false, 12.0, f));
     }
 }

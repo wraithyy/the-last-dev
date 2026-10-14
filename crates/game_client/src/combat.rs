@@ -48,6 +48,8 @@ pub trait SimRead: Send + Sync {
     fn quests(&self) -> &QuestLog;
     fn inventory(&self) -> &[(String, u32)];
     fn item_totals(&self) -> ItemTotals;
+    /// Remaining and total ms of an on-use item's cooldown, or the consumables' (`"consumable"`).
+    fn item_cooldown(&self, player: EntityId, key: &str) -> (u32, u32);
     fn zone_cleared(&self, zone: &str) -> bool;
     fn zone_links(&self, zone: &str) -> Vec<ZoneLinkView>;
     fn known_spells(&self, unit: EntityId) -> Vec<SpellId>;
@@ -98,6 +100,9 @@ impl SimRead for Sim {
     }
     fn item_totals(&self) -> ItemTotals {
         Sim::item_totals(self)
+    }
+    fn item_cooldown(&self, player: EntityId, key: &str) -> (u32, u32) {
+        Sim::item_cooldown(self, player, key)
     }
     fn zone_cleared(&self, zone: &str) -> bool {
         Sim::zone_cleared(self, zone)
@@ -557,24 +562,14 @@ pub fn can_act(sim: &dyn SimRead, flow: &GameFlow, player: EntityId) -> bool {
     !flow.input_locked() && sim.unit(player).is_some_and(|u| u.alive && !u.stunned)
 }
 
-/// Physical key positions, so the number row works on any layout (e.g. the Czech
-/// "+ěščřžýáíé" row without Shift); the numpad is an alternative for layouts where
-/// that row types letters. Slot order matches the class bar (`SimRead::bar_of`, keys 1..9, 0).
-pub const CAST_KEYS: [[KeyCode; 2]; 10] = [
-    [KeyCode::Digit1, KeyCode::Numpad1],
-    [KeyCode::Digit2, KeyCode::Numpad2],
-    [KeyCode::Digit3, KeyCode::Numpad3],
-    [KeyCode::Digit4, KeyCode::Numpad4],
-    [KeyCode::Digit5, KeyCode::Numpad5],
-    [KeyCode::Digit6, KeyCode::Numpad6],
-    [KeyCode::Digit7, KeyCode::Numpad7],
-    [KeyCode::Digit8, KeyCode::Numpad8],
-    [KeyCode::Digit9, KeyCode::Numpad9],
-    [KeyCode::Digit0, KeyCode::Numpad0],
-];
+/// Slot keys are physical positions (see `keybinds`), so the number row works on any layout
+/// (e.g. the Czech "+ěščřžýáíé" row without Shift); the numpad is the alternative.
+/// Slot order matches the class bar (`SimRead::bar_of`, keys 1..9, 0).
+pub const SLOT_COUNT: usize = 10;
 
 fn cast_keys(
     keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<crate::keybinds::Keybinds>,
     paused: Res<Paused>,
     flow: Res<GameFlow>,
     sim: SimView,
@@ -584,8 +579,8 @@ fn cast_keys(
     if paused.0 || !can_act(&*sim, &flow, player.0) {
         return;
     }
-    for (slot, slot_keys) in CAST_KEYS.iter().enumerate() {
-        if keys.any_just_pressed(*slot_keys) {
+    for slot in 0..SLOT_COUNT {
+        if keys.any_just_pressed(binds.slot_keys(slot)) {
             cast_slot(&*sim, &mut pending, player.0, slot);
         }
     }
@@ -618,6 +613,7 @@ pub fn toggle_auto_attack(
 
 fn auto_attack_key(
     keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<crate::keybinds::Keybinds>,
     paused: Res<Paused>,
     sim: SimView,
     target: Res<Target>,
@@ -625,7 +621,7 @@ fn auto_attack_key(
     mut notices: MessageWriter<UiNotice>,
     player: Single<&SimUnit, With<Player>>,
 ) {
-    if !paused.0 && keys.just_pressed(KeyCode::KeyT) {
+    if !paused.0 && binds.just(&keys, crate::keybinds::Action::AutoAttack) {
         toggle_auto_attack(
             &*sim,
             &mut pending,
@@ -648,13 +644,17 @@ pub fn cast_coffee_break(sim: &dyn SimRead, pending: &mut PendingCommands, caste
 
 fn coffee_key(
     keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<crate::keybinds::Keybinds>,
     paused: Res<Paused>,
     flow: Res<GameFlow>,
     sim: SimView,
     mut pending: ResMut<PendingCommands>,
     player: Single<&SimUnit, With<Player>>,
 ) {
-    if !paused.0 && keys.just_pressed(KeyCode::KeyC) && can_act(&*sim, &flow, player.0) {
+    if !paused.0
+        && binds.just(&keys, crate::keybinds::Action::Coffee)
+        && can_act(&*sim, &flow, player.0)
+    {
         cast_coffee_break(&*sim, &mut pending, player.0);
     }
 }
@@ -672,13 +672,17 @@ pub fn cast_resurrect(sim: &dyn SimRead, pending: &mut PendingCommands, caster: 
 
 fn resurrect_key(
     keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<crate::keybinds::Keybinds>,
     paused: Res<Paused>,
     flow: Res<GameFlow>,
     sim: SimView,
     mut pending: ResMut<PendingCommands>,
     player: Single<&SimUnit, With<Player>>,
 ) {
-    if !paused.0 && keys.just_pressed(KeyCode::KeyV) && can_act(&*sim, &flow, player.0) {
+    if !paused.0
+        && binds.just(&keys, crate::keybinds::Action::Resurrect)
+        && can_act(&*sim, &flow, player.0)
+    {
         cast_resurrect(&*sim, &mut pending, player.0);
     }
 }
@@ -687,11 +691,11 @@ fn resurrect_key(
 /// friendly NPC is talked to, a lootable corpse in reach is looted. F does the
 /// same for the target, or talks to the nearest friendly in reach.
 fn interact_input(
-    keys: Res<ButtonInput<KeyCode>>,
+    (keys, binds): (Res<ButtonInput<KeyCode>>, Res<crate::keybinds::Keybinds>),
     buttons: Res<ButtonInput<MouseButton>>,
     motion: Res<AccumulatedMouseMotion>,
     window: Single<&Window, With<PrimaryWindow>>,
-    camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
     colliders: Res<Colliders>,
     paused: Res<Paused>,
     flow: Res<GameFlow>,
@@ -726,7 +730,7 @@ fn interact_input(
         picked = pick_unit(cursor, *camera, &colliders.0, &units);
         clicked = true;
     }
-    if keys.just_pressed(KeyCode::KeyF) {
+    if binds.just(&keys, crate::keybinds::Action::Interact) {
         picked = target.0.or_else(|| {
             units
                 .iter()

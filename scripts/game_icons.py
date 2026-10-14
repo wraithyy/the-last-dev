@@ -62,6 +62,28 @@ GLYPHS = {
     "wont_fix": ("sbed/cancel", "red"),
     "human_inside": ("delapouite/person", "red"),
     "demo_lanyard": ("lorc/ribbon", "green"),
+    # Economy: gear slots, consumables, junk and the Story Points coin.
+    "gear_headset": ("delapouite/headphones", "violet"),
+    "gear_hoodie": ("delapouite/hoodie", "blue"),
+    "gear_mug": ("delapouite/coffee-cup", "gold"),
+    "gear_beanie": ("delapouite/winter-hat", "teal"),
+    "gear_propeller": ("delapouite/propeller-beanie", "green"),
+    "gear_vr": ("delapouite/vr-headset", "violet"),
+    "gear_shades": ("delapouite/sunglasses", "red"),
+    "gear_idcard": ("delapouite/id-card", "teal"),
+    "gear_extinguisher": ("delapouite/fire-extinguisher", "red"),
+    "gear_stein": ("lorc/beer-stein", "gold"),
+    "gear_tshirt": ("delapouite/t-shirt", "green"),
+    "gear_desk": ("delapouite/desk", "teal"),
+    "gear_keyboard": ("delapouite/keyboard", "blue"),
+    "coffee_pot": ("delapouite/coffee-pot", "teal"),
+    "pills": ("delapouite/medicine-pills", "green"),
+    "sandwich": ("delapouite/sandwich", "gold"),
+    "poster": ("lorc/scroll-unfurled", "violet"),
+    "junk_ticket": ("delapouite/ticket", "blue"),
+    "junk_trash": ("delapouite/trash-can", "green"),
+    "junk_candy": ("lorc/wrapped-sweet", "red"),
+    "story_points": ("delapouite/two-coins", "gold"),
 }
 
 GLYPH_PX, OFFSET, FRAME = 44, 10, 3

@@ -100,7 +100,8 @@ Each flag also has an environment variable: TLD_BIND, TLD_WEB_DIR, TLD_CONTENT,
 TLD_MAX_ROOMS, TLD_MAX_PLAYERS_PER_ROOM, TLD_MAX_CONNS, TLD_ALLOWED_ORIGINS
 (comma list), TLD_TRUSTED_PROXIES (comma list), TLD_TRUST_FORWARDED_FOR=1,
 TLD_HEALTHZ_DETAILS=1, TLD_PER_IP_CONNS, TLD_PER_IP_ROOMS_PER_MIN,
-TLD_PER_IP_FAILED_JOINS, TLD_NO_LAN_EXEMPT=1, TLD_DEV_START_LEVEL (QA only: joiners start
+TLD_PER_IP_FAILED_JOINS, TLD_NO_LAN_EXEMPT=1, TLD_DEV_GEAR (QA only: gear per joiner,
+`a|b;c|d`), TLD_DEV_START_LEVEL (QA only: joiners start
 at these levels in join order, e.g. 5,1; the last repeats). Flags win. Per-IP limits: 0 disables.
 Without --bind/TLD_BIND, PORT (set by hosts like Render) binds 0.0.0.0:$PORT.
 Defaults: 0.0.0.0:7777, ./web, embedded content, 50, 5, 200, per-IP 16 / 6 / 10.";

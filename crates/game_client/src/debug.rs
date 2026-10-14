@@ -12,6 +12,7 @@
 //!   (140 frames the whole campus) and `WOW_PLAYER_AT=x,z,yaw`.
 //! - `WOW_JIRA=1`, `WOW_MAP=1`: open the `~/jira` log or the map at start.
 //! - `WOW_KILL_BOSS=<secs>`: the zone boss dies (as a player kill) that many seconds in.
+//! - `WOW_BOSS_PCT=<pct>@<secs>`: the zone boss drops to that HP percent at that time (phase shots).
 //! - `WOW_FPS=1`: log average frame time and drawn mesh count every 3 s (vsync caps the rate, so read the ms).
 //! - `WOW_HOVER_SLOT=<0-9>`: show that action slot's tooltip without a pointer.
 //!
@@ -187,6 +188,29 @@ impl Plugin for DebugPlugin {
                 .in_set(SimReady),
             );
         }
+        if let Some((pct, at)) = env::var("WOW_BOSS_PCT").ok().and_then(|v| {
+            let (p, t) = v.split_once('@')?;
+            Some((p.parse::<u32>().ok()?, t.parse::<f32>().ok()?))
+        }) {
+            app.add_systems(
+                Update,
+                (move |time: Res<Time>, mut sim: ResMut<CombatSim>, mut done: Local<bool>| {
+                    if *done || time.elapsed_secs() < at {
+                        return;
+                    }
+                    *done = true;
+                    let boss = sim
+                        .0
+                        .units()
+                        .find(|u| u.boss && u.alive)
+                        .map(|u| (u.id, u.max_hp));
+                    if let Some((id, max)) = boss {
+                        sim.0.debug_set_hp(id, max * pct / 100);
+                    }
+                })
+                .in_set(SimReady),
+            );
+        }
         if env::var("WOW_TROPHIES").is_ok() {
             app.insert_resource(TrophiesOpen(true));
         }
@@ -251,9 +275,8 @@ fn key_code(name: &str) -> Option<KeyCode> {
         "F5" => KeyCode::F5,
         _ => {
             if let Some(d) = name.strip_prefix("Digit") {
-                *crate::combat::CAST_KEYS
-                    .get((d.parse::<usize>().ok()? + 9) % 10)?
-                    .first()?
+                let slot = u8::try_from((d.parse::<usize>().ok()? + 9) % 10).ok()?;
+                crate::keybinds::Action::Slot(slot).default_key()
             } else {
                 let c = name.strip_prefix("Key")?.chars().next()?;
                 match c {
@@ -261,6 +284,7 @@ fn key_code(name: &str) -> Option<KeyCode> {
                     'F' => KeyCode::KeyF,
                     'G' => KeyCode::KeyG,
                     'H' => KeyCode::KeyH,
+                    'I' => KeyCode::KeyI,
                     'K' => KeyCode::KeyK,
                     'L' => KeyCode::KeyL,
                     'S' => KeyCode::KeyS,
@@ -474,7 +498,8 @@ fn screenshot_and_exit(
 fn retarget_camera(
     mut commands: Commands,
     plan: Res<ShotPlan>,
-    cams: Query<Entity, (Added<Camera3d>, Without<crate::classes::StageCamera>)>,
+    // Only the play camera: preview cameras (role picker, character sheet) render elsewhere.
+    cams: Query<Entity, (Added<Camera3d>, With<crate::camera::OrbitCamera>)>,
 ) {
     for cam in &cams {
         commands

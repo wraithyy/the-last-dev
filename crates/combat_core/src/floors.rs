@@ -123,6 +123,7 @@ impl Sim {
     pub(crate) fn despawn(&mut self, i: usize) {
         let id = Self::id_of(i);
         self.cancel_cast(i, None, 0);
+        self.cancel_telegraphs_of(id);
         self.set_auto_attack(i, false);
         let u = &mut self.units[i];
         u.despawned = true;

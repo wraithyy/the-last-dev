@@ -9,6 +9,7 @@
 use super::{ACCENT, DIM, KEY_RIM, KEY_TOP, PANEL_EDGE, drop_shadow, label};
 use crate::config::CAM_ZOOM_PIXELS_PER_LINE;
 use crate::input::{Paused, TextFocus};
+use crate::keybinds::Action;
 use crate::net::{load_hud, save_hud};
 use crate::touch::TouchMode;
 use bevy::input::InputSystems;
@@ -639,6 +640,7 @@ fn spawn_strip(commands: &mut Commands) {
 
 fn toggle_keys(
     keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<crate::keybinds::Keybinds>,
     paused: Res<Paused>,
     focus: Res<TextFocus>,
     mut windows: ResMut<HudWindows>,
@@ -647,11 +649,11 @@ fn toggle_keys(
         return;
     }
     for (key, win) in [
-        (KeyCode::KeyH, Win::Chat),
-        (KeyCode::KeyL, Win::Combat),
-        (KeyCode::KeyK, Win::Meter),
+        (Action::Chat, Win::Chat),
+        (Action::CombatLog, Win::Combat),
+        (Action::Meter, Win::Meter),
     ] {
-        if keys.just_pressed(key) {
+        if binds.just(&keys, key) {
             windows.toggle(win);
         }
     }

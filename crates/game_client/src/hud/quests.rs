@@ -212,8 +212,8 @@ fn spawn_quest_ui(mut commands: Commands) {
         Node {
             position_type: PositionType::Absolute,
             right: px(12),
-            // Below the player's aura row (top right).
-            top: px(96),
+            // Below the minimap and the player's aura row (top right).
+            top: px(super::BELOW_MINIMAP + 34.0),
             width: px(TRACKER_W),
             padding: UiRect::all(px(8)),
             flex_direction: FlexDirection::Column,
@@ -399,10 +399,11 @@ fn open_on_talk(
 
 fn toggle_log(
     keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<crate::keybinds::Keybinds>,
     paused: Res<Paused>,
     mut windows: ResMut<QuestWindows>,
 ) {
-    if !paused.0 && keys.just_pressed(KeyCode::KeyJ) {
+    if !paused.0 && binds.just(&keys, crate::keybinds::Action::QuestLog) {
         windows.log = !windows.log;
         if windows.log {
             windows.dialog = None;

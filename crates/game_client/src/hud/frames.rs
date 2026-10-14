@@ -2,7 +2,7 @@
 
 use super::{
     ACCENT_WARM, BAR_BG, DIM, HP_GREEN, IconCache, MANA_BLUE, PANEL_BOTTOM, PANEL_EDGE, PANEL_TOP,
-    fmt_secs, gloss, label, set_text, vgrad,
+    TipSource, fmt_secs, gloss, label, set_text, vgrad,
 };
 use crate::combat::{CombatEvent, SimRead, SimReady, SimUnit, SimView};
 use crate::config::*;
@@ -19,6 +19,8 @@ const FRAME_GAP: f32 = 14.0;
 const AVATAR_RIM: Color = Color::srgb(0.55, 0.62, 0.75);
 const CASTING: Color = Color::srgb(1.0, 0.72, 0.1);
 const UNINTERRUPTIBLE: Color = Color::srgb(0.55, 0.55, 0.58);
+/// Must-interrupt casts (`SpellDef::kick`): red, and the name says so.
+const MUST_KICK: Color = Color::srgb(0.95, 0.12, 0.1);
 const CAST_OK: Color = Color::srgb(0.2, 0.8, 0.25);
 const CAST_FAIL: Color = Color::srgb(0.85, 0.15, 0.12);
 /// Bars ease toward the sim value at this exponential rate (1/s) instead of jumping.
@@ -332,145 +334,154 @@ fn spawn_cast_bar(
     icons: &mut IconCache,
     assets: &AssetServer,
 ) {
-    commands
-        .spawn((
-            CastRoot(who),
+    let mut bar = commands.spawn((
+        CastRoot(who),
+        Node {
+            position_type: PositionType::Absolute,
+            height: px(CAST_BAR_H),
+            display: Display::None,
+            ..node
+        },
+    ));
+    // Only the target's bar has a hover tooltip; the player's own cast is already on the action bar.
+    if who == Who::Target {
+        bar.insert((
+            Button,
+            TipSource {
+                tag: "target-cast",
+                ..default()
+            },
+        ));
+    }
+    bar.with_children(|root| {
+        root.spawn((
             Node {
                 position_type: PositionType::Absolute,
+                left: px(-(CAST_BAR_H + CAST_ICON_GAP)),
+                width: px(CAST_BAR_H),
                 height: px(CAST_BAR_H),
-                display: Display::None,
-                ..node
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(3)),
+                ..default()
             },
-        ))
-        .with_children(|root| {
-            root.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: px(-(CAST_BAR_H + CAST_ICON_GAP)),
-                    width: px(CAST_BAR_H),
-                    height: px(CAST_BAR_H),
-                    border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(3)),
-                    ..default()
-                },
-                BorderColor::all(PANEL_EDGE),
-                BackgroundColor(BAR_BG),
-                children![(
-                    CastIcon(who),
-                    ImageNode::new(icons.get(assets, "code_review")),
-                    Node {
-                        width: percent(100),
-                        height: percent(100),
-                        ..default()
-                    },
-                )],
-            ));
-            root.spawn((
+            BorderColor::all(PANEL_EDGE),
+            BackgroundColor(BAR_BG),
+            children![(
+                CastIcon(who),
+                ImageNode::new(icons.get(assets, "code_review")),
                 Node {
                     width: percent(100),
                     height: percent(100),
-                    border: UiRect::all(px(1)),
-                    border_radius: BorderRadius::all(px(3)),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    overflow: Overflow::clip(),
                     ..default()
                 },
-                BorderColor::all(PANEL_EDGE),
-                vgrad(Color::srgb(0.02, 0.03, 0.05), Color::srgb(0.08, 0.09, 0.12)),
-                super::drop_shadow(),
-            ))
-            .with_children(|bar| {
+            )],
+        ));
+        root.spawn((
+            Node {
+                width: percent(100),
+                height: percent(100),
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(3)),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BorderColor::all(PANEL_EDGE),
+            vgrad(Color::srgb(0.02, 0.03, 0.05), Color::srgb(0.08, 0.09, 0.12)),
+            super::drop_shadow(),
+        ))
+        .with_children(|bar| {
+            bar.spawn((
+                CastFill {
+                    who,
+                    color: CASTING,
+                },
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(0),
+                    top: px(0),
+                    bottom: px(0),
+                    width: percent(0),
+                    ..default()
+                },
+                glossy(CASTING),
+            ));
+            bar.spawn(gloss(0.25));
+            // Segment ticks give the smooth bar a CLI progress "[=====>   ]" rhythm.
+            for k in 1..CAST_SEGMENTS {
                 bar.spawn((
-                    CastFill {
-                        who,
-                        color: CASTING,
-                    },
                     Node {
                         position_type: PositionType::Absolute,
-                        left: px(0),
+                        left: percent(100.0 * k as f32 / CAST_SEGMENTS as f32),
+                        width: px(1),
                         top: px(0),
                         bottom: px(0),
-                        width: percent(0),
                         ..default()
                     },
-                    glossy(CASTING),
+                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
                 ));
-                bar.spawn(gloss(0.25));
-                // Segment ticks give the smooth bar a CLI progress "[=====>   ]" rhythm.
-                for k in 1..CAST_SEGMENTS {
-                    bar.spawn((
-                        Node {
-                            position_type: PositionType::Absolute,
-                            left: percent(100.0 * k as f32 / CAST_SEGMENTS as f32),
-                            width: px(1),
-                            top: px(0),
-                            bottom: px(0),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
-                    ));
-                }
+            }
+            bar.spawn((
+                CastSpark(who),
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: px(-4),
+                    bottom: px(-4),
+                    left: percent(0),
+                    margin: UiRect::left(px(-5)),
+                    width: px(10),
+                    display: Display::None,
+                    ..default()
+                },
+                BackgroundGradient::from(LinearGradient::new(
+                    LinearGradient::TO_RIGHT,
+                    vec![
+                        ColorStop::new(Color::srgba(1.0, 0.95, 0.7, 0.0), percent(0)),
+                        ColorStop::new(Color::srgba(1.0, 0.97, 0.8, 0.95), percent(50)),
+                        ColorStop::new(Color::srgba(1.0, 0.95, 0.7, 0.0), percent(100)),
+                    ],
+                )),
+            ));
+            let name_left = if who == Who::Target {
+                CAST_BAR_H + 4.0
+            } else {
+                8.0
+            };
+            bar.spawn((
+                CastText(who, CastField::Name),
+                label("", 12.0),
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(name_left),
+                    ..default()
+                },
+            ));
+            bar.spawn((
+                CastText(who, CastField::Time),
+                label("", 12.0),
+                Node {
+                    position_type: PositionType::Absolute,
+                    right: px(8),
+                    ..default()
+                },
+            ));
+            if who == Who::Target {
                 bar.spawn((
-                    CastSpark(who),
+                    CastShield,
+                    ImageNode::new(icons.get(assets, "guardrails")),
                     Node {
                         position_type: PositionType::Absolute,
-                        top: px(-4),
-                        bottom: px(-4),
-                        left: percent(0),
-                        margin: UiRect::left(px(-5)),
-                        width: px(10),
+                        left: px(-2),
+                        width: px(CAST_BAR_H),
+                        height: px(CAST_BAR_H),
                         display: Display::None,
                         ..default()
                     },
-                    BackgroundGradient::from(LinearGradient::new(
-                        LinearGradient::TO_RIGHT,
-                        vec![
-                            ColorStop::new(Color::srgba(1.0, 0.95, 0.7, 0.0), percent(0)),
-                            ColorStop::new(Color::srgba(1.0, 0.97, 0.8, 0.95), percent(50)),
-                            ColorStop::new(Color::srgba(1.0, 0.95, 0.7, 0.0), percent(100)),
-                        ],
-                    )),
                 ));
-                let name_left = if who == Who::Target {
-                    CAST_BAR_H + 4.0
-                } else {
-                    8.0
-                };
-                bar.spawn((
-                    CastText(who, CastField::Name),
-                    label("", 12.0),
-                    Node {
-                        position_type: PositionType::Absolute,
-                        left: px(name_left),
-                        ..default()
-                    },
-                ));
-                bar.spawn((
-                    CastText(who, CastField::Time),
-                    label("", 12.0),
-                    Node {
-                        position_type: PositionType::Absolute,
-                        right: px(8),
-                        ..default()
-                    },
-                ));
-                if who == Who::Target {
-                    bar.spawn((
-                        CastShield,
-                        ImageNode::new(icons.get(assets, "guardrails")),
-                        Node {
-                            position_type: PositionType::Absolute,
-                            left: px(-2),
-                            width: px(CAST_BAR_H),
-                            height: px(CAST_BAR_H),
-                            display: Display::None,
-                            ..default()
-                        },
-                    ));
-                }
-            });
+            }
         });
+    });
 }
 
 fn spawn_aura_row(
@@ -490,6 +501,14 @@ fn spawn_aura_row(
             for i in 0..AURA_SLOTS {
                 r.spawn((
                     AuraSlot(row, i),
+                    Button,
+                    TipSource {
+                        tag: match row {
+                            Row::PlayerAuras => "player-aura",
+                            Row::TargetDebuffs => "target-aura",
+                        },
+                        ..default()
+                    },
                     Node {
                         width: px(AURA_ICON),
                         height: px(AURA_ICON),
@@ -584,7 +603,7 @@ fn spawn_frames(mut commands: Commands, assets: Res<AssetServer>, mut icons: Res
         &mut commands,
         Row::PlayerAuras,
         Node {
-            top: px(FRAME_TOP),
+            top: px(super::BELOW_MINIMAP),
             right: px(12),
             flex_direction: FlexDirection::RowReverse,
             ..default()
@@ -885,15 +904,23 @@ struct BarView {
     shield: bool,
     /// The spark only belongs on a bar that is still filling.
     spark: bool,
+    /// The live cast behind the bar, for its tooltip; None for the post-cast flash.
+    cast: Option<CastView>,
 }
 
 const CAST_LABEL_MAX: usize = 24;
 
 fn cast_view(sim: &dyn SimRead, cast: CastView, remaining_only: bool) -> BarView {
-    let (name, icon) = sim
-        .content()
-        .spell(cast.spell)
-        .map_or_else(Default::default, |d| (d.name.clone(), d.icon.clone()));
+    let def = sim.content().spell(cast.spell);
+    let kick = cast.interruptible && def.is_some_and(|d| d.kick);
+    let (name, icon) = def.map_or_else(Default::default, |d| {
+        let name = if kick {
+            format!("KICK: {}", d.name)
+        } else {
+            d.name.clone()
+        };
+        (name, d.icon.clone())
+    });
     // One line on the narrow bars: "Have You Tried Turning It Off and On Again" would wrap.
     let name = if name.chars().count() > CAST_LABEL_MAX {
         let cut: String = name.chars().take(CAST_LABEL_MAX - 3).collect();
@@ -905,7 +932,9 @@ fn cast_view(sim: &dyn SimRead, cast: CastView, remaining_only: bool) -> BarView
     let secs = |ms: u32| ms as f32 / 1000.0;
     BarView {
         fill: (cast.elapsed_ms as f32 / total as f32).clamp(0.0, 1.0),
-        color: if cast.interruptible {
+        color: if kick {
+            MUST_KICK
+        } else if cast.interruptible {
             CASTING
         } else {
             UNINTERRUPTIBLE
@@ -919,6 +948,7 @@ fn cast_view(sim: &dyn SimRead, cast: CastView, remaining_only: bool) -> BarView
             format!("{:.1} / {:.1}", secs(cast.elapsed_ms), secs(cast.total_ms))
         },
         shield: !cast.interruptible,
+        cast: Some(cast),
     }
 }
 
@@ -929,7 +959,12 @@ fn update_cast_bars(
     units: Query<&SimUnit>,
     assets: Res<AssetServer>,
     mut icons: ResMut<IconCache>,
-    mut roots: Query<(&CastRoot, &mut Node, &mut Visibility)>,
+    mut roots: Query<(
+        &CastRoot,
+        &mut Node,
+        &mut Visibility,
+        Option<&mut TipSource>,
+    )>,
     mut fills: Query<(&mut CastFill, &mut Node, &mut BackgroundGradient), Without<CastRoot>>,
     mut sparks: Query<(&CastSpark, &mut Node), (Without<CastRoot>, Without<CastFill>)>,
     mut icon_nodes: Query<(&CastIcon, &mut ImageNode)>,
@@ -958,14 +993,18 @@ fn update_cast_bars(
                 time: String::new(),
                 shield: false,
                 spark: false,
+                cast: None,
             }),
             _ => None,
         }
     };
     let (player, tgt) = (view(Who::Player), view(Who::Target));
     let pick = |who| if who == Who::Player { &player } else { &tgt };
-    for (root, mut node, mut vis) in &mut roots {
+    for (root, mut node, mut vis, tip) in &mut roots {
         let shown = pick(root.0).is_some();
+        if let Some(mut tip) = tip {
+            tip.cast = pick(root.0).as_ref().and_then(|v| v.cast);
+        }
         node.display = if shown { Display::Flex } else { Display::None };
         vis.set_if_neq(if shown {
             Visibility::Inherited
@@ -1027,7 +1066,7 @@ fn update_auras(
     assets: Res<AssetServer>,
     mut icons: ResMut<IconCache>,
     player: Single<&SimUnit, With<Player>>,
-    mut slots: Query<(&AuraSlot, &mut Node, &mut BorderColor)>,
+    mut slots: Query<(&AuraSlot, &mut Node, &mut BorderColor, &mut TipSource)>,
     mut images: Query<(&AuraPart, &mut ImageNode)>,
     mut texts: Query<(&AuraPart, &mut Text)>,
 ) {
@@ -1059,8 +1098,9 @@ fn update_auras(
             .find(|(r, _)| *r == row)
             .and_then(|(_, v)| v.get(i))
     };
-    for (AuraSlot(row, i), mut node, mut border) in &mut slots {
+    for (AuraSlot(row, i), mut node, mut border, mut tip) in &mut slots {
         let aura = get(*row, *i);
+        tip.aura = aura.cloned();
         node.display = if aura.is_some() {
             Display::Flex
         } else {

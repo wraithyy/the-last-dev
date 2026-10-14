@@ -308,7 +308,7 @@ fn emit_zs(
 fn animate_zs(
     mut commands: Commands,
     time: Res<Time>,
-    cam: Query<&GlobalTransform, With<Camera3d>>,
+    cam: Query<&GlobalTransform, With<crate::camera::OrbitCamera>>,
     mut zs: Query<(Entity, &mut Transform, &mut ZSprite)>,
 ) {
     let Some(cam) = cam.iter().next() else {

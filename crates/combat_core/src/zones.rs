@@ -24,9 +24,9 @@ pub(crate) struct ZoneState {
 pub(crate) struct World {
     zones: BTreeMap<String, ZoneState>,
     pub cleared: BTreeSet<String>,
-    bosses_killed: BTreeSet<String>,
+    pub(crate) bosses_killed: BTreeSet<String>,
     /// Zones whose `Unlocked` event was already emitted.
-    announced: BTreeSet<String>,
+    pub(crate) announced: BTreeSet<String>,
 }
 
 /// One exit of a zone as `Sim::zone_links` reports it.
@@ -35,6 +35,22 @@ pub struct ZoneLinkView {
     pub anchor: String,
     pub to: String,
     pub unlocked: bool,
+}
+
+/// Most extra members one pack can gain from group size; their zone slots are reserved past
+/// every regular slot, `MAX_PACK_EXTRA` per pack, so they stay dead across re-entries too.
+const MAX_PACK_EXTRA: usize = 4;
+/// Regular slots never reach this; extra-member slots start here.
+const EXTRA_SLOT_BASE: usize = 10_000;
+
+/// A trash pack of the loaded zone, kept for group-size growth after the load.
+pub(crate) struct PackRt {
+    id: u32,
+    at: Vec3,
+    yaw: f32,
+    level: u8,
+    defs: Vec<usize>,
+    index: usize,
 }
 
 struct Planned {
@@ -86,9 +102,22 @@ impl Sim {
         let mut plan = Vec::new();
         let mut pack_id = self.next_pack;
         let mut slot = 0;
+        let mut packs = Vec::new();
         for (k, p) in z.packs.iter().enumerate() {
             let (at, yaw) = anchor(&p.anchor)?;
             let level = if k * 2 < z.packs.len() { lo } else { hi };
+            let mut defs = Vec::new();
+            for key in &p.units {
+                defs.push(self.def_index(key)?);
+            }
+            packs.push(PackRt {
+                id: pack_id,
+                at,
+                yaw,
+                level,
+                defs,
+                index: k,
+            });
             for (key, (dx, dz)) in p.units.iter().zip(pack_offsets(p.units.len())) {
                 if !dead.contains(&slot) {
                     plan.push(Planned {
@@ -167,6 +196,7 @@ impl Sim {
         st.left_at = None;
         self.zone = Some(id.to_string());
         self.next_pack = pack_id;
+        self.zone_packs = packs;
         for p in plan {
             self.spawn(
                 p.def,
@@ -182,6 +212,7 @@ impl Sim {
                 },
             );
         }
+        self.grow_packs();
         if let Some((pos, yaw)) = graveyard {
             self.set_respawn_point(pos, yaw);
         }
@@ -192,6 +223,64 @@ impl Sim {
             self.events.push(Event::FloorLoaded { floor });
         }
         Ok(())
+    }
+
+    /// Co-op pack growth: every `group_pack_growth_players` players beyond the first add one
+    /// member to each trash pack (cycling through its units, next pack offset). Runs on load and
+    /// when someone joins; a pack already fighting or wiped out is left alone, and killed extras
+    /// stay dead like regular trash.
+    pub(crate) fn grow_packs(&mut self) {
+        let per = self.content.config.group_pack_growth_players as usize;
+        if per == 0 {
+            return;
+        }
+        let want = (self.players.len().saturating_sub(1) / per).min(MAX_PACK_EXTRA);
+        let dead = self
+            .zone
+            .as_ref()
+            .and_then(|z| self.world.zones.get(z))
+            .map(|s| s.dead_trash.clone())
+            .unwrap_or_default();
+        let mut spawns = Vec::new();
+        for p in &self.zone_packs {
+            let members: Vec<&crate::sim::Unit> = self
+                .units
+                .iter()
+                .filter(|u| u.state.pack == Some(p.id) && !u.despawned)
+                .collect();
+            let busy = members
+                .iter()
+                .any(|u| u.state.in_combat || !u.threat.is_empty());
+            if busy || !members.iter().any(|u| u.state.alive) {
+                continue;
+            }
+            let offsets = pack_offsets(p.defs.len() + want);
+            for e in 0..want {
+                let slot = EXTRA_SLOT_BASE + p.index * MAX_PACK_EXTRA + e;
+                let have = members.iter().any(|u| u.zone_slot == Some(slot));
+                if have || dead.contains(&slot) {
+                    continue;
+                }
+                let (dx, dz) = offsets.get(p.defs.len() + e).copied().unwrap_or((0.0, 0.0));
+                let pos = Vec3::new(p.at.x + dx, p.at.y, p.at.z + dz);
+                spawns.push((p.defs[e % p.defs.len()], pos, p.yaw, p.level, p.id, slot));
+            }
+        }
+        for (def, pos, yaw, level, pack, slot) in spawns {
+            self.spawn(
+                def,
+                pos,
+                yaw,
+                SpawnOpts {
+                    level: Some(level),
+                    pack: Some(pack),
+                    respawns: false,
+                    summoner: None,
+                    floor_boss: false,
+                    zone_slot: Some(slot),
+                },
+            );
+        }
     }
 
     /// The zone loaded by `load_zone`, if any.

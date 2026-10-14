@@ -36,7 +36,16 @@ pub fn yell_color(is_player: bool, hostile: bool) -> Color {
 
 /// Mini-bosses are ordinary (stunnable) units in the sim; the HUD still marks them.
 pub fn is_elite(key: &str) -> bool {
-    matches!(key, "hr_partner" | "marketing_lead" | "ciso")
+    matches!(
+        key,
+        "hr_partner"
+            | "marketing_lead"
+            | "ciso"
+            | "chief_happiness_officer"
+            | "chief_of_staff"
+            | "shadow_it_server"
+            | "hype_cycle_analyst"
+    )
 }
 
 /// Green used for trophy bonuses everywhere (loot window, log, inventory).

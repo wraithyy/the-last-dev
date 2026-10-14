@@ -85,7 +85,7 @@ pub(crate) struct Unit {
     pub spell_yell_cursor: BTreeMap<SpellId, usize>,
     pub respawn_at: Option<u64>,
     /// One roll per group member (`None` when the kill happened with no player in the sim).
-    pub loot: Vec<(Option<EntityId>, Vec<String>)>,
+    pub loot: Vec<LootShare>,
     /// Cached sum of the player's trophy bonuses; zero for everyone else.
     pub item_bonus: ItemTotals,
     /// Highest-priority yell requested this tick (with an explicit line for
@@ -116,6 +116,25 @@ pub(crate) struct Unit {
     pub class: Option<usize>,
     /// Player HP once per second, newest first (Revert Commit looks back in it).
     pub hp_hist: [u32; HP_HIST_LEN],
+    /// Perks of the equipped gear and complete sets (players only).
+    pub perks: Vec<crate::economy::ActivePerk>,
+    /// Ready tick per on-use item, the consumable group (`"consumable"`) and perk ICDs.
+    pub item_cd: BTreeMap<String, u64>,
+    /// Tick of the pull (first threat entry); 0 while out of combat. Drives `AiDef::enrage`.
+    pub combat_since: u64,
+    /// Players: in combat until this tick after an enemy that had them on its table reset.
+    pub combat_lock_until: u64,
+    /// `AiDef::flee`: running for the exit now, and the earliest tick of the next run.
+    pub fleeing: bool,
+    pub flee_next: u64,
+}
+
+/// One group member's unclaimed roll on a corpse.
+#[derive(Clone, Debug)]
+pub(crate) struct LootShare {
+    pub owner: Option<EntityId>,
+    pub items: Vec<String>,
+    pub sp: u32,
 }
 
 /// Seconds of HP history kept per player.
@@ -128,6 +147,8 @@ pub(crate) struct Hit {
     pub crit: bool,
     pub combo: bool,
     pub school: School,
+    /// Periodic or expiry damage: goes around frontal shields.
+    pub dot: bool,
 }
 
 /// How a unit enters the world.
@@ -164,6 +185,12 @@ pub struct Sim {
     /// Root of every unit's private wander stream.
     seed: u64,
     pub(crate) wandering: bool,
+    /// Gear, junk and SP rolls; separate from `rng` so loot tables never shift combat replays.
+    pub(crate) loot_rng: Rng,
+    pub(crate) telegraphs: Vec<crate::telegraph::TelegraphRt>,
+    pub(crate) next_telegraph: u32,
+    /// Trash packs of the loaded zone (co-op growth on join).
+    pub(crate) zone_packs: Vec<crate::zones::PackRt>,
 }
 
 impl Sim {
@@ -186,6 +213,10 @@ impl Sim {
             hostile_yell_next: 0,
             seed,
             wandering: true,
+            loot_rng: Rng::new(seed ^ 0x5EED_0F10_07AB),
+            telegraphs: Vec::new(),
+            next_telegraph: 1,
+            zone_packs: Vec::new(),
         }
     }
 
@@ -224,11 +255,13 @@ impl Sim {
         // Re-apply now that the unit is known to be the player (level table stats).
         if let Some(i) = self.index(id) {
             self.units[i].class = Some(ci);
+            self.units[i].state.equipped = vec![String::new(); crate::economy::SLOTS];
             self.apply_level(i, 1);
             let hp = self.units[i].state.hp;
             self.units[i].hp_hist = [hp; HP_HIST_LEN];
         }
         self.rescale_group_hp();
+        self.grow_packs();
         id
     }
 
@@ -243,7 +276,7 @@ impl Sim {
         self.players.retain(|p| *p != id);
         self.quest_logs.remove(&id);
         for u in &mut self.units {
-            u.loot.retain(|(owner, _)| *owner != Some(id));
+            u.loot.retain(|l| l.owner != Some(id));
             if u.state.lootable && u.loot.is_empty() {
                 u.state.lootable = false;
             }
@@ -346,6 +379,10 @@ impl Sim {
             phase: 1,
             idle_pose: d.idle_pose,
             inventory: Vec::new(),
+            sp: 0,
+            bag: Vec::new(),
+            equipped: Vec::new(),
+            buyback: Vec::new(),
         };
         self.units.push(Unit {
             state,
@@ -391,6 +428,12 @@ impl Sim {
             nav: NavAgent::default(),
             class: None,
             hp_hist: [0; HP_HIST_LEN],
+            combat_since: 0,
+            combat_lock_until: 0,
+            fleeing: false,
+            flee_next: 0,
+            perks: Vec::new(),
+            item_cd: BTreeMap::new(),
         });
         let i = self.units.len() - 1;
         // Neighbouring NPCs of the same kind start at different lines, so they banter.
@@ -438,7 +481,13 @@ impl Sim {
             | Command::Talk { .. }
             | Command::AcceptQuest { .. }
             | Command::TurnInQuest { .. }
-            | Command::AbandonQuest { .. } => {}
+            | Command::AbandonQuest { .. }
+            | Command::Equip { .. }
+            | Command::Unequip { .. }
+            | Command::Buy { .. }
+            | Command::Sell { .. }
+            | Command::Buyback { .. }
+            | Command::UseItem { .. } => {}
         }
         self.pending.push((Some(player), cmd));
     }
@@ -555,6 +604,7 @@ impl Sim {
         self.run_queue();
         self.update_auto_attack();
         self.update_ai();
+        self.update_telegraphs();
         self.update_wander();
         self.update_auras();
         self.update_regen();
@@ -617,6 +667,12 @@ impl Sim {
             Command::AcceptQuest { quest } => self.accept_quest(actor, &quest),
             Command::TurnInQuest { quest } => self.turn_in_quest(actor, &quest),
             Command::AbandonQuest { quest } => self.abandon_quest(actor, &quest),
+            Command::Equip { item } => self.equip(actor, &item),
+            Command::Unequip { slot } => self.unequip(actor, slot),
+            Command::Buy { vendor, item } => self.buy(actor, vendor, &item),
+            Command::Sell { vendor, item } => self.sell(actor, vendor, &item),
+            Command::Buyback { vendor, item } => self.buyback(actor, vendor, &item),
+            Command::UseItem { item } => self.use_item(actor, &item),
             other => self.apply_named(other),
         }
     }
@@ -651,7 +707,13 @@ impl Sim {
             | Command::Talk { .. }
             | Command::AcceptQuest { .. }
             | Command::TurnInQuest { .. }
-            | Command::AbandonQuest { .. } => {}
+            | Command::AbandonQuest { .. }
+            | Command::Equip { .. }
+            | Command::Unequip { .. }
+            | Command::Buy { .. }
+            | Command::Sell { .. }
+            | Command::Buyback { .. }
+            | Command::UseItem { .. } => {}
         }
     }
 
@@ -687,21 +749,44 @@ impl Sim {
         let shares = &mut self.units[ci].loot;
         let Some(k) = shares
             .iter()
-            .position(|(o, _)| *o == Some(looter))
-            .or_else(|| shares.iter().position(|(o, _)| o.is_none()))
+            .position(|l| l.owner == Some(looter))
+            .or_else(|| shares.iter().position(|l| l.owner.is_none()))
         else {
             return;
         };
-        let (_, items) = shares.remove(k);
-        self.units[ci].state.lootable = !self.units[ci].loot.is_empty();
+        let share = shares.remove(k);
         let player = self.is_player(looter);
+        let (mut items, mut sp) = (share.items, share.sp);
         if player {
-            self.add_trophies(li, &items);
+            let (trophies, goods): (Vec<String>, Vec<String>) = items
+                .into_iter()
+                .partition(|n| self.content.item(n).is_some());
+            self.add_trophies(li, &trophies);
+            // Whatever does not fit stays on the corpse for a second try.
+            let left = self.stow(li, goods.clone());
+            items = trophies
+                .into_iter()
+                .chain(goods.into_iter().filter(|g| !left.contains(g)))
+                .collect();
+            self.units[li].state.sp = self.units[li].state.sp.saturating_add(sp);
+            if !left.is_empty() {
+                self.units[ci].loot.push(LootShare {
+                    owner: Some(looter),
+                    items: left,
+                    sp: 0,
+                });
+                self.item_error(looter, ItemError::BagFull);
+            }
+            self.bag_event(li);
+        } else {
+            sp = 0;
         }
+        self.units[ci].state.lootable = !self.units[ci].loot.is_empty();
         let e = Event::Looted {
             looter,
             corpse,
             items: items.clone(),
+            sp,
         };
         self.emit_for(looter, e);
         if player {
@@ -735,15 +820,20 @@ impl Sim {
         u.mana = scale(u.mana, old_mana, u.max_mana);
     }
 
-    /// Re-sums the inventory, then rebuilds the level-derived stats (which include the bonus).
-    fn refresh_item_bonus(&mut self, i: usize) {
+    /// Re-sums trophies, gear and set bonuses, then rebuilds the level-derived stats (which include the bonus).
+    pub(crate) fn refresh_item_bonus(&mut self, i: usize) {
         let mut total = ItemTotals::default();
         for (name, copies) in &self.units[i].state.inventory {
             if let Some(it) = self.content.item(name) {
                 total.add(&it.bonus.totals(*copies));
             }
         }
+        let (gear, perks) = self.gear_totals(i);
+        total.add(&gear.totals);
+        total.haste_pct += gear.haste_tenths / 10;
+        total.armor_tenths = total.armor_tenths.min(crate::economy::ARMOR_CAP_TENTHS);
         self.units[i].item_bonus = total;
+        self.units[i].perks = perks;
         let (hp, mana) = (self.units[i].state.hp, self.units[i].state.mana);
         let level = self.units[i].state.level;
         self.apply_level(i, level);
@@ -798,6 +888,17 @@ impl Sim {
             return false;
         }
         self.apply_aura(ti, key, duration_ms, None, id, None);
+        true
+    }
+
+    /// Debug/test: sets a living unit's HP (clamped to 1..=max) without an event; boss phases
+    /// follow on its next AI step. False for unknown or dead units.
+    pub fn debug_set_hp(&mut self, id: EntityId, hp: u32) -> bool {
+        let Some(i) = self.index(id).filter(|&i| self.units[i].state.alive) else {
+            return false;
+        };
+        let s = &mut self.units[i].state;
+        s.hp = hp.clamp(1, s.max_hp);
         true
     }
 
@@ -923,7 +1024,7 @@ impl Sim {
         if spell.cast_ms > 0 && u.moving {
             return Err(CastError::Moving);
         }
-        if u.state.mana < spell.mana {
+        if u.state.mana < self.perk_mana_cost(ci, spell.id, spell.mana) {
             return Err(CastError::NotEnoughMana);
         }
         if spell.channel.is_some() && u.state.mana >= u.state.max_mana {
@@ -1177,7 +1278,7 @@ impl Sim {
                 &self.blockers,
             )?;
         }
-        if self.units[ci].state.mana < spell.mana {
+        if self.units[ci].state.mana < self.perk_mana_cost(ci, spell.id, spell.mana) {
             return Err(CastError::NotEnoughMana);
         }
         Ok(())
@@ -1186,13 +1287,13 @@ impl Sim {
     /// Spend mana, start the spell cooldown, report success, apply the effects.
     pub(crate) fn resolve(&mut self, ci: usize, spell: &SpellDef, target: Option<EntityId>) {
         let caster = Self::id_of(ci);
+        let mana = self.perk_mana_cost(ci, spell.id, spell.mana);
+        let cooldown_ms = self.perk_cooldown(ci, spell.id, spell.cooldown_ms);
         let u = &mut self.units[ci];
-        u.state.mana = u.state.mana.saturating_sub(spell.mana);
-        if spell.cooldown_ms > 0 {
-            u.cooldowns.insert(
-                spell.id,
-                (self.now + ticks(spell.cooldown_ms), spell.cooldown_ms),
-            );
+        u.state.mana = u.state.mana.saturating_sub(mana);
+        if cooldown_ms > 0 {
+            u.cooldowns
+                .insert(spell.id, (self.now + ticks(cooldown_ms), cooldown_ms));
         }
         self.events.push(Event::CastSucceeded {
             caster,
@@ -1203,6 +1304,11 @@ impl Sim {
             self.spell_yell(ci, spell);
         }
         self.note_cast(ci, spell.id);
+        // Players have no telegraphs; enemy telegraphs land later in `update_telegraphs`.
+        if spell.telegraph.is_some() && !self.is_player(caster) {
+            let ti = target.and_then(|t| self.index(t));
+            return self.start_telegraphs(ci, spell, ti);
+        }
         let targets: Vec<usize> = match spell.area {
             Some(area) => self.area_targets(ci, area),
             None => target.and_then(|t| self.index(t)).into_iter().collect(),
@@ -1216,6 +1322,7 @@ impl Sim {
                 }
             }
         }
+        self.perk_after_cast(ci, spell.id, target);
     }
 
     /// Player-only shout on spell release; gated by a global cooldown, never touches the rng.
@@ -1271,6 +1378,7 @@ impl Sim {
             crit,
             combo,
             school,
+            dot,
         } = hit;
         let Some(ti) = self.index(target) else { return };
         let t = &self.units[ti];
@@ -1292,10 +1400,16 @@ impl Sim {
                 crit,
                 combo,
                 school,
+                dot,
             };
             return self.deal_damage(target, source, hit);
         }
         let amount = self.modified_damage(source, ti, amount);
+        let amount = if dot {
+            amount
+        } else {
+            self.frontal_shield(source, ti, amount)
+        };
         let mut absorbed = 0;
         let mut depleted: Vec<String> = Vec::new();
         for a in &mut self.units[ti].auras {
@@ -1332,6 +1446,9 @@ impl Sim {
             self.add_threat(ti, source, amount.max(1));
         } else if dealt > 0 {
             self.pushback(ti);
+            if hp > 0 {
+                self.perk_on_hurt(ti);
+            }
         }
         if hp == 0 {
             self.die(ti, Some(source));
@@ -1381,6 +1498,8 @@ impl Sim {
         u.moving = false;
         u.threat.clear();
         u.state.target = None;
+        u.combat_since = 0;
+        u.fleeing = false;
         self.events.push(Event::Death { unit: id, killer });
         self.kill_adds_of(id);
         self.request_yell(ti, YellKind::Death);
@@ -1412,12 +1531,18 @@ impl Sim {
         };
         let mut shares = Vec::with_capacity(owners.len());
         for owner in owners {
-            let items: Vec<String> = loot_table
+            let mut items: Vec<String> = loot_table
                 .iter()
                 .filter(|e| self.rng.chance_pct(e.chance_pct))
                 .map(|e| e.item.clone())
                 .collect();
-            shares.push((owner, items));
+            let role = owner
+                .and_then(|p| self.index(p))
+                .and_then(|p| self.class_at(p))
+                .map(|c| c.role);
+            let (goods, sp) = self.roll_economy_loot(ti, role);
+            items.extend(goods);
+            shares.push(LootShare { owner, items, sp });
         }
         self.units[ti].loot = shares.clone();
         self.units[ti].state.lootable = true;
@@ -1427,8 +1552,12 @@ impl Sim {
         if let Some(k) = killer {
             self.award_kill_xp(k, ti);
         }
-        for (owner, items) in shares {
-            let e = Event::LootDropped { corpse: id, items };
+        for LootShare { owner, items, sp } in shares {
+            let e = Event::LootDropped {
+                corpse: id,
+                items,
+                sp,
+            };
             match owner {
                 Some(p) => self.emit_to(p, e),
                 None => self.events.push(e),
@@ -1492,9 +1621,11 @@ impl Sim {
             let is_player = self.is_player(id);
             let now_in = u.state.alive
                 && if is_player {
-                    self.units
-                        .iter()
-                        .any(|o| o.state.alive && o.threat.contains_key(&id))
+                    self.now < u.combat_lock_until
+                        || self
+                            .units
+                            .iter()
+                            .any(|o| o.state.alive && o.threat.contains_key(&id))
                 } else {
                     !u.threat.is_empty()
                 };

@@ -82,6 +82,20 @@ mod platform {
         let _ = std::fs::write(p, bits.to_string());
     }
 
+    pub fn load_keys() -> Option<String> {
+        std::fs::read_to_string(path()?.with_file_name("keys.txt")).ok()
+    }
+
+    pub fn save_keys(text: &str) {
+        let Some(p) = path().map(|p| p.with_file_name("keys.txt")) else {
+            return;
+        };
+        if let Some(dir) = p.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let _ = std::fs::write(p, text);
+    }
+
     pub fn load_class() -> Option<String> {
         let p = path()?.with_file_name("class.txt");
         let s = std::fs::read_to_string(p).ok()?;
@@ -140,6 +154,18 @@ mod platform {
         }
     }
 
+    const KEYS: &str = "tld.keys";
+
+    pub fn load_keys() -> Option<String> {
+        storage()?.get_item(KEYS).ok().flatten()
+    }
+
+    pub fn save_keys(text: &str) {
+        if let Some(s) = storage() {
+            let _ = s.set_item(KEYS, text);
+        }
+    }
+
     const CLASS: &str = "tld.class";
 
     pub fn load_class() -> Option<String> {
@@ -165,7 +191,9 @@ mod platform {
     }
 }
 
-pub use platform::{load, load_class, load_hud, page, save, save_class, save_hud};
+pub use platform::{
+    load, load_class, load_hud, load_keys, page, save, save_class, save_hud, save_keys,
+};
 
 #[cfg(test)]
 mod tests {

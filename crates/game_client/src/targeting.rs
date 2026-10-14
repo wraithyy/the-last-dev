@@ -5,6 +5,7 @@ use crate::collision::to_core;
 use crate::combat::{CombatSim, SimUnit, SimView};
 use crate::config::*;
 use crate::input::{MouseState, Paused, QuestWindows, TrophiesOpen};
+use crate::keybinds::{Action, Keybinds};
 use crate::player::{Player, PlayerBody};
 use crate::units::Unit;
 use bevy::prelude::*;
@@ -101,15 +102,9 @@ fn drop_invalid_target(
     }
 }
 
-/// F1 targets yourself, F2-F5 the other group members in join order (as in WoW).
-pub const PARTY_KEYS: [KeyCode; 5] = [
-    KeyCode::F1,
-    KeyCode::F2,
-    KeyCode::F3,
-    KeyCode::F4,
-    KeyCode::F5,
-];
-
+/// Party keys (F1 yourself, F2-F5 the other group members in join order, as in WoW) are
+/// `Action::Party(0..5)`; see `party_slot` for the mapping.
+///
 /// Sim id behind party key `slot`: 0 is `you`, `k` the k-th other member.
 pub fn party_slot(players: &[EntityId], you: EntityId, slot: usize) -> Option<EntityId> {
     if slot == 0 {
@@ -125,6 +120,7 @@ pub fn entity_of_sim(units: &Query<(Entity, &SimUnit)>, id: EntityId) -> Option<
 
 fn party_keys(
     keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<Keybinds>,
     paused: Res<Paused>,
     sim: SimView,
     me: Single<&SimUnit, With<Player>>,
@@ -134,7 +130,7 @@ fn party_keys(
     if paused.0 {
         return;
     }
-    let Some(slot) = PARTY_KEYS.iter().position(|k| keys.just_pressed(*k)) else {
+    let Some(slot) = (0..5u8).position(|i| binds.just(&keys, Action::Party(i))) else {
         return;
     };
     if let Some(e) = party_slot(sim.players(), me.0, slot).and_then(|id| entity_of_sim(&units, id))
@@ -145,6 +141,7 @@ fn party_keys(
 
 fn handle_keys(
     keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<Keybinds>,
     // Grouped because Esc closes these in priority order.
     (mut paused, mut trophies, mut windows): (
         ResMut<Paused>,
@@ -164,7 +161,7 @@ fn handle_keys(
         }
         return;
     }
-    if paused.0 || !keys.just_pressed(KeyCode::Tab) {
+    if paused.0 || !binds.just(&keys, Action::TargetNext) {
         return;
     }
     let fighting = |s: Option<&SimUnit>| {
@@ -225,7 +222,7 @@ fn click_select(
     mouse: Res<MouseState>,
     paused: Res<Paused>,
     colliders: Res<Colliders>,
-    camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
     units: Query<(Entity, &Transform, &Unit)>,
     ui: Query<&Interaction>,
     mut target: ResMut<Target>,

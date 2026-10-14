@@ -42,6 +42,8 @@ See [docs/PLAN.md](docs/PLAN.md), [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md), [d
 
 ## Controls
 
+Every key below is the default; **Esc menu > `~/keybindings`** rebinds any of them (click an action, press a key; a key already in use is swapped; Reset to defaults restores everything). Bindings are physical key positions, so Czech and other layouts keep working, and they are saved (a file next to the co-op settings on native, localStorage on the web). The action bar and the hint bar show your bindings.
+
 | Input | Action |
 |---|---|
 | W / S | Run forward / backpedal (slower) |
@@ -65,6 +67,8 @@ See [docs/PLAN.md](docs/PLAN.md), [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md), [d
 | B | Toggle the `~/trophies` inventory window (B, `[x]` or Esc closes it) |
 | J | Toggle the `~/jira` quest log (abandon tickets there) |
 | N | Toggle the map (current zone + zone tree) |
+| `=` / `-` (or the `+` / `-` buttons) | Zoom the `~/radar` minimap (top right: north up, you in the middle, group blue, hostiles within 40 m red, quest givers `!` / `?`, loot gold, doors `#`; click it to open the map) |
+| Hover an aura icon or the target's cast bar | IDE-style tooltip: name, effect, time left, stacks, dispel type, interruptible |
 | Up / Down, Enter, Backspace (ticket dialog) | Pick a ticket, accept / complete it, back to the list |
 | R (victory screen) | Start a new sprint |
 | M | Mute / unmute all audio |
@@ -112,6 +116,8 @@ docs/                 plan, version choices, known limitations
 | `WOW_TALK=1` | Talk to the nearest friendly NPC two seconds in |
 | `WOW_GIVE_ITEMS=1`, `WOW_TROPHIES=1` | Grant a sample set of trophies at start, open the `~/trophies` window at start |
 | `WOW_HOVER_SLOT=0..9`, `WOW_AUTORUN=1`, `WOW_LINEUP=1\|2` | Force a tooltip, hold forward, show the cast lineup |
+| `WOW_HOVER_TIP=player-aura\|target-aura\|party-aura\|target-cast` | Force the aura or cast tooltip of the first matching node |
+| `WOW_KEYBIND_DEMO=1\|2` | Rebind slot 1 to X and coffee to R in memory only (not saved); `1` also opens the `~/keybindings` panel |
 
 ## Credits
 

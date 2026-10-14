@@ -7,14 +7,17 @@ mod actionbar;
 mod banners;
 mod feed;
 mod frames;
+mod hovertip;
 mod logs;
 mod map;
 mod meter;
+mod minimap;
 mod quests;
 mod trophies;
 
 use crate::combat::{SimReady, SimView};
 use crate::input::Paused;
+use crate::keybinds::{Action, Keybinds};
 use crate::targeting::TargetInfo;
 use bevy::prelude::*;
 use std::collections::HashMap;
@@ -22,6 +25,9 @@ use std::collections::HashMap;
 pub use actionbar::CooldownMaterial;
 pub use banners::Banner;
 pub use feed::LogLineMsg;
+pub use hovertip::TipSource;
+/// Top edge (HUD px) of the first row under the minimap: player auras, then the quest tracker.
+pub const BELOW_MINIMAP: f32 = minimap::TOP + minimap::HEIGHT + 4.0;
 pub use quests::giver_mark;
 
 /// Terminal cyan: focus, hover and "active" states across the HUD.
@@ -61,18 +67,21 @@ impl Plugin for HudPlugin {
                 trophies::TrophiesPlugin,
                 quests::QuestsPlugin,
                 map::MapPlugin,
+                minimap::MinimapPlugin,
+                hovertip::HoverTipPlugin,
             ))
             .add_systems(Startup, spawn_misc)
             .add_systems(
                 Update,
                 (update_pause_overlay, toggle_dev, update_dev_overlay).in_set(SimReady),
-            );
+            )
+            .add_systems(Update, update_key_hint);
     }
 }
 
 /// Icon files shipped in `assets/icons` (see CREDITS.md). Any other key gets a
 /// generated letter badge, so content can name icons before art exists.
-pub const ICON_FILES: [&str; 195] = [
+pub const ICON_FILES: [&str; 216] = [
     "ab_loser",
     "ab_test",
     "ab_winner",
@@ -111,6 +120,7 @@ pub const ICON_FILES: [&str; 195] = [
     "code_review",
     "code_smell",
     "coffee_break",
+    "coffee_pot",
     "coins",
     "confident_answer",
     "connection_pool",
@@ -138,6 +148,19 @@ pub const ICON_FILES: [&str; 195] = [
     "feature_flag",
     "forwarded_reply",
     "free_swag",
+    "gear_beanie",
+    "gear_desk",
+    "gear_extinguisher",
+    "gear_headset",
+    "gear_hoodie",
+    "gear_idcard",
+    "gear_keyboard",
+    "gear_mug",
+    "gear_propeller",
+    "gear_shades",
+    "gear_stein",
+    "gear_tshirt",
+    "gear_vr",
     "generate_prs",
     "git_blame",
     "gpu_candle",
@@ -161,6 +184,9 @@ pub const ICON_FILES: [&str; 195] = [
     "jailbreak",
     "job_pending",
     "judgment",
+    "junk_candy",
+    "junk_ticket",
+    "junk_trash",
     "key",
     "keyboard",
     "kill_9",
@@ -188,8 +214,10 @@ pub const ICON_FILES: [&str; 195] = [
     "password_rotation",
     "phished",
     "phishing",
+    "pills",
     "pixel_push",
     "pizza",
+    "poster",
     "postmortem",
     "preemption",
     "press_release",
@@ -230,6 +258,7 @@ pub const ICON_FILES: [&str; 195] = [
     "rubber_band",
     "rubber_duck",
     "rug_pull",
+    "sandwich",
     "scooter_helmet",
     "scope_creep",
     "self_improvement",
@@ -243,6 +272,7 @@ pub const ICON_FILES: [&str; 195] = [
     "standup",
     "sticky",
     "still_typing",
+    "story_points",
     "stress_ball",
     "synergy_storm",
     "term_sheet",
@@ -388,6 +418,39 @@ struct DevOverlay(bool);
 #[derive(Component)]
 pub struct KeyHint;
 
+#[derive(Component)]
+struct KeyHintText;
+
+/// The cheat sheet reads the bindings, so a rebound key never lies in the hint bar.
+fn update_key_hint(binds: Res<Keybinds>, mut text: Single<&mut Text, With<KeyHintText>>) {
+    if !binds.is_changed() {
+        return;
+    }
+    let k = |a| binds.label(a);
+    let line = format!(
+        "{}{}{}{} move | RMB steer | LMB orbit | Wheel zoom | {} jump | {} target | {} auto | {}-{} cast | {} / right-click talk, loot | {} jira | {} map | {} gear | {} trophies | {} metrics | {} chat | {} log | {} mute | Esc menu",
+        k(Action::Forward),
+        k(Action::TurnLeft),
+        k(Action::Backward),
+        k(Action::TurnRight),
+        k(Action::Jump),
+        k(Action::TargetNext),
+        k(Action::AutoAttack),
+        k(Action::Slot(0)),
+        k(Action::Slot(9)),
+        k(Action::Interact),
+        k(Action::QuestLog),
+        k(Action::Map),
+        k(Action::CharacterSheet),
+        k(Action::Trophies),
+        k(Action::Meter),
+        k(Action::Chat),
+        k(Action::CombatLog),
+        k(Action::Mute),
+    );
+    crate::hud::set_text(&mut text, &line);
+}
+
 fn spawn_misc(mut commands: Commands) {
     commands.spawn((
         KeyHint,
@@ -399,10 +462,8 @@ fn spawn_misc(mut commands: Commands) {
             ..default()
         },
         children![(
-            label(
-                "WASD move | RMB steer | LMB orbit | Wheel zoom | Space jump | Tab target | T auto | 1-0 cast | F / right-click talk, loot | J jira | N map | B trophies | K metrics | H chat | L log | M mute | Esc menu",
-                11.0,
-            ),
+            KeyHintText,
+            label("", 11.0),
             TextColor(Color::srgba(0.8, 0.9, 1.0, 0.5)),
         )],
     ));

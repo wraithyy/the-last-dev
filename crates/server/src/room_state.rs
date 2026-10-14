@@ -209,6 +209,15 @@ impl RoomState {
         {
             self.sim.set_level_of(eid, *level);
         }
+        // QA only (co-op outfit screenshots): `TLD_DEV_GEAR=a|b;c|d` equips joiner N with list N.
+        if let Ok(v) = std::env::var("TLD_DEV_GEAR") {
+            let lists: Vec<&str> = v.split(';').collect();
+            if let Some(list) = lists.get(nth).or(lists.last()) {
+                for item in list.split('|').map(str::trim).filter(|s| !s.is_empty()) {
+                    self.sim.debug_equip(eid, item);
+                }
+            }
+        }
         // Same respawn rule load_zone applies to everyone already in the group.
         if let Some((g, gy)) = geom.and_then(|g| g.anchor("graveyard")) {
             self.sim.set_respawn_point(g, gy);

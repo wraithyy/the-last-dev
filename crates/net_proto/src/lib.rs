@@ -7,14 +7,14 @@
 
 use combat_core::{
     AiState, AuraView, Command, Content, CooldownView, EntityId, Event, MAX_PLAYERS, QuestLog,
-    SpellId, UnitState, Vec3,
+    SpellId, TelegraphShape, UnitState, Vec3,
 };
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 4;
+pub const PROTOCOL_VERSION: u16 = 6;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -30,6 +30,8 @@ pub const MAX_EVENTS_PER_FRAME: usize = 2_048;
 pub const MAX_SNAPSHOT_UNITS: usize = 1_024;
 /// Items of one loot roll, quests of one offer.
 pub const MAX_LIST_LEN: usize = 64;
+/// Item names (gear, junk, consumables) are short content keys too.
+pub const MAX_ITEM_NAME_BYTES: usize = 64;
 /// Error, yell and other free-form server strings (yells are content lines, not user text).
 pub const MAX_TEXT_BYTES: usize = 512;
 
@@ -456,9 +458,28 @@ pub struct PlayerSnap {
     pub max_mana: u32,
     pub xp: u32,
     pub xp_to_next: u32,
+    /// Equipped gear by slot as indices into `Content::economy.gear` (`NO_GEAR` = empty), so
+    /// late joiners see everyone's outfit.
+    pub gear: Vec<u16>,
 }
 
 impl PlayerSnap {
+    pub const NO_GEAR: u16 = u16::MAX;
+
+    /// The gear names by slot ("" for empty or unknown indices).
+    pub fn equipped(&self, content: &Content) -> Vec<String> {
+        self.gear
+            .iter()
+            .map(|&k| {
+                content
+                    .economy
+                    .gear
+                    .get(usize::from(k))
+                    .map_or_else(String::new, |g| g.name.clone())
+            })
+            .collect()
+    }
+
     pub fn from_state(u: &UnitState, content: &Content) -> PlayerSnap {
         PlayerSnap {
             id: u.id,
@@ -470,6 +491,19 @@ impl PlayerSnap {
             max_mana: u.max_mana,
             xp: u.xp,
             xp_to_next: u.xp_to_next,
+            gear: u
+                .equipped
+                .iter()
+                .map(|n| {
+                    content
+                        .economy
+                        .gear
+                        .iter()
+                        .position(|g| g.name == *n)
+                        .and_then(|k| u16::try_from(k).ok())
+                        .unwrap_or(Self::NO_GEAR)
+                })
+                .collect(),
         }
     }
 }
@@ -511,6 +545,12 @@ pub fn is_player_command(cmd: &Command) -> bool {
         Command::AcceptQuest { quest }
         | Command::TurnInQuest { quest }
         | Command::AbandonQuest { quest } => quest.len() <= MAX_QUEST_ID_BYTES,
+        Command::Equip { item }
+        | Command::UseItem { item }
+        | Command::Buy { item, .. }
+        | Command::Sell { item, .. }
+        | Command::Buyback { item, .. } => item.len() <= MAX_ITEM_NAME_BYTES,
+        Command::Unequip { slot } => usize::from(*slot) < combat_core::SLOTS,
         Command::SetTarget { .. }
         | Command::Cast { .. }
         | Command::StopCasting { .. }
@@ -641,7 +681,9 @@ impl Msg for ServerMsg {
             ServerMsg::Snapshot { units, players, .. } => {
                 units.len() <= MAX_SNAPSHOT_UNITS
                     && players.len() <= MAX_PLAYERS
-                    && players.iter().all(|p| p.class.len() <= MAX_CLASS_BYTES)
+                    && players.iter().all(|p| {
+                        p.class.len() <= MAX_CLASS_BYTES && p.gear.len() <= combat_core::SLOTS
+                    })
                     && units.iter().all(|u| u.auras.len() <= MAX_LIST_LEN)
             }
             ServerMsg::MoveCorrection { pos, .. } => {
@@ -677,10 +719,47 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
             Err(ProtoError::TooMany)
         }
     };
+    let names = |v: &[String]| {
+        list(v.len())?;
+        if v.iter().all(|n| n.len() <= MAX_ITEM_NAME_BYTES) {
+            Ok(())
+        } else {
+            Err(ProtoError::TooMany)
+        }
+    };
     match e {
         Event::Knockback { dir, strength, .. } => finite(&[dir.x, dir.y, dir.z, *strength]),
         Event::Teleported { pos, .. } => finite(&[pos.x, pos.y, pos.z]),
-        Event::LootDropped { items, .. } | Event::Looted { items, .. } => list(items.len()),
+        Event::TelegraphStarted {
+            shape,
+            pos,
+            facing,
+            cover,
+            ..
+        } => {
+            list(cover.len())?;
+            let dims = match *shape {
+                TelegraphShape::Circle { radius_m } => [radius_m, 0.0],
+                TelegraphShape::Cone {
+                    radius_m,
+                    angle_deg,
+                } => [radius_m, angle_deg],
+                TelegraphShape::Line { length_m, width_m } => [length_m, width_m],
+            };
+            finite(&[pos.x, pos.y, pos.z, *facing, dims[0], dims[1]])?;
+            cover.iter().try_for_each(|c| finite(&[c.x, c.y, c.z]))
+        }
+        Event::LootDropped { items, .. } | Event::Looted { items, .. } => names(items),
+        Event::Bag {
+            bag,
+            equipped,
+            buyback,
+            ..
+        } => names(bag).and(names(equipped)).and(names(buyback)),
+        Event::GearChanged { equipped, .. } => names(equipped),
+        Event::Proc { item, .. } | Event::ItemCooldown { item, .. } => {
+            names(std::slice::from_ref(item))
+        }
         Event::QuestOffered { quests, .. } => list(quests.len()),
         Event::Yell { text, .. } if text.len() > MAX_TEXT_BYTES => Err(ProtoError::TooMany),
         _ => Ok(()),
@@ -882,6 +961,25 @@ mod tests {
                 Command::AbandonQuest {
                     quest: "q_intro".into(),
                 },
+                Command::Equip {
+                    item: "The Monorepo".into(),
+                },
+                Command::Unequip { slot: 4 },
+                Command::Buy {
+                    vendor: 12,
+                    item: "Ibuprofen".into(),
+                },
+                Command::Sell {
+                    vendor: 12,
+                    item: "Expired Free Pizza Coupon".into(),
+                },
+                Command::Buyback {
+                    vendor: 12,
+                    item: "Expired Free Pizza Coupon".into(),
+                },
+                Command::UseItem {
+                    item: "Cold Brew".into(),
+                },
             ]
             .into_iter()
             .map(ClientMsg::Cmd),
@@ -1004,6 +1102,98 @@ mod tests {
                         npc: 4,
                         quests: vec!["q_intro".into()],
                     },
+                    Event::TelegraphStarted {
+                        id: 7,
+                        source: 5,
+                        spell: SpellId(635),
+                        shape: TelegraphShape::Circle { radius_m: 45.0 },
+                        pos: Vec3::new(1.0, 0.0, -3.0),
+                        facing: 0.5,
+                        resolve_ms: 5000,
+                        cover: vec![Vec3::new(-6.0, 0.0, 2.0), Vec3::new(6.0, 0.0, 2.0)],
+                    },
+                    Event::TelegraphStarted {
+                        id: 8,
+                        source: 5,
+                        spell: SpellId(630),
+                        shape: TelegraphShape::Line {
+                            length_m: 34.0,
+                            width_m: 3.5,
+                        },
+                        pos: Vec3::new(0.0, 0.0, 0.0),
+                        facing: -1.2,
+                        resolve_ms: 1800,
+                        cover: vec![],
+                    },
+                    Event::TelegraphStarted {
+                        id: 9,
+                        source: 6,
+                        spell: SpellId(608),
+                        shape: TelegraphShape::Cone {
+                            radius_m: 8.0,
+                            angle_deg: 80.0,
+                        },
+                        pos: Vec3::new(2.0, 0.0, 2.0),
+                        facing: 3.0,
+                        resolve_ms: 1800,
+                        cover: vec![],
+                    },
+                    Event::TelegraphResolved {
+                        id: 7,
+                        landed: true,
+                    },
+                    Event::TelegraphResolved {
+                        id: 8,
+                        landed: false,
+                    },
+                    Event::LootDropped {
+                        corpse: 9,
+                        items: vec![
+                            "Prompt Fragment".into(),
+                            "Mechanical Keyboard of Clacking".into(),
+                        ],
+                        sp: 14,
+                    },
+                    Event::Looted {
+                        looter: 1,
+                        corpse: 9,
+                        items: vec!["Mechanical Keyboard of Clacking".into()],
+                        sp: 14,
+                    },
+                    Event::Bag {
+                        unit: 1,
+                        sp: 120,
+                        bag: vec!["Ibuprofen".into(), "Cold Brew".into()],
+                        equipped: vec![
+                            "".into(),
+                            "".into(),
+                            "Mechanical Keyboard of Clacking".into(),
+                            "".into(),
+                            "".into(),
+                        ],
+                        buyback: vec!["Expired Free Pizza Coupon".into()],
+                    },
+                    Event::GearChanged {
+                        unit: 1,
+                        equipped: vec![
+                            "".into(),
+                            "".into(),
+                            "Mechanical Keyboard of Clacking".into(),
+                            "".into(),
+                            "".into(),
+                        ],
+                    },
+                    Event::Proc {
+                        unit: 1,
+                        item: "Mechanical Keyboard of Clacking".into(),
+                    },
+                    Event::ItemError {
+                        reason: combat_core::ItemError::NotEnoughSp,
+                    },
+                    Event::ItemCooldown {
+                        item: "Escalation Hotline Badge".into(),
+                        ms: 60_000,
+                    },
                 ],
             },
             ServerMsg::Snapshot {
@@ -1016,6 +1206,7 @@ mod tests {
                     max_mana: 200,
                     xp: 10,
                     xp_to_next: 400,
+                    gear: vec![3, PlayerSnap::NO_GEAR, 0, PlayerSnap::NO_GEAR, 7],
                 }],
             },
             ServerMsg::MoveCorrection {
@@ -1095,6 +1286,15 @@ mod tests {
             quest: "q".repeat(MAX_QUEST_ID_BYTES + 1),
         });
         assert_eq!(roundtrip(&long_quest), Err(ProtoError::IllegalCommand));
+        let long_item = ClientMsg::Cmd(Command::Buy {
+            vendor: 3,
+            item: "i".repeat(MAX_ITEM_NAME_BYTES + 1),
+        });
+        assert_eq!(roundtrip(&long_item), Err(ProtoError::IllegalCommand));
+        let bad_slot = ClientMsg::Cmd(Command::Unequip {
+            slot: combat_core::SLOTS as u8,
+        });
+        assert_eq!(roundtrip(&bad_slot), Err(ProtoError::IllegalCommand));
         let nan = ClientMsg::Move {
             pos: Vec3::new(f32::NAN, 0.0, 0.0),
             facing: 0.0,
@@ -1269,6 +1469,35 @@ mod tests {
             pos: Vec3::new(0.0, f32::NAN, 0.0),
         };
         assert_eq!(roundtrip(&corr), Err(ProtoError::BadNumber));
+        let tele = |shape, cover: Vec<Vec3>| ServerMsg::Events {
+            tick: 1,
+            events: vec![Event::TelegraphStarted {
+                id: 1,
+                source: 2,
+                spell: SpellId(600),
+                shape,
+                pos: Vec3::new(0.0, 0.0, 0.0),
+                facing: 0.0,
+                resolve_ms: 1000,
+                cover,
+            }],
+        };
+        let circle = TelegraphShape::Circle { radius_m: 3.0 };
+        let nan_cone = TelegraphShape::Cone {
+            radius_m: f32::NAN,
+            angle_deg: 60.0,
+        };
+        assert_eq!(
+            roundtrip(&tele(nan_cone, vec![])),
+            Err(ProtoError::BadNumber)
+        );
+        let bad_cover = vec![Vec3::new(0.0, f32::INFINITY, 0.0)];
+        assert_eq!(
+            roundtrip(&tele(circle, bad_cover)),
+            Err(ProtoError::BadNumber)
+        );
+        let crowd = vec![Vec3::new(0.0, 0.0, 0.0); MAX_LIST_LEN + 1];
+        assert_eq!(roundtrip(&tele(circle, crowd)), Err(ProtoError::TooMany));
         let many = ServerMsg::Events {
             tick: 1,
             events: vec![Event::Despawned { unit: 1 }; MAX_EVENTS_PER_FRAME + 1],
@@ -1279,9 +1508,29 @@ mod tests {
             events: vec![Event::LootDropped {
                 corpse: 1,
                 items: vec!["x".into(); MAX_LIST_LEN + 1],
+                sp: 3,
             }],
         };
         assert_eq!(roundtrip(&loot), Err(ProtoError::TooMany));
+        let long_name = ServerMsg::Events {
+            tick: 1,
+            events: vec![Event::GearChanged {
+                unit: 1,
+                equipped: vec!["x".repeat(MAX_ITEM_NAME_BYTES + 1)],
+            }],
+        };
+        assert_eq!(roundtrip(&long_name), Err(ProtoError::TooMany));
+        let big_bag = ServerMsg::Events {
+            tick: 1,
+            events: vec![Event::Bag {
+                unit: 1,
+                sp: 0,
+                bag: vec!["junk".into(); MAX_LIST_LEN + 1],
+                equipped: vec![],
+                buyback: vec![],
+            }],
+        };
+        assert_eq!(roundtrip(&big_bag), Err(ProtoError::TooMany));
         let welcome = |players: usize, cleared: usize| ServerMsg::Welcome {
             you: 1,
             room: "r".into(),
@@ -1357,6 +1606,35 @@ mod tests {
         assert_eq!(quantize_yaw(-std::f32::consts::FRAC_PI_2), 192);
         assert_eq!(from_cm(pos_cm(u.pos)), s.pos());
         assert!((yaw_from_byte(s.facing) - s.yaw()).abs() < 1e-6);
+    }
+
+    #[test]
+    fn player_gear_travels_as_content_indices() {
+        let Ok(content) = Content::from_ron(include_str!("../../../content/game.ron")) else {
+            panic!("content")
+        };
+        let mut sim = combat_core::Sim::new(content.clone(), 1);
+        let p = sim.spawn_player("backend", Vec3::default(), 0.0);
+        assert!(sim.debug_equip(p, "Incident Commander Headset"));
+        assert!(sim.debug_equip(p, "The Monorepo"));
+        let Some(u) = sim.unit(p) else {
+            panic!("no player")
+        };
+        let snap = PlayerSnap::from_state(u, &content);
+        assert_eq!(snap.gear.len(), combat_core::SLOTS);
+        assert_eq!(snap.equipped(&content), u.equipped);
+        assert_eq!(
+            roundtrip(&ServerMsg::Snapshot {
+                tick: 1,
+                units: vec![],
+                players: vec![snap.clone()]
+            }),
+            Ok(ServerMsg::Snapshot {
+                tick: 1,
+                units: vec![],
+                players: vec![snap]
+            })
+        );
     }
 
     #[test]

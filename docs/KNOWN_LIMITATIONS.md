@@ -16,6 +16,8 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 
 ## Co-op (online)
 
+- Gear, bag and Story Points are per room session; joiners start fresh (no import of the offline save, which the server could not trust).
+
 - Player interaction is deliberately narrow: target a teammate (click, party frame, F1 self / F2-F5 members), cast the helpful spells on them (Guardrails, Rollback, On-Call Caffeine), resurrect with "Have You Tried Turning It Off and On Again" (V), and aim emotes at them. There is no trading, no free-text chat, no duels, no inspect and no item handover; trophies are personal.
 - Loot is per player and private: each member gets their own roll, only the looter sees `LootDropped`/`Looted`, and sparkles, the gold plate and the loot cursor follow your own unclaimed roll (a corpse a teammate still has to loot shows nothing for you). A corpse whose roll was empty for you looks like an empty corpse offline: no sparkles, and looting says there was nothing.
 - Quest credit: `Kill` objectives credit the killer and every living member within 60 m; `Loot` and `Talk` only the acting player; `ClearZone` everyone. There is no quest sharing; each member accepts tickets from the giver.
@@ -33,7 +35,8 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - The ceiling is not a collider; the camera is clamped below it by height (`CAM_MAX_HEIGHT`).
 
 - The cast pose is the one-handed shoot clip held on its last frame, and backpedal plays the walk clip reversed. The hand glow position is tuned by eye, not bound to the fist bone.
-- Nameplates and floating numbers are screen-space UI nodes: they are culled by distance (40 m) and camera direction, not occluded by walls, and can overlap in tight packs.
+- Nameplates and floating numbers are screen-space UI nodes: they are culled by distance (40 m) and camera direction and not occluded by walls. Plates are de-cluttered by stacking them upward (target first, then nearest first in 2 m bands); in a very dense pack the plates pushed furthest shrink and then vanish, because Bevy UI has no group opacity to fade them. Floating combat numbers are not de-cluttered.
+- The minimap rasterises the zone once per zone from the layout (floor, walls, blockers) and slides it under a clipped view; it is square, not round, has no fog of war, and shows hostiles and quest givers from the sim state (so it also shows them through walls). Zoom steps are 18 to 90 m.
 - Every spell, aura and trophy has a shipped icon (test `every_spell_aura_and_trophy_has_a_shipped_icon_file`); a key without a file would fall back to a generated letter badge.
 - The exit elevator doors and lamp are client-only overlays in front of the static dressing; they are not colliders.
 - Floor 1's sleeping IT Support comes from the catalog pose for that anchor (`catalog::npc_at`); the sim only knows one pose per unit kind. Mini-boss "ELITE" tags are a client list (`copy::is_elite`).
@@ -96,6 +99,12 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - `Command::Loot` failures (too far, not lootable) are silent: `CastError` has no loot variants. Corpses are always lootable, possibly with an empty loot list.
 - Auto attack is a single ranged "Nitpick" on the player; the swing timer is not hasted and there is no melee auto attack for the player.
 - Evade speed equals chase speed, and the leash is measured from the spawn point only.
+
+## UI
+
+- Keybindings: one key per action (slot keys and numpad keys are separate actions, so there is no secondary binding). Esc, Enter, Backspace, F9 and modifier keys other than Shift cannot be bound; the ticket dialog (arrows, Enter, Backspace), the victory restart (R), the role picker (1-4) and the debug overlay (F9) are fixed. A key already in use is swapped, never rejected. The panel is hidden in the touch layout; touch buttons press whatever key their action is bound to.
+- Aura tooltips: the content defines no aura prose, so the description line is derived from the aura's mechanics (stun, silence, periodic damage or heal, stat percentages), and the name is the aura's display name in snake_case. Party frames show up to 6 aura icons per member; the target frame shows harmful auras only.
+- The cast tooltip exists for the target's cast bar only; the player's own cast uses the action bar tooltip.
 
 ## Touch and PWA
 

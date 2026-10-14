@@ -31,7 +31,7 @@ use bevy::prelude::*;
 pub use emotes::{EmoteRequest, ToggleEmoteMenu};
 pub use lobby::Lobby;
 pub use session::{GameMode, LeaveRequest, MoveInput, online_step};
-pub use store::{load_class, load_hud, save_class, save_hud};
+pub use store::{load_class, load_hud, load_keys, save_class, save_hud, save_keys};
 pub use transport::{NetClient, NetEvent};
 pub use world::NetWorld;
 

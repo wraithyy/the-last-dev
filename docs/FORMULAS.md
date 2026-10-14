@@ -157,26 +157,52 @@ Solo: `xp_each = kill_xp`, unchanged. Same level, reward 120: 2 players 60 each,
 
 Loot: every member rolls the unit's loot table separately, in join order, whatever their distance; each `LootDropped` and `Looted` goes to that member only. A leaver's unclaimed roll is dropped.
 
-Enemy HP scaling (`config.group_hp_pct_per_player`, default 40):
+Enemy HP scaling (`config.group_hp_pct_per_player`, content 55, serde default 40):
 
 ```
 group_pct = 100 + group_hp_pct_per_player * (players - 1)
 max_hp    = level_scaled_max_hp * group_pct / 100      // hostile AI units only, not friendlies or players
 ```
 
-Applied at spawn (zone load, `spawn_unit`, summons) and re-applied to every living enemy when a member joins or leaves, keeping its HP fraction (`hp = hp * new_max / old_max`, at least 1 while alive). Solo is 100% (no change); 5 players is 260%.
+Applied at spawn (zone load, `spawn_unit`, summons) and re-applied to every living enemy when a member joins or leaves, keeping its HP fraction (`hp = hp * new_max / old_max`, at least 1 while alive). Solo is 100% (no change); 3 players 210%, 5 players 320%.
 
-Enemy damage scaling (`config.group_damage_pct_per_player`, content 15, serde default 0):
+Enemy damage scaling (`config.group_damage_pct_per_player`, content 30, serde default 0):
 
 ```
 group_dmg_pct = 100 + group_damage_pct_per_player * (players - 1)
 dmg_pct       = level_dmg_pct * group_dmg_pct / 100     // hostile AI units only
 ```
 
-Multiplies every damage and heal an enemy deals (melee, spells, periodic and expiry amounts snapshotted at application), re-applied with the HP scaling on every join and leave. Solo 100%, 2 players 115%, 5 players 160%.
+Multiplies every damage and heal an enemy deals (melee, spells, periodic and expiry amounts snapshotted at application), re-applied with the HP scaling on every join and leave. Solo 100%, 2 players 130%, 3 players 160%, 5 players 220%.
+
+Non-boss enemies also deal `config.trash_damage_pct` (content 110, default 100) of their level-scaled damage.
+
+Pack growth (`config.group_pack_growth_players`, content 2, default 0 = off): every that many players beyond the first, each trash pack gains one member (`floor((players - 1) / 2)`, at most 4): the pack's units in order, cycling, at the next `pack_offsets` slots. Spawned on zone load and when a member joins (packs already fighting or wiped out are skipped); extra members have their own zone slots, so killed ones stay dead on re-entry like the rest.
+
+Linked packs (`config.pack_link_m`, content 7 m, default 0 = off): when a trash unit gets its first threat, idle trash of other packs (not bosses or summons) within that distance of it joins on the same source, and pulls its own pack. Leash: beyond `leash_m` from its spawn a unit evades home and heals to full; every player on its threat table stays in combat for `config.combat_lock_ms` (content 5,000) after the reset, so no out-of-combat regen or resurrect right after kiting a pull away.
 
 Quest rewards add `reward.xp` flat on turn-in: no level-difference adjustment, nothing at the cap, same carry-over and level-up rules as kills.
 
 Zone spawns: packs in the first half of the zone's list spawn at `level_range.0`, the rest at `level_range.1`; bosses and friendlies keep their authored level; summons use the summoner's level. Trash of a zone left for at least `TRASH_RESPAWN_MS` (300,000 ms of sim time) respawns on re-entry and gives XP again.
 
 Thermal Runaway (Cooling Failure) is a stacking DoT: `3 * dmg_pct / 100 * stacks` every 2 s, one stack per pulse (7 s), up to 20; Rollback's dispel takes the Hot Aisle debuff re-applied after it, so the heat cannot be cleansed. Recursive Self-Improvement (AGI phase 3): +8% damage done per stack, one stack every 4 s, up to 25.
+
+## Gear
+
+```
+budget   = quality(rarity) * (70 + 3 * ilvl) / 100 * (125% for keyboards)   // quality: 40, 70, 100, 130, 160
+stat     = floor(package[role][stat] * budget / 100)                         // per piece
+```
+
+Role packages at budget 100 (HP, mana, SP, crit tenths, haste tenths, mp5, armour tenths, power tenths): Ranged 0/15/6/12/20/0/0/35, Melee 30/0/6/18/0/0/0/35, Tank 70/5/0/0/0/0/35/20, Healer 0/35/6/0/20/8/0/35, generalist 30/18/4/0/0/0/0/25. Worn pieces, set bonuses (2 pieces: stats; 4 pieces: a perk) and trophies add up in `ItemTotals`; gear haste is summed in tenths and floored to whole percent.
+
+```
+power    : amount = (base + sp * coef / 100) * dmg_pct / 100 * (1000 + power_tenths) / 1000   // damage and heals
+armour   : hit    = hit * (1000 - min(armor_tenths, 250)) / 1000, before the aura modifiers
+perks    : SpellDamage / SpellHeal +pct on that spell; Cooldown and ManaCost -pct (cooldowns at most -80%);
+           Echo repeats a landed hit at pct (chance roll on the combat rng, only when worn)
+```
+
+Story Points per kill and member: `(level * sp_per_level + U[0, level]) * mult` (elite 4, boss 12; summons 0). Gear drop chance: trash 12%, elite 60%, boss 100%; rarity weights Common/Uncommon/Rare/Epic trash 50/35/13/2, elite 10/45/37/8, boss 0/25/55/20; the piece is from the mob's tier (`ceil(level / 2)`), from the looter's role 70% of the time. Bosses with named Legendaries add one 25% of the time; non-bosses drop junk 30%. Quest turn-ins pay `xp * 15%` SP. Prices: `base(rarity) * (2 + ilvl) / 4` with base 8/20/50/120/300 unless authored; sell price 25% (junk 100%).
+
+Measured (combat_core tests, level-capped bots, 3 seeds): a full set of tier-appropriate Rare gear cuts boss kill time to 72-80% of fresh and raises the boss-fight minimum HP by 13-32 points; Code Review damage over 10 s goes up by about 60% at tier 5.

@@ -275,7 +275,7 @@ fn spawn_texts(
 fn place_texts(
     mut commands: Commands,
     time: Res<Time>,
-    camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
     ui_scale: Res<UiScale>,
     transforms: Query<&Transform, Without<FloatText>>,
     mut texts: Query<(

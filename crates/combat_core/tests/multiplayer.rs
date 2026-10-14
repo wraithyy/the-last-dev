@@ -50,17 +50,17 @@ fn enemy_hp_scales_with_group_size_on_join_leave_and_spawn() {
     let p2 = h
         .sim
         .spawn_player("fullstack", Vec3::new(1.0, 0.0, 0.0), 0.0);
-    assert_eq!((h.unit(h.mob).max_hp, h.unit(h.mob).hp), (1260, 1260));
+    assert_eq!((h.unit(h.mob).max_hp, h.unit(h.mob).hp), (1395, 1395));
     let p3 = h
         .sim
         .spawn_player("fullstack", Vec3::new(2.0, 0.0, 0.0), 0.0);
-    assert_eq!(h.unit(h.mob).max_hp, 1620);
+    assert_eq!(h.unit(h.mob).max_hp, 1890);
     // Players themselves are not scaled.
     assert_eq!(h.unit(p2).max_hp, h.unit(h.player).max_hp);
     let late = h.sim.spawn_unit("ceo", Vec3::new(0.0, 0.0, -90.0), 0.0);
-    assert_eq!(late.map(|id| h.unit(id).max_hp), Ok(1620));
+    assert_eq!(late.map(|id| h.unit(id).max_hp), Ok(1890));
     assert!(h.sim.remove_player(p3));
-    assert_eq!(h.unit(h.mob).max_hp, 1260);
+    assert_eq!(h.unit(h.mob).max_hp, 1395);
 
     let mut c = H::new(1, -60.0, |c| c.config.group_hp_pct_per_player = 100);
     c.sim
@@ -79,7 +79,7 @@ fn rescale_keeps_the_hp_fraction_of_a_wounded_enemy() {
     h.sim
         .spawn_player("fullstack", Vec3::new(1.0, 0.0, 0.0), 0.0);
     let after = h.unit(h.mob);
-    assert_eq!(after.max_hp, before.max_hp * 140 / 100);
+    assert_eq!(after.max_hp, before.max_hp * 155 / 100);
     assert_eq!(after.hp, before.hp * after.max_hp / before.max_hp);
 }
 
@@ -188,6 +188,8 @@ fn second_player_aggro_alone_and_leaving_mid_fight_resets_the_mob() {
 #[test]
 fn every_member_rolls_own_loot_and_loots_only_their_share() {
     let mut h = H::new(5, -3.0, |c| {
+        // Trophy rolls only: gear and junk have their own tests (economy.rs).
+        c.economy = Default::default();
         for l in &mut def_mut(c, "ceo").loot {
             l.chance_pct = 100;
         }
@@ -514,6 +516,8 @@ fn resurrect_revives_a_dead_teammate_where_they_fell_out_of_combat_only() {
 fn enemy_damage_scales_with_group_size() {
     let first_melee = |players: usize| {
         let mut h = H::new(1, -2.0, |c| {
+            // The CEO is a boss: leave out the extra boss slice to see the plain group factor.
+            c.config.group_boss_damage_pct_per_player = 0;
             if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
                 ai.abilities.clear();
             }
@@ -541,6 +545,6 @@ fn enemy_damage_scales_with_group_size() {
     };
     let solo = first_melee(1);
     assert!(solo > 0);
-    assert_eq!(first_melee(2), solo * 115 / 100);
-    assert_eq!(first_melee(3), solo * 130 / 100);
+    assert_eq!(first_melee(2), solo * 130 / 100);
+    assert_eq!(first_melee(3), solo * 160 / 100);
 }

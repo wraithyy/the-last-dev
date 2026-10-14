@@ -174,6 +174,7 @@ impl Sim {
             self.add_trophies(pi, std::slice::from_ref(t));
         }
         self.grant_xp(pi, def.reward.xp);
+        self.quest_sp(pi, def.reward.xp);
         self.check_unlocks();
     }
 

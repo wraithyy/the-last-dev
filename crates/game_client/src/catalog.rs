@@ -509,6 +509,32 @@ static TABLE: &[(&str, UnitVisual)] = &[
         ),
     ),
     (
+        "procurement_officer",
+        v(
+            SUIT_F,
+            1.72,
+            "Procurement Officer",
+            "<Approves Purchases in 3-6 Weeks>",
+            &[
+                paint("Shirt", 0.85, 0.65, 0.1),
+                paint("Pants", 0.15, 0.15, 0.2),
+            ],
+        ),
+    ),
+    (
+        "hardware_broker",
+        v(
+            WORKER,
+            1.78,
+            "Hardware Broker",
+            "<Refurbished, Probably>",
+            &[
+                paint("Shirt", 0.2, 0.45, 0.75),
+                paint("Pants", 0.2, 0.2, 0.22),
+            ],
+        ),
+    ),
+    (
         "barista",
         v(
             CASUAL_F,
@@ -711,6 +737,92 @@ static TABLE: &[(&str, UnitVisual)] = &[
             "AGI Prototype",
             "<Definitely Not Sentient>",
             &[],
+        ),
+    ),
+    // ---- enemy mechanics: new trash, CEO adds, elites ----
+    (
+        "defensive_stakeholder",
+        v(
+            SUIT_F,
+            1.75,
+            "Defensive Stakeholder",
+            "<Has Concerns>",
+            &[
+                paint("Shirt", 0.55, 0.6, 0.68),
+                paint("Pants", 0.15, 0.17, 0.22),
+            ],
+        ),
+    ),
+    (
+        "agent_orchestrator",
+        v(
+            ENGINEER,
+            1.8,
+            "Agent Orchestrator",
+            "<Spawns Sub-Agents>",
+            &[paint("Shirt", 0.2, 0.75, 0.7)],
+        ),
+    ),
+    (
+        "strategy_consultant",
+        v(
+            WORKER,
+            1.8,
+            "Strategy Consultant",
+            "<Billing the CEO>",
+            &[
+                paint("Vest", 0.1, 0.12, 0.2),
+                paint("Shirt", 0.92, 0.92, 0.95),
+            ],
+        ),
+    ),
+    (
+        "chief_happiness_officer",
+        v(
+            CASUAL_F,
+            1.85,
+            "Chief Happiness Officer",
+            "<Mandatory Fun Committee>",
+            &[
+                paint("Shirt", 1.0, 0.85, 0.15),
+                paint("Hair", 1.0, 0.45, 0.7),
+            ],
+        ),
+    ),
+    (
+        "chief_of_staff",
+        v(
+            SUIT_F,
+            1.95,
+            "Chief of Staff",
+            "<Gatekeeper of the Calendar>",
+            &[
+                paint("Shirt", 0.12, 0.12, 0.14),
+                paint("Pants", 0.05, 0.05, 0.06),
+            ],
+        ),
+    ),
+    (
+        "shadow_it_server",
+        v(
+            CASUAL3,
+            2.05,
+            "Shadow IT Server",
+            "<Running Since 2014>",
+            &[
+                glow("Shirt", 0.2, 0.9, 0.3),
+                paint("Pants", 0.12, 0.12, 0.12),
+            ],
+        ),
+    ),
+    (
+        "hype_cycle_analyst",
+        v(
+            DOC_M,
+            2.0,
+            "Hype Cycle Analyst",
+            "<Peak of Inflated Expectations>",
+            &[paint("Shirt", 0.85, 0.3, 0.95)],
         ),
     ),
 ];
@@ -948,6 +1060,8 @@ mod tests {
         "ciso",
         "it_support",
         "facilities_guy",
+        "procurement_officer",
+        "hardware_broker",
         "barista",
         "smoking_corner_dev",
         "delivery_robot",
@@ -964,6 +1078,13 @@ mod tests {
         "vc_partner",
         "prompt_whisperer",
         "agi_prototype",
+        "defensive_stakeholder",
+        "agent_orchestrator",
+        "strategy_consultant",
+        "chief_happiness_officer",
+        "chief_of_staff",
+        "shadow_it_server",
+        "hype_cycle_analyst",
     ];
 
     #[test]

@@ -204,7 +204,7 @@ fn load_zone_spawns_the_campus_and_reports_its_links() {
     assert!(t.has(|e| matches!(e, Event::ZoneLoaded { zone } if zone == "campus")));
     assert!(!t.has(|e| matches!(e, Event::FloorLoaded { .. })));
     let hostiles = t.sim.units().filter(|u| u.hostile).count();
-    assert_eq!(hostiles, 17, "8 packs, no boss");
+    assert_eq!(hostiles, 15, "8 packs, no boss");
     for key in ["intern", "facilities_guy", "barista", "smoking_corner_dev"] {
         assert!(t.sim.units().any(|u| u.key == key && !u.hostile), "{key}");
     }

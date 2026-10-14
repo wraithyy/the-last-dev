@@ -8,6 +8,7 @@ use super::{
 use crate::combat::{CombatEvent, PendingCommands, SimRead, SimReady, SimView, UiNotice};
 use crate::config::*;
 use crate::copy;
+use crate::economy::goods;
 use bevy::prelude::*;
 use combat_core::{AuraEnd, Command, EntityId, Event, ITEM_STACK_CAP, School};
 
@@ -35,6 +36,7 @@ struct RespawnButton;
 #[derive(Resource, Default)]
 struct LootState {
     items: Vec<String>,
+    sp: u32,
     dirty: bool,
 }
 #[derive(Component)]
@@ -308,7 +310,8 @@ pub fn event_sink(ev: &Event) -> Sink {
         | Event::QuestAccepted { .. }
         | Event::QuestReady { .. }
         | Event::QuestCompleted { .. }
-        | Event::Looted { .. } => Sink::Chat,
+        | Event::Looted { .. }
+        | Event::GearChanged { .. } => Sink::Chat,
         _ => Sink::Combat,
     }
 }
@@ -344,6 +347,7 @@ fn collect_events(
     mut combat: ResMut<CombatLog>,
     mut banner: ResMut<ErrorBanner>,
     mut loot: ResMut<LootState>,
+    mut best_gear: Local<Option<u64>>,
     mut xp_gains: Local<usize>,
     // Mana ticks of the running Coffee Break, reported once as a single line.
     mut coffee_mana: Local<u32>,
@@ -368,7 +372,11 @@ fn collect_events(
     let own_cast = batch
         .iter()
         .any(|e| matches!(e, Event::CastSucceeded { caster, .. } if Some(*caster) == me));
-    for ev in batch {
+    // Several pieces equipped in one tick brag once, for the final outfit.
+    let last_gear = batch
+        .iter()
+        .rposition(|e| matches!(e, Event::GearChanged { unit, .. } if Some(*unit) == me));
+    for (k, ev) in batch.into_iter().enumerate() {
         out.sink = event_sink(ev);
         match ev {
             Event::Damage {
@@ -497,6 +505,31 @@ fn collect_events(
             Event::CastFailed { caster, reason, .. } if Some(*caster) == me => {
                 banner.text = reason.message().to_owned();
                 banner.left = ERROR_TEXT_SECS;
+            }
+            Event::ItemError { reason } => {
+                banner.text = reason.message().to_owned();
+                banner.left = ERROR_TEXT_SECS;
+            }
+            Event::Proc { unit, item } => {
+                let whose = if Some(*unit) == me {
+                    "Your".to_string()
+                } else {
+                    possessive(&*sim, *unit)
+                };
+                out.push(format!("{whose} [{item}] kicks in."), goods::PERK_GOLD);
+            }
+            Event::GearChanged { unit, equipped } if Some(*unit) == me && Some(k) == last_gear => {
+                let score = goods::gear_score(sim.content(), equipped);
+                match *best_gear {
+                    Some(best) if score > best => out.push(
+                        format!(
+                            "New personal best: gear score {score} (was {best}). A LinkedIn post about your growth journey has been drafted for you."
+                        ),
+                        goods::UPGRADE_GREEN,
+                    ),
+                    _ => {}
+                }
+                *best_gear = Some(best_gear.unwrap_or(0).max(score));
             }
             Event::AuraApplied { target, key } => {
                 let name = aura_name(&*sim, *target, key);
@@ -634,9 +667,41 @@ fn collect_events(
                 format!("Ticket closed: {}.", quest_name(&*sim, quest)),
                 QUEST_YELLOW,
             ),
-            Event::Looted { looter, items, .. } if Some(*looter) == me => {
+            Event::Looted {
+                looter, items, sp, ..
+            } if Some(*looter) == me => {
+                let content = sim.content();
+                let me_state = me.and_then(|p| sim.unit(p));
+                let equipped = me_state
+                    .map(|u| goods::slots_of(&u.equipped))
+                    .unwrap_or_default();
+                let role = me_state
+                    .and_then(|u| content.class_of_unit(&u.key))
+                    .map(|c| c.role);
+                if best_gear.is_none() {
+                    *best_gear = Some(goods::gear_score(content, &equipped));
+                }
                 for item in items {
-                    let Some(def) = sim.content().item(item) else {
+                    if let Some(g) = content.economy.gear(item) {
+                        let tag = if goods::is_upgrade(content, item, &equipped, role) {
+                            "  UPGRADE! Press I to wear it."
+                        } else {
+                            ""
+                        };
+                        out.push(
+                            format!("You receive loot: [{item}] ({}){tag}", g.rarity.label()),
+                            goods::rarity_color(g.rarity),
+                        );
+                        continue;
+                    }
+                    if content.economy.goods(item).is_some() {
+                        out.push(
+                            format!("You receive: [{item}]"),
+                            goods::name_color(content, item),
+                        );
+                        continue;
+                    }
+                    let Some(def) = content.item(item) else {
                         continue;
                     };
                     let held = sim.inventory().iter().find(|(n, _)| n == item);
@@ -651,13 +716,17 @@ fn collect_events(
                         copy::BONUS_GREEN,
                     );
                 }
-                if items.is_empty() {
+                if *sp > 0 {
+                    out.push(format!("You receive {sp} Story Points."), goods::SP_GOLD);
+                }
+                if items.is_empty() && *sp == 0 {
                     out.push(
                         "You find nothing to loot. The AI already expensed it.".into(),
                         Color::srgb(0.7, 0.7, 0.7),
                     );
                 } else {
                     loot.items.clone_from(items);
+                    loot.sp = *sp;
                     loot.dirty = true;
                 }
             }
@@ -709,11 +778,69 @@ fn update_loot(
         for e in &rows {
             commands.entity(e).despawn();
         }
+        let content = sim.content();
+        let me_state = sim.player().and_then(|p| sim.unit(p));
+        let equipped = me_state
+            .map(|u| goods::slots_of(&u.equipped))
+            .unwrap_or_default();
+        let role = me_state
+            .and_then(|u| content.class_of_unit(&u.key))
+            .map(|c| c.role);
+        let mut rows: Vec<(String, Color, String, Color, String, &str)> = Vec::new();
+        if loot.sp > 0 {
+            rows.push((
+                format!("{} Story Points", loot.sp),
+                goods::SP_GOLD,
+                "Spend them at Procurement (campus) or the IT Asset Store.".into(),
+                DIM,
+                String::new(),
+                "story_points",
+            ));
+        }
         for item in &loot.items {
-            let def = sim.content().item(item);
-            let icon = icons.get(&assets, def.map_or("unknown", |d| d.icon.as_str()));
-            let bonus = def.map_or_else(String::new, |d| copy::bonus_text(&d.bonus.totals(1)));
-            let desc = def.map_or_else(String::new, |d| d.description.clone());
+            let icon = goods::icon_of(content, item);
+            let color = goods::name_color(content, item);
+            let (line, line_color) = match content.economy.goods(item) {
+                Some(combat_core::Goods::Gear(g)) => {
+                    let mut l = format!("{} {}  ", g.rarity.label(), g.slot.label());
+                    l.push_str(&goods::stat_lines(&g.stats()).join(", "));
+                    let up = goods::is_upgrade(content, item, &equipped, role);
+                    if up {
+                        l = format!("UPGRADE  {l}");
+                    }
+                    (
+                        l,
+                        if up {
+                            goods::UPGRADE_GREEN
+                        } else {
+                            Color::WHITE
+                        },
+                    )
+                }
+                Some(g) => (
+                    format!(
+                        "Sells for {} SP",
+                        content.economy.sell_price(g.name()).unwrap_or(0)
+                    ),
+                    goods::SP_GOLD,
+                ),
+                None => (
+                    content
+                        .item(item)
+                        .map_or_else(String::new, |d| copy::bonus_text(&d.bonus.totals(1))),
+                    copy::BONUS_GREEN,
+                ),
+            };
+            let desc = content
+                .economy
+                .goods(item)
+                .map(|g| g.description().to_string())
+                .or_else(|| content.item(item).map(|d| d.description.clone()))
+                .unwrap_or_default();
+            rows.push((item.clone(), color, line, line_color, desc, icon));
+        }
+        for (item, color, bonus, bonus_color, desc, icon) in rows {
+            let icon = icons.get(&assets, icon);
             commands.entity(*window_entity).with_child((
                 LootRow,
                 Button,
@@ -741,15 +868,15 @@ fn update_loot(
                             ..default()
                         },
                         children![
-                            (label(item.clone(), 13.0), TextColor(Color::WHITE)),
-                            (label(bonus, 12.0), TextColor(copy::BONUS_GREEN)),
+                            (label(item.clone(), 13.0), TextColor(color)),
+                            (label(bonus, 12.0), TextColor(bonus_color)),
                             (label(desc, 11.0), TextColor(DIM)),
                         ]
                     ),
                 ],
             ));
         }
-        node.display = if loot.items.is_empty() {
+        node.display = if loot.items.is_empty() && loot.sp == 0 {
             Display::None
         } else {
             Display::Flex
@@ -757,6 +884,7 @@ fn update_loot(
     }
     if clicks.iter().any(|i| *i == Interaction::Pressed) {
         loot.items.clear();
+        loot.sp = 0;
         node.display = Display::None;
         for e in &rows {
             commands.entity(e).despawn();

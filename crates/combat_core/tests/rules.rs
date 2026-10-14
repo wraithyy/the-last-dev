@@ -741,9 +741,11 @@ fn death_grants_xp_drops_loot_and_respawns_after_15_seconds() {
         h.events()
             .any(|(_, e)| matches!(e, Event::XpGained { amount: 120, unit } if *unit == h.player))
     );
-    assert!(h.events().any(
-        |(_, e)| matches!(e, Event::LootDropped { items, .. } if items == &["Prompt Fragment"])
-    ));
+    assert!(
+        h.events()
+            .any(|(_, e)| matches!(e, Event::LootDropped { items, sp, .. }
+            if items.first().map(String::as_str) == Some("Prompt Fragment") && *sp > 0))
+    );
     let m = h.unit(h.mob);
     assert!(
         (m.alive, m.lootable, m.ai, m.respawn_in_ms)
@@ -784,7 +786,8 @@ fn death_grants_xp_drops_loot_and_respawns_after_15_seconds() {
     });
     h.tick();
     assert_eq!(
-        h.count(|e| matches!(e, Event::Looted { items, .. } if items == &["Prompt Fragment"])),
+        h.count(|e| matches!(e, Event::Looted { items, .. }
+            if items.first().map(String::as_str) == Some("Prompt Fragment"))),
         1
     );
     assert!(!h.unit(h.mob).lootable);
@@ -803,6 +806,7 @@ fn loot_drop_follows_configured_probability() {
     for (chance, expect) in [(0, 0), (100, 1)] {
         let mut h = H::new(3, -20.0, |c| {
             one_shot(c);
+            c.economy = Default::default();
             def_mut(c, "ceo").loot[0].chance_pct = chance;
         });
         h.target(h.mob);

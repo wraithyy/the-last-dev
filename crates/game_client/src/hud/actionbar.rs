@@ -13,6 +13,7 @@ use crate::config::*;
 use crate::copy;
 use crate::game::GameFlow;
 use crate::input::Paused;
+use crate::keybinds::{Action, KeyLegend, Keybinds};
 use crate::player::Player;
 use crate::targeting::Target;
 use bevy::prelude::*;
@@ -167,7 +168,7 @@ fn bar_height() -> f32 {
 }
 
 /// Legend printed on a keycap corner; a dark pill keeps it readable over any icon art.
-fn legend(key: &str) -> impl Bundle {
+fn legend(action: Action, key: &str) -> impl Bundle {
     (
         Node {
             position_type: PositionType::Absolute,
@@ -178,7 +179,11 @@ fn legend(key: &str) -> impl Bundle {
             ..default()
         },
         BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
-        children![(label(key, 11.0), TextColor(Color::srgb(0.9, 0.95, 1.0)))],
+        children![(
+            KeyLegend(action),
+            label(key, 11.0),
+            TextColor(Color::srgb(0.9, 0.95, 1.0))
+        )],
     )
 }
 
@@ -367,7 +372,7 @@ fn spawn_bar(mut commands: Commands, mut materials: ResMut<Assets<CooldownMateri
                             TextLayout::justify(Justify::Center),
                             TextColor(DIM),
                         ));
-                        face.spawn(legend(key));
+                        face.spawn(legend(Action::Slot(i as u8), key));
                     });
                 });
             }
@@ -429,6 +434,7 @@ fn spawn_bar(mut commands: Commands, mut materials: ResMut<Assets<CooldownMateri
 
 /// Look of one accent keycap: plate behind, key face, face edge and the thin gauge under it.
 struct Accent {
+    action: Action,
     legend: &'static str,
     plate: (Color, Color),
     face: (Color, Color),
@@ -437,6 +443,7 @@ struct Accent {
 }
 
 const ATTACK_ACCENT: Accent = Accent {
+    action: Action::AutoAttack,
     legend: "T",
     plate: (Color::srgb(0.2, 0.08, 0.05), Color::srgb(0.06, 0.03, 0.03)),
     face: (Color::srgb(0.92, 0.45, 0.24), Color::srgb(0.58, 0.2, 0.12)),
@@ -445,6 +452,7 @@ const ATTACK_ACCENT: Accent = Accent {
 };
 
 const REZ_ACCENT: Accent = Accent {
+    action: Action::Resurrect,
     legend: "V",
     plate: (Color::srgb(0.05, 0.1, 0.12), Color::srgb(0.02, 0.04, 0.05)),
     face: (Color::srgb(0.3, 0.62, 0.66), Color::srgb(0.12, 0.3, 0.34)),
@@ -454,6 +462,7 @@ const REZ_ACCENT: Accent = Accent {
 const REZ_EDGE: Color = Color::srgb(0.2, 0.42, 0.45);
 
 const COFFEE_ACCENT: Accent = Accent {
+    action: Action::Coffee,
     legend: "C",
     plate: (Color::srgb(0.12, 0.08, 0.05), Color::srgb(0.04, 0.03, 0.03)),
     face: (Color::srgb(0.62, 0.42, 0.26), Color::srgb(0.3, 0.17, 0.1)),
@@ -581,7 +590,7 @@ fn accent_key<R: Bundle, B: Bundle, I: Bundle, G: Bundle, F: Bundle>(
                         },
                         BackgroundColor(Color::NONE),
                     ));
-                    b.spawn(legend(look.legend));
+                    b.spawn(legend(look.action, look.legend));
                 });
             });
             root.spawn((
@@ -888,6 +897,7 @@ fn update_slots(
     sim: SimView,
     flow: Res<GameFlow>,
     keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<Keybinds>,
     assets: Res<AssetServer>,
     mut icons: ResMut<IconCache>,
     mut materials: ResMut<Assets<CooldownMaterial>>,
@@ -924,9 +934,7 @@ fn update_slots(
         .collect();
     let view = |i: usize| views.get(i).copied().unwrap_or_default();
     let held = |i: usize, interaction: &Interaction| {
-        crate::combat::CAST_KEYS
-            .get(i)
-            .is_some_and(|k| keys.any_pressed(*k))
+        (i < crate::combat::SLOT_COUNT && keys.any_pressed(binds.slot_keys(i)))
             || *interaction == Interaction::Pressed
     };
 

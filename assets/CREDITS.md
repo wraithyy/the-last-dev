@@ -260,6 +260,27 @@ bonus they grant (red HP, blue mana, violet spell power, gold crit, teal haste, 
 | assets/icons/wont_fix.png | cancel | sbed | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/sbed/cancel.svg |
 | assets/icons/human_inside.png | person | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/person.svg |
 | assets/icons/demo_lanyard.png | ribbon | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/ribbon.svg |
+| assets/icons/gear_headset.png | headphones | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/headphones.svg |
+| assets/icons/gear_hoodie.png | hoodie | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/hoodie.svg |
+| assets/icons/gear_mug.png | coffee-cup | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/coffee-cup.svg |
+| assets/icons/gear_beanie.png | winter-hat | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/winter-hat.svg |
+| assets/icons/gear_propeller.png | propeller-beanie | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/propeller-beanie.svg |
+| assets/icons/gear_vr.png | vr-headset | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/vr-headset.svg |
+| assets/icons/gear_shades.png | sunglasses | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/sunglasses.svg |
+| assets/icons/gear_idcard.png | id-card | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/id-card.svg |
+| assets/icons/gear_extinguisher.png | fire-extinguisher | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/fire-extinguisher.svg |
+| assets/icons/gear_stein.png | beer-stein | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/beer-stein.svg |
+| assets/icons/gear_tshirt.png | t-shirt | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/t-shirt.svg |
+| assets/icons/gear_desk.png | desk | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/desk.svg |
+| assets/icons/gear_keyboard.png | keyboard | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/keyboard.svg |
+| assets/icons/coffee_pot.png | coffee-pot | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/coffee-pot.svg |
+| assets/icons/pills.png | medicine-pills | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/medicine-pills.svg |
+| assets/icons/sandwich.png | sandwich | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/sandwich.svg |
+| assets/icons/poster.png | scroll-unfurled | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/scroll-unfurled.svg |
+| assets/icons/junk_ticket.png | ticket | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/ticket.svg |
+| assets/icons/junk_trash.png | trash-can | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/trash-can.svg |
+| assets/icons/junk_candy.png | wrapped-sweet | lorc | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/lorc/wrapped-sweet.svg |
+| assets/icons/story_points.png | two-coins | delapouite | CC BY 3.0 | https://github.com/game-icons/icons/blob/master/delapouite/two-coins.svg |
 
 Authors: Lorc (https://lorcblog.blogspot.com), Delapouite (https://delapouite.com), Andy Meneely (http://www.se.rit.edu/~andy/), sbed (http://opengameart.org/content/95-game-icons), rihlsul (https://github.com/game-icons/icons/tree/master/rihlsul). Glyph names and authors per https://game-icons.net/about.html.
 

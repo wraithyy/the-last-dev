@@ -541,39 +541,26 @@ fn unlock_on_gesture(
     }
 }
 
-fn toggle_mute(keys: Res<ButtonInput<KeyCode>>, mut settings: ResMut<AudioSettings>) {
-    if keys.just_pressed(KeyCode::KeyM) {
+fn toggle_mute(
+    keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<crate::keybinds::Keybinds>,
+    mut settings: ResMut<AudioSettings>,
+) {
+    if binds.just(&keys, crate::keybinds::Action::Mute) {
         settings.muted = !settings.muted;
     }
 }
 
-const ACTION_KEYS: [KeyCode; 21] = [
-    KeyCode::KeyC,
-    KeyCode::Digit1,
-    KeyCode::Digit2,
-    KeyCode::Digit3,
-    KeyCode::Digit4,
-    KeyCode::Digit5,
-    KeyCode::Digit6,
-    KeyCode::Digit7,
-    KeyCode::Digit8,
-    KeyCode::Digit9,
-    KeyCode::Digit0,
-    KeyCode::Numpad1,
-    KeyCode::Numpad2,
-    KeyCode::Numpad3,
-    KeyCode::Numpad4,
-    KeyCode::Numpad5,
-    KeyCode::Numpad6,
-    KeyCode::Numpad7,
-    KeyCode::Numpad8,
-    KeyCode::Numpad9,
-    KeyCode::Numpad0,
-];
+/// The coffee key and every action bar slot key, number row and numpad.
+fn action_pressed(binds: &crate::keybinds::Keybinds, keys: &ButtonInput<KeyCode>) -> bool {
+    keys.just_pressed(binds.key(crate::keybinds::Action::Coffee))
+        || (0..crate::combat::SLOT_COUNT).any(|i| keys.any_just_pressed(binds.slot_keys(i)))
+}
 
 /// Interface sounds that have no sim event: keycaps, the trophy window, the victory screen.
 fn ui_sfx(
     keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<crate::keybinds::Keybinds>,
     paused: Res<Paused>,
     flow: Res<GameFlow>,
     trophies: Res<TrophiesOpen>,
@@ -581,7 +568,7 @@ fn ui_sfx(
     mut was_victory: Local<bool>,
     mut out: MessageWriter<Sfx>,
 ) {
-    if !paused.0 && !flow.input_locked() && keys.any_just_pressed(ACTION_KEYS) {
+    if !paused.0 && !flow.input_locked() && action_pressed(&binds, &keys) {
         out.write(Sfx::new(Snd::Key));
     }
     if trophies.0 != *was_open {

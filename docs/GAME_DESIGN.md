@@ -48,7 +48,24 @@ Bosses:
 | 2 | The Analyst | The analysis was written by Claude and he never read it. *Requirements Change*: silences one spell school for 6 s; *Unread Spec*: debuff, damage increases each time you cast the same spell twice in a row. |
 | 3 | The Customer | *Scope Creep*: stacking self-buff every 15 s (soft enrage); *Should Have Been Done Yesterday*: big cast, interruptible. |
 | 4 | VP of Synergy | Phase 1 with two Middle Manager adds; phase 2 at 50%: *Reorg* teleports you and resets add threat. |
-| 5 | CEO | Existing encounter plus phase 2 at 40%: *Pivot to AGI* summons Chatbot Minions, Hallucination Blast cast time shortens. |
+| 5 | CEO | Three phases. P1: *Vision Statement* (three buzzword beams sweep the room, dodge), *Synergy Circle* (stack to share, solo takes it whole), must-interrupt *Pivot to AGI* (room-wide hit plus chatbots if it lands). P2 at 60%: *Hire Consultants* (two adds whose *Billable Synergy* cuts his damage taken by 35% while they live), *Quarterly Earnings Call* (room-wide hit unless you hide behind one of three desks). P3 at 25%: *Golden Parachute* (+15% damage taken, he walks for the elevator and casts the must-interrupt *Severance Negotiation* heal there, then repeats), *Layoff Notice* tiles land around you every 5 s. Victory banner on death. |
+
+## Enemy mechanics
+
+Every zone mixes two or three mechanics with a floor telegraph and a counter (full rules in COMBAT_API.md, Enemy mechanics):
+
+| Zone | Mechanics |
+|---|---|
+| Campus | *Package Drop Zone* circles (Delivery Robot), *Last-Mile Dash* lines (E-Scooter Executive); elite **Chief Happiness Officer**: summons ambassadors, *Trust Fall* circle, enrages at 35 s |
+| Open Space | (unchanged: Vibe Coder adds and the interruptible 4,000-Line Diff) |
+| Meeting Rooms | Scrum Master heals allies (*Stand-up Recovery*, must interrupt), *Meeting Room Booked* circles (Middle Manager), *Calendar Invite* spread circles with a dispellable DoT (Agile Coach) |
+| Sales & Marketing | **Defensive Stakeholder** (laptop shield: -60% from the front, down while it types), *Company-Wide Reply-All* (Sales Rep, must interrupt); Head of Marketing enrages at 40 s |
+| PMO | Defensive Stakeholder, *Mandatory All-Hands* (Product Owner, must interrupt), *Deadline* (dispellable) |
+| C-Level Penthouse | *Pump and Dump* cones (Crypto Bro); elite **Chief of Staff**: clipboard shield, *Calendar Tetris* spread circles, enrages at 45 s; the CEO |
+| Data Center | *Exhaust Vent* cones (Cooling Fan), *Sacrifice to the Cluster* (GPU Cultist, must interrupt), **Agent Orchestrator** spawning sub-agents until killed; elite **Shadow IT Server**: sweeping *Undocumented Cron Job* lines, dispellable *Root Access Revoked*, enrages at 50 s |
+| Innovation Lab | *Laser Pointer Keynote* lines (Demo Presenter), *Down Round* (VC Partner, must interrupt); elite **Hype Cycle Analyst**: *Trough of Disillusionment* (get out), *Magic Quadrant* circles, enrages; the AGI adds *Scaling Laws* beams |
+
+Every class has an interrupt by level 3 (Kill Query moved from 4 to 3); Rollback and Feature Flag Off dispel Magic debuffs. Elites (also HR Business Partner, Head of Marketing, CISO) drop their best trophy every time.
 
 ## Classes
 
@@ -58,7 +75,7 @@ Four roles, picked on first launch ("Choose your role"; Esc > Change role restar
 |---|---|---|---|
 | Fullstack Engineer | RANGED | the spells below | knows everything a little, gets blamed for all of it |
 | Frontend Developer | MELEE | Pixel Push 1, CSS Combo 1, !important 2, Lighthouse Audit 3, Hot Reload 4, Dark Mode 5, Responsive Layout 6, Infinite Scroll 7, Center the Div 8, Rewrite It in a New Framework 9 | stacks Specificity (5), cashes it in with !important; dash, self-heal defensive |
-| Backend Engineer | TANK | Blocking Call 1, Rate Limiter 1, Who Touched Prod? 2, Connection Pool 3, Kill Query 4, Database Lock 5, Horizontal Scaling 6, Retry With Exponential Backoff 7, Cache Invalidation 8, DROP TABLE 9 | 350% threat, armour, taunt, AoE threat, temporary max HP |
+| Backend Engineer | TANK | Blocking Call 1, Rate Limiter 1, Who Touched Prod? 2, Connection Pool 3, Kill Query 3, Database Lock 5, Horizontal Scaling 6, Retry With Exponential Backoff 7, Cache Invalidation 8, DROP TABLE 9 | 350% threat, armour, taunt, AoE threat, temporary max HP |
 | DevOps Engineer | HEALER | kill -9 1, Hotfix 1, SIGSTOP 2, Auto-scaling 3, Chaos Monkey 4, Revert Commit 5, Feature Flag Off 6, Circuit Breaker 7, Blue-Green Deploy 8, terraform destroy 9 | ally heals, HoT, group heal, restore HP of 5 s ago, own faster resurrect (Restart Pod) |
 
 ## Player progression
@@ -78,6 +95,16 @@ Levels 1-10, XP from kills (trash and bosses). Each level raises max HP and mana
 | 9 | Write It By Hand | long cast, huge damage, the AI-free ultimate |
 
 Action bar grows to keys 1-0 (physical digit row and numpad).
+
+## Gear, Story Points and vendors
+
+Loot means something: every kill pays Story Points (SP) and may drop gear of the zone's tier (ilvl 2/4/6/8/10), weighted toward your role; elites (HR Business Partner, Marketing Lead, CISO) drop more often, bosses always drop a piece and sometimes a named Legendary. Five slots are worn visibly on the character: Headgear (cap, beanie, headset, propeller hat, VR visor, shades, crown), Hoodie (tints the shirt, logo and glowing trims by tier), Keyboard (slung on the back, RGB at the top), Mug (right hand: mug, thermos, stein, chalice) and Lanyard (badge on the chest). Rarities read like a code review: Works On My Machine (grey), Passed CI (green), Merged (blue), Shipped to Prod (purple, glows), Approved in Code Review (orange, glows harder).
+
+Stats come from a budget (rarity x item level, keyboards +25%) split by the piece's role package; the sheet names them in dev terms: Uptime (HP), Context Window (mana), Velocity (spell power), Throughput (% damage and healing), Hot Takes (crit), Caffeine (haste), Focus Time (mana per 5 s), Plausible Deniability (% less damage taken). Perks change how you play: echoes ("Pixel Push hits twice above 80% HP"), riders ("Who Touched Prod? taunts everything within 8 m", "Hotfix also cleanses"), cooldown cuts, lifesteal, on-hurt shields, and on-use gadgets on U / O / P. Four 4-piece sets (Burnout Collection, On-Call Rotation, Full-Stack Overflow, Pixel Perfect) give stats at 2 and alter a signature spell at 4.
+
+Vendors: Procurement (campus plaza, "3-6 weeks") sells consumables (Ibuprofen, Energy Drink, Cold Brew, Leftover Catering Sandwich), All-Hands hoodie colours and tier 1-2 gear with a rotating Rare shelf; the IT Asset Store in Data Center Hall A sells tier 3-4 gear and a rotating Rare/Epic shelf. Sell junk (Unread Jira Notification, Expired Free Pizza Coupon, ...) at full price and gear at a quarter; buy back the last six sales. Windows: `~/whoami` (I) with the paper doll, a live 3D preview, stats, the bag and perks; `~/procurement` when you talk to a vendor; tooltips compare with what you wear and flag upgrades.
+
+Offline progress (level, gear, bag, SP, trophies, quests and cleared zones) is saved per class (native file next to the co-op settings, localStorage on the web) and loaded at start; after the final victory the character stays and the world resets. Online play is session-only: joiners start fresh as before and the server holds everyone's gear for the room.
 
 ## Engine needs (combat_core)
 
@@ -106,5 +133,6 @@ combat_core side (client presentation is tracked separately):
 - [x] Player levels 1-10, XP table, level-difference XP with gray mobs, stat growth, spell unlocks, 10-slot bar (`known_spells`). Deviation: Reject PR unlocks at level 2 and Guardrails at 3.
 - [x] Headless playthrough test: every floor cleared at its max level on three seeds; golden replay of a floor-1 clear from level 1.
 - [x] Trophies: all 46 loot items are permanent bonus items (`items` table: HP, mana, spell power, crit, haste, mana regen; 3-copy stack cap). Looting fills `UnitState.inventory` and applies the bonus at once; the client shows them in the loot window, the combat log and the B window (`~/trophies`).
+- [x] Economy: 89 gear pieces in five visible slots, 4 sets, 8 Legendaries, 14 junk items, 5 consumables, 2 vendors, Story Points, perks and on-use gadgets, per-class offline saves (`economy.rs`, `save.rs`, client `economy/`).
 - [ ] Channels, mini-boss optionality, per-room elevator logic (client).
 

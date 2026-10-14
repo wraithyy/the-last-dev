@@ -12,8 +12,8 @@ use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
-const CANVAS_W: f32 = 440.0;
-const CANVAS_H: f32 = 330.0;
+pub(super) const CANVAS_W: f32 = 440.0;
+pub(super) const CANVAS_H: f32 = 330.0;
 /// Raster pixels per UI pixel: sharp enough at UI scale 2.
 const RES: f32 = 2.0;
 const FLOOR_RGBA: [u8; 4] = [38, 44, 58, 235];
@@ -146,7 +146,7 @@ fn spawn_map(mut commands: Commands) {
 }
 
 /// Floor runs filled and walls stroked into an RGBA raster; returns the image and the view.
-fn rasterise(layout: &FloorLayout) -> (Image, Vec2, f32) {
+pub(super) fn rasterise(layout: &FloorLayout) -> (Image, Vec2, f32) {
     let runs = layout.footprint.floor_runs();
     let (mut lo, mut hi) = (Vec2::splat(f32::MAX), Vec2::splat(f32::MIN));
     for &(x0, x1, z0, z1) in &runs {
@@ -287,6 +287,7 @@ fn marker(c: &mut ChildSpawnerCommands, at: Vec2, glyph: &str, size: f32, color:
 fn update_map(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<crate::keybinds::Keybinds>,
     paused: Res<Paused>,
     sim: SimView,
     flow: Res<GameFlow>,
@@ -301,7 +302,7 @@ fn update_map(
     markers: Query<Entity, With<MapMarker>>,
     player: Single<&Transform, With<Player>>,
 ) {
-    if !paused.0 && keys.just_pressed(KeyCode::KeyN) {
+    if !paused.0 && binds.just(&keys, crate::keybinds::Action::Map) {
         windows.map = !windows.map;
     }
     root.display = if windows.map {

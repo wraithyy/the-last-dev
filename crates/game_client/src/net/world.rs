@@ -202,6 +202,8 @@ pub struct NetWorld {
     /// Corpses holding this player's own loot roll (from `LootDropped`, which only this
     /// player receives); the snapshot's lootable flag is about anybody's roll.
     my_loot: BTreeSet<EntityId>,
+    /// On-use item (or `"consumable"`) cooldowns from `ItemCooldown`: (end tick, total ms).
+    item_cds: HashMap<String, (u64, u32)>,
 }
 
 impl NetWorld {
@@ -234,6 +236,7 @@ impl NetWorld {
             last_move: None,
             prediction: None,
             my_loot: BTreeSet::new(),
+            item_cds: HashMap::new(),
         };
         for p in players {
             w.add_player(p);
@@ -391,6 +394,10 @@ impl NetWorld {
             phase: 1,
             idle_pose: d.idle_pose,
             inventory: Vec::new(),
+            sp: 0,
+            bag: Vec::new(),
+            equipped: Vec::new(),
+            buyback: Vec::new(),
         })
     }
 
@@ -462,6 +469,7 @@ impl NetWorld {
                 u.max_mana = p.max_mana;
                 u.xp = p.xp;
                 u.xp_to_next = p.xp_to_next;
+                u.equipped = p.equipped(&self.content);
             }
         }
     }
@@ -795,10 +803,17 @@ impl NetWorld {
                 looter,
                 corpse,
                 items,
+                ..
             } => {
                 if *looter == you {
                     self.my_loot.remove(corpse);
-                    for item in items {
+                    // Gear, junk and SP arrive with the `Bag` event; only trophies stack here.
+                    let trophies: Vec<String> = items
+                        .iter()
+                        .filter(|n| content.item(n).is_some())
+                        .cloned()
+                        .collect();
+                    for item in &trophies {
                         self.add_item(item);
                     }
                     // This client's roll is claimed; the corpse may stay lootable for others.
@@ -855,6 +870,29 @@ impl NetWorld {
                 {
                     *c = *count;
                 }
+            }
+            Event::Bag {
+                unit,
+                sp,
+                bag,
+                equipped,
+                buyback,
+            } => {
+                if let Some(u) = self.units.get_mut(unit) {
+                    u.sp = *sp;
+                    u.bag = bag.clone();
+                    u.equipped = equipped.clone();
+                    u.buyback = buyback.clone();
+                }
+            }
+            Event::GearChanged { unit, equipped } => {
+                if let Some(u) = self.units.get_mut(unit) {
+                    u.equipped = equipped.clone();
+                }
+            }
+            Event::ItemCooldown { item, ms } => {
+                let end = self.tick + ms_to_ticks(*ms);
+                self.item_cds.insert(item.clone(), (end, *ms));
             }
             Event::QuestCompleted { quest } => {
                 self.quests.active.retain(|q| q.id != *quest);
@@ -994,13 +1032,18 @@ impl SimRead for NetWorld {
             .map_or(&NO_ITEMS[..], |u| u.inventory.as_slice())
     }
     fn item_totals(&self) -> ItemTotals {
-        let mut t = ItemTotals::default();
-        for (name, n) in self.inventory() {
-            if let Some(item) = self.content.item(name) {
-                t.add(&item.bonus.totals(*n));
-            }
-        }
-        t
+        let equipped = self
+            .units
+            .get(&self.you)
+            .map_or(&[][..], |u| u.equipped.as_slice());
+        self.content
+            .economy
+            .player_totals(&self.content, self.inventory(), equipped)
+    }
+    fn item_cooldown(&self, _player: EntityId, key: &str) -> (u32, u32) {
+        self.item_cds
+            .get(key)
+            .map_or((0, 0), |&(end, total)| (self.remaining_ms(end), total))
     }
     fn zone_cleared(&self, zone: &str) -> bool {
         self.cleared.contains(zone)
@@ -1122,6 +1165,60 @@ mod tests {
     }
 
     #[test]
+    fn bag_gear_and_snapshot_outfits_reach_the_mirror() {
+        let mut w = world_with(&[(2, "backend_dev", UnitSnap::ALIVE)]);
+        w.add_player(&PlayerInfo {
+            id: 2,
+            name: "Bob".into(),
+            class: "backend".into(),
+        });
+        let mut worn = vec![String::new(); combat_core::SLOTS];
+        worn[2] = "The Monorepo".into();
+        w.receive_events(
+            2,
+            vec![
+                Event::Bag {
+                    unit: 1,
+                    sp: 77,
+                    bag: vec!["Ibuprofen".into()],
+                    equipped: worn.clone(),
+                    buyback: vec![],
+                },
+                Event::Looted {
+                    looter: 1,
+                    corpse: 9,
+                    items: vec!["Prompt Fragment".into(), "Ibuprofen".into()],
+                    sp: 5,
+                },
+                Event::GearChanged {
+                    unit: 2,
+                    equipped: worn.clone(),
+                },
+            ],
+            0.0,
+        );
+        let me = &w.units[&1];
+        assert_eq!((me.sp, me.bag.len()), (77, 1));
+        // Only trophies stack in the trophy inventory; goods live in the bag.
+        assert_eq!(me.inventory, vec![("Prompt Fragment".to_string(), 1)]);
+        assert_eq!(w.units[&2].equipped, worn);
+        assert!(
+            w.item_totals().spell_power > 0,
+            "the Monorepo's stats count"
+        );
+        let Some(u) = w.units.get(&2).cloned() else {
+            panic!()
+        };
+        let snap = PlayerSnap::from_state(&u, &w.content);
+        if let Some(u) = w.units.get_mut(&2) {
+            u.equipped.clear();
+        }
+        let snaps = snaps_of(&w, &[(2, UnitSnap::ALIVE)]);
+        w.apply_snapshot(3, &snaps, &[snap], 0.1);
+        assert_eq!(w.units[&2].equipped, worn);
+    }
+
+    #[test]
     fn own_cast_is_predicted_at_once_and_handed_to_the_server() {
         let cr = SpellId(1);
         let mut w = world_with(&[(2, "meatproxy", UnitSnap::ALIVE)]);
@@ -1192,6 +1289,7 @@ mod tests {
                 Event::LootDropped {
                     corpse: 2,
                     items: vec![],
+                    sp: 4,
                 },
             ],
             0.0,
@@ -1211,6 +1309,7 @@ mod tests {
                 looter: 1,
                 corpse: 2,
                 items: vec![],
+                sp: 4,
             }],
             0.2,
         );

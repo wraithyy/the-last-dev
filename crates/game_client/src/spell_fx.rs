@@ -358,7 +358,7 @@ enum FaceCamera {
 }
 
 fn face_camera(
-    cams: Query<&GlobalTransform, With<Camera3d>>,
+    cams: Query<&GlobalTransform, With<crate::camera::OrbitCamera>>,
     mut q: Query<(&FaceCamera, &mut Transform), Without<Camera3d>>,
 ) {
     let Some(cam) = cams.iter().next() else {

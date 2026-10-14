@@ -167,6 +167,8 @@ pub fn legacy_ceo(c: &mut Content) {
         ai.respawn_ms = 15000;
         ai.abilities.retain(|a| a.spell == BLAST);
         ai.phases.clear();
+        ai.flee = None;
+        ai.enrage = None;
     }
     // The shipped CEO always drops the deck (a quest needs it); the legacy encounter rolled 35%.
     for l in ceo
@@ -289,12 +291,15 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             )
         }
         Event::XpGained { unit, amount } => format!("{} gains {amount} xp", t(*unit)),
-        Event::LootDropped { corpse, items } => format!("{} drops {items:?}", t(*corpse)),
+        Event::LootDropped { corpse, items, sp } => {
+            format!("{} drops {items:?} and {sp} SP", t(*corpse))
+        }
         Event::Looted {
             looter,
             corpse,
             items,
-        } => format!("{} loots {} {items:?}", t(*looter), t(*corpse)),
+            sp,
+        } => format!("{} loots {} {items:?} and {sp} SP", t(*looter), t(*corpse)),
         Event::Respawned { unit } => format!("{} respawns", t(*unit)),
         Event::Resurrected { unit, by, hp, mana } => {
             format!("{} resurrects {} ({hp} HP, {mana} mana)", t(*by), t(*unit))
@@ -357,6 +362,34 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
         } => format!("quest {quest} objective {objective}: {count}/{need}"),
         Event::QuestReady { quest } => format!("quest {quest} ready"),
         Event::QuestCompleted { quest } => format!("quest {quest} completed"),
+        Event::TelegraphStarted {
+            id,
+            source,
+            spell: s,
+            shape,
+            pos,
+            resolve_ms,
+            ..
+        } => format!(
+            "{} telegraphs {} #{id} {shape:?} at ({:.1}, {:.1}) in {resolve_ms} ms",
+            t(*source),
+            spell_name(sim, *s),
+            pos.x,
+            pos.z
+        ),
+        Event::TelegraphResolved { id, landed } => {
+            format!(
+                "telegraph #{id} {}",
+                if *landed { "lands" } else { "fizzles" }
+            )
+        }
+        Event::Bag { unit, sp, bag, .. } => {
+            format!("{} bag: {} items, {sp} SP", t(*unit), bag.len())
+        }
+        Event::GearChanged { unit, equipped } => format!("{} wears {equipped:?}", t(*unit)),
+        Event::Proc { unit, item } => format!("{} procs {item}", t(*unit)),
+        Event::ItemError { reason } => format!("item error: {}", reason.message()),
+        Event::ItemCooldown { item, ms } => format!("{item} cools down for {ms} ms"),
     };
     format!("[{tick:05}] {body}")
 }

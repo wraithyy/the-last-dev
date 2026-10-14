@@ -7,7 +7,9 @@
 
 mod common;
 
-use combat_core::{Command, Event, QuestStatus, Sim, SpellId, TRASH_RESPAWN_MS, Vec3, ms_to_ticks};
+use combat_core::{
+    Command, Event, QuestStatus, Sim, SpellId, TRASH_RESPAWN_MS, TelegraphView, Vec3, ms_to_ticks,
+};
 use common::*;
 use std::fmt::Write as _;
 use std::path::PathBuf;
@@ -25,6 +27,8 @@ const NO_KICK: [SpellId; 4] = [SpellId(112), SpellId(150), SpellId(154), SpellId
 /// The AGI's telegraph for its spell reflect window.
 const ALIGNMENT: SpellId = SpellId(187);
 const PACK_SPACING: f32 = 70.0;
+/// Bot running speed while dodging or chasing.
+const RUN_MPS: f32 = 7.0;
 const PIXEL_PUSH: SpellId = SpellId(20);
 const CSS_COMBO: SpellId = SpellId(21);
 const IMPORTANT: SpellId = SpellId(22);
@@ -89,9 +93,13 @@ struct Bot {
     log: String,
     report: Report,
     in_boss: bool,
+    /// Walked this tick (dodging or chasing): reported to the sim, which cancels cast-time spells.
+    moving: bool,
+    dodge_goal: Option<Vec3>,
     /// Loot every corpse after a pull (quest runs only; the golden predates looting).
     looting: bool,
     class: &'static str,
+    seed: u64,
 }
 
 fn yaw_to(from: Vec3, to: Vec3) -> f32 {
@@ -123,8 +131,11 @@ impl Bot {
             log: format!("# {zone} playthrough, seed {seed}, start level {level}\n"),
             report: Report::default(),
             in_boss: false,
+            moving: false,
+            dodge_goal: None,
             looting: false,
             class,
+            seed,
         }
     }
 
@@ -143,7 +154,7 @@ impl Bot {
         self.sim.push(Command::PlayerMoved {
             pos: self.pos,
             yaw,
-            moving: false,
+            moving: std::mem::take(&mut self.moving),
             jumping: false,
         });
         let events = self.sim.tick();
@@ -196,8 +207,48 @@ impl Bot {
         }
     }
 
-    /// Hostiles fighting the player: adds (low max HP) first, then the nearest.
+    /// The class's interrupt, and its stun as the fallback on non-bosses.
+    fn kick_spells(&self) -> (SpellId, SpellId) {
+        match self.class {
+            "frontend" => (LIGHTHOUSE, CENTER_DIV),
+            "backend" => (KILL_QUERY, DB_LOCK),
+            "devops" => (SIGSTOP, SIGSTOP),
+            _ => (RPR, DUCK),
+        }
+    }
+
+    fn off_cooldown(&self, spell: SpellId) -> bool {
+        let v = self.sim.cooldown(self.player, spell);
+        v.cd_remaining_ms == 0 && v.usable != Err(combat_core::CastError::NotLearned)
+    }
+
+    /// An enemy in the fight casting a must-interrupt spell, nearest first.
+    fn kick_caster(&self) -> Option<u64> {
+        let c = self.sim.content();
+        self.sim
+            .units()
+            .filter(|u| u.hostile && u.alive && u.in_combat)
+            .filter(|u| {
+                u.cast
+                    .is_some_and(|k| k.interruptible && c.spell(k.spell).is_some_and(|s| s.kick))
+            })
+            .min_by(|a, b| {
+                combat_core::distance(a.pos, self.pos)
+                    .total_cmp(&combat_core::distance(b.pos, self.pos))
+            })
+            .map(|u| u.id)
+    }
+
+    /// Hostiles fighting the player: a must-interrupt caster while the kick is up, then adds
+    /// (low max HP), then the nearest.
     fn pick_target(&self) -> Option<u64> {
+        let (kick, stun) = self.kick_spells();
+        if let Some(id) = self.kick_caster() {
+            let boss = self.sim.unit(id).is_some_and(|u| u.boss);
+            if self.off_cooldown(kick) || (!boss && self.off_cooldown(stun)) {
+                return Some(id);
+            }
+        }
         self.sim
             .units()
             .filter(|u| {
@@ -212,7 +263,124 @@ impl Bot {
             .map(|u| u.id)
     }
 
+    /// Walks up to one tick of running speed toward `goal`.
+    fn walk(&mut self, goal: Vec3) {
+        let (dx, dz) = (goal.x - self.pos.x, goal.z - self.pos.z);
+        let d = (dx * dx + dz * dz).sqrt();
+        if d < 1e-3 {
+            return;
+        }
+        let step = (RUN_MPS / 30.0).min(d);
+        self.pos.x += dx / d * step;
+        self.pos.z += dz / d * step;
+        self.moving = true;
+    }
+
+    /// Steps out of any telegraph that would hit where we stand (the nearest safe spot, cover
+    /// included). Shared (split) telegraphs are stood in on purpose. True while walking.
+    fn dodge(&mut self) -> bool {
+        let tgs: Vec<TelegraphView> = self
+            .sim
+            .telegraphs()
+            .into_iter()
+            .filter(|t| !t.split)
+            .collect();
+        let unsafe_at = |p: Vec3| tgs.iter().any(|t| t.hits(p));
+        if !unsafe_at(self.pos) {
+            self.dodge_goal = None;
+            return false;
+        }
+        // Keep walking to the spot already picked while it stays safe (no zig-zag).
+        if let Some(g) = self.dodge_goal.filter(|g| !unsafe_at(*g)) {
+            self.walk(g);
+            return true;
+        }
+        let mut candidates: Vec<Vec3> = tgs.iter().flat_map(|t| t.cover.clone()).collect();
+        for k in 1..=10 {
+            let r = 1.5 * k as f32;
+            for a in 0..16 {
+                let ang = a as f32 * std::f32::consts::TAU / 16.0;
+                candidates.push(Vec3::new(
+                    self.pos.x + r * ang.cos(),
+                    0.0,
+                    self.pos.z + r * ang.sin(),
+                ));
+            }
+        }
+        let goal = candidates
+            .into_iter()
+            .filter(|p| !unsafe_at(*p))
+            .min_by(|a, b| {
+                combat_core::distance(*a, self.pos).total_cmp(&combat_core::distance(*b, self.pos))
+            });
+        self.dodge_goal = goal;
+        match goal {
+            Some(g) => {
+                self.walk(g);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Closes in on a target out of reach (a fleeing boss): melee to 3 m, casters to 24 m.
+    fn chase(&mut self) -> bool {
+        let Some(t) = self.target.and_then(|t| self.sim.unit(t)).cloned() else {
+            return false;
+        };
+        let melee = matches!(self.class, "frontend" | "backend");
+        let (far, near) = if melee { (4.5, 3.0) } else { (27.0, 24.0) };
+        let d = combat_core::distance(t.pos, self.pos);
+        if !t.alive || d <= far {
+            return false;
+        }
+        let k = (d - near) / d;
+        let goal = Vec3::new(
+            self.pos.x + (t.pos.x - self.pos.x) * k,
+            0.0,
+            self.pos.z + (t.pos.z - self.pos.z) * k,
+        );
+        self.walk(goal);
+        true
+    }
+
+    /// Kick only what matters: against a unit with must-interrupt casts, save the kick for
+    /// those; otherwise any interruptible cast worth a kick.
+    fn worth_kick(&self, t: &combat_core::UnitState, spell: SpellId) -> bool {
+        if NO_KICK.contains(&spell) {
+            return false;
+        }
+        let c = self.sim.content();
+        let kick = |id: SpellId| c.spell(id).is_some_and(|s| s.kick);
+        let kicker = |key: &str| {
+            c.unit_def(key)
+                .and_then(|u| u.ai.as_ref())
+                .is_some_and(|ai| ai.abilities.iter().any(|a| kick(a.spell)))
+        };
+        let pack_kicks = kicker(&t.key)
+            || self
+                .sim
+                .units()
+                .any(|u| u.hostile && u.alive && u.in_combat && kicker(&u.key));
+        kick(spell) || !pack_kicks
+    }
+
     fn act(&mut self) {
+        if self.me().alive && !self.me().stunned && (self.dodge() || self.chase()) {
+            return;
+        }
+        // A must-interrupt cast with the kick on cooldown: drop our own cast for the stun.
+        let (kick, stun) = self.kick_spells();
+        if let Some(id) = self.kick_caster()
+            && self.me().cast.is_some()
+            && !self.off_cooldown(kick)
+            && self.off_cooldown(stun)
+            && self.sim.unit(id).is_some_and(|u| !u.boss)
+        {
+            self.sim.push(Command::StopCasting {
+                caster: self.player,
+            });
+        }
         match self.class {
             "frontend" => self.act_frontend(),
             "backend" => self.act_backend(),
@@ -237,7 +405,7 @@ impl Bot {
     /// Kick an interruptible cast worth kicking with `kick`, else stun a non-boss with `stun`.
     fn try_kick(&mut self, t: &combat_core::UnitState, kick: SpellId, stun: SpellId) -> bool {
         let Some(c) = t.cast else { return false };
-        if !c.interruptible || NO_KICK.contains(&c.spell) {
+        if !c.interruptible || !self.worth_kick(t, c.spell) {
             return false;
         }
         for s in [kick, stun] {
@@ -430,7 +598,7 @@ impl Bot {
         }
         if let Some(c) = t.cast
             && c.interruptible
-            && !NO_KICK.contains(&c.spell)
+            && self.worth_kick(&t, c.spell)
         {
             if self.ready(RPR) {
                 return self.cast(RPR);
@@ -474,7 +642,8 @@ impl Bot {
 
     fn fight_until_calm(&mut self) {
         let start = self.sim.now().0;
-        while self.sim.now().0 - start < 90 || self.me().in_combat {
+        // An opener still in flight (a cast from range) counts: its hit is what pulls.
+        while self.sim.now().0 - start < 90 || self.me().in_combat || self.me().cast.is_some() {
             if self.sim.now().0 > MAX_TICKS || self.report.died {
                 return;
             }
@@ -647,6 +816,16 @@ impl Bot {
             self.pull(at, true);
         }
         self.report.level = self.me().level;
+        // Tuning aid: `WOW_BOT_DUMP=<dir>` keeps every run's full event log.
+        if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+            let name = format!(
+                "{}_{}_{}.log",
+                self.class,
+                zone.replace('/', "-"),
+                self.seed
+            );
+            let _ = std::fs::write(PathBuf::from(dir).join(name), &self.log);
+        }
         (self.report, self.log)
     }
 }
@@ -803,17 +982,24 @@ fn campus_chain(class: &'static str) {
             bot.report.rests,
             bot.report.pulls
         );
-        assert!(!bot.report.died, "{class} seed {seed}: died on the campus");
+        if bot.report.died {
+            let tail: Vec<&str> = bot.log.lines().rev().take(60).collect();
+            let tail: Vec<&str> = tail.into_iter().rev().collect();
+            panic!(
+                "{class} seed {seed}: died on the campus\n{}",
+                tail.join("\n")
+            );
+        }
         assert!(left.is_empty(), "{class} seed {seed}: unfinished {left:?}");
         assert!(
             rounds <= 3,
             "seed {seed}: {rounds} clears is too much farming"
         );
         // The campus is the tutorial: a fresh hire leaves it at level 3 and walks into tower/1
-        // (levels 1-2) slightly over-levelled, never at 4+ with the floor turned grey.
-        // Other classes draw a different rng stream (other hit counts), so a 50% quest drop
-        // can need the third clear allowed above, which is worth one extra level.
-        let levels = if class == "fullstack" { 3..=3 } else { 3..=4 };
+        // (levels 1-2) slightly over-levelled. A bad quest-drop streak (telegraph dodges and
+        // kicks shift every class's rng stream) can need the third clear allowed above, which
+        // is worth one extra level; never more.
+        let levels = 3..=4;
         assert!(
             levels.contains(&me.level),
             "{class} seed {seed}: the campus should take a fresh hire to level 3 (got {})",
@@ -856,4 +1042,287 @@ fn floor_one_from_level_one_matches_golden() {
         log == golden,
         "floor 1 log drifted; if intended, rerun with UPDATE_GOLDEN=1"
     );
+}
+
+// ---- Economy: gear across the campaign (economy.rs, docs/FORMULAS.md Gear) ----
+
+/// Zones in campaign order; each is played at its max level.
+const CAMPAIGN: [&str; 10] = [
+    "campus",
+    "tower/1",
+    "tower/2",
+    "tower/3",
+    "tower/4",
+    "datacenter/1",
+    "datacenter/2",
+    "tower/5",
+    "lab/1",
+    "lab/2",
+];
+
+impl Bot {
+    fn role(&self) -> Option<combat_core::Role> {
+        self.sim.class_of(self.player).map(|c| c.role)
+    }
+
+    /// The simple bot rule: wear whatever in the bag scores higher for the class's role.
+    fn equip_upgrades(&mut self) {
+        let role = self.role();
+        let me = self.me();
+        let eco = &self.sim.content().economy;
+        let score = |n: &str| eco.gear(n).map_or(0, |g| eco.score(g, role));
+        let mut picks: Vec<String> = Vec::new();
+        for name in &me.bag {
+            let Some(g) = eco.gear(name) else { continue };
+            let worn = &me.equipped[g.slot.index()];
+            let rival = picks
+                .iter()
+                .find(|p| eco.gear(p).is_some_and(|o| o.slot == g.slot))
+                .cloned();
+            let best = rival.as_deref().map_or_else(|| score(worn), score);
+            if score(name) > best {
+                picks.retain(|p| eco.gear(p).is_none_or(|o| o.slot != g.slot));
+                picks.push(name.clone());
+            }
+        }
+        for item in picks {
+            self.sim.apply_as(self.player, Command::Equip { item });
+            self.tick();
+        }
+    }
+
+    /// Between zones: a vendor appears next to the bot (as if visited). It sells the junk and
+    /// every piece that is no upgrade, then buys the best affordable upgrade per slot.
+    fn visit_vendor(&mut self, zone: &str) {
+        let key = if zone.starts_with("tower/") || zone == "campus" {
+            "procurement_officer"
+        } else {
+            "hardware_broker"
+        };
+        let Ok(v) = self.sim.spawn_unit(key, self.pos, 0.0) else {
+            return;
+        };
+        self.tick();
+        let role = self.role();
+        let me = self.me();
+        let eco = self.sim.content().economy.clone();
+        let worn = |slot: usize| {
+            eco.gear(&me.equipped[slot])
+                .map_or(0, |w| eco.score(w, role))
+        };
+        let keep = |n: &str| match eco.gear(n) {
+            Some(g) => eco.score(g, role) > worn(g.slot.index()),
+            None => eco.consumable(n).is_some(),
+        };
+        for item in me
+            .bag
+            .iter()
+            .filter(|n| !keep(n))
+            .cloned()
+            .collect::<Vec<_>>()
+        {
+            self.sim
+                .apply_as(self.player, Command::Sell { vendor: v, item });
+            self.tick();
+        }
+        let now_ms = combat_core::ticks_to_ms(self.sim.now().0);
+        let Some(def) = eco.vendor_for(key) else {
+            return;
+        };
+        let mut stock: Vec<&combat_core::GearDef> = eco
+            .stock(def, now_ms)
+            .iter()
+            .filter_map(|n| eco.gear(n))
+            .filter(|g| eco.score(g, role) > worn(g.slot.index()))
+            .collect();
+        stock.sort_by_key(|g| std::cmp::Reverse(eco.score(g, role)));
+        let mut bought: Vec<combat_core::Slot> = Vec::new();
+        for g in stock {
+            if bought.contains(&g.slot) || self.me().sp < g.price() {
+                continue;
+            }
+            bought.push(g.slot);
+            let item = g.name.clone();
+            self.sim
+                .apply_as(self.player, Command::Buy { vendor: v, item });
+            self.tick();
+        }
+        self.equip_upgrades();
+    }
+
+    /// Debug: the best World Rare of `tier` for the role in every slot (a "well-geared" player).
+    fn wear_tier_gear(&mut self, tier: u8) {
+        let role = self.role();
+        let eco = self.sim.content().economy.clone();
+        for slot in combat_core::Slot::ALL {
+            let best = eco
+                .gear
+                .iter()
+                .filter(|g| {
+                    g.slot == slot
+                        && g.tier() == tier
+                        && g.rarity == combat_core::Rarity::Rare
+                        && g.source == combat_core::GearSource::World
+                })
+                .max_by_key(|g| eco.score(g, role));
+            if let Some(g) = best {
+                self.sim.debug_equip(self.player, &g.name);
+            }
+        }
+    }
+
+    /// `run` without consuming the bot: packs, then the boss, equipping drops after each pull.
+    fn run_geared(&mut self, zone: &str) {
+        let def = self.sim.content().zone(zone).cloned();
+        let packs = def.as_ref().map_or(0, |z| z.packs.len());
+        let has_boss = def.is_some_and(|z| z.boss.is_some());
+        for k in 1..=packs {
+            if self.report.died {
+                return;
+            }
+            if let Some((at, _)) = anchor(&format!("pack_{k}")) {
+                self.pull(at, false);
+                self.equip_upgrades();
+            }
+        }
+        if has_boss && let Some((at, _)) = anchor("boss") {
+            self.rest(true);
+            self.pull(at, true);
+            self.equip_upgrades();
+        }
+    }
+}
+
+/// (zone, boss-fight min HP %, boss-fight seconds, died) per zone of one campaign.
+type ZoneLine = (String, u32, u64, bool);
+
+/// The whole campaign for one class and seed, carrying the character (gear, bag, SP) from zone
+/// to zone through a save, as the client does across sessions.
+fn campaign(class: &'static str, seed: u64) -> (Vec<ZoneLine>, combat_core::UnitState) {
+    let mut save: Option<combat_core::SaveData> = None;
+    let mut lines = Vec::new();
+    let mut last = None;
+    for zone in CAMPAIGN {
+        let max = content().zone(zone).map_or(1, |z| z.level_range.1);
+        let mut bot = Bot::new_as(class, zone, max, seed);
+        bot.looting = true;
+        if let Some(s) = &save {
+            assert!(bot.sim.import_save(bot.player, s));
+            bot.sim.set_player_level(max);
+            bot.visit_vendor(zone);
+        }
+        bot.run_geared(zone);
+        let secs = bot.report.after.last().map_or(0, |a| a.2);
+        lines.push((
+            zone.to_string(),
+            bot.report.boss_min_hp_pct,
+            secs,
+            bot.report.died,
+        ));
+        save = bot.sim.export_save(bot.player);
+        last = Some(bot.me());
+        if bot.report.died {
+            break;
+        }
+    }
+    let Some(me) = last else {
+        panic!("empty campaign")
+    };
+    (lines, me)
+}
+
+/// Every class clears the campaign on three seeds while equipping what drops.
+#[test]
+fn every_class_clears_the_campaign_equipping_drops() {
+    let mut failures = Vec::new();
+    for class in ["fullstack", "frontend", "backend", "devops"] {
+        let mut lowest: Vec<(String, u32)> = Vec::new();
+        for seed in [7, 42, 1234] {
+            let (lines, me) = campaign(class, seed);
+            println!("{class} seed {seed}: {lines:?}");
+            for (zone, min, _, died) in &lines {
+                if *died {
+                    failures.push(format!("{class} seed {seed}: died in {zone}"));
+                }
+                if content().zone(zone).is_some_and(|z| z.boss.is_none()) {
+                    continue;
+                }
+                match lowest.iter_mut().find(|(z, _)| z == zone) {
+                    Some((_, m)) => *m = (*m).min(*min),
+                    None => lowest.push((zone.clone(), *min)),
+                }
+            }
+            let worn: Vec<&str> = me.equipped.iter().map(String::as_str).collect();
+            println!(
+                "{class} seed {seed}: {} SP, {} in bag, wearing {worn:?}",
+                me.sp,
+                me.bag.len()
+            );
+            assert!(me.sp > 0, "{class}: no Story Points over a whole campaign");
+            assert!(
+                me.equipped.iter().filter(|e| !e.is_empty()).count() >= 3,
+                "{class} seed {seed}: barely any gear after the campaign: {worn:?}"
+            );
+        }
+        println!(
+            "{class}: lowest boss-fight HP % per zone over 3 seeds (geared by drops): {lowest:?}"
+        );
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// The difference gear makes: each class fights the tier's bosses at max level fresh and in a
+/// full set of the tier's Rare pieces for its role. DPS and healers must kill clearly faster;
+/// the tank must end its fights clearly healthier (or faster).
+#[test]
+fn tier_gear_makes_boss_fights_clearly_easier() {
+    let zones = [
+        ("tower/2", 2u8),
+        ("tower/3", 3),
+        ("tower/4", 4),
+        ("tower/5", 5),
+    ];
+    let mut table = Vec::new();
+    let mut failures = Vec::new();
+    for class in ["fullstack", "frontend", "backend", "devops"] {
+        let (mut bare_secs, mut geared_secs, mut bare_hp, mut geared_hp) = (0u64, 0u64, 0u64, 0u64);
+        for (zone, tier) in zones {
+            let max = content().zone(zone).map_or(1, |z| z.level_range.1);
+            for seed in [7, 42, 1234] {
+                let (b, _) = Bot::new_as(class, zone, max, seed).run(zone);
+                let mut g = Bot::new_as(class, zone, max, seed);
+                g.wear_tier_gear(tier);
+                let (gr, _) = g.run(zone);
+                let secs = |r: &Report| r.after.last().map_or(0, |a| a.2);
+                bare_secs += secs(&b);
+                geared_secs += secs(&gr);
+                bare_hp += u64::from(b.boss_min_hp_pct);
+                geared_hp += u64::from(gr.boss_min_hp_pct);
+                table.push(format!(
+                    "{class:9} {zone:8} seed {seed:4}: fresh {:3}s min HP {:3}% | geared {:3}s min HP {:3}%",
+                    secs(&b),
+                    b.boss_min_hp_pct,
+                    secs(&gr),
+                    gr.boss_min_hp_pct
+                ));
+            }
+        }
+        let pct = geared_secs * 100 / bare_secs.max(1);
+        let n = (zones.len() * 3) as u64;
+        table.push(format!(
+            "{class}: boss time with tier gear = {pct}% of fresh; average boss-fight min HP {}% -> {}%",
+            bare_hp / n,
+            geared_hp / n
+        ));
+        let ok = if class == "backend" {
+            pct <= 85 || geared_hp >= bare_hp + 10 * n
+        } else {
+            pct <= 85
+        };
+        if !ok {
+            failures.push(format!("{class}: gear barely mattered ({pct}% time)"));
+        }
+    }
+    println!("{}", table.join("\n"));
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

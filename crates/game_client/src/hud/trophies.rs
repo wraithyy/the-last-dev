@@ -116,6 +116,7 @@ fn spawn_window(mut commands: Commands) {
 fn update_window(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<crate::keybinds::Keybinds>,
     paused: Res<Paused>,
     mut open: ResMut<TrophiesOpen>,
     sim: SimView,
@@ -129,7 +130,7 @@ fn update_window(
     mut totals: Single<&mut Text, With<TrophyTotals>>,
     mut shown: Local<Option<Vec<(String, u32)>>>,
 ) {
-    if !paused.0 && keys.just_pressed(KeyCode::KeyB) {
+    if !paused.0 && binds.just(&keys, crate::keybinds::Action::Trophies) {
         open.0 = !open.0;
     }
     if close.iter().any(|i| *i == Interaction::Pressed) {

@@ -436,7 +436,8 @@ fn deadline_explodes_unless_rolled_back() {
     let mut w = world(10, |_| {});
     w.spawn("project_manager", 0.0, -3.0);
     assert!(w.run_until(300, aura_on(w.p, "deadline")));
-    let boom = |e: &Event| matches!(e, Event::Damage { spell: Some(s), amount: 110, .. } if *s == SpellId(109));
+    // 110 authored, +10% trash damage (`trash_damage_pct`).
+    let boom = |e: &Event| matches!(e, Event::Damage { spell: Some(s), amount: 121, .. } if *s == SpellId(109));
     assert!(w.run_until(250, boom));
 
     let mut w = world(10, |_| {});

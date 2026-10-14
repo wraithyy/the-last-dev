@@ -9,7 +9,7 @@
 use super::session::send;
 use super::transport::NetClient;
 use super::world::NetWorld;
-use crate::combat::{CAST_KEYS, CombatEvent, SimRead, SimUnit};
+use crate::combat::{CombatEvent, SLOT_COUNT, SimRead, SimUnit};
 use crate::hud::{ACCENT, KEY_RIM, KEY_TOP, KEY_TOP_HI, PANEL_EDGE, label, panel_bg, vgrad};
 use crate::input::{Paused, TextFocus};
 use crate::player::Player;
@@ -84,15 +84,17 @@ fn spawn_menu(mut commands: Commands) {
                     },
                     BorderColor::all(KEY_RIM),
                     vgrad(KEY_TOP_HI, KEY_TOP),
-                    children![label(format!("{} {}", slot_key(i), e.command()), 13.0)],
+                    children![
+                        (
+                            crate::keybinds::KeyLegend(crate::keybinds::Action::Slot(i as u8)),
+                            label("", 13.0),
+                            TextColor(ACCENT),
+                        ),
+                        label(format!(" {}", e.command()), 13.0),
+                    ],
                 ));
             }
         });
-}
-
-/// Key label of emote slot `i`: the number row, 0 last.
-fn slot_key(i: usize) -> usize {
-    (i + 1) % 10
 }
 
 /// What one frame's keys do to the menu: whether it is open afterwards and which emote
@@ -113,8 +115,10 @@ pub fn menu_keys(
     }
 }
 
+#[allow(clippy::too_many_arguments)] // Bevy system: one parameter per resource it touches
 fn menu_input(
     mut keys: ResMut<ButtonInput<KeyCode>>,
+    binds: Res<crate::keybinds::Keybinds>,
     paused: Res<Paused>,
     focus: Res<TextFocus>,
     mut toggles: MessageReader<ToggleEmoteMenu>,
@@ -127,18 +131,18 @@ fn menu_input(
         open = !open;
     }
     if !paused.0 && !focus.0 {
-        let digit = CAST_KEYS.iter().position(|k| keys.any_just_pressed(*k));
+        let digit = (0..SLOT_COUNT).find(|i| keys.any_just_pressed(binds.slot_keys(*i)));
         let was_open = open;
         let (now_open, pick) = menu_keys(
             open,
-            keys.just_pressed(KeyCode::KeyG),
+            binds.just(&keys, crate::keybinds::Action::Emotes),
             keys.just_pressed(KeyCode::Escape),
             digit,
         );
         if was_open {
             // Consumed: the action bar must not cast and Esc must not open the pause menu.
-            for k in CAST_KEYS.iter().flatten() {
-                keys.clear_just_pressed(*k);
+            for k in (0..SLOT_COUNT).flat_map(|i| binds.slot_keys(i)) {
+                keys.clear_just_pressed(k);
             }
             keys.clear_just_pressed(KeyCode::Escape);
         }
@@ -215,8 +219,6 @@ mod tests {
         assert_eq!(menu_keys(true, true, false, None), (false, None));
         assert_eq!(menu_keys(true, false, true, None), (false, None));
         assert_eq!(menu_keys(true, false, false, None), (true, None));
-        assert_eq!(slot_key(0), 1);
-        assert_eq!(slot_key(9), 0);
     }
 
     #[test]

@@ -18,7 +18,7 @@
 [00063] Copilot Drone dies (killer Fullstack Engineer)
 [00063] Copilot Drone ai Dead
 [00063] Fullstack Engineer gains 28 xp
-[00063] Copilot Drone drops []
+[00063] Copilot Drone drops [] and 2 SP
 [00063] Copilot Drone leaves combat
 [00064] Fullstack Engineer auto attack on
 [00064] Fullstack Engineer swings at MeatProxy
@@ -50,7 +50,7 @@
 [00246] MeatProxy dies (killer Fullstack Engineer)
 [00246] MeatProxy ai Dead
 [00246] Fullstack Engineer gains 55 xp
-[00246] MeatProxy drops ["Pasted Chat Transcript", "Reply Sent to the Wrong Thread"]
+[00246] MeatProxy drops ["Pasted Chat Transcript", "Reply Sent to the Wrong Thread"] and 1 SP
 [00246] Fullstack Engineer leaves combat
 [00246] MeatProxy leaves combat
 [00246] MeatProxy yells: I apologize for the confusion...
@@ -71,7 +71,7 @@
 [00309] Copilot Drone dies (killer Fullstack Engineer)
 [00309] Copilot Drone ai Dead
 [00309] Fullstack Engineer gains 28 xp
-[00309] Copilot Drone drops ["Accepted Suggestion"]
+[00309] Copilot Drone drops ["Accepted Suggestion"] and 1 SP
 [00309] Copilot Drone leaves combat
 [00310] Fullstack Engineer auto attack on
 [00310] Fullstack Engineer swings at Copilot Drone
@@ -95,7 +95,7 @@
 [00401] Copilot Drone dies (killer Fullstack Engineer)
 [00401] Copilot Drone ai Dead
 [00401] Fullstack Engineer gains 28 xp
-[00401] Copilot Drone drops ["Accepted Suggestion"]
+[00401] Copilot Drone drops ["Accepted Suggestion", "60% Keyboard With 40% of the Keys"] and 1 SP
 [00401] Copilot Drone leaves combat
 [00401] Copilot Drone yells: Suggestion... dismissed...
 [00402] Fullstack Engineer auto attack on
@@ -124,7 +124,7 @@
 [00626] Vibe-Coding Junior dies (killer Fullstack Engineer)
 [00626] Vibe-Coding Junior ai Dead
 [00626] Fullstack Engineer gains 50 xp
-[00626] Vibe-Coding Junior drops []
+[00626] Vibe-Coding Junior drops [] and 1 SP
 [00626] Fullstack Engineer leaves combat
 [00626] Vibe-Coding Junior leaves combat
 [00626] Vibe-Coding Junior yells: I'll just... regenerate... myself...
@@ -147,10 +147,10 @@
 [00702] Fullstack Engineer begins Refactor (2500 ms)
 [00720] Vibe-Coding Junior ai Attack
 [00720] Vibe-Coding Junior swings at Fullstack Engineer
-[00720] Vibe-Coding Junior hits Fullstack Engineer with melee for 7 (absorbed 0)
+[00720] Vibe-Coding Junior hits Fullstack Engineer with melee for 8 (absorbed 0)
 [00724] MeatProxy ai Attack
 [00724] MeatProxy swings at Fullstack Engineer
-[00724] MeatProxy hits Fullstack Engineer with melee for 7 (absorbed 0)
+[00724] MeatProxy hits Fullstack Engineer with melee for 8 (absorbed 0)
 [00737] Vibe-Coding Junior begins Review Request (2000 ms)
 [00737] Vibe-Coding Junior ai Casting
 [00737] Vibe-Coding Junior yells: Review request! Approve it so I can ask the AI why it broke.
@@ -160,7 +160,7 @@
 [00797] Fullstack Engineer gains review_fatigue
 [00797] Vibe-Coding Junior ai Attack
 [00797] Vibe-Coding Junior swings at Fullstack Engineer
-[00797] Vibe-Coding Junior hits Fullstack Engineer with melee for 7 (absorbed 0)
+[00797] Vibe-Coding Junior hits Fullstack Engineer with melee for 8 (absorbed 0)
 [00807] Fullstack Engineer casts Refactor
 [00807] Vibe-Coding Junior loses code_smell (Consumed)
 [00807] Fullstack Engineer hits Vibe-Coding Junior with Refactor for 151 (absorbed 0) COMBO
@@ -168,7 +168,7 @@
 [00807] Vibe-Coding Junior dies (killer Fullstack Engineer)
 [00807] Vibe-Coding Junior ai Dead
 [00807] Fullstack Engineer gains 57 xp
-[00807] Vibe-Coding Junior drops ["final_final_v3_actually_works.zip"]
+[00807] Vibe-Coding Junior drops ["final_final_v3_actually_works.zip"] and 3 SP
 [00807] Vibe-Coding Junior leaves combat
 [00808] Fullstack Engineer auto attack on
 [00808] Fullstack Engineer swings at MeatProxy
@@ -177,9 +177,9 @@
 [00819] MeatProxy casts Forwarded Reply
 [00819] MeatProxy ai Attack
 [00819] MeatProxy swings at Fullstack Engineer
-[00819] MeatProxy hits Fullstack Engineer with melee for 7 (absorbed 0)
+[00819] MeatProxy hits Fullstack Engineer with melee for 8 (absorbed 0)
 [00879] MeatProxy swings at Fullstack Engineer
-[00879] MeatProxy hits Fullstack Engineer with melee for 7 (absorbed 0)
+[00879] MeatProxy hits Fullstack Engineer with melee for 8 (absorbed 0)
 [00911] Fullstack Engineer casts Code Review
 [00911] Fullstack Engineer hits MeatProxy with Code Review for 79 (absorbed 0)
 [00911] MeatProxy gains code_smell
@@ -187,9 +187,9 @@
 [00911] Fullstack Engineer hits MeatProxy with melee for 14 (absorbed 0)
 [00912] Fullstack Engineer begins Refactor (3000 ms)
 [00939] MeatProxy swings at Fullstack Engineer
-[00939] MeatProxy hits Fullstack Engineer with melee for 7 (absorbed 0)
+[00939] MeatProxy hits Fullstack Engineer with melee for 8 (absorbed 0)
 [00999] MeatProxy swings at Fullstack Engineer
-[00999] MeatProxy hits Fullstack Engineer with melee for 7 (absorbed 0)
+[00999] MeatProxy hits Fullstack Engineer with melee for 8 (absorbed 0)
 [01032] Fullstack Engineer casts Refactor
 [01032] MeatProxy loses code_smell (Consumed)
 [01032] Fullstack Engineer hits MeatProxy with Refactor for 151 (absorbed 0) COMBO
@@ -199,7 +199,7 @@
 [01032] MeatProxy dies (killer Fullstack Engineer)
 [01032] MeatProxy ai Dead
 [01032] Fullstack Engineer gains 63 xp
-[01032] MeatProxy drops []
+[01032] MeatProxy drops ["Hoodie From a Hackathon Nobody Won", "Expired Free Pizza Coupon"] and 3 SP
 [01032] Fullstack Engineer leaves combat
 [01032] MeatProxy leaves combat
 [01032] MeatProxy yells: I apologize for the confusion...
@@ -214,7 +214,7 @@
 [01107] Copilot Drone dies (killer Fullstack Engineer)
 [01107] Copilot Drone ai Dead
 [01107] Fullstack Engineer gains 31 xp
-[01107] Copilot Drone drops []
+[01107] Copilot Drone drops [] and 3 SP
 [01107] Fullstack Engineer enters combat
 [01107] Copilot Drone enters combat
 [01107] MeatProxy enters combat
@@ -229,7 +229,7 @@
 [01169] Copilot Drone dies (killer Fullstack Engineer)
 [01169] Copilot Drone ai Dead
 [01169] Fullstack Engineer gains 31 xp
-[01169] Copilot Drone drops []
+[01169] Copilot Drone drops ["Broken Standing Desk Crank"] and 2 SP
 [01169] Copilot Drone leaves combat
 [01170] Fullstack Engineer auto attack on
 [01170] Fullstack Engineer swings at MeatProxy
@@ -237,7 +237,7 @@
 [01171] Fullstack Engineer begins Code Review (2000 ms)
 [01199] MeatProxy ai Attack
 [01199] MeatProxy swings at Fullstack Engineer
-[01199] MeatProxy hits Fullstack Engineer with melee for 7 (absorbed 0)
+[01199] MeatProxy hits Fullstack Engineer with melee for 8 (absorbed 0)
 [01246] Fullstack Engineer casts Code Review
 [01246] Fullstack Engineer hits MeatProxy with Code Review for 79 (absorbed 0)
 [01246] MeatProxy gains code_smell
@@ -251,7 +251,7 @@
 [01313] MeatProxy hits Fullstack Engineer with Forwarded Reply for 39 (absorbed 0)
 [01313] MeatProxy ai Attack
 [01313] MeatProxy swings at Fullstack Engineer
-[01313] MeatProxy hits Fullstack Engineer with melee for 7 (absorbed 0)
+[01313] MeatProxy hits Fullstack Engineer with melee for 8 (absorbed 0)
 [01352] Fullstack Engineer casts Refactor
 [01352] Fullstack Engineer yells: Rewriting this before it becomes load-bearing.
 [01352] Fullstack Engineer misses MeatProxy with Refactor
@@ -259,9 +259,9 @@
 [01352] Fullstack Engineer hits MeatProxy with melee for 10 (absorbed 0)
 [01353] Fullstack Engineer begins Refactor (2500 ms)
 [01373] MeatProxy swings at Fullstack Engineer
-[01373] MeatProxy hits Fullstack Engineer with melee for 7 (absorbed 0)
+[01373] MeatProxy hits Fullstack Engineer with melee for 8 (absorbed 0)
 [01433] MeatProxy swings at Fullstack Engineer
-[01433] MeatProxy hits Fullstack Engineer with melee for 7 (absorbed 0)
+[01433] MeatProxy hits Fullstack Engineer with melee for 8 (absorbed 0)
 [01458] Fullstack Engineer casts Refactor
 [01458] MeatProxy loses code_smell (Consumed)
 [01458] Fullstack Engineer hits MeatProxy with Refactor for 151 (absorbed 0) COMBO
@@ -271,7 +271,7 @@
 [01458] Fullstack Engineer gains 63 xp
 [01458] Fullstack Engineer reaches level 2
 [01458] Fullstack Engineer learns Reject PR
-[01458] MeatProxy drops ["Pasted Chat Transcript"]
+[01458] MeatProxy drops ["Pasted Chat Transcript"] and 3 SP
 [01458] Fullstack Engineer leaves combat
 [01458] MeatProxy leaves combat
 [01458] MeatProxy yells: I apologize for the confusion...
@@ -371,7 +371,7 @@
 [01976] Fullstack Engineer auto attack off
 [01976] Unreviewed PR dies (killer Fullstack Engineer)
 [01976] Unreviewed PR ai Dead
-[01976] Unreviewed PR drops []
+[01976] Unreviewed PR drops [] and 0 SP
 [01976] Unreviewed PR leaves combat
 [01976] Unreviewed PR yells: Closed... without... merging...
 [01977] Fullstack Engineer auto attack on
@@ -392,7 +392,7 @@
 [02068] Fullstack Engineer auto attack off
 [02068] Unreviewed PR dies (killer Fullstack Engineer)
 [02068] Unreviewed PR ai Dead
-[02068] Unreviewed PR drops []
+[02068] Unreviewed PR drops [] and 0 SP
 [02068] Unreviewed PR leaves combat
 [02069] Fullstack Engineer auto attack on
 [02069] Fullstack Engineer swings at The Vibe Coder
@@ -429,7 +429,7 @@
 [02327] #16 despawns
 [02327] The Vibe Coder ai Dead
 [02327] Fullstack Engineer gains 250 xp
-[02327] The Vibe Coder drops ["Prompt Fragment", "Mechanical Keyboard with No Keycaps"]
+[02327] The Vibe Coder drops ["Prompt Fragment", "Mechanical Keyboard with No Keycaps", "Rubber Duck With a Pager"] and 36 SP
 [02327] zone tower/1 cleared
 [02327] floor 1 cleared
 [02327] tower/2 unlocked

@@ -10,6 +10,7 @@ mod combat_anim;
 mod config;
 mod copy;
 mod debug;
+mod economy;
 mod floating_text;
 mod floors;
 mod game;
@@ -17,6 +18,7 @@ mod gear;
 mod hair;
 mod hud;
 mod input;
+mod keybinds;
 mod loot_fx;
 mod nameplates;
 mod net;
@@ -25,6 +27,7 @@ mod presentation;
 mod rigs;
 mod spell_fx;
 mod targeting;
+mod telegraph_fx;
 mod touch;
 mod units;
 mod vfx;
@@ -94,7 +97,14 @@ fn main() {
             rigs::RigsPlugin,
             yell::YellPlugin,
         ))
-        .add_plugins((net::NetPlugin, touch::TouchPlugin, classes::ClassesPlugin))
+        .add_plugins((
+            net::NetPlugin,
+            touch::TouchPlugin,
+            classes::ClassesPlugin,
+            keybinds::KeybindsPlugin,
+            telegraph_fx::TelegraphFxPlugin,
+            economy::EconomyPlugin,
+        ))
         .run();
 }
 

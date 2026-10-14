@@ -84,7 +84,30 @@ impl Sim {
             .class_at(ti)
             .map_or(0, |c| i64::from(c.damage_taken_pct));
         let taken = self.aura_sum(ti, |a| a.damage_taken_pct) + armour;
-        pct_mod(pct_mod(u64::from(amount), done), taken) as u32
+        let gear = u64::from(self.units[ti].item_bonus.armor_tenths);
+        let amount = u64::from(amount) * (1000 - gear.min(1000)) / 1000;
+        pct_mod(pct_mod(amount, done), taken) as u32
+    }
+
+    /// Defensive Stakeholder: direct hits from inside the front arc are scaled down, unless the
+    /// bearer is casting or stunned (its shield arm is busy).
+    pub(crate) fn frontal_shield(&self, source: EntityId, ti: usize, amount: u32) -> u32 {
+        let t = &self.units[ti];
+        let Some(fs) = self.content.units[t.def].frontal_shield else {
+            return amount;
+        };
+        let Some(si) = self.index(source).filter(|&si| si != ti) else {
+            return amount;
+        };
+        if t.cast.is_some() || self.has_aura_flag(ti, |a| a.stun) {
+            return amount;
+        }
+        let half = (fs.arc_deg / 2.0).to_radians();
+        if crate::geom::is_facing(t.state.pos, t.state.yaw, self.units[si].state.pos, half) {
+            pct_mod(u64::from(amount), i64::from(fs.damage_taken_pct)) as u32
+        } else {
+            amount
+        }
     }
 
     /// Living, present units on the caster's side (`allies`) or the other side, within the radius.
@@ -105,9 +128,11 @@ impl Sim {
     /// Amount from base + spell power, scaled by the caster's level.
     fn power(&self, ci: usize, base: u32, coefficient_pct: u32) -> u64 {
         let u = &self.units[ci];
+        // Gear power (tenths of a percent); zero for everyone but geared players.
         (u64::from(base) + u64::from(u.sp) * u64::from(coefficient_pct) / 100)
             * u64::from(u.dmg_pct)
-            / 100
+            * (1000 + u64::from(u.item_bonus.power_tenths))
+            / 100_000
     }
 
     pub(crate) fn apply_effect(
@@ -147,6 +172,7 @@ impl Sim {
                 }
                 let crit_pct = self.content.units[self.units[ci].def].crit_pct;
                 let mut amount = self.power(ci, *base, *coefficient_pct);
+                amount = self.perk_amount(ci, spell.id, amount, false);
                 let mut combo = false;
                 let stacks = consume_aura.as_ref().and_then(|c| {
                     self.units[ti]
@@ -183,8 +209,10 @@ impl Sim {
                     crit,
                     combo,
                     school: spell.school,
+                    dot: false,
                 };
                 self.deal_damage(caster, Self::id_of(ti), hit);
+                self.perk_after_hit(ci, ti, spell, amount as u32);
                 if let (Some(a), true) = (apply_aura, self.units[ti].state.alive) {
                     self.apply_aura(ti, &a.aura, a.duration_ms, None, caster, Some(spell.id));
                 }
@@ -214,7 +242,8 @@ impl Sim {
                 },
                 Some(ti),
             ) => {
-                let amount = self.power(ci, *base, *coefficient_pct) as u32;
+                let amount = self.power(ci, *base, *coefficient_pct);
+                let amount = self.perk_amount(ci, spell.id, amount, true) as u32;
                 self.heal(caster, ti, Some(spell.id), amount);
             }
             (Effect::Aura { aura, duration_ms }, Some(ti)) => {
@@ -232,7 +261,11 @@ impl Sim {
                         .auras
                         .iter()
                         .rev()
-                        .find(|a| self.content.aura(&a.key).is_some_and(|d| d.harmful))
+                        .find(|a| {
+                            self.content.aura(&a.key).is_some_and(|d| {
+                                d.harmful && d.dispel != crate::content::DispelType::Never
+                            })
+                        })
                         .map(|a| a.key.clone());
                     let Some(key) = newest else { break };
                     self.remove_aura(ti, &key, AuraEnd::Consumed);
@@ -341,6 +374,7 @@ impl Sim {
                     crit: false,
                     combo: false,
                     school,
+                    dot: false,
                 };
                 self.deal_damage(caster, Self::id_of(ti), hit);
             }
@@ -608,6 +642,7 @@ impl Sim {
                     crit: false,
                     combo: false,
                     school,
+                    dot: true,
                 };
                 self.deal_damage(source, Self::id_of(ti), hit);
             }
@@ -637,6 +672,7 @@ impl Sim {
                 crit: false,
                 combo: false,
                 school: def.school,
+                dot: true,
             };
             self.deal_damage(source, Self::id_of(ti), hit);
         }

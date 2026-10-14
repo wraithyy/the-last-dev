@@ -149,6 +149,15 @@ fn progress_events(
                     .entity(*stack)
                     .with_child(toast(&def.name, &name, &sig));
             }
+            Event::Death { unit, .. } if sim.unit(*unit).is_some_and(|u| u.key == "ceo") => {
+                queue.queue.push_back(Banner {
+                    title: "CEO DEFEATED".into(),
+                    subtitle:
+                        "The golden parachute deployed anyway. Press release: 'a bold new chapter.'"
+                            .into(),
+                    color: GOLD,
+                });
+            }
             _ => {}
         }
     }

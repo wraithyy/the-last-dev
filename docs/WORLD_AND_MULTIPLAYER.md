@@ -215,7 +215,7 @@ Crate `crates/net_proto`, shared by the server and the client. Dependencies: `co
   have been an email`, `/take this offline`, `/no bandwidth`, `/blocked`, `/ship it`) with
   `command()`, `text()`, `text_at(name)` ("Let's sync on this, Alice.") and `from_command()`. No
   free text on the wire. An emote can carry the targeted teammate's id; the server keeps it only for
-  another member of the room. `PROTOCOL_VERSION` is 3 since targeted emotes and `Resurrected`.
+  another member of the room. Version 5 added `TelegraphStarted` / `TelegraphResolved` (enemy ground telegraphs); see `net_proto::PROTOCOL_VERSION` for the current one.
 
 ### Hosting and operations
 

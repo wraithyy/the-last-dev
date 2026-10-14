@@ -50,6 +50,7 @@ impl Sim {
         if !first {
             return;
         }
+        self.units[ti].combat_since = self.now;
         let abilities = self.content.units[self.units[ti].def]
             .ai
             .as_ref()
@@ -68,6 +69,7 @@ impl Sim {
         let Some(pack) = self.units[ti].state.pack else {
             return;
         };
+        self.pull_linked(ti, pack, source);
         for o in 0..self.units.len() {
             let u = &self.units[o];
             let joins = o != ti
@@ -77,6 +79,35 @@ impl Sim {
                 && u.threat.is_empty()
                 && u.state.ai == Some(AiState::Idle);
             if joins {
+                self.add_threat(o, source, 1);
+                self.set_ai(o, AiState::Chase);
+            }
+        }
+    }
+
+    /// Linked packs: idle trash of another pack standing within `pack_link_m` of the pulled
+    /// unit joins the fight (and brings its own pack). Bosses never link.
+    fn pull_linked(&mut self, ti: usize, pack: u32, source: EntityId) {
+        let r = self.content.config.pack_link_m;
+        if r <= 0.0 || self.units[ti].floor_boss {
+            return;
+        }
+        let at = self.units[ti].state.pos;
+        let linked: Vec<usize> = (0..self.units.len())
+            .filter(|&o| {
+                let u = &self.units[o];
+                u.state.pack.is_some_and(|p| p != pack)
+                    && u.state.alive
+                    && !u.despawned
+                    && !u.floor_boss
+                    && u.summoner.is_none()
+                    && u.threat.is_empty()
+                    && u.state.ai == Some(AiState::Idle)
+                    && dist_xz(u.state.pos, at) <= r
+            })
+            .collect();
+        for o in linked {
+            if self.units[o].threat.is_empty() {
                 self.add_threat(o, source, 1);
                 self.set_ai(o, AiState::Chase);
             }
@@ -187,10 +218,14 @@ impl Sim {
         if !self.units[i].state.alive {
             return;
         }
+        self.check_enrage(i, ai);
         if self.units[i].cast.is_some() {
             return self.set_ai(i, AiState::Casting);
         }
-        if self.try_abilities(i, ai) && self.units[i].cast.is_some() {
+        if self.flee_step(i, ai) {
+            return;
+        }
+        if self.try_abilities(i, ai, false) && self.units[i].cast.is_some() {
             return self.set_ai(i, AiState::Casting);
         }
         // An instant ability may have moved or killed someone.
@@ -241,6 +276,7 @@ impl Sim {
                 crit: false,
                 combo: false,
                 school: School::Physical,
+                dot: false,
             };
             self.deal_damage(src, dst, hit);
         }
@@ -334,7 +370,71 @@ impl Sim {
         }
     }
 
-    fn try_abilities(&mut self, i: usize, ai: &AiDef) -> bool {
+    /// Soft timer: the aura goes on once per pull, `after_ms` after it.
+    fn check_enrage(&mut self, i: usize, ai: &AiDef) {
+        let Some(en) = &ai.enrage else { return };
+        let u = &self.units[i];
+        let due = u.combat_since > 0 && self.now >= u.combat_since + ticks(en.after_ms);
+        if !due || u.auras.iter().any(|a| a.key == en.aura) {
+            return;
+        }
+        // Lasts until the fight ends (evade and death clear every aura).
+        self.apply_aura(i, &en.aura, 3_600_000, None, Self::id_of(i), None);
+        if !en.yells.is_empty() {
+            let cur = &mut self.units[i].yell_cursor[YellKind::Phase as usize];
+            let line = en.yells[*cur % en.yells.len()].clone();
+            *cur += 1;
+            self.request_yell_line(i, YellKind::Phase, Some(line));
+        }
+    }
+
+    /// `AiDef::flee`: runs for the exit (instant abilities only on the way), casts the flee
+    /// spell on arrival, then fights for `pause_ms`. True while it owns this tick.
+    fn flee_step(&mut self, i: usize, ai: &AiDef) -> bool {
+        let Some(f) = &ai.flee else { return false };
+        let u = &self.units[i];
+        if u.state.phase < f.phase || (!u.fleeing && self.now < u.flee_next) {
+            return false;
+        }
+        if !self.units[i].fleeing {
+            self.units[i].fleeing = true;
+            self.units[i].nav.reset();
+            if !f.yells.is_empty() {
+                let cur = &mut self.units[i].yell_cursor[YellKind::Phase as usize];
+                let line = f.yells[*cur % f.yells.len()].clone();
+                *cur += 1;
+                self.request_yell_line(i, YellKind::Phase, Some(line));
+            }
+        }
+        let (spawn, yaw) = (self.units[i].spawn_pos, self.units[i].spawn_yaw);
+        let (fw, rt) = (crate::geom::forward(yaw), crate::telegraph::right(yaw));
+        let exit = Vec3::new(
+            spawn.x + rt.x * f.to.0 + fw.x * f.to.1,
+            spawn.y,
+            spawn.z + rt.z * f.to.0 + fw.z * f.to.1,
+        );
+        let pos = self.units[i].state.pos;
+        let step = f.speed_mps / TICK_HZ as f32;
+        if dist_xz(pos, exit) <= step {
+            self.units[i].state.pos = exit;
+            self.units[i].fleeing = false;
+            self.units[i].flee_next = self.now + ticks(f.pause_ms);
+            if let Some(spell) = self.content.spell(f.spell).cloned() {
+                self.start_cast(i, &spell, Some(Self::id_of(i)));
+            }
+            self.set_ai(i, AiState::Casting);
+            return true;
+        }
+        self.try_abilities(i, ai, true);
+        let wp = self.nav_target(i, exit).map_or(exit, |(wp, _)| wp);
+        self.units[i].state.yaw = yaw_toward(pos, wp);
+        self.units[i].state.pos = step_toward(pos, wp, step, 0.0);
+        self.set_ai(i, AiState::Chase);
+        true
+    }
+
+    /// `instant_only`: on the run, cast-time abilities wait (they would root the unit).
+    fn try_abilities(&mut self, i: usize, ai: &AiDef, instant_only: bool) -> bool {
         if self.has_aura_flag(i, |a| a.silence) {
             return false;
         }
@@ -349,6 +449,9 @@ impl Sim {
             let Some(spell) = self.content.spell(ab.spell).cloned() else {
                 continue;
             };
+            if instant_only && spell.cast_ms > 0 {
+                continue;
+            }
             if self.now < u.lockout_until[spell.school.index()] {
                 continue;
             }
@@ -375,7 +478,17 @@ impl Sim {
 
     /// Resets the encounter: cast, every aura (Scope Creep stacks too), threat and phase.
     fn begin_evade(&mut self, i: usize) {
+        // Kiting a pull away until it resets is not a free reset: no regen or rez for a while.
+        let lock = self.now + ticks(self.content.config.combat_lock_ms);
+        let chased: Vec<EntityId> = self.units[i].threat.keys().copied().collect();
+        for p in chased {
+            if let Some(pi) = self.index(p).filter(|_| self.is_player(p)) {
+                let u = &mut self.units[pi];
+                u.combat_lock_until = u.combat_lock_until.max(lock);
+            }
+        }
         self.cancel_cast(i, None, 0);
+        self.cancel_telegraphs_of(Self::id_of(i));
         let keys: Vec<String> = self.units[i].auras.iter().map(|a| a.key.clone()).collect();
         for k in keys {
             self.remove_aura(i, &k, AuraEnd::Expired);
@@ -384,6 +497,9 @@ impl Sim {
         u.threat.clear();
         u.state.target = None;
         u.nav.reset();
+        u.combat_since = 0;
+        u.fleeing = false;
+        u.flee_next = 0;
         if u.state.phase != 1 {
             u.state.phase = 1;
             self.events.push(Event::PhaseChanged {
@@ -440,6 +556,9 @@ impl Sim {
         u.cooldowns.clear();
         u.lockout_until = [0; 2];
         u.last_player_hit = None;
+        u.combat_since = 0;
+        u.fleeing = false;
+        u.flee_next = 0;
         self.events.push(Event::Respawned {
             unit: Self::id_of(i),
         });

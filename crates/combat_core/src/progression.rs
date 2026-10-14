@@ -45,6 +45,7 @@ impl Sim {
         let is_player = self.is_player(Self::id_of(i));
         let group_pct = self.group_hp_pct();
         let group_dmg_pct = self.group_damage_pct();
+        let group_extra = self.players.len().saturating_sub(1) as u32;
         let hp_level_pct = self.class_at(i).map_or(100, |c| c.level_hp_pct);
         let hp_aura_pct = self.max_hp_aura_pct(i);
         let d = &self.content.units[self.units[i].def];
@@ -80,7 +81,19 @@ impl Sim {
                 (u64::from(d.max_hp) * u64::from(hp) * u64::from(group) / 10_000).max(1) as u32;
             u.state.max_mana = d.max_mana;
             u.sp = d.spell_power;
-            u.dmg_pct = scale_pct(s.damage_pct_per_level, level, d.level) * group_dmg / 100;
+            let trash = if d.hostile && d.ai.is_some() && !d.boss {
+                self.content.config.trash_damage_pct
+            } else {
+                100
+            };
+            // Bosses are the group's real test: they get an extra slice per member on top.
+            let group_dmg = if d.boss && d.hostile {
+                group_dmg + self.content.config.group_boss_damage_pct_per_player * group_extra
+            } else {
+                group_dmg
+            };
+            u.dmg_pct =
+                scale_pct(s.damage_pct_per_level, level, d.level) * group_dmg / 100 * trash / 100;
             if d.hostile {
                 let xp = scale_pct(s.xp_pct_per_level, level, d.level);
                 u.state.xp = (u64::from(d.xp_reward) * u64::from(xp) / 100) as u32;

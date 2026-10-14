@@ -106,6 +106,7 @@ impl Sim {
             crit,
             combo: false,
             school: School::Physical,
+            dot: false,
         };
         self.deal_damage(src, dst, hit);
     }

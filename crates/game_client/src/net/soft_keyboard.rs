@@ -87,6 +87,20 @@ pub fn has_focus() -> bool {
     .unwrap_or(false)
 }
 
+/// Caret position (end of the selection) in the hidden input.
+pub fn caret() -> Option<usize> {
+    with(|k| k.input.selection_end().ok().flatten())
+        .flatten()
+        .map(|c| c as usize)
+}
+
+pub fn set_caret(pos: usize) {
+    with(|k| {
+        let p = u32::try_from(pos).unwrap_or(u32::MAX);
+        let _ = k.input.set_selection_range(p, p);
+    });
+}
+
 pub fn set_value(value: &str) {
     with(|k| k.input.set_value(value));
 }

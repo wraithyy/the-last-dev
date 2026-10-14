@@ -1,5 +1,6 @@
 //! Data-driven content: spells, auras, units, levels, zones, quests and balance, parsed from RON.
 
+use crate::telegraph::TelegraphShape;
 use crate::time::ms_to_ticks;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -69,6 +70,24 @@ pub struct Config {
     /// Extra enemy damage per group member beyond the first, in percent (FORMULAS.md).
     #[serde(default)]
     pub group_damage_pct_per_player: u32,
+    /// Co-op: extra boss damage per group member beyond the first, on top of the group damage.
+    #[serde(default)]
+    pub group_boss_damage_pct_per_player: u32,
+    /// Co-op: every this many players beyond the first, each trash pack spawns one more
+    /// member (0 = off; FORMULAS.md, Co-op group).
+    #[serde(default)]
+    pub group_pack_growth_players: u32,
+    /// Linked packs: pulling a pack also pulls idle trash of other packs within this many
+    /// metres of the pulled unit (0 = off).
+    #[serde(default)]
+    pub pack_link_m: f32,
+    /// Damage of non-boss hostile units, in percent (bosses are tuned on their own).
+    #[serde(default = "hundred")]
+    pub trash_damage_pct: u32,
+    /// Players stay in combat this long after an enemy that had them on its threat table
+    /// resets (no out-of-combat regen or resurrect right after kiting a pull away).
+    #[serde(default)]
+    pub combat_lock_ms: u32,
 }
 
 fn default_group_hp_pct() -> u32 {
@@ -167,6 +186,18 @@ pub struct AuraDef {
     /// Per stack, on the bearer's max HP while it lasts (players only; Horizontal Scaling).
     #[serde(default)]
     pub max_hp_pct: i32,
+    /// Whether `Dispel` effects (and consumables) can remove it; only harmful auras matter.
+    #[serde(default)]
+    pub dispel: DispelType,
+}
+
+/// Dispel category of an aura, shown on the debuff so players know what can clear it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum DispelType {
+    #[default]
+    Magic,
+    /// Enrages and boss mechanics: no button makes them go away.
+    Never,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -372,6 +403,57 @@ pub struct SpellDef {
     pub yells: Vec<String>,
     #[serde(default)]
     pub channel: Option<ChannelDef>,
+    /// Enemy spells: the effects land on a ground telegraph after a delay instead of at once.
+    #[serde(default)]
+    pub telegraph: Option<TelegraphDef>,
+    /// Must-interrupt: completing it wipes or heavily punishes; the HUD marks the cast bar.
+    #[serde(default)]
+    pub kick: bool,
+}
+
+/// Where a telegraph is painted at release.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Deserialize)]
+pub enum TelegraphAt {
+    /// Circles on the target's spot; cones and lines start at the caster and aim at the target.
+    #[default]
+    Target,
+    Caster,
+    /// One copy on every unit of the other side within the spell's range (spread mechanic).
+    EachHostile,
+}
+
+fn one_u8() -> u8 {
+    1
+}
+
+/// Ground telegraph of an enemy spell: the shape lands `delay_ms` after release on whoever of
+/// the other side is inside it then.
+#[derive(Clone, Debug, Deserialize)]
+pub struct TelegraphDef {
+    pub shape: TelegraphShape,
+    pub delay_ms: u32,
+    #[serde(default)]
+    pub at: TelegraphAt,
+    /// Stack mechanic: damage is divided among the units inside; if nobody is inside, everyone
+    /// of the other side nearby takes it in full.
+    #[serde(default)]
+    pub split: bool,
+    /// Copies side by side across the facing, `step_m` apart, each landing `step_ms` after the
+    /// previous one (a sweep).
+    #[serde(default = "one_u8")]
+    pub count: u8,
+    #[serde(default)]
+    pub step_m: f32,
+    #[serde(default)]
+    pub step_ms: u32,
+    /// Safe spots as (right, forward) offsets from the caster's spawn point in its spawn
+    /// facing; standing within `cover_radius_m` of one (or out of line of sight) is safe.
+    #[serde(default)]
+    pub cover: Vec<(f32, f32)>,
+    #[serde(default)]
+    pub cover_radius_m: f32,
+    /// Floor text of the decal ("Meeting room booked").
+    pub label: String,
 }
 
 impl SpellDef {
@@ -417,6 +499,10 @@ pub struct ItemBonus {
     pub haste_pct: u32,
     /// Extra mana per 5 s while in combat, on top of the unit's own trickle.
     pub mana_regen: u32,
+    /// Damage reduction in percent, authored in tenths (gear sets).
+    pub armor_pct: f32,
+    /// Damage and healing done in percent, authored in tenths (gear sets).
+    pub power_pct: f32,
 }
 
 /// Summed trophy bonuses. Crit is kept in tenths of a percent so sums stay exact integers.
@@ -428,11 +514,19 @@ pub struct ItemTotals {
     pub crit_tenths: u32,
     pub haste_pct: u32,
     pub mana_regen: u32,
+    /// Damage reduction from gear, tenths of a percent (capped when applied).
+    pub armor_tenths: u32,
+    /// Damage and healing done from gear, tenths of a percent.
+    pub power_tenths: u32,
+}
+
+fn tenths(v: f32) -> u32 {
+    (v.max(0.0) * 10.0).round() as u32
 }
 
 impl ItemBonus {
     fn crit_tenths(&self) -> u32 {
-        (self.crit_pct.max(0.0) * 10.0).round() as u32
+        tenths(self.crit_pct)
     }
 
     /// The bonus of `copies` copies, honouring `ITEM_STACK_CAP`.
@@ -445,6 +539,8 @@ impl ItemBonus {
             crit_tenths: self.crit_tenths() * n,
             haste_pct: self.haste_pct * n,
             mana_regen: self.mana_regen * n,
+            armor_tenths: tenths(self.armor_pct) * n,
+            power_tenths: tenths(self.power_pct) * n,
         }
     }
 }
@@ -461,6 +557,8 @@ impl ItemTotals {
         self.crit_tenths += o.crit_tenths;
         self.haste_pct += o.haste_pct;
         self.mana_regen += o.mana_regen;
+        self.armor_tenths += o.armor_tenths;
+        self.power_tenths += o.power_tenths;
     }
 }
 
@@ -503,6 +601,37 @@ pub struct AiAbility {
     pub yells: Vec<String>,
 }
 
+/// Soft timer: after `after_ms` in combat the unit gains `aura` until the fight ends.
+#[derive(Clone, Debug, Deserialize)]
+pub struct EnrageDef {
+    pub after_ms: u32,
+    pub aura: String,
+    #[serde(default)]
+    pub yells: Vec<String>,
+}
+
+/// From `phase` on the unit runs for an exit at `to` ((right, forward) metres from its spawn
+/// in its spawn facing), casts `spell` there, fights `pause_ms`, then runs again.
+#[derive(Clone, Debug, Deserialize)]
+pub struct FleeDef {
+    pub phase: u8,
+    pub to: (f32, f32),
+    pub speed_mps: f32,
+    pub spell: SpellId,
+    #[serde(default)]
+    pub pause_ms: u32,
+    #[serde(default)]
+    pub yells: Vec<String>,
+}
+
+/// Direct hits from inside the front arc are scaled by `damage_taken_pct`, except while the
+/// unit is casting or stunned. Periodic damage goes around the shield.
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub struct FrontalShield {
+    pub arc_deg: f32,
+    pub damage_taken_pct: i32,
+}
+
 /// Entered once when HP drops to `below_hp_pct` or less; phases are numbered from 2.
 #[derive(Clone, Debug, Deserialize)]
 pub struct PhaseDef {
@@ -529,6 +658,10 @@ pub struct AiDef {
     pub abilities: Vec<AiAbility>,
     #[serde(default)]
     pub phases: Vec<PhaseDef>,
+    #[serde(default)]
+    pub enrage: Option<EnrageDef>,
+    #[serde(default)]
+    pub flee: Option<FleeDef>,
 }
 
 fn nitpick_icon() -> String {
@@ -633,6 +766,11 @@ pub struct UnitDef {
     /// Presentation hint for idle friendly NPCs.
     #[serde(default)]
     pub idle_pose: Option<IdlePose>,
+    #[serde(default)]
+    pub frontal_shield: Option<FrontalShield>,
+    /// Named rare: elite nameplate and a guaranteed better drop.
+    #[serde(default)]
+    pub elite: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
@@ -829,6 +967,9 @@ pub struct Content {
     pub levels: Vec<LevelDef>,
     pub zones: Vec<ZoneDef>,
     pub quests: Vec<QuestDef>,
+    /// Gear, Story Points, vendors (see `economy.rs`); absent in minimal test content.
+    #[serde(default)]
+    pub economy: crate::economy::Economy,
 }
 
 impl Content {
@@ -1004,6 +1145,20 @@ impl Content {
                     s.name
                 ));
             }
+            if let Some(t) = &s.telegraph {
+                let cover_ok = t.cover.is_empty() || t.cover_radius_m > 0.0;
+                if !t.shape.valid()
+                    || t.delay_ms == 0
+                    || t.count == 0
+                    || t.label.is_empty()
+                    || !cover_ok
+                {
+                    return bad(format!(
+                        "spell {} telegraph needs a positive shape, delay, count, a label and a cover radius with cover",
+                        s.name
+                    ));
+                }
+            }
             if usize::from(s.learn_level) > self.levels.len() || s.learn_level == 0 {
                 return bad(format!("spell {} learn_level out of range", s.name));
             }
@@ -1059,6 +1214,24 @@ impl Content {
                     return bad(format!("unit {} ability cooldown min > max", u.key));
                 }
             }
+            if let Some(e) = &ai.enrage
+                && (self.aura(&e.aura).is_none() || e.after_ms == 0)
+            {
+                return bad(format!(
+                    "unit {} enrage needs a known aura and a delay",
+                    u.key
+                ));
+            }
+            if let Some(f) = &ai.flee {
+                let phases = 2..=ai.phases.len() as u8 + 1;
+                if self.spell(f.spell).is_none() || !phases.contains(&f.phase) || f.speed_mps <= 0.0
+                {
+                    return bad(format!(
+                        "unit {} flee needs a known spell, a phase it reaches and a speed",
+                        u.key
+                    ));
+                }
+            }
             let mut prev = 100;
             for p in &ai.phases {
                 if p.below_hp_pct >= prev {
@@ -1074,6 +1247,7 @@ impl Content {
         }
         self.validate_zones()?;
         self.validate_quests()?;
+        self.economy.validate(self)?;
         Ok(())
     }
 }
