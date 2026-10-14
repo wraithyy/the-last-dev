@@ -983,6 +983,34 @@ static TABLE: &[(&str, UnitVisual)] = &[
             &[paint("Shirt", 0.55, 0.45, 0.3)],
         ),
     ),
+    // Sprint mode: the Scope Creep add and the Legacy Code elite.
+    (
+        "additional_requirement",
+        v(
+            SUIT_M,
+            1.7,
+            "Additional Requirement",
+            "<Just One Small Thing>",
+            &[
+                paint("Shirt", 0.95, 0.75, 0.2),
+                paint("Pants", 0.2, 0.2, 0.25),
+            ],
+        ),
+    ),
+    (
+        "legacy_monolith",
+        v(
+            SUIT_M_BALD,
+            2.3,
+            "Do Not Touch",
+            "<Legacy Code, Est. 1998>",
+            &[
+                paint("Shirt", 0.35, 0.38, 0.3),
+                paint("Pants", 0.25, 0.25, 0.22),
+                glow("Face", 0.3, 1.0, 0.4),
+            ],
+        ),
+    ),
 ];
 
 /// Primitive rig kind (see `rigs.rs`) of a unit key, `None` for character-model units.

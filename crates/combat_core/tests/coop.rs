@@ -726,3 +726,127 @@ fn a_kited_reset_keeps_the_player_in_combat_for_a_while() {
         "healed to full at home"
     );
 }
+
+// ---- sprint mode ----
+
+impl Group {
+    /// Every member in the best World Rare of `tier` for its role, slot by slot.
+    fn gear_up(&mut self, tier: u8) {
+        let eco = self.sim.content().economy.clone();
+        for k in 0..self.m.len() {
+            let id = self.m[k].id;
+            let role = self.sim.class_of(id).map(|c| c.role);
+            for slot in combat_core::Slot::ALL {
+                let best = eco
+                    .gear
+                    .iter()
+                    .filter(|g| {
+                        g.slot == slot
+                            && g.tier() == tier
+                            && g.rarity == combat_core::Rarity::Rare
+                            && g.source == combat_core::GearSource::World
+                    })
+                    .max_by_key(|g| eco.score(g, role));
+                if let Some(g) = best {
+                    self.sim.debug_equip(id, &g.name);
+                }
+            }
+        }
+    }
+
+    /// A whole sprint with the group as host: trash first, the boss last, respawn after wipes.
+    fn sprint(
+        &mut self,
+        building: &str,
+        level: u8,
+    ) -> (Option<combat_core::SprintResult>, u32, u32) {
+        let lead = self.m[0].id;
+        self.sim.apply_as(
+            lead,
+            Command::StartSprint {
+                building: building.into(),
+                level,
+            },
+        );
+        self.tick();
+        let deadline = self.sim.now().0 + 40 * 60 * 30;
+        while self.sim.sprint_last_result().is_none() && self.sim.now().0 < deadline {
+            if let Some(z) = self.sim.sprint_travel().map(str::to_string) {
+                if let Err(e) = self.sim.load_zone(&z, &anchor, Vec::new()) {
+                    panic!("load_zone {z}: {e}");
+                }
+                self.tick();
+                continue;
+            }
+            let dead: Vec<usize> = (0..self.m.len()).filter(|&k| !self.alive(k)).collect();
+            if !dead.is_empty() && !self.in_combat() {
+                for k in dead {
+                    let id = self.m[k].id;
+                    self.sim.apply_as(id, Command::RespawnPlayer);
+                }
+                self.tick();
+                for k in 0..self.m.len() {
+                    if let Some(u) = self.unit(self.m[k].id) {
+                        self.m[k].pos = u.pos;
+                    }
+                }
+                self.wiped = false;
+                continue;
+            }
+            let left: Vec<UnitState> = self
+                .sim
+                .units()
+                .filter(|u| u.hostile && u.alive && u.ai.is_some())
+                .cloned()
+                .collect();
+            let evading = left.iter().any(|u| u.ai == Some(AiState::Evade));
+            let front = self.front;
+            let next = left
+                .iter()
+                .filter(|u| u.ai != Some(AiState::Evade))
+                .min_by(|a, b| {
+                    a.boss.cmp(&b.boss).then(
+                        combat_core::distance(a.pos, front)
+                            .total_cmp(&combat_core::distance(b.pos, front)),
+                    )
+                })
+                .filter(|u| !u.boss || !evading)
+                .map(|u| u.pos);
+            match next {
+                Some(at) => {
+                    self.pull(at);
+                    self.rest();
+                }
+                None => self.tick(),
+            }
+        }
+        let st = self.sim.sprint_status().unwrap_or_default();
+        let last = self.sim.sprint_last_result();
+        (
+            last.map(|l| l.0),
+            last.map_or(st.time_ms(), |l| l.1),
+            st.par_ms,
+        )
+    }
+}
+
+/// The three-bot group (tank, DPS, healer) at level 10 in tier-5 gear delivers sprint level 5
+/// (two affixes) in every building.
+#[test]
+fn a_group_delivers_sprint_level_five() {
+    let mut failures = Vec::new();
+    for (seed, building) in [(7, "tower"), (42, "datacenter"), (1234, "lab")] {
+        let mut g = Group::new(content(), "campus", 10, seed);
+        g.gear_up(5);
+        let (result, time, par) = g.sprint(building, 5);
+        let affixes = g.sim.sprint_status().map(|s| s.affixes).unwrap_or_default();
+        println!(
+            "group {building} +5 seed {seed}: {result:?} in {time} ms (par {par}), affixes {affixes:?}, most dead at once {}",
+            g.deaths
+        );
+        if result != Some(combat_core::SprintResult::Delivered) {
+            failures.push(format!("{building} seed {seed}: {result:?} {time}/{par}"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}

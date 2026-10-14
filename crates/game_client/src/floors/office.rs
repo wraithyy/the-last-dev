@@ -69,6 +69,25 @@ fn campus(p: &mut Plan) {
     }
     // Behind the reception kiosk, back to the plaza, reading.
     secret(p, "secret:docs_intern", 10.0, -5.8, (10.0, -10.0));
+    // Sprint mode: the planning board beside the walk from the car park, and a terminal at
+    // the tower entrance.
+    let (x, z) = (-14.0, 17.0);
+    p.boxed(v(x, 1.6, z), v(2.6, 1.5, 0.06), Mat::Board, true);
+    p.sign(v(x, 1.6, z + 0.05), 0.0, 2.5, Sign::SprintBoard);
+    for dx in [-1.2, 1.2] {
+        p.boxed(
+            v(x + dx, 0.8, z - 0.06),
+            v(0.07, 1.6, 0.07),
+            Mat::Metal,
+            false,
+        );
+    }
+    spot(p, "prop:sprint_board", (x, 1.6, z), (x, z + 2.0));
+    let (x, z) = (4.5, -20.5);
+    p.boxed(v(x, 0.6, z), v(0.7, 1.2, 0.5), Mat::Dark, true);
+    p.boxed(v(x, 1.45, z + 0.05), v(0.66, 0.5, 0.06), Mat::Dark, false);
+    p.sign(v(x, 1.45, z + 0.09), 0.0, 0.62, Sign::SprintTerminal);
+    spot(p, "prop:sprint_terminal", (x, 1.2, z), (x, z + 1.5));
 }
 
 fn open_space(p: &mut Plan) {

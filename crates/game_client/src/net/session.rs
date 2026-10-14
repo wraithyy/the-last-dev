@@ -286,7 +286,7 @@ pub fn run_session(
                         quests,
                         cleared,
                         unlocked,
-                        ..
+                        seed,
                     } => {
                         let (phase, outcome) = advance(session.phase, &Step::Welcome);
                         session.phase = phase;
@@ -297,6 +297,7 @@ pub fn run_session(
                             let mut world =
                                 NetWorld::new(sim.0.content().clone(), you, room.clone(), &players);
                             world.apply_welcome(&quests, &cleared, &unlocked);
+                            world.seed = seed;
                             if let Some(code) = checked_code(&room) {
                                 lobby.room = code;
                             }

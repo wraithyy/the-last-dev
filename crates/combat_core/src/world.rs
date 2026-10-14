@@ -50,6 +50,8 @@ pub enum PropKind {
     BikeRack,
     /// A parked e-scooter anyone can borrow.
     Scooter,
+    /// Sprint planning (board or terminal): the client opens the planner on its own use.
+    SprintBoard,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -395,8 +397,11 @@ impl Sim {
         let Some(i) = self.index(player).filter(|_| self.is_player(player)) else {
             return;
         };
+        let capstone = self.worn_capstone_ok(i, key);
         let s = &mut self.units[i].state;
-        if (!key.is_empty() && !s.achievements.iter().any(|a| a == key)) || s.title == key {
+        if (!key.is_empty() && !capstone && !s.achievements.iter().any(|a| a == key))
+            || s.title == key
+        {
             return;
         }
         s.title = key.to_string();
@@ -404,6 +409,16 @@ impl Sim {
             unit: player,
             title: key.to_string(),
         });
+    }
+
+    /// `key` is the row-5 talent unit `i` picked, so its promotion may be worn as a title.
+    pub(crate) fn worn_capstone_ok(&self, i: usize, key: &str) -> bool {
+        let class = self.class_at(i).map_or("", |c| c.key.as_str());
+        let picks = self.units[i].state.talents;
+        self.content
+            .talents
+            .picked(class, &picks)
+            .any(|(r, t)| r + 1 == crate::talents::TALENT_ROWS && t.key == key)
     }
 
     pub(crate) fn interact(&mut self, player: EntityId, key: &str) {

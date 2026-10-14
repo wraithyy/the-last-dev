@@ -282,6 +282,8 @@ pub enum Sign {
     ScooterZone,
     CampusExit,
     GraveSprint,
+    SprintBoard,
+    SprintTerminal,
     // data center
     ColdAisle,
     HotAisle,

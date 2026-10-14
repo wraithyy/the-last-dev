@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 8;
+pub const PROTOCOL_VERSION: u16 = 10;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -475,8 +475,10 @@ pub struct PlayerSnap {
     /// Equipped gear by slot as indices into `Content::economy.gear` (`NO_GEAR` = empty), so
     /// late joiners see everyone's outfit.
     pub gear: Vec<u16>,
-    /// Key of the achievement whose title the player wears ("" for none).
+    /// Key of the achievement (or capstone talent) whose title the player wears ("" for none).
     pub title: String,
+    /// Career Ladder pick per row (0 = none), so others see the promotions.
+    pub talents: combat_core::TalentPicks,
 }
 
 impl PlayerSnap {
@@ -521,6 +523,7 @@ impl PlayerSnap {
                 })
                 .collect(),
             title: u.title.clone(),
+            talents: u.talents,
         }
     }
 }
@@ -578,6 +581,11 @@ pub fn is_player_command(cmd: &Command) -> bool {
         | Command::Talk { .. } => true,
         Command::Interact { prop } => prop.len() <= combat_core::world::WORLD_KEY_MAX,
         Command::SetTitle { achievement } => achievement.len() <= combat_core::world::WORLD_KEY_MAX,
+        Command::PickTalent { row, choice } => {
+            usize::from(*row) < combat_core::TALENT_ROWS && *choice <= combat_core::TALENT_CHOICES
+        }
+        Command::ResetTalents => true,
+        Command::StartSprint { building, .. } => building.len() <= MAX_QUEST_ID_BYTES,
     }
 }
 
@@ -704,6 +712,7 @@ impl Msg for ServerMsg {
                         p.class.len() <= MAX_CLASS_BYTES
                             && p.gear.len() <= combat_core::SLOTS
                             && p.title.len() <= combat_core::world::WORLD_KEY_MAX
+                            && talents_ok(&p.talents)
                     })
                     && units.iter().all(|u| u.auras.len() <= MAX_LIST_LEN)
             }
@@ -720,6 +729,10 @@ impl Msg for ServerMsg {
             Err(ProtoError::TooMany)
         }
     }
+}
+
+fn talents_ok(t: &combat_core::TalentPicks) -> bool {
+    t.iter().all(|k| *k <= combat_core::TALENT_CHOICES)
 }
 
 fn finite(v: &[f32]) -> Result<(), ProtoError> {
@@ -792,7 +805,38 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
             }
         }
         Event::Yell { text, .. } if text.len() > MAX_TEXT_BYTES => Err(ProtoError::TooMany),
+        Event::TalentsChanged { talents, .. } if !talents_ok(talents) => Err(ProtoError::TooMany),
+        Event::SprintStarted { status, zones } => check_sprint(status).and(names(zones)),
+        Event::SprintProgress { status } => check_sprint(status),
+        Event::SprintEnded { summary, .. } => {
+            check_sprint(&summary.status)?;
+            if summary.meter.len() > MAX_PLAYERS
+                || summary.rewards.len() > MAX_PLAYERS
+                || summary
+                    .meter
+                    .iter()
+                    .any(|m| m.class.len() > MAX_CLASS_BYTES)
+            {
+                return Err(ProtoError::TooMany);
+            }
+            summary.rewards.iter().try_for_each(|r| names(&r.items))
+        }
+        Event::SprintAffix { affix, text, .. }
+            if affix.len() > combat_core::world::WORLD_KEY_MAX || text.len() > MAX_TEXT_BYTES =>
+        {
+            Err(ProtoError::TooMany)
+        }
         _ => Ok(()),
+    }
+}
+
+/// Building and affix keys are short content keys, at most one per affix level.
+fn check_sprint(s: &combat_core::SprintStatus) -> Result<(), ProtoError> {
+    let short = |k: &String| k.len() <= MAX_ITEM_NAME_BYTES;
+    if s.affixes.len() <= MAX_LIST_LEN && short(&s.building) && s.affixes.iter().all(short) {
+        Ok(())
+    } else {
+        Err(ProtoError::TooMany)
     }
 }
 
@@ -1017,6 +1061,8 @@ mod tests {
                 Command::SetTitle {
                     achievement: "pc_load_letter".into(),
                 },
+                Command::PickTalent { row: 4, choice: 3 },
+                Command::ResetTalents,
             ]
             .into_iter()
             .map(ClientMsg::Cmd),
@@ -1231,6 +1277,13 @@ mod tests {
                         item: "Escalation Hotline Badge".into(),
                         ms: 60_000,
                     },
+                    Event::TalentsChanged {
+                        unit: 1,
+                        talents: [2, 2, 1, 0, 0],
+                    },
+                    Event::ItemError {
+                        reason: combat_core::ItemError::InCombat,
+                    },
                 ],
             },
             ServerMsg::Snapshot {
@@ -1245,6 +1298,7 @@ mod tests {
                     xp_to_next: 400,
                     gear: vec![3, PlayerSnap::NO_GEAR, 0, PlayerSnap::NO_GEAR, 7],
                     title: "pc_load_letter".into(),
+                    talents: [1, 3, 0, 2, 0],
                 }],
             },
             ServerMsg::MoveCorrection {
@@ -1262,7 +1316,89 @@ mod tests {
                 target: Some(3),
             },
             ServerMsg::Pong { t: 123_456 },
+            ServerMsg::Events {
+                tick: 9,
+                events: sprint_events(),
+            },
         ]
+    }
+
+    fn sprint_events() -> Vec<Event> {
+        let status = combat_core::SprintStatus {
+            building: "tower".into(),
+            level: 7,
+            affixes: vec!["reorg".into(), "burnout".into(), "mandatory_fun".into()],
+            par_ms: 1_200_000,
+            elapsed_ms: 61_000,
+            penalty_ms: 5_000,
+            forces_pct: 63,
+            bosses_left: 2,
+            bosses_total: 3,
+            stage: 1,
+            stages: 3,
+            deaths: 1,
+            tech_debt: 0,
+        };
+        vec![
+            Event::SprintStarted {
+                status: status.clone(),
+                zones: vec!["tower/1".into(), "tower/3".into(), "tower/4".into()],
+            },
+            Event::SprintProgress {
+                status: status.clone(),
+            },
+            Event::SprintAffix {
+                affix: "reorg".into(),
+                unit: 0,
+                text: "Reorg!".into(),
+            },
+            Event::SprintRefused {
+                reason: combat_core::SprintError::NotLeader,
+            },
+            Event::SprintEnded {
+                result: combat_core::SprintResult::Delivered,
+                time_ms: 700_000,
+                upgrade: 2,
+                summary: combat_core::SprintSummary {
+                    status,
+                    meter: vec![combat_core::MeterLine {
+                        unit: 1,
+                        class: "devops".into(),
+                        damage: 123_456,
+                        healing: 7_890,
+                    }],
+                    rewards: vec![combat_core::RewardLine {
+                        unit: 1,
+                        items: vec!["Hoodie".into()],
+                        sp: 280,
+                    }],
+                    next_level: 9,
+                },
+            },
+        ]
+    }
+
+    #[test]
+    fn sprint_events_are_capped() {
+        let mut ev = sprint_events();
+        if let Event::SprintProgress { status } = &mut ev[1] {
+            status.building = "x".repeat(MAX_ITEM_NAME_BYTES + 1);
+        }
+        let msg = ServerMsg::Events {
+            tick: 1,
+            events: vec![ev[1].clone()],
+        };
+        assert_eq!(roundtrip(&msg), Err(ProtoError::TooMany));
+        let start = ClientMsg::Cmd(Command::StartSprint {
+            building: "lab".into(),
+            level: 3,
+        });
+        assert_eq!(roundtrip(&start), Ok(start.clone()));
+        let long = ClientMsg::Cmd(Command::StartSprint {
+            building: "x".repeat(MAX_QUEST_ID_BYTES + 1),
+            level: 3,
+        });
+        assert_eq!(roundtrip(&long), Err(ProtoError::IllegalCommand));
     }
 
     fn roundtrip<M: Msg + PartialEq + fmt::Debug>(m: &M) -> Result<M, ProtoError> {
@@ -1333,6 +1469,13 @@ mod tests {
             slot: combat_core::SLOTS as u8,
         });
         assert_eq!(roundtrip(&bad_slot), Err(ProtoError::IllegalCommand));
+        for (row, choice) in [
+            (combat_core::TALENT_ROWS as u8, 1),
+            (0, combat_core::TALENT_CHOICES + 1),
+        ] {
+            let bad = ClientMsg::Cmd(Command::PickTalent { row, choice });
+            assert_eq!(roundtrip(&bad), Err(ProtoError::IllegalCommand));
+        }
         let nan = ClientMsg::Move {
             pos: Vec3::new(f32::NAN, 0.0, 0.0),
             facing: 0.0,
@@ -1502,6 +1645,14 @@ mod tests {
             }],
         };
         assert_eq!(roundtrip(&knock), Err(ProtoError::BadNumber));
+        let promo = ServerMsg::Events {
+            tick: 1,
+            events: vec![Event::TalentsChanged {
+                unit: 1,
+                talents: [1, 9, 0, 0, 0],
+            }],
+        };
+        assert_eq!(roundtrip(&promo), Err(ProtoError::TooMany));
         let corr = ServerMsg::MoveCorrection {
             seq: 1,
             pos: Vec3::new(0.0, f32::NAN, 0.0),

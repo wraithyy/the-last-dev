@@ -6,8 +6,10 @@ use crate::economy::SLOTS;
 use crate::sim::Sim;
 use crate::targeting::EntityId;
 
-/// Bumped when a field changes meaning; other versions load as no save at all.
-pub const SAVE_VERSION: u32 = 1;
+/// Bumped when a field changes meaning. Version 1 (before talents) still loads, with no picks;
+/// anything else loads as no save at all.
+pub const SAVE_VERSION: u32 = 2;
+const OLDEST_VERSION: u32 = 1;
 const HEADER: &str = "the-last-dev save";
 /// Copies of one trophy kept in a save; far above anything a run produces.
 const TROPHY_COPIES_MAX: u32 = 99;
@@ -32,6 +34,11 @@ pub struct SaveData {
     /// Unlocked achievement keys and the one whose title is worn ("" for none).
     pub achievements: Vec<String>,
     pub title: String,
+    /// Career Ladder pick per row (0 = none).
+    pub talents: crate::talents::TalentPicks,
+    /// Sprint mode: recommended next level per building, and the delivered-run leaderboard.
+    pub sprint_keys: Vec<(String, u8)>,
+    pub sprint_records: Vec<crate::sprint::SprintRecord>,
 }
 
 fn list(v: &str) -> Vec<String> {
@@ -78,10 +85,34 @@ impl SaveData {
             active.join("|"),
             kills.join("|"),
         );
+        let talents: Vec<String> = self.talents.iter().map(u8::to_string).collect();
         out.push_str(&format!(
-            "achievements={}\ntitle={}\n",
+            "achievements={}\ntitle={}\ntalents={}\n",
             self.achievements.join("|"),
-            self.title
+            self.title,
+            talents.join(",")
+        ));
+        let keys: Vec<String> = self
+            .sprint_keys
+            .iter()
+            .map(|(b, l)| format!("{b}*{l}"))
+            .collect();
+        // The name is free text: last field, without the list separator.
+        let records: Vec<String> = self
+            .sprint_records
+            .iter()
+            .map(|r| {
+                let name: String = r.name.chars().filter(|c| *c != '|').collect();
+                format!(
+                    "{}*{}*{}*{}*{name}",
+                    r.building, r.level, r.time_ms, r.class
+                )
+            })
+            .collect();
+        out.push_str(&format!(
+            "sprint_keys={}\nsprint_records={}\n",
+            keys.join("|"),
+            records.join("|")
         ));
         out
     }
@@ -132,6 +163,35 @@ impl SaveData {
                 "bosses" => s.bosses = list(v),
                 "achievements" => s.achievements = list(v),
                 "title" => s.title = v.chars().take(crate::world::WORLD_KEY_MAX).collect(),
+                "sprint_keys" => {
+                    s.sprint_keys = list(v)
+                        .into_iter()
+                        .filter_map(|t| {
+                            let (b, l) = t.rsplit_once('*')?;
+                            Some((b.to_string(), l.parse().ok()?))
+                        })
+                        .collect()
+                }
+                "sprint_records" => {
+                    s.sprint_records = list(v)
+                        .into_iter()
+                        .filter_map(|t| {
+                            let mut f = t.splitn(5, '*');
+                            Some(crate::sprint::SprintRecord {
+                                building: f.next()?.to_string(),
+                                level: f.next()?.parse().ok()?,
+                                time_ms: f.next()?.parse().ok()?,
+                                class: f.next()?.chars().take(32).collect(),
+                                name: f.next().unwrap_or("").chars().take(32).collect(),
+                            })
+                        })
+                        .collect()
+                }
+                "talents" => {
+                    for (slot, n) in s.talents.iter_mut().zip(v.split(',')) {
+                        *slot = n.trim().parse().unwrap_or(0);
+                    }
+                }
                 "quests_active" => {
                     s.quests_active = list(v)
                         .into_iter()
@@ -154,7 +214,9 @@ impl SaveData {
                 _ => {}
             }
         }
-        (version == Some(SAVE_VERSION)).then_some(s)
+        version
+            .is_some_and(|v| (OLDEST_VERSION..=SAVE_VERSION).contains(&v))
+            .then_some(s)
     }
 }
 
@@ -163,7 +225,9 @@ impl Sim {
     pub fn export_save(&self, player: EntityId) -> Option<SaveData> {
         let i = self.index(player).filter(|_| self.is_player(player))?;
         let s = &self.units[i].state;
-        let mut cleared: Vec<String> = self.world.cleared.iter().cloned().collect();
+        // Mid-sprint the sim plays in the run's own world; the save keeps the campaign's.
+        let world = self.campaign_world();
+        let mut cleared: Vec<String> = world.cleared.iter().cloned().collect();
         cleared.sort();
         Some(SaveData {
             class: self.class_at(i).map(|c| c.key.clone()).unwrap_or_default(),
@@ -175,9 +239,12 @@ impl Sim {
             trophies: s.inventory.clone(),
             quests_done: self.quests_of(player).completed.clone(),
             cleared,
-            bosses: self.world.bosses_killed.iter().cloned().collect(),
+            bosses: world.bosses_killed.iter().cloned().collect(),
+            sprint_keys: self.sprint_keys_of(player),
+            sprint_records: self.sprint_records(player).to_vec(),
             achievements: s.achievements.clone(),
             title: s.title.clone(),
+            talents: s.talents,
             quests_active: self
                 .quests_of(player)
                 .active
@@ -290,8 +357,15 @@ impl Sim {
             .filter(|k| known(k))
             .cloned()
             .collect();
+        self.set_sprint_progress(
+            player,
+            save.sprint_keys.clone(),
+            save.sprint_records.clone(),
+        );
+        let class = self.class_at(i).map(|c| c.key.clone()).unwrap_or_default();
+        self.units[i].state.talents = self.content.talents.sanitize(&class, &save.talents, level);
         let title = Some(&save.title)
-            .filter(|t| achievements.contains(t))
+            .filter(|t| achievements.contains(t) || self.worn_capstone_ok(i, t))
             .cloned()
             .unwrap_or_default();
         let u = &mut self.units[i].state;

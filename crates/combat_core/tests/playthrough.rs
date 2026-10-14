@@ -100,6 +100,10 @@ struct Bot {
     looting: bool,
     class: &'static str,
     seed: u64,
+    /// Lowest HP % seen on any tick (sprint balance).
+    low_hp_pct: u32,
+    /// Stop drinking when something attacks (sprint adds); off for the golden runs.
+    rest_alert: bool,
 }
 
 fn yaw_to(from: Vec3, to: Vec3) -> f32 {
@@ -136,6 +140,8 @@ impl Bot {
             looting: false,
             class,
             seed,
+            low_hp_pct: 100,
+            rest_alert: false,
         }
     }
 
@@ -159,6 +165,9 @@ impl Bot {
         });
         let events = self.sim.tick();
         let now = self.sim.now().0;
+        if let Some(me) = self.sim.unit(self.player).filter(|u| u.alive) {
+            self.low_hp_pct = self.low_hp_pct.min(me.hp * 100 / me.max_hp.max(1));
+        }
         if self.in_boss
             && let Some(me) = self.sim.unit(self.player)
         {
@@ -669,6 +678,9 @@ impl Bot {
             self.report.rests += 1;
         }
         while !full(&self.me()) && !self.report.died && self.sim.now().0 < MAX_TICKS {
+            if self.rest_alert && self.me().in_combat {
+                return self.fight_until_calm();
+            }
             self.tick();
         }
     }
@@ -1203,6 +1215,16 @@ type ZoneLine = (String, u32, u64, bool);
 /// to zone through a save, as the client does across sessions.
 /// Also returns how many quests the bot closed on the way.
 fn campaign(class: &'static str, seed: u64) -> (Vec<ZoneLine>, combat_core::UnitState, usize) {
+    campaign_build(class, seed, 0)
+}
+
+/// `campaign` with Career Ladder option `build` (1..=3) taken in every row as soon as the level
+/// allows (through the same command the talent window sends); 0 takes no talents.
+fn campaign_build(
+    class: &'static str,
+    seed: u64,
+    build: u8,
+) -> (Vec<ZoneLine>, combat_core::UnitState, usize) {
     let mut save: Option<combat_core::SaveData> = None;
     let mut lines = Vec::new();
     let mut last = None;
@@ -1216,6 +1238,13 @@ fn campaign(class: &'static str, seed: u64) -> (Vec<ZoneLine>, combat_core::Unit
             assert!(bot.sim.import_save(bot.player, s));
             bot.sim.set_player_level(max);
             bot.visit_vendor(zone);
+        }
+        if build > 0 {
+            for row in 0..combat_core::TALENT_ROWS as u8 {
+                bot.sim
+                    .apply_as(bot.player, Command::PickTalent { row, choice: build });
+            }
+            bot.tick();
         }
         // Quests on the way: hand in breadcrumbs and pick up the zone's work on arrival,
         // close what is done after the clear (twice, for chains that open on turn-in).
@@ -1339,6 +1368,207 @@ fn tier_gear_makes_boss_fights_clearly_easier() {
         };
         if !ok {
             failures.push(format!("{class}: gear barely mattered ({pct}% time)"));
+        }
+    }
+    println!("{}", table.join("\n"));
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+// ---- sprint mode balance ----
+
+/// How one sprint went for the balance tests (all of it shows in the printed table).
+#[derive(Debug)]
+#[allow(dead_code)] // some fields are only read through Debug
+struct SprintRun {
+    result: Option<combat_core::SprintResult>,
+    time_ms: u32,
+    par_ms: u32,
+    low_hp_pct: u32,
+    deaths: u16,
+    forces_pct: u8,
+    affixes: Vec<String>,
+}
+
+impl Bot {
+    /// A whole sprint with the bot as host: it loads each stage when the sim asks, pulls the
+    /// nearest enemy until the stage is empty and takes the respawn when it dies.
+    fn sprint(&mut self, building: &str, level: u8) -> SprintRun {
+        self.sim.push(Command::StartSprint {
+            building: building.into(),
+            level,
+        });
+        self.tick();
+        let deadline = self.sim.now().0 + 40 * 60 * 30;
+        while self.sim.sprint_last_result().is_none() && self.sim.now().0 < deadline {
+            if let Some(z) = self.sim.sprint_travel().map(str::to_string) {
+                if let Err(e) = self.sim.load_zone(&z, &anchor, Vec::new()) {
+                    panic!("load_zone {z}: {e}");
+                }
+                self.tick();
+                continue;
+            }
+            if self.report.died || !self.me().alive {
+                self.sim.push(Command::RespawnPlayer);
+                self.tick();
+                self.pos = self.me().pos;
+                self.report.died = false;
+                continue;
+            }
+            let pos = self.pos;
+            // Trash first (the scope), the boss last; an evading pack is waited for.
+            let left: Vec<combat_core::UnitState> = self
+                .sim
+                .units()
+                .filter(|u| u.hostile && u.alive && u.ai.is_some())
+                .cloned()
+                .collect();
+            let evading = left
+                .iter()
+                .any(|u| u.ai == Some(combat_core::AiState::Evade));
+            let next = left
+                .iter()
+                .filter(|u| u.ai != Some(combat_core::AiState::Evade))
+                .min_by(|a, b| {
+                    a.boss.cmp(&b.boss).then(
+                        combat_core::distance(a.pos, pos)
+                            .total_cmp(&combat_core::distance(b.pos, pos)),
+                    )
+                })
+                .filter(|u| !u.boss || !evading)
+                .map(|u| (u.pos, u.boss));
+            match next {
+                Some((at, boss)) => {
+                    if boss {
+                        self.rest(true);
+                    }
+                    self.pull(at, boss);
+                }
+                None => self.tick(),
+            }
+        }
+        let st = self.sim.sprint_status().unwrap_or_default();
+        let last = self.sim.sprint_last_result();
+        SprintRun {
+            result: last.map(|l| l.0),
+            time_ms: last.map_or(st.time_ms(), |l| l.1),
+            par_ms: st.par_ms,
+            low_hp_pct: self.low_hp_pct,
+            deaths: st.deaths,
+            forces_pct: st.forces_pct,
+            affixes: st.affixes.clone(),
+        }
+    }
+}
+
+/// A level-10 character of `class` in the campus in a full tier-5 Rare set, ready for sprints.
+fn sprinter(class: &'static str, seed: u64) -> Bot {
+    let mut b = Bot::new_as(class, "campus", 10, seed);
+    b.wear_tier_gear(5);
+    b.low_hp_pct = 100;
+    b.rest_alert = true;
+    b
+}
+
+const SPRINT_CLASSES: [&str; 4] = ["fullstack", "frontend", "backend", "devops"];
+
+/// Every class solo delivers sprint levels 1-3 within par over three seeds (one building per
+/// seed, so all three buildings are covered).
+#[test]
+fn every_class_delivers_low_sprints_solo() {
+    let mut failures = Vec::new();
+    for class in SPRINT_CLASSES {
+        for (seed, building) in [(7, "tower"), (42, "datacenter"), (1234, "lab")] {
+            for level in 1..=3 {
+                let r = sprinter(class, seed).sprint(building, level);
+                println!("{class:9} {building:10} +{level} seed {seed:4}: {r:?}");
+                if r.result != Some(combat_core::SprintResult::Delivered) {
+                    failures.push(format!("{class} {building} +{level} seed {seed}: {r:?}"));
+                }
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Level 10 (four affixes, +72% HP and damage) must not be a walk in the park: someone drops
+/// under half HP or the clock gets close to par.
+#[test]
+fn sprint_level_ten_is_hard() {
+    let mut failures = Vec::new();
+    for class in SPRINT_CLASSES {
+        let r = sprinter(class, 7).sprint("tower", 10);
+        println!("{class:9} tower +10: {r:?}");
+        let near_par = u64::from(r.time_ms) * 100 >= u64::from(r.par_ms) * 75;
+        if r.low_hp_pct >= 50 && !near_par && r.deaths == 0 {
+            failures.push(format!("{class}: +10 was trivial: {r:?}"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Career Ladder balance: every class clears the campaign on three seeds with each of its three
+/// builds (option 1, 2 or 3 in every row). No build may make boss fights more than ~25% faster
+/// than the strongest class does without talents.
+#[test]
+fn every_talent_build_clears_the_campaign() {
+    let boss_secs = |lines: &[ZoneLine]| -> u64 {
+        lines
+            .iter()
+            .filter(|(z, ..)| content().zone(z).is_some_and(|z| z.boss.is_some()))
+            .map(|l| l.2)
+            .sum()
+    };
+    let classes = ["fullstack", "frontend", "backend", "devops"];
+    let seeds = [7, 42, 1234];
+    let mut base: Vec<(&str, u64)> = Vec::new();
+    for class in classes {
+        let secs = seeds
+            .iter()
+            .map(|s| boss_secs(&campaign(class, *s).0))
+            .sum();
+        base.push((class, secs));
+    }
+    let fastest = base.iter().map(|b| b.1).min().unwrap_or(1).max(1);
+    let mut failures = Vec::new();
+    let mut table = vec![format!("no talents, boss seconds over 3 seeds: {base:?}")];
+    for class in classes {
+        let own = base.iter().find(|b| b.0 == class).map_or(1, |b| b.1);
+        for build in 1..=3u8 {
+            let mut lowest: Vec<(String, u32)> = Vec::new();
+            let mut secs = 0;
+            for seed in seeds {
+                let (lines, me, _) = campaign_build(class, seed, build);
+                assert_eq!(
+                    me.talents,
+                    [build; combat_core::TALENT_ROWS],
+                    "{class} build {build}: picks did not stick"
+                );
+                secs += boss_secs(&lines);
+                for (zone, min, _, died) in &lines {
+                    if *died {
+                        failures.push(format!("{class} build {build} seed {seed}: died in {zone}"));
+                    }
+                    if content().zone(zone).is_some_and(|z| z.boss.is_none()) {
+                        continue;
+                    }
+                    match lowest.iter_mut().find(|(z, _)| z == zone) {
+                        Some((_, m)) => *m = (*m).min(*min),
+                        None => lowest.push((zone.clone(), *min)),
+                    }
+                }
+            }
+            let floor = lowest.iter().map(|l| l.1).min().unwrap_or(0);
+            table.push(format!(
+                "{class:9} build {build}: boss time {}% of own bare, {}% of fastest class; lowest boss HP {floor}% {lowest:?}",
+                secs * 100 / own.max(1),
+                secs * 100 / fastest
+            ));
+            if secs * 100 < fastest * 80 {
+                failures.push(format!(
+                    "{class} build {build}: boss fights {}% of the fastest bare class (cap 80%)",
+                    secs * 100 / fastest
+                ));
+            }
         }
     }
     println!("{}", table.join("\n"));

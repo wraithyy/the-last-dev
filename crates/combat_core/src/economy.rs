@@ -107,8 +107,8 @@ pub enum Perk {
     SpellHeal { spell: Option<SpellId>, pct: u32 },
     /// The spell's cooldown is `pct` shorter.
     Cooldown { spell: SpellId, pct: u32 },
-    /// The spell(s) cost `pct` less mana.
-    ManaCost { spell: Option<SpellId>, pct: u32 },
+    /// The spell(s) cost `pct` less mana (negative: more).
+    ManaCost { spell: Option<SpellId>, pct: i32 },
     /// A landed damaging hit repeats at `pct` damage with `chance_pct`, while the caster is at
     /// or above `min_hp_pct` HP.
     Echo {
@@ -135,24 +135,76 @@ pub enum Perk {
         #[serde(default)]
         icd_ms: u32,
     },
-    /// Spell damage heals you for `pct` of it.
-    Leech { pct: u32 },
+    /// Spell damage (of `spell` only, if given) heals you for `pct` of it.
+    Leech {
+        pct: u32,
+        #[serde(default)]
+        spell: Option<SpellId>,
+    },
     /// Active: the gadget bar fires `cast`, then the item cools down.
     OnUse { cast: SpellId, cooldown_ms: u32 },
+    // ---- Career Ladder talents (talents.rs); gear may use them too ----
+    /// The spell's cast time changes by `pct` percent (-100: instant).
+    CastTime { spell: Option<SpellId>, pct: i32 },
+    /// Cast-time spells start and keep casting while moving (channels excluded).
+    CastWhileMoving { spell: Option<SpellId> },
+    /// The spell also lands on up to `count` more units of its target's side within `radius_m`
+    /// of the target, at `pct` of the damage or healing. Enemies must already be fighting;
+    /// heals pick injured allies only.
+    Splash {
+        spell: SpellId,
+        radius_m: f32,
+        count: u8,
+        pct: u32,
+    },
+    /// Your killing blow resets `reset`'s cooldown and/or fires `cast`.
+    OnKill {
+        #[serde(default)]
+        reset: Option<SpellId>,
+        #[serde(default)]
+        cast: Option<SpellId>,
+    },
+    /// Each cast of `on` (any spell for `None`) resets `reset`'s cooldown with `chance_pct`.
+    Reset {
+        on: Option<SpellId>,
+        chance_pct: u32,
+        reset: SpellId,
+    },
+    /// The bar spell casts `with` instead (its cost, cast time and cooldown); perks that name
+    /// `spell` apply to `with` as well.
+    Replace { spell: SpellId, with: SpellId },
+    /// Periodic ticks of the auras the spell applies are `pct` stronger.
+    Periodic { spell: SpellId, pct: u32 },
+    /// Damage of the spell(s) refunds `pct` of it as mana.
+    ManaReturn { spell: Option<SpellId>, pct: u32 },
+    /// Mana costs are paid in HP instead: `pct` HP per 100 mana (never below 1 HP).
+    HpCost { pct: u32 },
+    /// All damage taken changes by `pct` percent.
+    DamageTaken { pct: i32 },
 }
 
 impl Perk {
-    fn spells(&self) -> Vec<SpellId> {
+    /// Every spell the perk names (validation and tooltips).
+    pub fn spells(&self) -> Vec<SpellId> {
         match self {
             Perk::SpellDamage { spell, .. }
             | Perk::SpellHeal { spell, .. }
             | Perk::ManaCost { spell, .. }
-            | Perk::Echo { spell, .. } => spell.iter().copied().collect(),
-            Perk::Cooldown { spell, .. } => vec![*spell],
+            | Perk::Echo { spell, .. }
+            | Perk::Leech { spell, .. }
+            | Perk::CastTime { spell, .. }
+            | Perk::CastWhileMoving { spell }
+            | Perk::ManaReturn { spell, .. } => spell.iter().copied().collect(),
+            Perk::Cooldown { spell, .. }
+            | Perk::Splash { spell, .. }
+            | Perk::Periodic { spell, .. } => vec![*spell],
             Perk::Rider { spell, cast } => vec![*spell, *cast],
             Perk::OnCast { spell, cast, .. } => spell.iter().copied().chain([*cast]).collect(),
             Perk::OnHurt { cast, .. } | Perk::OnUse { cast, .. } => vec![*cast],
-            Perk::Leech { .. } => Vec::new(),
+            Perk::OnKill { reset, cast } => reset.iter().chain(cast.iter()).copied().collect(),
+            Perk::Reset { on, reset, .. } => on.iter().copied().chain([*reset]).collect(),
+            Perk::Replace { spell, with } => vec![*spell, *with],
+            Perk::HpCost { .. } | Perk::DamageTaken { .. } => Vec::new(),
         }
     }
 }
@@ -620,6 +672,86 @@ pub struct ActivePerk {
     pub perk: Perk,
 }
 
+/// Cost, cast time and cooldown math over one player's perks, shared by the sim and the HUD
+/// (which builds it from the talent picks alone).
+pub struct PerkView<'a>(pub &'a [ActivePerk]);
+
+impl PerkView<'_> {
+    /// What a press of `spell` casts: its `Replace` variant or itself.
+    pub fn replaced(&self, spell: SpellId) -> SpellId {
+        self.0
+            .iter()
+            .find_map(|p| match p.perk {
+                Perk::Replace { spell: s, with } if s == spell => Some(with),
+                _ => None,
+            })
+            .unwrap_or(spell)
+    }
+
+    /// A perk naming `named` applies to a cast of `cast`: the same spell, or the variant that
+    /// replaces it.
+    pub fn hits(&self, named: SpellId, cast: SpellId) -> bool {
+        named == cast || self.replaced(named) == cast
+    }
+
+    fn hits_opt(&self, named: Option<SpellId>, cast: SpellId) -> bool {
+        named.is_none_or(|s| self.hits(s, cast))
+    }
+
+    /// HP paid instead of `mana` under an `HpCost` perk; 0 without one.
+    pub fn hp_cost(&self, mana: u32) -> u32 {
+        let pct: u32 = self
+            .0
+            .iter()
+            .map(|p| match p.perk {
+                Perk::HpCost { pct } => pct,
+                _ => 0,
+            })
+            .sum();
+        (u64::from(mana) * u64::from(pct) / 100) as u32
+    }
+
+    /// Mana the cast spends (0 when an `HpCost` perk pays it in HP).
+    pub fn mana_cost(&self, spell: SpellId, mana: u32) -> u32 {
+        if self.hp_cost(mana) > 0 {
+            return 0;
+        }
+        let pct: i32 = self
+            .0
+            .iter()
+            .map(|p| match &p.perk {
+                Perk::ManaCost { spell: s, pct } if self.hits_opt(*s, spell) => *pct,
+                _ => 0,
+            })
+            .sum();
+        (i64::from(mana) * i64::from((100 - pct).max(0)) / 100) as u32
+    }
+
+    /// Cooldown after `Cooldown` perks (at most 80% shorter).
+    pub fn cooldown(&self, spell: SpellId, ms: u32) -> u32 {
+        let pct: u32 = self
+            .0
+            .iter()
+            .map(|p| match &p.perk {
+                Perk::Cooldown { spell: s, pct } if self.hits(*s, spell) => *pct,
+                _ => 0,
+            })
+            .sum();
+        (u64::from(ms) * u64::from(100u32.saturating_sub(pct.min(80))) / 100) as u32
+    }
+
+    /// Cast-time change in percent from `CastTime` perks.
+    pub fn cast_time_pct(&self, spell: SpellId) -> i64 {
+        self.0
+            .iter()
+            .map(|p| match &p.perk {
+                Perk::CastTime { spell: s, pct } if self.hits_opt(*s, spell) => i64::from(*pct),
+                _ => 0,
+            })
+            .sum()
+    }
+}
+
 impl Sim {
     fn economy(&self) -> &Economy {
         &self.content.economy
@@ -652,49 +784,134 @@ impl Sim {
         &self.units[i].perks
     }
 
-    /// Spell damage or healing after the caster's gear perks.
+    pub(crate) fn perk_hits(&self, ci: usize, named: SpellId, cast: SpellId) -> bool {
+        self.perk_view(ci).hits(named, cast)
+    }
+
+    fn perk_hits_opt(&self, ci: usize, named: Option<SpellId>, cast: SpellId) -> bool {
+        named.is_none_or(|s| self.perk_hits(ci, s, cast))
+    }
+
+    /// Spell damage or healing after the caster's gear perks (and a splash's reduced share).
     pub(crate) fn perk_amount(&self, ci: usize, spell: SpellId, amount: u64, heal: bool) -> u64 {
         let pct: u64 = self
             .perks(ci)
             .iter()
             .map(|p| match &p.perk {
-                Perk::SpellDamage { spell: s, pct } if !heal && s.is_none_or(|s| s == spell) => {
+                Perk::SpellDamage { spell: s, pct }
+                    if !heal && self.perk_hits_opt(ci, *s, spell) =>
+                {
                     u64::from(*pct)
                 }
-                Perk::SpellHeal { spell: s, pct } if heal && s.is_none_or(|s| s == spell) => {
+                Perk::SpellHeal { spell: s, pct } if heal && self.perk_hits_opt(ci, *s, spell) => {
                     u64::from(*pct)
                 }
                 _ => 0,
             })
             .sum();
-        amount * (100 + pct) / 100
+        amount * (100 + pct) / 100 * u64::from(self.units[ci].splash_pct) / 100
+    }
+
+    fn perk_view(&self, ci: usize) -> PerkView<'_> {
+        PerkView(&self.units[ci].perks)
     }
 
     pub(crate) fn perk_mana_cost(&self, ci: usize, spell: SpellId, mana: u32) -> u32 {
-        let pct: u32 = self
-            .perks(ci)
-            .iter()
-            .map(|p| match &p.perk {
-                Perk::ManaCost { spell: s, pct } if s.is_none_or(|s| s == spell) => *pct,
-                _ => 0,
-            })
-            .sum();
-        (u64::from(mana) * u64::from(100u32.saturating_sub(pct)) / 100) as u32
+        self.perk_view(ci).mana_cost(spell, mana)
+    }
+
+    /// HP paid instead of `mana` under an `HpCost` perk; 0 without one.
+    pub(crate) fn perk_hp_cost(&self, ci: usize, mana: u32) -> u32 {
+        self.perk_view(ci).hp_cost(mana)
     }
 
     pub(crate) fn perk_cooldown(&self, ci: usize, spell: SpellId, ms: u32) -> u32 {
-        let pct: u32 = self
-            .perks(ci)
-            .iter()
-            .map(|p| match &p.perk {
-                Perk::Cooldown { spell: s, pct } if *s == spell => *pct,
-                _ => 0,
-            })
-            .sum();
-        (u64::from(ms) * u64::from(100u32.saturating_sub(pct.min(80))) / 100) as u32
+        self.perk_view(ci).cooldown(spell, ms)
     }
 
-    /// After a landed damaging spell hit of `amount` (before modifiers): echoes and leech.
+    /// Cast-time change in percent from `CastTime` perks.
+    pub(crate) fn perk_cast_time_pct(&self, ci: usize, spell: SpellId) -> i64 {
+        self.perk_view(ci).cast_time_pct(spell)
+    }
+
+    /// A `CastWhileMoving` perk covers this (non-channel) spell.
+    pub(crate) fn perk_moving_ok(&self, ci: usize, spell: &crate::content::SpellDef) -> bool {
+        spell.channel.is_none()
+            && self.perks(ci).iter().any(|p| {
+                matches!(&p.perk, Perk::CastWhileMoving { spell: s } if self.perk_hits_opt(ci, *s, spell.id))
+            })
+    }
+
+    /// Damage-taken change in percent from the bearer's `DamageTaken` perks.
+    pub(crate) fn perk_damage_taken_pct(&self, ti: usize) -> i64 {
+        self.perks(ti)
+            .iter()
+            .map(|p| match p.perk {
+                Perk::DamageTaken { pct } => i64::from(pct),
+                _ => 0,
+            })
+            .sum()
+    }
+
+    /// Periodic tick strength change from `Periodic` perks of the aura's caster.
+    pub(crate) fn perk_periodic_pct(&self, si: usize, spell: Option<SpellId>) -> u64 {
+        let Some(spell) = spell else { return 0 };
+        self.perks(si)
+            .iter()
+            .map(|p| match &p.perk {
+                Perk::Periodic { spell: s, pct } if self.perk_hits(si, *s, spell) => {
+                    u64::from(*pct)
+                }
+                _ => 0,
+            })
+            .sum()
+    }
+
+    /// Extra targets of a single-target spell from a `Splash` perk: up to `count` living units
+    /// on the primary target's side near it, nearest first, with the share in percent.
+    pub(crate) fn perk_splash(
+        &self,
+        ci: usize,
+        spell: &crate::content::SpellDef,
+        primary: usize,
+    ) -> Option<(Vec<usize>, u32)> {
+        let (radius, count, pct) = self.perks(ci).iter().find_map(|p| match &p.perk {
+            Perk::Splash {
+                spell: s,
+                radius_m,
+                count,
+                pct,
+            } if self.perk_hits(ci, *s, spell.id) => Some((*radius_m, *count, *pct)),
+            _ => None,
+        })?;
+        let at = self.units[primary].state.pos;
+        let side = self.units[primary].state.hostile;
+        let heal = !side && spell.target != SpellTarget::Enemy;
+        let mut near: Vec<(f32, usize)> = (0..self.units.len())
+            .filter(|&o| {
+                let u = &self.units[o];
+                o != primary
+                    && u.state.alive
+                    && !u.despawned
+                    && u.state.hostile == side
+                    && u.state.ai != Some(crate::types::AiState::Evade)
+                    && (!side || u.state.in_combat)
+                    && (!heal || u.state.hp < u.state.max_hp)
+            })
+            .map(|o| (crate::effects::dist_xz(self.units[o].state.pos, at), o))
+            .filter(|(d, _)| *d <= radius)
+            .collect();
+        near.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        let picked: Vec<usize> = near
+            .into_iter()
+            .take(usize::from(count))
+            .map(|(_, o)| o)
+            .collect();
+        (!picked.is_empty()).then_some((picked, pct))
+    }
+
+    /// After a landed damaging spell hit of `amount` (before modifiers): echoes, leech and
+    /// mana refunds.
     pub(crate) fn perk_after_hit(
         &mut self,
         ci: usize,
@@ -713,7 +930,7 @@ impl Sim {
                     chance_pct,
                     pct,
                     min_hp_pct,
-                } if s.is_none_or(|s| s == spell.id) => {
+                } if self.perk_hits_opt(ci, s, spell.id) => {
                     let me = &self.units[ci].state;
                     let healthy =
                         u64::from(me.hp) * 100 >= u64::from(me.max_hp) * u64::from(min_hp_pct);
@@ -734,13 +951,68 @@ impl Sim {
                     };
                     self.deal_damage(Self::id_of(ci), Self::id_of(ti), hit);
                 }
-                Perk::Leech { pct } => {
+                Perk::Leech { pct, spell: s } if self.perk_hits_opt(ci, s, spell.id) => {
                     let heal = (u64::from(amount) * u64::from(pct) / 100) as u32;
                     if heal > 0 {
                         self.heal(Self::id_of(ci), ci, Some(spell.id), heal);
                     }
                 }
+                Perk::ManaReturn { spell: s, pct } if self.perk_hits_opt(ci, s, spell.id) => {
+                    let u = &mut self.units[ci].state;
+                    let gain = (u64::from(amount) * u64::from(pct) / 100) as u32;
+                    let gain = gain.min(u.max_mana.saturating_sub(u.mana));
+                    u.mana += gain;
+                    if gain > 0 {
+                        self.events.push(Event::ManaGain {
+                            unit: Self::id_of(ci),
+                            spell: spell.id,
+                            amount: gain,
+                        });
+                    }
+                }
                 _ => {}
+            }
+        }
+    }
+
+    /// Clears a spell's cooldown (and its talent variant's) for unit `i`.
+    fn reset_cooldown(&mut self, i: usize, spell: SpellId) {
+        let with = self.effective_spell(i, spell);
+        let u = &mut self.units[i];
+        u.cooldowns.remove(&spell);
+        u.cooldowns.remove(&with);
+    }
+
+    /// Unit `ki` landed a killing blow: `OnKill` resets and procs.
+    pub(crate) fn perk_on_kill(&mut self, ki: usize) {
+        if self.units[ki].perks.is_empty() || !self.units[ki].state.alive {
+            return;
+        }
+        let perks = self.units[ki].perks.clone();
+        for p in perks {
+            let Perk::OnKill { reset, cast } = p.perk else {
+                continue;
+            };
+            if let Some(r) = reset {
+                let cooling = [r, self.effective_spell(ki, r)].iter().any(|s| {
+                    self.units[ki]
+                        .cooldowns
+                        .get(s)
+                        .is_some_and(|c| c.0 > self.now)
+                });
+                if cooling {
+                    self.reset_cooldown(ki, r);
+                    // fire_item_spell announces itself; a bare reset needs its own proc line.
+                    if cast.is_none() {
+                        self.events.push(Event::Proc {
+                            unit: Self::id_of(ki),
+                            item: p.source.clone(),
+                        });
+                    }
+                }
+            }
+            if let Some(c) = cast {
+                self.fire_item_spell(ki, c, None, &p.source);
             }
         }
     }
@@ -766,15 +1038,28 @@ impl Sim {
         let perks = self.units[ci].perks.clone();
         for p in perks {
             match p.perk {
-                Perk::Rider { spell: s, cast } if s == spell => {
+                Perk::Rider { spell: s, cast } if self.perk_hits(ci, s, spell) => {
                     self.fire_item_spell(ci, cast, ti, &p.source);
+                }
+                Perk::Reset {
+                    on,
+                    chance_pct,
+                    reset,
+                } if self.perk_hits_opt(ci, on, spell) => {
+                    if self.rng.chance_pct(chance_pct) {
+                        self.events.push(Event::Proc {
+                            unit: Self::id_of(ci),
+                            item: p.source.clone(),
+                        });
+                        self.reset_cooldown(ci, reset);
+                    }
                 }
                 Perk::OnCast {
                     spell: s,
                     chance_pct,
                     cast,
                     icd_ms,
-                } if s.is_none_or(|s| s == spell) => {
+                } if self.perk_hits_opt(ci, s, spell) => {
                     let key = p.source.clone();
                     if self.perk_ready_peek(ci, &key) && self.rng.chance_pct(chance_pct) {
                         self.perk_ready(ci, &key, icd_ms);
@@ -1126,6 +1411,7 @@ impl Sim {
         mob: usize,
         role: Option<Role>,
     ) -> (Vec<String>, u32) {
+        let freeze = self.sprint_has(crate::sprint::Affix::BudgetFreeze);
         let u = &self.units[mob];
         let d = &self.content.units[u.def];
         if !d.hostile || u.summoner.is_some() || d.ai.is_none() {
@@ -1144,6 +1430,8 @@ impl Sim {
         };
         let rng = &mut self.loot_rng;
         let sp = (level * eco.sp_per_level + rng.below(level + 1)) * mult.max(1);
+        // Sprint Budget Freeze: no Story Points, but the loot budget doubles.
+        let (sp, loot_mult) = if freeze { (0, 2) } else { (sp, 1) };
         let mut items = Vec::new();
         let gear_pct = if boss {
             100
@@ -1152,6 +1440,7 @@ impl Sim {
         } else {
             eco.trash_gear_pct
         };
+        let gear_pct = (gear_pct * loot_mult).min(100);
         let tier = u.state.level.div_ceil(2).max(1);
         if rng.chance_pct(gear_pct) {
             let weights = if boss {

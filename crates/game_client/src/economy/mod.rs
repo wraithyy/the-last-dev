@@ -16,7 +16,7 @@
 
 pub mod goods;
 mod outfit;
-mod save;
+pub mod save;
 mod sheet;
 mod shop;
 

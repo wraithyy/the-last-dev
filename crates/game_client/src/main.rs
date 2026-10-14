@@ -27,6 +27,7 @@ mod player;
 mod presentation;
 mod rigs;
 mod spell_fx;
+mod sprint;
 mod targeting;
 mod telegraph_fx;
 mod touch;
@@ -106,6 +107,7 @@ fn main() {
             telegraph_fx::TelegraphFxPlugin,
             economy::EconomyPlugin,
             office::OfficePlugin,
+            sprint::SprintPlugin,
         ))
         .run();
 }

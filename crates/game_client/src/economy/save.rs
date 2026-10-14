@@ -109,6 +109,37 @@ fn write(
     }
 }
 
+/// Delivered sprints of an online run go to the local leaderboard of the class too, with the
+/// new recommended level (the rest of an online session stays out of the save). Needs an
+/// existing save of that class.
+pub fn record_online_sprint(
+    class: &str,
+    record: Option<combat_core::SprintRecord>,
+    key: (String, u8),
+) {
+    if disabled() {
+        return;
+    }
+    let Some(mut save) = platform::read(class).and_then(|t| SaveData::decode(&t)) else {
+        return;
+    };
+    save.sprint_records.extend(record);
+    save.sprint_keys.retain(|(b, _)| *b != key.0);
+    save.sprint_keys.push(key);
+    platform::write(class, &save.encode());
+}
+
+/// The local leaderboard of a class's save (empty without one).
+pub fn local_sprint_records(class: &str) -> Vec<combat_core::SprintRecord> {
+    if disabled() {
+        return Vec::new();
+    }
+    platform::read(class)
+        .and_then(|t| SaveData::decode(&t))
+        .map(|s| s.sprint_records)
+        .unwrap_or_default()
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 mod platform {
     use std::path::PathBuf;

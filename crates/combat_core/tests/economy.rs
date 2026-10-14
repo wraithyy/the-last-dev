@@ -720,7 +720,7 @@ fn saves_roundtrip_and_tolerate_bad_data() {
     // Garbage, other versions and unknown names never break a load.
     assert!(SaveData::decode("").is_none());
     assert!(SaveData::decode("hello\nworld").is_none());
-    assert!(SaveData::decode(&text.replace("version=1", "version=99")).is_none());
+    assert!(SaveData::decode(&text.replace("version=2", "version=99")).is_none());
     let mangled = text
         .replace("level=10", "level=banana")
         .replace("Ibuprofen", "Ibuprofen|Nonexistent Thing")

@@ -397,6 +397,27 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
         } => format!("{} uses {prop} ({outcome})", t(*unit)),
         Event::Achievement { unit, key } => format!("{} earns {key}", t(*unit)),
         Event::TitleChanged { unit, title } => format!("{} wears title {title:?}", t(*unit)),
+        Event::TalentsChanged { unit, talents } => format!("{} talents {talents:?}", t(*unit)),
+        Event::SprintStarted { status, zones } => {
+            format!(
+                "sprint {} +{} starts: {zones:?}",
+                status.building, status.level
+            )
+        }
+        Event::SprintProgress { status } => format!(
+            "sprint {} ms, {}% burned, {} bosses left",
+            status.time_ms(),
+            status.forces_pct,
+            status.bosses_left
+        ),
+        Event::SprintEnded {
+            result,
+            time_ms,
+            upgrade,
+            ..
+        } => format!("sprint ends {result:?} in {time_ms} ms, upgrade {upgrade}"),
+        Event::SprintAffix { affix, text, .. } => format!("affix {affix}: {text}"),
+        Event::SprintRefused { reason } => format!("sprint refused: {}", reason.message()),
     };
     format!("[{tick:05}] {body}")
 }

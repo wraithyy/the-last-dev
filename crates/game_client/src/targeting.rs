@@ -139,14 +139,17 @@ fn party_keys(
     }
 }
 
+#[allow(clippy::type_complexity)] // Bevy system parameters
 fn handle_keys(
     keys: Res<ButtonInput<KeyCode>>,
     binds: Res<Keybinds>,
     // Grouped because Esc closes these in priority order.
-    (mut paused, mut trophies, mut windows): (
+    (mut paused, mut trophies, mut windows, mut sprint, mut career): (
         ResMut<Paused>,
         ResMut<TrophiesOpen>,
         ResMut<QuestWindows>,
+        ResMut<crate::input::SprintWindows>,
+        ResMut<crate::input::CareerOpen>,
     ),
     mut target: ResMut<Target>,
     player: Single<&PlayerBody, With<Player>>,
@@ -154,7 +157,11 @@ fn handle_keys(
     sim: SimView,
 ) {
     if keys.just_pressed(KeyCode::Escape) {
-        if windows.close_one() || std::mem::take(&mut trophies.0) {
+        if sprint.close_one()
+            || windows.close_one()
+            || std::mem::take(&mut trophies.0)
+            || std::mem::take(&mut career.0)
+        {
             // The window closes first; the next Esc clears the target or pauses.
         } else if target.0.take().is_none() {
             paused.0 = !paused.0;

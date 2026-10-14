@@ -63,6 +63,30 @@ pub trait SimRead: Send + Sync {
         }
     }
 
+    /// `unit`'s class key and Career Ladder picks ("" and none for non-players).
+    fn talents_of(&self, unit: EntityId) -> (String, combat_core::TalentPicks) {
+        let Some(u) = self.unit(unit) else {
+            return (String::new(), [0; combat_core::TALENT_ROWS]);
+        };
+        let class = self
+            .content()
+            .class_of_unit(&u.key)
+            .map_or_else(String::new, |c| c.key.clone());
+        (class, u.talents)
+    }
+
+    /// The perks `unit`'s talents grant (cost, cast time and cooldown math for tooltips).
+    fn talent_perks(&self, unit: EntityId) -> Vec<combat_core::ActivePerk> {
+        let (class, picks) = self.talents_of(unit);
+        self.content().talents.perks(&class, &picks)
+    }
+
+    /// The bar spell as `unit` casts it under its talents (a Career Ladder variant or itself).
+    fn talent_spell(&self, unit: EntityId, spell: SpellId) -> SpellId {
+        let (class, picks) = self.talents_of(unit);
+        self.content().talents.spell_for(&class, &picks, spell)
+    }
+
     /// The resurrect of `unit`'s class.
     fn resurrect_of(&self, unit: EntityId) -> Option<&SpellDef> {
         let key = self.unit(unit).map_or("", |u| u.key.as_str());

@@ -48,6 +48,7 @@ impl Sim {
         let group_extra = self.players.len().saturating_sub(1) as u32;
         let hp_level_pct = self.class_at(i).map_or(100, |c| c.level_hp_pct);
         let hp_aura_pct = self.max_hp_aura_pct(i);
+        let (sprint_hp, sprint_dmg) = self.sprint_mob_pct(i);
         let d = &self.content.units[self.units[i].def];
         let u = &mut self.units[i];
         u.state.level = level;
@@ -77,8 +78,10 @@ impl Sim {
             } else {
                 (100, 100)
             };
-            u.state.max_hp =
-                (u64::from(d.max_hp) * u64::from(hp) * u64::from(group) / 10_000).max(1) as u32;
+            u.state.max_hp = (u64::from(d.max_hp) * u64::from(hp) * u64::from(group) / 10_000
+                * u64::from(sprint_hp)
+                / 100)
+                .max(1) as u32;
             u.state.max_mana = d.max_mana;
             u.sp = d.spell_power;
             let trash = if d.hostile && d.ai.is_some() && !d.boss {
@@ -92,8 +95,10 @@ impl Sim {
             } else {
                 group_dmg
             };
-            u.dmg_pct =
-                scale_pct(s.damage_pct_per_level, level, d.level) * group_dmg / 100 * trash / 100;
+            u.dmg_pct = scale_pct(s.damage_pct_per_level, level, d.level) * group_dmg / 100 * trash
+                / 100
+                * sprint_dmg
+                / 100;
             if d.hostile {
                 let xp = scale_pct(s.xp_pct_per_level, level, d.level);
                 u.state.xp = (u64::from(d.xp_reward) * u64::from(xp) / 100) as u32;
@@ -198,7 +203,8 @@ impl Sim {
         }
         let in_class = self
             .class_at(i)
-            .is_none_or(|c| c.knows(&self.content, spell.id));
+            .is_none_or(|c| c.knows(&self.content, spell.id))
+            || self.is_variant_of_known(i, spell.id);
         in_class && spell.learn_level <= self.units[i].state.level
     }
 

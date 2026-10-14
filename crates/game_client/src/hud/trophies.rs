@@ -260,8 +260,8 @@ fn update_achievements(
     let content = sim.content();
     let state = (me.achievements.clone(), me.title.clone());
     let worn = content
-        .achievement(&me.title)
-        .map_or_else(|| "none".to_string(), |a| format!("<{}>", a.title));
+        .title_text(&me.title)
+        .map_or_else(|| "none".to_string(), |t| format!("<{t}>"));
     set_text(
         &mut title,
         &format!(

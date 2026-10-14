@@ -409,7 +409,7 @@ impl RoomState {
         }
         let mut routed = self.sim.tick_routed();
         self.follow_sim_moves(&routed);
-        if self.check_exits() {
+        if self.follow_sprint() || self.check_exits() {
             // ZoneLoaded and the despawns go out with this tick, before the snapshot.
             routed.extend(self.sim.drain_events_routed());
         }
@@ -620,6 +620,16 @@ impl RoomState {
         }
         let to = exit_choice(living, ready, in_combat, dest, dwelled);
         to.is_some_and(|to| self.travel(&zone, &to))
+    }
+
+    /// Sprint mode: the sim names the next stage (or campus after the review); the server
+    /// loads it for the whole group. True when the group travelled.
+    fn follow_sprint(&mut self) -> bool {
+        let Some(to) = self.sim.sprint_travel().map(str::to_string) else {
+            return false;
+        };
+        let from = self.sim.zone().unwrap_or(START_ZONE).to_string();
+        self.travel(&from, &to)
     }
 
     fn travel(&mut self, from: &str, to: &str) -> bool {
@@ -1130,6 +1140,55 @@ mod tests {
             .unwrap()
             .0;
         assert!(dist_xz(s.members[&0].pos, arrival) < 4.0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_leader_starts_a_sprint_and_the_server_moves_the_group() {
+        let mut s = room();
+        s.on_join(0, "lead", "fullstack");
+        s.on_join(1, "member", "devops");
+        for p in [0, 1] {
+            let e = eid_of(&s, p);
+            s.sim.set_level_of(e, 10);
+        }
+        s.tick();
+        let start = || {
+            ClientMsg::Cmd(Command::StartSprint {
+                building: "lab".into(),
+                level: 2,
+            })
+        };
+        s.on_message(1, start());
+        let out = s.tick();
+        let refused = |out: &[(Audience, Bytes)], p| {
+            msgs(out, p).iter().any(|m| {
+                matches!(m, ServerMsg::Events { events, .. }
+                if events.iter().any(|e| matches!(e, Event::SprintRefused { .. })))
+            })
+        };
+        assert!(refused(&out, 1) && !refused(&out, 0));
+        assert!(!s.sim.sprint_active());
+        s.on_message(0, start());
+        let mut out = Vec::new();
+        for _ in 0..150 {
+            out.extend(s.tick());
+        }
+        assert_eq!(s.sim.zone(), Some("lab/1"));
+        for p in [0, 1] {
+            let m = msgs(&out, p);
+            for want in ["started", "loaded"] {
+                assert!(
+                    m.iter()
+                        .any(|m| matches!(m, ServerMsg::Events { events, .. }
+                        if events.iter().any(|e| match e {
+                            Event::SprintStarted { .. } => want == "started",
+                            Event::ZoneLoaded { zone } => want == "loaded" && zone == "lab/1",
+                            _ => false,
+                        }))),
+                    "player {p} missed {want}"
+                );
+            }
+        }
     }
 
     #[tokio::test(start_paused = true)]

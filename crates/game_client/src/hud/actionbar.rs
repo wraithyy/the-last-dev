@@ -19,7 +19,7 @@ use crate::targeting::Target;
 use bevy::prelude::*;
 use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
-use combat_core::{CastError, Content, Effect, SpellDef, SpellId, SpellTarget};
+use combat_core::{CastError, Content, Effect, PerkView, SpellDef, SpellId, SpellTarget};
 
 const KEY_LABELS: [&str; 10] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 /// Locked (silenced / school lockout) keycaps: dimmed under a padlock.
@@ -444,6 +444,8 @@ fn spawn_bar(mut commands: Commands, mut materials: ResMut<Assets<CooldownMateri
                 label("", 12.0),
                 TextColor(Color::srgb(0.5, 0.75, 0.55)),
             ));
+            // Career Ladder talents that change this spell.
+            t.spawn((TipLine(2), label("", 12.0), TextColor(ACCENT_WARM)));
         });
 }
 
@@ -1150,7 +1152,8 @@ fn update_slots(
             continue;
         }
         let v = view(*i);
-        match v.spell.and_then(|id| sim.content().spell(id)) {
+        let cast = v.spell.map(|id| sim.talent_spell(me, id));
+        match cast.and_then(|id| sim.content().spell(id)) {
             Some(def) if v.learned => {
                 let handle = icons.get(&assets, &def.icon);
                 if img.image != handle {
@@ -1264,6 +1267,8 @@ struct TipContent {
     sig: String,
     stats: String,
     doc: String,
+    /// Talent notes, one `// [Talent] text` line each; empty without talents.
+    talents: String,
 }
 
 /// Return "type" of one effect, as the tooltip and the learned-spell toast print it.
@@ -1315,23 +1320,30 @@ pub fn spell_signature(d: &SpellDef, content: &Content) -> (String, String) {
     (asset_key(&d.name), format!("({arg}) -> {ret}"))
 }
 
-fn spell_tip(d: &SpellDef, content: &Content) -> TipContent {
+/// Stats as the caster pays them: talent perks change mana (or HP), cast time and cooldown.
+fn spell_tip(d: &SpellDef, content: &Content, perks: &PerkView) -> TipContent {
     let mut stats = Vec::new();
-    if d.mana > 0 {
-        stats.push(format!("{} mana", d.mana));
+    let mana = perks.mana_cost(d.id, d.mana);
+    let hp = perks.hp_cost(d.mana);
+    if hp > 0 {
+        stats.push(format!("{hp} HP"));
+    } else if mana > 0 {
+        stats.push(format!("{mana} mana"));
     }
     stats.push(if d.range_m > 0.0 {
         format!("{:.0} m", d.range_m)
     } else {
         "self".to_string()
     });
-    stats.push(if d.cast_ms == 0 {
+    let cast_ms = (i64::from(d.cast_ms) * (100 + perks.cast_time_pct(d.id)).max(0) / 100) as u32;
+    stats.push(if cast_ms == 0 {
         "instant".to_string()
     } else {
-        format!("{:.1}s cast", d.cast_ms as f32 / 1000.0)
+        format!("{:.1}s cast", cast_ms as f32 / 1000.0)
     });
-    if d.cooldown_ms > 0 {
-        stats.push(format!("{}s cd", d.cooldown_ms / 1000));
+    let cooldown_ms = perks.cooldown(d.id, d.cooldown_ms);
+    if cooldown_ms > 0 {
+        stats.push(format!("{}s cd", cooldown_ms / 1000));
     }
     if !d.gcd {
         stats.push("off-GCD".to_string());
@@ -1342,6 +1354,7 @@ fn spell_tip(d: &SpellDef, content: &Content) -> TipContent {
         sig,
         stats: stats.join(" | "),
         doc: format!("/// {}", d.description),
+        talents: String::new(),
     }
 }
 
@@ -1358,6 +1371,7 @@ fn coffee_tip(d: &SpellDef) -> TipContent {
             d.cooldown_ms / 1000
         ),
         doc: format!("/// {}", d.description),
+        talents: String::new(),
     }
 }
 
@@ -1381,13 +1395,27 @@ fn update_tooltip(
         .map(|(Slot(i), _)| *i)
         .or(forced.map(|f| f.0))
         .and_then(|i| sim.bar_of(player.0).get(i).copied())
-        .and_then(|id| content_db.spell(id).map(|d| (id, d)));
+        .and_then(|id| {
+            content_db
+                .spell(sim.talent_spell(player.0, id))
+                .map(|d| (id, d))
+        });
     let hovered_attack = **attack != Interaction::None;
     let hovered_coffee = **coffee != Interaction::None;
     let hovered_rez = **rez != Interaction::None;
     let content = if let Some((id, d)) = hovered_slot {
         if sim.known_spells(player.0).contains(&id) {
-            Some(spell_tip(d, content_db))
+            let perks = sim.talent_perks(player.0);
+            let mut tip = spell_tip(d, content_db, &PerkView(&perks));
+            let (class, picks) = sim.talents_of(player.0);
+            tip.talents = content_db
+                .talents
+                .notes(&class, &picks, id)
+                .iter()
+                .map(|t| format!("// [{}] {}", t.name, t.text))
+                .collect::<Vec<_>>()
+                .join("\n");
+            Some(tip)
         } else {
             // Unlearned: show only the stub, like an unresolved symbol.
             Some(TipContent {
@@ -1395,6 +1423,7 @@ fn update_tooltip(
                 sig: "() -> !".into(),
                 stats: format!("unlocks at level {}", d.learn_level),
                 doc: "/// TODO: get promoted first.".into(),
+                talents: String::new(),
             })
         }
     } else if hovered_attack {
@@ -1415,11 +1444,13 @@ fn update_tooltip(
                     a.damage_max,
                     copy::AUTO_ATTACK_FLAVOUR
                 ),
+                talents: String::new(),
             })
     } else if hovered_coffee {
         content_db.channel_spell().map(coffee_tip)
     } else if hovered_rez {
-        sim.resurrect_of(player.0).map(|d| spell_tip(d, content_db))
+        sim.resurrect_of(player.0)
+            .map(|d| spell_tip(d, content_db, &PerkView(&[])))
     } else {
         None
     };
@@ -1451,10 +1482,10 @@ fn update_tooltip(
     for (TipLine(i), mut text) in &mut lines {
         set_text(
             &mut text,
-            if *i == 0 {
-                &content.stats
-            } else {
-                &content.doc
+            match i {
+                0 => &content.stats,
+                1 => &content.doc,
+                _ => &content.talents,
             },
         );
     }

@@ -167,6 +167,8 @@ fn ms_to_ticks(ms: u32) -> u64 {
 #[derive(Resource)]
 pub struct NetWorld {
     content: Content,
+    /// The room's gameplay seed (`Welcome`): this session's sprint affix rotation.
+    pub seed: u64,
     pub you: EntityId,
     pub room: String,
     /// Display names by player id, already sanitised by the server.
@@ -212,6 +214,7 @@ impl NetWorld {
     pub fn new(content: Content, you: EntityId, room: String, players: &[PlayerInfo]) -> Self {
         let mut w = NetWorld {
             content,
+            seed: 0,
             you,
             room,
             names: BTreeMap::new(),
@@ -403,6 +406,7 @@ impl NetWorld {
             buyback: Vec::new(),
             achievements: Vec::new(),
             title: String::new(),
+            talents: [0; combat_core::TALENT_ROWS],
         })
     }
 
@@ -476,6 +480,7 @@ impl NetWorld {
                 u.xp_to_next = p.xp_to_next;
                 u.equipped = p.equipped(&self.content);
                 u.title.clone_from(&p.title);
+                u.talents = p.talents;
             }
         }
     }
@@ -906,6 +911,11 @@ impl NetWorld {
             Event::TitleChanged { unit, title } => {
                 if let Some(u) = self.units.get_mut(unit) {
                     u.title.clone_from(title);
+                }
+            }
+            Event::TalentsChanged { unit, talents } => {
+                if let Some(u) = self.units.get_mut(unit) {
+                    u.talents = *talents;
                 }
             }
             Event::ItemCooldown { item, ms } => {

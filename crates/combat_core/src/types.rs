@@ -179,9 +179,24 @@ pub enum Command {
     Interact {
         prop: String,
     },
-    /// Wear the title of an unlocked achievement under the name; "" takes it off.
+    /// Wear the title of an unlocked achievement (or your picked row-5 talent) under the name;
+    /// "" takes it off.
     SetTitle {
         achievement: String,
+    },
+    /// Career Ladder: take option `choice` (1..=3) of talent row `row` (0..5), out of combat,
+    /// once the level allows and the row is still free.
+    PickTalent {
+        row: u8,
+        choice: u8,
+    },
+    /// Performance Review: clear every talent pick for Story Points, out of combat.
+    ResetTalents,
+    /// Sprint mode: the group leader commits the group to a timed run of `building` (a
+    /// `SprintDef::buildings` key) at `level`, from the campus with everyone alive and calm.
+    StartSprint {
+        building: String,
+        level: u8,
     },
 }
 
@@ -197,6 +212,10 @@ pub enum ItemError {
     CannotUse,
     NotReady,
     Dead,
+    /// Talent picks and resets wait until the fight is over.
+    InCombat,
+    /// Talent row locked, already taken or nothing to reset.
+    NotEligible,
 }
 
 impl ItemError {
@@ -211,6 +230,8 @@ impl ItemError {
             ItemError::CannotUse => "Nothing happens. Like most initiatives.",
             ItemError::NotReady => "Not ready yet. It's still in code review.",
             ItemError::Dead => "You are dead. Equipment is the least of your problems.",
+            ItemError::InCombat => "Performance reviews are not scheduled during incidents.",
+            ItemError::NotEligible => "Not eligible for that promotion. Try again next cycle.",
         }
     }
 }
@@ -467,6 +488,38 @@ pub enum Event {
         unit: EntityId,
         title: String,
     },
+    /// A player's Career Ladder picks changed (everyone sees the promotions).
+    TalentsChanged {
+        unit: EntityId,
+        talents: crate::talents::TalentPicks,
+    },
+    /// Sprint mode: a run started; the host loads `zones[0]` when `Sim::sprint_travel` says so.
+    SprintStarted {
+        status: crate::sprint::SprintStatus,
+        zones: Vec<String>,
+    },
+    /// Once a second during a run (timer, story points burned, bosses left).
+    SprintProgress {
+        status: crate::sprint::SprintStatus,
+    },
+    /// The run is over: the review, keystone change and the chest (`upgrade` is 0 unless
+    /// delivered).
+    SprintEnded {
+        result: crate::sprint::SprintResult,
+        time_ms: u32,
+        upgrade: i8,
+        summary: crate::sprint::SprintSummary,
+    },
+    /// An affix did something visible (`unit` is the enemy or player involved, 0 for none).
+    SprintAffix {
+        affix: String,
+        unit: EntityId,
+        text: String,
+    },
+    /// `StartSprint` was refused (routed to the asker).
+    SprintRefused {
+        reason: crate::sprint::SprintError,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -539,8 +592,10 @@ pub struct UnitState {
     pub buyback: Vec<String>,
     /// Player: unlocked achievement keys, oldest first.
     pub achievements: Vec<String>,
-    /// Player: key of the achievement whose title is worn, "" for none.
+    /// Player: key of the achievement (or capstone talent) whose title is worn, "" for none.
     pub title: String,
+    /// Player: Career Ladder pick per row (0 = none, else option 1..=3); zeros for others.
+    pub talents: crate::talents::TalentPicks,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

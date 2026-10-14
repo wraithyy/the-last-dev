@@ -1020,6 +1020,12 @@ pub struct Content {
     /// Interactive props, hidden NPCs, achievements and the spells everyone knows (`world.rs`).
     #[serde(default)]
     pub world: crate::world::WorldDef,
+    /// Career Ladder rows per class (`talents.rs`); absent in minimal test content.
+    #[serde(default)]
+    pub talents: crate::talents::Talents,
+    /// Sprint mode buildings, affixes and rewards (`sprint.rs`); absent in minimal test content.
+    #[serde(default)]
+    pub sprint: crate::sprint::SprintDef,
 }
 
 impl Content {
@@ -1299,6 +1305,8 @@ impl Content {
         self.validate_quests()?;
         self.economy.validate(self)?;
         self.world.validate(self)?;
+        self.talents.validate(self)?;
+        self.sprint.validate(self)?;
         Ok(())
     }
 }

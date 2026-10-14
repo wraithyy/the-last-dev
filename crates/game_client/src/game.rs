@@ -110,6 +110,19 @@ pub struct GameFlow {
 }
 
 impl GameFlow {
+    /// Starts the fade to `zone` (sprint stages); false while a transition is already running.
+    pub fn travel_to(&mut self, zone: &str) -> bool {
+        if !matches!(self.fade, Fade::Idle) || self.victory || zone == self.zone {
+            return false;
+        }
+        self.fade = Fade::Out {
+            t: 0.0,
+            to: zone.to_string(),
+        };
+        self.tip = self.tip.wrapping_add(1);
+        true
+    }
+
     /// Movement and casting are frozen during a zone transition and on the victory screen.
     pub fn input_locked(&self) -> bool {
         !matches!(self.fade, Fade::Idle) || self.victory
@@ -549,10 +562,13 @@ fn zone_events(
     mode: Res<GameMode>,
     mut banners: MessageWriter<Banner>,
     units: Query<(&SimUnit, &Transform)>,
+    sprint: Res<crate::sprint::SprintHud>,
 ) {
     let content = sim.content();
     for CombatEvent(ev) in events.read() {
         match ev {
+            // A sprint stage clear is no campaign milestone (sprint.rs has its own banner).
+            Event::ZoneCleared { .. } if sprint.active => {}
             Event::ZoneCleared { zone } => {
                 let (title, subtitle) = match zone.as_str() {
                     "tower/5" => (

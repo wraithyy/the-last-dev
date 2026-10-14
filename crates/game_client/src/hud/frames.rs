@@ -799,12 +799,11 @@ fn update_frames(
                     Color::srgb(0.35, 1.0, 0.4)
                 };
             }
-            // A worn achievement title (players) replaces the unit's own subtitle.
+            // A worn achievement or promotion title (players) replaces the unit's own subtitle.
             Field::Title => set_text(
                 &mut text,
                 &sim.content()
-                    .achievement(&u.title)
-                    .map(|a| a.title.as_str())
+                    .title_text(&u.title)
                     .or_else(|| {
                         sim.content()
                             .unit_def(&u.key)

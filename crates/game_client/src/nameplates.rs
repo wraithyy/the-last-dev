@@ -210,8 +210,7 @@ fn update_titles(sim: SimView, mut titles: Query<(&PlateTitle, &mut Text)>) {
         let Some(u) = sim.unit(*id) else { continue };
         let content = sim.content();
         let title = content
-            .achievement(&u.title)
-            .map(|a| a.title.as_str())
+            .title_text(&u.title)
             .or_else(|| content.unit_def(&u.key).map(|d| d.title.as_str()))
             .unwrap_or("");
         let want = plate_title(title);

@@ -16,6 +16,8 @@ mod quests;
 mod rng;
 mod save;
 mod sim;
+pub mod sprint;
+pub mod talents;
 pub mod targeting;
 mod telegraph;
 pub mod time;
@@ -34,7 +36,7 @@ pub use content::{
 };
 pub use economy::{
     ActivePerk, ConsumableDef, Economy, GearDef, GearSource, GearStats, GearVisual, Goods, JunkDef,
-    Perk, Rarity, SLOTS, SetDef, Slot, VendorDef,
+    Perk, PerkView, Rarity, SLOTS, SetDef, Slot, VendorDef,
 };
 pub use floors::pack_offsets;
 pub use geom::{Aabb, Vec3, distance, forward, in_range, is_facing, line_of_sight};
@@ -42,6 +44,14 @@ pub use progression::GROUP_SHARE_RANGE_M;
 pub use quests::{ActiveQuest, GIVER_REACH_SLACK_M, QuestLog, QuestStatus};
 pub use save::{SAVE_VERSION, SaveData};
 pub use sim::{MAX_PLAYERS, Sim};
+pub use sprint::{
+    Affix, AffixDef, MeterLine, RewardLine, SprintBuilding, SprintDef, SprintError, SprintPreview,
+    SprintRecord, SprintResult, SprintStatus, SprintSummary, affixes_for,
+    preview as sprint_preview, retro_lines,
+};
+pub use talents::{
+    ClassTalents, TALENT_CHOICES, TALENT_ROWS, TalentDef, TalentPicks, TalentRow, Talents,
+};
 pub use targeting::{
     EntityId, TAB_TARGET_RANGE, TargetCandidate, TargetError, tab_target, validate_target,
 };

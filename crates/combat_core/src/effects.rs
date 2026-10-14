@@ -43,10 +43,11 @@ impl Sim {
             + self.aura_sum(i, |a| a.haste_pct as i32).max(0) as u32
     }
 
-    /// Haste first, then cast-time auras (Review Fatigue, Pivot to AGI).
+    /// Haste first, then cast-time auras (Review Fatigue, Pivot to AGI) and talent perks.
     pub(crate) fn cast_time(&self, i: usize, spell: &SpellDef) -> u32 {
         let hasted = self.content.cast_ms(spell, self.haste(i));
-        pct_mod(u64::from(hasted), self.aura_sum(i, |a| a.cast_time_pct)) as u32
+        let pct = self.aura_sum(i, |a| a.cast_time_pct) + self.perk_cast_time_pct(i, spell.id);
+        pct_mod(u64::from(hasted), pct) as u32
     }
 
     /// Max-HP percent from auras (Horizontal Scaling); players only.
@@ -83,7 +84,8 @@ impl Sim {
         let armour = self
             .class_at(ti)
             .map_or(0, |c| i64::from(c.damage_taken_pct));
-        let taken = self.aura_sum(ti, |a| a.damage_taken_pct) + armour;
+        let taken =
+            self.aura_sum(ti, |a| a.damage_taken_pct) + armour + self.perk_damage_taken_pct(ti);
         let gear = u64::from(self.units[ti].item_bonus.armor_tenths);
         let amount = u64::from(amount) * (1000 - gear.min(1000)) / 1000;
         pct_mod(pct_mod(amount, done), taken) as u32
@@ -554,9 +556,12 @@ impl Sim {
         }
         let si = self.index(source);
         let (sp, dmg_pct) = si.map_or((0, 100), |s| (self.units[s].sp, self.units[s].dmg_pct));
+        let talent_pct = 100 + si.map_or(0, |s| self.perk_periodic_pct(s, spell));
         let tick_amount = def.periodic.as_ref().map_or(0, |p| {
             ((u64::from(p.base) + u64::from(sp) * u64::from(p.coefficient_pct) / 100)
                 * u64::from(dmg_pct)
+                / 100
+                * talent_pct
                 / 100) as u32
         });
         let interval = def.periodic.as_ref().map_or(0, |p| ticks(p.interval_ms));

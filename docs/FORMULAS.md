@@ -206,3 +206,10 @@ perks    : SpellDamage / SpellHeal +pct on that spell; Cooldown and ManaCost -pc
 Story Points per kill and member: `(level * sp_per_level + U[0, level]) * mult` (elite 4, boss 12; summons 0). Gear drop chance: trash 12%, elite 60%, boss 100%; rarity weights Common/Uncommon/Rare/Epic trash 50/35/13/2, elite 10/45/37/8, boss 0/25/55/20; the piece is from the mob's tier (`ceil(level / 2)`), from the looter's role 70% of the time. Bosses with named Legendaries add one 25% of the time; non-bosses drop junk 30%. Quest turn-ins pay `xp * 15%` SP. Prices: `base(rarity) * (2 + ilvl) / 4` with base 8/20/50/120/300 unless authored; sell price 25% (junk 100%).
 
 Measured (combat_core tests, level-capped bots, 3 seeds): a full set of tier-appropriate Rare gear cuts boss kill time to 72-80% of fresh and raises the boss-fight minimum HP by 13-32 points; Code Review damage over 10 s goes up by about 60% at tier 5.
+
+## Talents
+
+- Splash: extra targets within the radius of the primary target (nearest first, enemies already in combat, injured allies for heals) take `pct` of the spell's damage or healing; DoTs and HoTs land at full strength.
+- `CastTime` adds to the cast-time aura percent after haste (-100 = instant); `ManaCost` subtracts from 100% of the cost; `HpCost` pays `mana * pct / 100` HP instead (never below 1 HP); `Periodic` scales the snapshotted tick; `DamageTaken` adds to the damage-taken percent with auras and class armour.
+- Performance Review: `respec_sp_per_level * level` Story Points (15 per level: 150 SP at level 10, about 3% of a campaign's SP).
+- Balance gate (`every_talent_build_clears_the_campaign`): each class clears the campaign on 3 seeds with options 1, 2 and 3 in every row; total boss time may not drop below 80% of the fastest class without talents.

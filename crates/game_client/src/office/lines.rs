@@ -173,6 +173,10 @@ pub fn mine(def: &PropDef, outcome: u32, nth: u32, content: &Content) -> Option<
         PropKind::Scooter => {
             "Unlocked with your face. The AI recognised you as 'Scooter Owner'.".to_string()
         }
+        PropKind::SprintBoard => {
+            "The board shows this week's affixes. Someone already estimated your death at 3 points."
+                .to_string()
+        }
     })
 }
 
@@ -219,6 +223,7 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::AiCar => "Honk",
         PropKind::BikeRack => "Keep the bike company",
         PropKind::Scooter => "Borrow (unlock with your face)",
+        PropKind::SprintBoard => "Plan a sprint (timed run)",
     };
     let extra = match def.kind {
         PropKind::FireAlarm => "WARNING: every enemy on this floor will come for you.".to_string(),
@@ -227,6 +232,9 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::Scooter => "+60% speed out of combat. Damage ends the ride.".to_string(),
         PropKind::Printer => "Users report persistence helps. Users are wrong.".to_string(),
         PropKind::BikeRack => "It has been waiting a long time.".to_string(),
+        PropKind::SprintBoard => {
+            "Story points, affixes, a par time. Velocity is mandatory.".to_string()
+        }
         _ => String::new(),
     };
     (action, extra)

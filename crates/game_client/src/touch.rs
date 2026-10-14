@@ -391,6 +391,7 @@ fn spawn_hud(mut commands: Commands) {
                 ("J", TouchButton::Act(Action::QuestLog)),
                 ("N", TouchButton::Act(Action::Map)),
                 ("B", TouchButton::Act(Action::Trophies)),
+                ("R", TouchButton::Act(Action::Career)),
                 ("M", TouchButton::Act(Action::Mute)),
                 ("Esc", TouchButton::Key(KeyCode::Escape)),
             ] {

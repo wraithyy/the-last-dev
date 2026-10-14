@@ -45,9 +45,9 @@ const EXTRA_SLOT_BASE: usize = 10_000;
 
 /// A trash pack of the loaded zone, kept for group-size growth after the load.
 pub(crate) struct PackRt {
-    id: u32,
-    at: Vec3,
-    yaw: f32,
+    pub(crate) id: u32,
+    pub(crate) at: Vec3,
+    pub(crate) yaw: f32,
     level: u8,
     defs: Vec<usize>,
     index: usize,
@@ -90,6 +90,13 @@ impl Sim {
         let anchor = |a: &str| {
             anchors(a).ok_or_else(|| ContentError::Invalid(format!("zone {id}: no anchor {a}")))
         };
+        let spots = z.packs.iter().map(|p| &p.anchor);
+        let spots = spots.chain(z.boss.iter().map(|b| &b.anchor));
+        for a in spots.chain(z.friendly.iter().map(|f| &f.anchor)) {
+            anchor(a)?;
+        }
+        // May swap the campaign world back in (leaving a sprint), so it goes before any lookup.
+        self.sprint_on_load(id);
         let state = self.world.zones.get(id);
         let recent = state
             .and_then(|s| s.left_at)
@@ -105,7 +112,7 @@ impl Sim {
         let mut packs = Vec::new();
         for (k, p) in z.packs.iter().enumerate() {
             let (at, yaw) = anchor(&p.anchor)?;
-            let level = if k * 2 < z.packs.len() { lo } else { hi };
+            let level = self.sprint_level(if k * 2 < z.packs.len() { lo } else { hi });
             let mut defs = Vec::new();
             for key in &p.units {
                 defs.push(self.def_index(key)?);
@@ -142,7 +149,7 @@ impl Sim {
                     def,
                     pos: at,
                     yaw,
-                    level: self.content.units[def].level,
+                    level: self.sprint_level(self.content.units[def].level),
                     pack: Some(pack_id),
                     boss: true,
                     slot: None,
@@ -213,6 +220,7 @@ impl Sim {
             );
         }
         self.grow_packs();
+        self.sprint_after_load();
         if let Some((pos, yaw)) = graveyard {
             self.set_respawn_point(pos, yaw);
         }
@@ -297,7 +305,9 @@ impl Sim {
                 .map(|l| ZoneLinkView {
                     anchor: l.anchor.clone(),
                     to: l.to.clone(),
-                    unlocked: l.requires.as_ref().is_none_or(|r| self.unlock_met(r)),
+                    unlocked: self
+                        .sprint_link_open(&l.to)
+                        .unwrap_or_else(|| l.requires.as_ref().is_none_or(|r| self.unlock_met(r))),
                 })
                 .collect()
         })

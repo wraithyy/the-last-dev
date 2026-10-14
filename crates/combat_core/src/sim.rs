@@ -116,8 +116,10 @@ pub(crate) struct Unit {
     pub class: Option<usize>,
     /// Player HP once per second, newest first (Revert Commit looks back in it).
     pub hp_hist: [u32; HP_HIST_LEN],
-    /// Perks of the equipped gear and complete sets (players only).
+    /// Perks of the equipped gear, complete sets and picked talents (players only).
     pub perks: Vec<crate::economy::ActivePerk>,
+    /// Share of damage and healing while a talent splash resolves on extra targets (else 100).
+    pub splash_pct: u32,
     /// Ready tick per on-use item, the consumable group (`"consumable"`) and perk ICDs.
     pub item_cd: BTreeMap<String, u64>,
     /// Tick of the pull (first threat entry); 0 while out of combat. Drives `AiDef::enrage`.
@@ -183,7 +185,7 @@ pub struct Sim {
     /// Earliest tick for the next throttled hostile yell, shared by all units.
     pub(crate) hostile_yell_next: u64,
     /// Root of every unit's private wander stream.
-    seed: u64,
+    pub(crate) seed: u64,
     pub(crate) wandering: bool,
     /// Gear, junk and SP rolls; separate from `rng` so loot tables never shift combat replays.
     pub(crate) loot_rng: Rng,
@@ -193,6 +195,8 @@ pub struct Sim {
     pub(crate) zone_packs: Vec<crate::zones::PackRt>,
     /// Props, achievements and rides (`world.rs`).
     pub(crate) fun: crate::world::WorldRt,
+    /// Sprint mode runs, keystones and records (`sprint.rs`).
+    pub(crate) sprint: crate::sprint::SprintState,
 }
 
 impl Sim {
@@ -220,6 +224,7 @@ impl Sim {
             next_telegraph: 1,
             zone_packs: Vec::new(),
             fun: crate::world::WorldRt::new(seed),
+            sprint: Default::default(),
         }
     }
 
@@ -388,6 +393,7 @@ impl Sim {
             buyback: Vec::new(),
             achievements: Vec::new(),
             title: String::new(),
+            talents: [0; crate::talents::TALENT_ROWS],
         };
         self.units.push(Unit {
             state,
@@ -438,6 +444,7 @@ impl Sim {
             fleeing: false,
             flee_next: 0,
             perks: Vec::new(),
+            splash_pct: 100,
             item_cd: BTreeMap::new(),
         });
         let i = self.units.len() - 1;
@@ -494,7 +501,10 @@ impl Sim {
             | Command::Buyback { .. }
             | Command::UseItem { .. }
             | Command::Interact { .. }
-            | Command::SetTitle { .. } => {}
+            | Command::SetTitle { .. }
+            | Command::PickTalent { .. }
+            | Command::ResetTalents
+            | Command::StartSprint { .. } => {}
         }
         self.pending.push((Some(player), cmd));
     }
@@ -529,7 +539,9 @@ impl Sim {
         self.zone.as_deref().and_then(floor_number)
     }
 
+    /// For a bar spell a talent replaces, the view is of the variant it casts.
     pub fn cooldown(&self, caster: EntityId, spell: SpellId) -> CooldownView {
+        let spell = self.cast_spell_for(caster, spell);
         let (Some(ci), Some(def)) = (self.index(caster), self.content.spell(spell)) else {
             return CooldownView {
                 gcd_remaining_ms: 0,
@@ -618,6 +630,7 @@ impl Sim {
         self.update_hp_history();
         self.update_combat_flags();
         self.update_world();
+        self.update_sprint();
         self.flush_yells();
         self.sync_views();
     }
@@ -683,6 +696,9 @@ impl Sim {
             Command::UseItem { item } => self.use_item(actor, &item),
             Command::Interact { prop } => self.interact(actor, &prop),
             Command::SetTitle { achievement } => self.set_title(actor, &achievement),
+            Command::PickTalent { row, choice } => self.pick_talent(actor, row, choice),
+            Command::ResetTalents => self.reset_talents(actor),
+            Command::StartSprint { building, level } => self.start_sprint(actor, &building, level),
             other => self.apply_named(other),
         }
     }
@@ -725,7 +741,10 @@ impl Sim {
             | Command::Buyback { .. }
             | Command::UseItem { .. }
             | Command::Interact { .. }
-            | Command::SetTitle { .. } => {}
+            | Command::SetTitle { .. }
+            | Command::PickTalent { .. }
+            | Command::ResetTalents
+            | Command::StartSprint { .. } => {}
         }
     }
 
@@ -740,7 +759,12 @@ impl Sim {
         u.state.pos = pos;
         u.state.yaw = yaw;
         u.moving = moving;
-        if moving {
+        let keeps = u
+            .cast
+            .as_ref()
+            .and_then(|c| self.content.spell(c.spell))
+            .is_some_and(|d| self.perk_moving_ok(i, d));
+        if moving && !keeps {
             self.cancel_cast(i, None, 0);
         }
     }
@@ -840,7 +864,8 @@ impl Sim {
                 total.add(&it.bonus.totals(*copies));
             }
         }
-        let (gear, perks) = self.gear_totals(i);
+        let (gear, mut perks) = self.gear_totals(i);
+        perks.extend(self.talent_perks(i));
         total.add(&gear.totals);
         total.haste_pct += gear.haste_tenths / 10;
         total.armor_tenths = total.armor_tenths.min(crate::economy::ARMOR_CAP_TENTHS);
@@ -1035,7 +1060,11 @@ impl Sim {
         } else {
             Some(u.state.id)
         };
-        if spell.cast_ms > 0 && u.moving {
+        if spell.cast_ms > 0
+            && u.moving
+            && self.cast_time(ci, spell) > 0
+            && !self.perk_moving_ok(ci, spell)
+        {
             return Err(CastError::Moving);
         }
         if u.state.mana < self.perk_mana_cost(ci, spell.id, spell.mana) {
@@ -1107,6 +1136,7 @@ impl Sim {
 
     fn handle_cast(&mut self, caster: EntityId, spell_id: SpellId) {
         let Some(ci) = self.index(caster) else { return };
+        let spell_id = self.effective_spell(ci, spell_id);
         let Some(spell) = self.content.spell(spell_id).cloned() else {
             return;
         };
@@ -1306,9 +1336,11 @@ impl Sim {
     pub(crate) fn resolve(&mut self, ci: usize, spell: &SpellDef, target: Option<EntityId>) {
         let caster = Self::id_of(ci);
         let mana = self.perk_mana_cost(ci, spell.id, spell.mana);
+        let hp_cost = self.perk_hp_cost(ci, spell.mana);
         let cooldown_ms = self.perk_cooldown(ci, spell.id, spell.cooldown_ms);
         let u = &mut self.units[ci];
         u.state.mana = u.state.mana.saturating_sub(mana);
+        u.state.hp = u.state.hp.saturating_sub(hp_cost).max(1);
         if cooldown_ms > 0 {
             u.cooldowns
                 .insert(spell.id, (self.now + ticks(cooldown_ms), cooldown_ms));
@@ -1339,6 +1371,17 @@ impl Sim {
                     self.apply_effect(ci, spell, e, Some(ti));
                 }
             }
+        }
+        if let (None, [primary]) = (spell.area, targets.as_slice())
+            && let Some((extra, pct)) = self.perk_splash(ci, spell, *primary)
+        {
+            self.units[ci].splash_pct = pct;
+            for e in spell.effects().filter(|e| !e.caster_centric()) {
+                for &ti in &extra {
+                    self.apply_effect(ci, spell, e, Some(ti));
+                }
+            }
+            self.units[ci].splash_pct = 100;
         }
         self.perk_after_cast(ci, spell.id, target);
     }
@@ -1423,6 +1466,7 @@ impl Sim {
             return self.deal_damage(target, source, hit);
         }
         let amount = self.modified_damage(source, ti, amount);
+        let amount = self.sprint_damage(source, ti, amount, spell, school);
         let amount = if dot {
             amount
         } else {
@@ -1582,6 +1626,12 @@ impl Sim {
             .then(|| self.now + ticks(respawn_ms));
         if let Some(k) = killer {
             self.award_kill_xp(k, ti);
+        }
+        if let Some(ki) = killer
+            .filter(|k| self.is_player(*k))
+            .and_then(|k| self.index(k))
+        {
+            self.perk_on_kill(ki);
         }
         for LootShare { owner, items, sp } in shares {
             let e = Event::LootDropped {

@@ -1228,3 +1228,47 @@ async fn load_10_rooms_of_5_bots() {
     );
     s.shutdown().await;
 }
+
+/// Career Ladder online: a pick travels as a command, the server sim validates it against the
+/// level, everyone gets `TalentsChanged`, and snapshots carry the picks for late joiners.
+#[tokio::test]
+async fn talent_picks_are_validated_and_shared() {
+    let s = start(Config {
+        dev_start_level: vec![4],
+        ..cfg()
+    })
+    .await;
+    let (mut a, code, a_id) = create(s.addr).await;
+    let (mut b, _) = join(s.addr, &code).await;
+    // Row 2 needs level 6: refused, only the sender hears why.
+    a.send(enc(&ClientMsg::Cmd(Command::PickTalent {
+        row: 2,
+        choice: 1,
+    })))
+    .await
+    .unwrap();
+    wait_for(&mut a, |m| {
+        matches!(m, ServerMsg::Events { events, .. } if events.iter().any(|e| matches!(e,
+            Event::ItemError { reason: combat_core::ItemError::NotEligible })))
+    })
+    .await;
+    a.send(enc(&ClientMsg::Cmd(Command::PickTalent {
+        row: 1,
+        choice: 3,
+    })))
+    .await
+    .unwrap();
+    wait_for(&mut b, |m| {
+        matches!(m, ServerMsg::Events { events, .. } if events.contains(&Event::TalentsChanged {
+            unit: a_id,
+            talents: [0, 3, 0, 0, 0],
+        }))
+    })
+    .await;
+    wait_for(&mut b, |m| {
+        matches!(m, ServerMsg::Snapshot { players, .. }
+            if players.iter().any(|p| p.id == a_id && p.talents == [0, 3, 0, 0, 0]))
+    })
+    .await;
+    s.shutdown().await;
+}

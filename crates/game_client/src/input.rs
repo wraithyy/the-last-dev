@@ -18,6 +18,23 @@ pub struct TextFocus(pub bool);
 #[derive(Resource, Default)]
 pub struct TrophiesOpen(pub bool);
 
+/// The `~/career` talent window (R); Esc closes it like the others.
+#[derive(Resource, Default)]
+pub struct CareerOpen(pub bool);
+
+/// Sprint planner and Sprint Review windows (`sprint.rs`); Esc closes them like the others.
+#[derive(Resource, Default)]
+pub struct SprintWindows {
+    pub planner: bool,
+    pub review: bool,
+}
+
+impl SprintWindows {
+    pub fn close_one(&mut self) -> bool {
+        std::mem::take(&mut self.review) || std::mem::take(&mut self.planner)
+    }
+}
+
 /// Quest dialog (sim id of the giver), `~/jira` log (J) and map (N). Here for the same reason as
 /// `TrophiesOpen`: Esc closes them before it clears the target or pauses.
 #[derive(Resource, Default)]
@@ -88,7 +105,9 @@ impl Plugin for InputPlugin {
         app.init_resource::<Paused>()
             .init_resource::<TextFocus>()
             .init_resource::<TrophiesOpen>()
+            .init_resource::<CareerOpen>()
             .init_resource::<QuestWindows>()
+            .init_resource::<SprintWindows>()
             .init_resource::<PlayerInput>()
             .init_resource::<MouseState>()
             .add_systems(

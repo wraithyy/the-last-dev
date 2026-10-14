@@ -689,6 +689,18 @@ fn sign_spec(s: Sign) -> SignSpec {
             [215, 215, 220],
             [150, 150, 160],
         ),
+        Sign::SprintBoard => sp(
+            &["SPRINT PLANNING", "PICK A BUILDING", "STORY POINTS: YES"],
+            [244, 246, 248],
+            [30, 60, 160],
+            [210, 60, 40],
+        ),
+        Sign::SprintTerminal => sp(
+            &["SPRINT TERMINAL", "> START RUN_"],
+            [10, 14, 20],
+            [90, 255, 140],
+            [255, 200, 80],
+        ),
         Sign::ColdAisle => sp(
             &["COLD AISLE", "BRING A JACKET"],
             [14, 40, 70],

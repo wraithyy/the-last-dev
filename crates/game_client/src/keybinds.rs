@@ -40,6 +40,8 @@ pub enum Action {
     Trophies,
     /// `~/whoami`: equipment, stats and bag.
     CharacterSheet,
+    /// `~/career`: the Career Ladder talent window.
+    Career,
     /// Gadget bar slot 0..3: equipped on-use items.
     Gadget(u8),
     Chat,
@@ -103,6 +105,7 @@ impl Action {
             Map,
             Trophies,
             CharacterSheet,
+            Career,
             Chat,
             CombatLog,
             Meter,
@@ -142,6 +145,7 @@ impl Action {
             Map => "map".into(),
             Trophies => "trophies".into(),
             CharacterSheet => "character_sheet".into(),
+            Career => "career".into(),
             Gadget(i) => format!("gadget{i}"),
             Chat => "chat".into(),
             CombatLog => "combat_log".into(),
@@ -178,6 +182,7 @@ impl Action {
             Map => "map".into(),
             Trophies => "trophies".into(),
             CharacterSheet => "~/whoami gear and bag".into(),
+            Career => "~/career talents".into(),
             Gadget(i) => format!("gadget {} (on-use gear)", i + 1),
             Chat => "chat window".into(),
             CombatLog => "combat log".into(),
@@ -198,8 +203,8 @@ impl Action {
             AutoAttack | Coffee | Resurrect | Interact | Gadget(_) => Group::Combat,
             Slot(_) => Group::Bar,
             NumSlot(_) => Group::Numpad,
-            QuestLog | Map | Trophies | CharacterSheet | Chat | CombatLog | Meter | Emotes
-            | Mute | MinimapZoomIn | MinimapZoomOut => Group::Windows,
+            QuestLog | Map | Trophies | CharacterSheet | Career | Chat | CombatLog | Meter
+            | Emotes | Mute | MinimapZoomIn | MinimapZoomOut => Group::Windows,
         }
     }
 
@@ -233,6 +238,8 @@ impl Action {
             Map => KeyCode::KeyN,
             Trophies => KeyCode::KeyB,
             CharacterSheet => KeyCode::KeyI,
+            // R for Review: the performance review that decides promotions.
+            Career => KeyCode::KeyR,
             Gadget(i) => [KeyCode::KeyU, KeyCode::KeyO, KeyCode::KeyP][usize::from(i).min(2)],
             Chat => KeyCode::KeyH,
             CombatLog => KeyCode::KeyL,
@@ -463,8 +470,8 @@ mod tests {
     #[test]
     fn rebind_to_free_key() {
         let mut b = Keybinds::default();
-        assert_eq!(b.rebind(Action::AutoAttack, KeyCode::KeyR), Rebind::Done);
-        assert_eq!(b.key(Action::AutoAttack), KeyCode::KeyR);
+        assert_eq!(b.rebind(Action::AutoAttack, KeyCode::KeyZ), Rebind::Done);
+        assert_eq!(b.key(Action::AutoAttack), KeyCode::KeyZ);
         assert_eq!(b.owner_of(KeyCode::KeyT), None);
     }
 
