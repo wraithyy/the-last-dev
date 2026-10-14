@@ -497,11 +497,17 @@ async fn ping_emote_and_leave() {
     let (mut b, b_id) = join(s.addr, &code).await;
     a.send(enc(&ClientMsg::Ping { t: 42 })).await.unwrap();
     wait_for(&mut a, |m| *m == ServerMsg::Pong { t: 42 }).await;
-    b.send(enc(&ClientMsg::Emote(Emote::Lgtm))).await.unwrap();
+    b.send(enc(&ClientMsg::Emote {
+        emote: Emote::Lgtm,
+        target: None,
+    }))
+    .await
+    .unwrap();
     wait_for(&mut a, |m| {
         *m == ServerMsg::Emoted {
             player: b_id,
             emote: Emote::Lgtm,
+            target: None,
         }
     })
     .await;

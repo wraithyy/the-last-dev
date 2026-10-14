@@ -16,6 +16,7 @@ impl Content {
     pub fn spell(&self, id: SpellId) -> Option<&SpellDef>;
     pub fn action_bar(&self) -> &[SpellId];          // full bar, keys 1..=0 in order (10 slots); see Sim::known_spells
     pub fn channel_spell(&self) -> Option<&SpellDef>;  // Coffee Break (first spell with a `channel`), off the bar
+    pub fn resurrect_spell(&self) -> Option<&SpellDef>; // co-op resurrect (first `DeadAlly` spell), off the bar
     pub fn unit_def(&self, key: &str) -> Option<&UnitDef>;
     pub fn item(&self, name: &str) -> Option<&ItemDef>;   // trophy table entry by loot item name
     pub fn aura(&self, key: &str) -> Option<&AuraDef>;
@@ -54,6 +55,7 @@ impl Sim {
     pub fn grant_trophy(&mut self, name: &str) -> bool;                    // debug/test: as if looted, no event; false for unknown items
     pub fn set_player_mana(&mut self, mana: u32);                         // debug/test: silent, clamped to max
     pub fn set_player_level(&mut self, level: u8);                        // debug/test: silent, clamps to 1..=max, 0 XP, full HP/mana
+    pub fn set_level_of(&mut self, player: EntityId, level: u8) -> bool;  // same for any member (server QA start level)
     pub fn known_spells(&self, unit: EntityId) -> Vec<SpellId>;           // learned action-bar spells, bar order
     pub fn push(&mut self, cmd: Command);    // applied at the start of the next tick, as the first player
     pub fn tick(&mut self) -> Vec<Event>;    // advance exactly one 1/30 s tick; every event
@@ -108,7 +110,7 @@ pub struct UnitState {
     pub idle_pose: Option<IdlePose>,                 // Sleeping | Chatting | Sitting (friendly NPC pose hint)
 }
 
-pub enum CastError { NoTarget, InvalidTarget, Dead, OutOfRange, NotFacing, NoLineOfSight, NotEnoughMana, OnCooldown, OnGcd, AlreadyCasting, SchoolLocked, Moving, NotInterruptible, NothingToInterrupt, Stunned, Silenced, NotLearned, FullMana }
+pub enum CastError { NoTarget, InvalidTarget, Dead, OutOfRange, NotFacing, NoLineOfSight, NotEnoughMana, OnCooldown, OnGcd, AlreadyCasting, SchoolLocked, Moving, NotInterruptible, NothingToInterrupt, Stunned, Silenced, NotLearned, FullMana, InCombat, TargetNotDead }
 // CastError::message() -> &'static str: "Out of range.", "Can't do that while stunned.", "Can't do that while silenced.", "You haven't learned that spell yet.", ...
 
 pub enum Audience { All, Player(EntityId) }    // see Co-op group
@@ -135,6 +137,7 @@ pub enum Event {
     LootDropped { corpse, items }, Looted { looter, corpse, items },
     Yell { unit, text },
     Respawned { unit },
+    Resurrected { unit, by, hp, mana },                              // a member revived `unit` where it fell
     Knockback { unit, dir: Vec3, strength: f32 },                    // unit vector on XZ, metres
     Teleported { unit, pos: Vec3 },
     PhaseChanged { unit, phase: u8 },
@@ -158,10 +161,10 @@ One `Sim` per room; every player in it is one group (`MAX_PLAYERS` = 5). The sin
 - Routed events: `tick_routed` / `drain_events_routed` return `(Audience, Event)` with `Audience::All | Player(id)`. `Player(id)`: `LootDropped` and `Looted` (one per member's roll), `XpGained`, `SpellLearned`, every quest event (`QuestOffered`, `QuestAccepted`, `QuestProgress`, `QuestReady`, `QuestCompleted`), and `CastFailed` / `CastQueued` of a player caster. Everything else (including `LevelUp`, `Death`, `Respawned`, player `Yell`s, `Knockback` and `Teleported` of a player) is `All`. `tick()` returns the same events in the same order without the audience.
 - Threat and AI: an idle enemy pulls the nearest living member within `aggro_m` and sight. It attacks its top-threat target; dead and removed players leave every threat table, so it switches to the next. When every member is dead (wipe) or gone, threat tables empty and enemies evade and reset as in single-player.
 - Kills, loot, XP: see FORMULAS.md, Co-op group. Every member rolls own loot; XP is split among living members near the kill with a group bonus; quest `Kill` credit goes to the killer and every living member within 60 m. `ClearZone` credit goes to everyone; `Loot` and `Talk` credit only to the acting player. A `QuestDone` unlock opens when any member has turned the quest in.
-- Scaling: enemy max HP is multiplied by `100 + group_hp_pct_per_player * (players - 1)` percent at spawn and rescaled (HP fraction kept) on every join and leave.
+- Scaling: enemy max HP is multiplied by `100 + group_hp_pct_per_player * (players - 1)` percent (40 per extra player) at spawn and rescaled (HP fraction kept) on every join and leave; enemy damage by `100 + group_damage_pct_per_player * (players - 1)` percent (15 per extra player).
 - `remove_player(id)`: the unit despawns (`Despawned`, `unit(id)` becomes `None`, its threat and every target on it are cleared), its unclaimed loot rolls and quest log are dropped, enemy HP is rescaled. False for a non-player.
 - Zones: one shared zone per room. `load_zone` keeps every player, cancels their casts, sets every member's respawn point to `graveyard` and, when the layout provides `player_spawn`, moves member `k` to `player_spawn + pack_offsets(n)[k]` facing its yaw. The server decides when the group travels (for example the leader entering a door) and can pass the arrival point as `player_spawn`. In single-player the client still owns the body and overrides the position with its next `PlayerMoved`.
-- Death: `RespawnPlayer` via `apply_as` revives only that member, at its own respawn point.
+- Death: `RespawnPlayer` via `apply_as` revives only that member, at its own respawn point; a teammate can instead resurrect it in place (`DeadAlly`). `debug_kill_player(id)` (debug/test) kills a member with no killer.
 
 ## Contract with the client: unit keys and zones
 
@@ -230,9 +233,11 @@ Event order on a zone boss kill: `Death`, `AiState Dead`, `XpGained`/`LevelUp`/`
 
 ## Spells, effects and auras
 
-`SpellDef`: `effect` plus `extra_effects: Vec<Effect>` (resolved in order), `target: Enemy | Caster` (default Enemy), `area: Option<(radius_m, allies)>`, `interruptible` (default true), `learn_level` (default 1), `yells`.
+`SpellDef`: `effect` plus `extra_effects: Vec<Effect>` (resolved in order), `target: Enemy | Caster | Ally | DeadAlly` (default Enemy), `area: Option<(radius_m, allies)>`, `interruptible` (default true), `learn_level` (default 1), `yells`.
 
-- `target: Enemy` spells need a hostile, living, non-evading target and check range, facing (at start) and LoS; `Caster` spells target the caster. With `area` set, the target-side effects hit every living unit within `radius_m` of the caster on the caster's side (`allies: true`, caster included) or the other side.
+- `target: Enemy` spells need a hostile, living, non-evading target and check range, facing (at start) and LoS; `Caster` spells target the caster.
+- `target: Ally` (Guardrails, Rollback, On-Call Caffeine): when the caster's target is another group member, that member must be alive (`Dead`), within `range_m` (`OutOfRange`) and in LoS (`NoLineOfSight`), no facing; checked again (range, LoS, alive) at completion. Any other target (an enemy, an NPC, yourself, none) self-casts, so single-player is unchanged. `CastSucceeded.target` names who it landed on.
+- `target: DeadAlly` (spell 13, "Have You Tried Turning It Off and On Again", 6 s cast, 30 m, learned at level 1, off the bar; the client binds it to V): the target must be another member that is dead (`TargetNotDead`, `InvalidTarget` for yourself, NPCs or enemies, `NoTarget`), in range and LoS, and the caster out of combat (`InCombat`), at start and at completion. Its `Resurrect { hp_pct, mana_pct }` effect (30 / 20) revives the member where it fell, keeping its cooldowns, and emits `Resurrected { unit, by, hp, mana }` (broadcast). A member who released meanwhile makes the cast fail with `TargetNotDead`. Content validation: `Resurrect` exactly in `DeadAlly` spells, `hp_pct` 1..=100, `mana_pct` <= 100. With `area` set, the target-side effects hit every living unit within `radius_m` of the caster on the caster's side (`allies: true`, caster included) or the other side.
 - Effects: `Damage { base, coefficient_pct, apply_aura?, consume_aura?, execute? }`, `Absorb`, `Interrupt { lockout_ms }`, `Heal { base, coefficient_pct }`, `Aura { aura, duration_ms }`, `RandomAura { auras, duration_ms }` (rng pick), `Dispel { count }` (removes up to `count` harmful auras, newest first, reason `Consumed`), `Lockout { lockout_ms, school? }` (locks `school`, or the school of the target's last cast spell; cancels a cast of that school), `Knockback { strength_m }`, `Teleport { distance_m }` (to `distance_m` in front of the caster's spawn point), `Summon { unit, count, max_alive }`, `ResetAllyThreat { radius_m }`, `ThreatSwap`, `ForwardLastSpell { pct }`, `DrainMana { pct }` (removes `pct` percent of the target's max mana, no event), `Nothing`. `Summon`, `ResetAllyThreat` and `ThreatSwap` act once around the caster; the rest act on each target.
 - Only `Damage` and `ForwardLastSpell` roll `spell_hit_pct`; heals, auras, dispels, knockbacks and interrupts always land.
 - `AuraDef` flags (all default off): `stun`, `silence`, `periodic: (interval_ms, base, coefficient_pct, heal)`, `school` (of periodic and expiry damage), `cast_time_pct`, `damage_taken_pct`, `damage_done_pct`, `haste_pct` (all per stack), `max_stacks` (default 1), `spread_radius_m`, `expire_damage`, `stack_on_repeat_cast`, `reflect`.

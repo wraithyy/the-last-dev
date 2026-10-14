@@ -44,6 +44,7 @@ impl Sim {
     pub(crate) fn apply_level(&mut self, i: usize, level: u8) {
         let is_player = self.is_player(Self::id_of(i));
         let group_pct = self.group_hp_pct();
+        let group_dmg_pct = self.group_damage_pct();
         let d = &self.content.units[self.units[i].def];
         let u = &mut self.units[i];
         u.state.level = level;
@@ -62,16 +63,16 @@ impl Sim {
         } else {
             let s = &self.content.config.mob_scaling;
             let hp = scale_pct(s.hp_pct_per_level, level, d.level);
-            let group = if d.hostile && d.ai.is_some() {
-                group_pct
+            let (group, group_dmg) = if d.hostile && d.ai.is_some() {
+                (group_pct, group_dmg_pct)
             } else {
-                100
+                (100, 100)
             };
             u.state.max_hp =
                 (u64::from(d.max_hp) * u64::from(hp) * u64::from(group) / 10_000).max(1) as u32;
             u.state.max_mana = d.max_mana;
             u.sp = d.spell_power;
-            u.dmg_pct = scale_pct(s.damage_pct_per_level, level, d.level);
+            u.dmg_pct = scale_pct(s.damage_pct_per_level, level, d.level) * group_dmg / 100;
             if d.hostile {
                 let xp = scale_pct(s.xp_pct_per_level, level, d.level);
                 u.state.xp = (u64::from(d.xp_reward) * u64::from(xp) / 100) as u32;
@@ -85,6 +86,12 @@ impl Sim {
     pub(crate) fn group_hp_pct(&self) -> u32 {
         let extra = self.players.len().saturating_sub(1) as u32;
         100 + self.content.config.group_hp_pct_per_player * extra
+    }
+
+    /// Enemy damage percent for the current group size (100 solo); see FORMULAS.md.
+    pub(crate) fn group_damage_pct(&self) -> u32 {
+        let extra = self.players.len().saturating_sub(1) as u32;
+        100 + self.content.config.group_damage_pct_per_player * extra
     }
 
     /// Re-applies the group HP scaling to every enemy after a join or leave, keeping each
@@ -115,11 +122,22 @@ impl Sim {
     /// Debug/test helper: puts the player at `level` (clamped to the table) with 0 XP,
     /// full HP and mana. Silent: no `LevelUp` or `SpellLearned` events.
     pub fn set_player_level(&mut self, level: u8) {
-        let level = level.clamp(1, self.content.max_level());
-        if let Some(i) = self.first_player_index() {
-            self.apply_level(i, level);
-            self.units[i].state.xp = 0;
+        if let Some(id) = self.player() {
+            self.set_level_of(id, level);
         }
+    }
+
+    /// `set_player_level` for any group member (server dev start level); false for a non-player.
+    pub fn set_level_of(&mut self, player: EntityId, level: u8) -> bool {
+        let level = level.clamp(1, self.content.max_level());
+        let Some(i) = self.index(player).filter(|_| self.is_player(player)) else {
+            return false;
+        };
+        self.apply_level(i, level);
+        let u = &mut self.units[i].state;
+        u.xp = 0;
+        u.xp_to_next = self.content.xp_to_next(level);
+        true
     }
 
     /// Debug/test helper: sets the player's mana (clamped to max). Silent.

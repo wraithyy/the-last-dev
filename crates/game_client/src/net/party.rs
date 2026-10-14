@@ -1,9 +1,10 @@
 //! Party frames under the player frame: name, level, HP and mana of every other member of
-//! the online room. Hidden offline.
+//! the online room. Hidden offline. Clicking a frame targets that member (like F2-F5).
 
 use super::world::NetWorld;
-use crate::combat::SimRead;
+use crate::combat::{SimRead, SimUnit};
 use crate::hud::{BAR_BG, DIM, HP_GREEN, MANA_BLUE, label, set_text};
+use crate::targeting::{Target, entity_of_sim};
 use bevy::prelude::*;
 use combat_core::{MAX_PLAYERS, UnitState};
 
@@ -23,7 +24,7 @@ pub struct PartyPlugin;
 impl Plugin for PartyPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_party)
-            .add_systems(Update, update_party);
+            .add_systems(Update, (update_party, click_party));
     }
 }
 
@@ -66,6 +67,7 @@ fn spawn_party(mut commands: Commands) {
             for slot in 0..MAX_PLAYERS - 1 {
                 root.spawn((
                     PartyRow(slot),
+                    Button,
                     Node {
                         flex_direction: FlexDirection::Column,
                         row_gap: px(2),
@@ -90,6 +92,26 @@ fn members(world: &NetWorld) -> Vec<&UnitState> {
         .filter(|id| **id != world.you)
         .filter_map(|id| world.unit(*id))
         .collect()
+}
+
+fn click_party(
+    net: Option<Res<NetWorld>>,
+    rows: Query<(&PartyRow, &Interaction), Changed<Interaction>>,
+    units: Query<(Entity, &SimUnit)>,
+    mut target: ResMut<Target>,
+) {
+    let Some(world) = net.as_deref() else { return };
+    for (PartyRow(slot), i) in &rows {
+        if *i != Interaction::Pressed {
+            continue;
+        }
+        if let Some(e) = members(world)
+            .get(*slot)
+            .and_then(|u| entity_of_sim(&units, u.id))
+        {
+            target.0 = Some(e);
+        }
+    }
 }
 
 fn fraction(cur: u32, max: u32) -> f32 {

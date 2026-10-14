@@ -9,14 +9,15 @@
 use super::session::send;
 use super::transport::NetClient;
 use super::world::NetWorld;
-use crate::combat::{CAST_KEYS, CombatEvent, SimUnit};
+use crate::combat::{CAST_KEYS, CombatEvent, SimRead, SimUnit};
 use crate::hud::{ACCENT, KEY_RIM, KEY_TOP, KEY_TOP_HI, PANEL_EDGE, label, panel_bg, vgrad};
 use crate::input::{Paused, TextFocus};
 use crate::player::Player;
+use crate::targeting::Target;
 use bevy::input::InputSystems;
 use bevy::prelude::*;
 use bevy::ui::UiSystems;
-use combat_core::Event;
+use combat_core::{EntityId, Event};
 use net_proto::{ClientMsg, Emote};
 
 /// Keeps a held button or a double tap from tripping the server's rate limit.
@@ -161,11 +162,20 @@ fn menu_input(
     }
 }
 
+/// Who an emote is aimed at: the targeted group member, never yourself or an NPC.
+pub fn emote_target(
+    players: &[EntityId],
+    me: EntityId,
+    target: Option<EntityId>,
+) -> Option<EntityId> {
+    target.filter(|t| *t != me && players.contains(t))
+}
+
 fn send_emotes(
     time: Res<Time>,
     mut requests: MessageReader<EmoteRequest>,
-    client: Res<NetClient>,
-    net: Option<Res<NetWorld>>,
+    (client, net): (Res<NetClient>, Option<Res<NetWorld>>),
+    (target, sim_units): (Res<Target>, Query<&SimUnit>),
     player: Single<&SimUnit, With<Player>>,
     mut events: MessageWriter<CombatEvent>,
     mut last: Local<Option<f32>>,
@@ -176,8 +186,10 @@ fn send_emotes(
             continue;
         }
         *last = Some(now);
-        if net.is_some() {
-            send(&client, &ClientMsg::Emote(*e));
+        if let Some(world) = net.as_deref() {
+            let picked = target.0.and_then(|t| sim_units.get(t).ok()).map(|s| s.0);
+            let target = emote_target(world.players(), player.0, picked);
+            send(&client, &ClientMsg::Emote { emote: *e, target });
         } else {
             events.write(CombatEvent(Event::Yell {
                 unit: player.0,
@@ -205,5 +217,14 @@ mod tests {
         assert_eq!(menu_keys(true, false, false, None), (true, None));
         assert_eq!(slot_key(0), 1);
         assert_eq!(slot_key(9), 0);
+    }
+
+    #[test]
+    fn emotes_aim_only_at_other_group_members() {
+        let players = [1, 2, 3];
+        assert_eq!(emote_target(&players, 1, Some(2)), Some(2));
+        assert_eq!(emote_target(&players, 1, Some(1)), None);
+        assert_eq!(emote_target(&players, 1, Some(40)), None);
+        assert_eq!(emote_target(&players, 1, None), None);
     }
 }

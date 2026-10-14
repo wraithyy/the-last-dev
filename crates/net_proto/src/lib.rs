@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 2;
+pub const PROTOCOL_VERSION: u16 = 3;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -61,7 +61,12 @@ pub enum ClientMsg {
         jumping: bool,
         seq: u32,
     },
-    Emote(Emote),
+    /// `target` is the player the emote is aimed at; the server keeps it only when it names
+    /// another member of the sender's room.
+    Emote {
+        emote: Emote,
+        target: Option<EntityId>,
+    },
     /// Echoed as `Pong { t }`; `t` is the client's own clock.
     Ping {
         t: u64,
@@ -132,6 +137,7 @@ pub enum ServerMsg {
     Emoted {
         player: EntityId,
         emote: Emote,
+        target: Option<EntityId>,
     },
     Pong {
         t: u64,
@@ -214,6 +220,23 @@ impl Emote {
     /// What the character says.
     pub fn text(self) -> &'static str {
         self.entry().1
+    }
+
+    /// The phrase aimed at a colleague ("Let's sync on this, Alice.").
+    pub fn text_at(self, name: &str) -> String {
+        let template = match self {
+            Emote::Sync => "Let's sync on this, {n}.",
+            Emote::CircleBack => "Let's circle back on that, {n}.",
+            Emote::PerMyLastEmail => "{n}, per my last email...",
+            Emote::Lgtm => "LGTM, {n}. Did not read it.",
+            Emote::PlusOne => "+1 to whatever {n} said.",
+            Emote::CouldHaveBeenAnEmail => "{n}, this could have been an email.",
+            Emote::TakeOffline => "{n}, let's take this offline.",
+            Emote::NoBandwidth => "{n}, I don't have the bandwidth for you.",
+            Emote::Blocked => "I'm blocked on {n}.",
+            Emote::ShipIt => "Ship it, {n}. We'll fix it in prod.",
+        };
+        template.replace("{n}", name)
     }
 
     pub fn from_command(cmd: &str) -> Option<Emote> {
@@ -798,7 +821,14 @@ mod tests {
             },
             ClientMsg::Ping { t: 123_456 },
         ];
-        v.extend(Emote::ALL.into_iter().map(ClientMsg::Emote));
+        v.extend(Emote::ALL.into_iter().map(|emote| ClientMsg::Emote {
+            emote,
+            target: None,
+        }));
+        v.push(ClientMsg::Emote {
+            emote: Emote::Sync,
+            target: Some(7),
+        });
         v.extend(
             [
                 Command::SetTarget {
@@ -908,6 +938,17 @@ mod tests {
             ServerMsg::Events {
                 tick: 99,
                 events: vec![
+                    Event::Resurrected {
+                        unit: 2,
+                        by: 1,
+                        hp: 90,
+                        mana: 40,
+                    },
+                    Event::CastFailed {
+                        caster: 1,
+                        spell: SpellId(13),
+                        reason: CastError::InCombat,
+                    },
                     Event::Damage {
                         source: 1,
                         target: 5,
@@ -961,6 +1002,12 @@ mod tests {
             ServerMsg::Emoted {
                 player: 2,
                 emote: Emote::Lgtm,
+                target: None,
+            },
+            ServerMsg::Emoted {
+                player: 2,
+                emote: Emote::Sync,
+                target: Some(3),
             },
             ServerMsg::Pong { t: 123_456 },
         ]
@@ -1246,6 +1293,11 @@ mod tests {
         }
         assert_eq!(Emote::from_command(" /LGTM "), Some(Emote::Lgtm));
         assert_eq!(Emote::from_command("/rm -rf"), None);
+        for e in Emote::ALL {
+            let t = e.text_at("Alice");
+            assert!(t.contains("Alice") && !t.contains("{n}"), "{t}");
+        }
+        assert_eq!(Emote::Sync.text_at("Alice"), "Let's sync on this, Alice.");
     }
 
     #[test]

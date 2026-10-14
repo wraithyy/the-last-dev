@@ -365,9 +365,22 @@ impl Default for AudioSettings {
             master: 1.0,
             music: 0.6,
             sfx: 0.8,
-            muted: false,
+            muted: start_muted(),
         }
     }
+}
+
+/// Test runs start silent: `WOW_MUTE=1` natively, `?mute=1` in the page URL on the web.
+#[cfg(not(target_arch = "wasm32"))]
+fn start_muted() -> bool {
+    std::env::var_os("WOW_MUTE").is_some()
+}
+
+#[cfg(target_arch = "wasm32")]
+fn start_muted() -> bool {
+    web_sys::window()
+        .and_then(|w| w.location().search().ok())
+        .is_some_and(|q| q.contains("mute=1"))
 }
 
 impl AudioSettings {

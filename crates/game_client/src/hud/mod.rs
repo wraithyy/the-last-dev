@@ -409,7 +409,7 @@ fn update_pause_overlay(paused: Res<Paused>, mut overlay: Single<&mut Node, With
 }
 
 fn toggle_dev(keys: Res<ButtonInput<KeyCode>>, mut dev: ResMut<DevOverlay>) {
-    if keys.just_pressed(KeyCode::F3) {
+    if keys.just_pressed(KeyCode::F9) {
         dev.0 = !dev.0;
     }
 }

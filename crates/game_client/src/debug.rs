@@ -20,6 +20,9 @@
 //! - `WOW_LOOT_DEMO=1`: show the loot window and log lines for three sample items (display only; see `hud/feed.rs`).
 //! - `WOW_COFFEE=<secs>`: drain mana to 30 and start a Coffee Break that many seconds in (1 if not a number).
 //! - `WOW_AUTORUN=1`: hold "forward" so animation and camera can be checked without input.
+//! - `WOW_KEYS=t:Key,t:Key:hold,t:yaw=<rad>`: scripted input for two-client co-op shots. At `t`
+//!   seconds a key (`KeyW`, `Digit6`, `F2`, `Tab`, ...) is tapped, or held for `hold` seconds,
+//!   or the player turns to `yaw`. Goes through the real input paths (online too).
 
 use crate::camera::OrbitCamera;
 use crate::combat::{CombatSim, PendingCommands, SimReady};
@@ -183,12 +186,143 @@ impl Plugin for DebugPlugin {
                 map: env::var("WOW_MAP").is_ok(),
             });
         }
+        if let Ok(v) = env::var("WOW_KEYS") {
+            let script = KeyScript {
+                steps: parse_key_script(&v),
+                held: Vec::new(),
+                next: 0,
+            };
+            app.insert_resource(script)
+                .add_systems(
+                    PreUpdate,
+                    run_key_script
+                        .after(bevy::input::InputSystems)
+                        .before(bevy::ui::UiSystems::Focus),
+                )
+                .add_systems(FixedPreUpdate, face_from_script);
+        }
         if env::var("WOW_AUTORUN").is_ok() {
             // Fixed pre-update runs after the per-frame input snapshot and before the sim consumes it.
             app.add_systems(FixedPreUpdate, |mut input: ResMut<PlayerInput>| {
                 input.forward = 1.0;
             });
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ScriptAction {
+    Key(KeyCode, f32),
+    Face(f32),
+}
+
+#[derive(Resource)]
+struct KeyScript {
+    steps: Vec<(f32, ScriptAction)>,
+    /// Keys held down and when to let go.
+    held: Vec<(KeyCode, f32)>,
+    next: usize,
+}
+
+/// One-shot facing set by the script, consumed by the movement step.
+#[derive(Resource)]
+struct ScriptFace(f32);
+
+fn key_code(name: &str) -> Option<KeyCode> {
+    let k = match name {
+        "Tab" => KeyCode::Tab,
+        "Escape" => KeyCode::Escape,
+        "Space" => KeyCode::Space,
+        "F1" => KeyCode::F1,
+        "F2" => KeyCode::F2,
+        "F3" => KeyCode::F3,
+        "F4" => KeyCode::F4,
+        "F5" => KeyCode::F5,
+        _ => {
+            if let Some(d) = name.strip_prefix("Digit") {
+                *crate::combat::CAST_KEYS
+                    .get((d.parse::<usize>().ok()? + 9) % 10)?
+                    .first()?
+            } else {
+                let c = name.strip_prefix("Key")?.chars().next()?;
+                match c {
+                    'C' => KeyCode::KeyC,
+                    'F' => KeyCode::KeyF,
+                    'G' => KeyCode::KeyG,
+                    'S' => KeyCode::KeyS,
+                    'T' => KeyCode::KeyT,
+                    'V' => KeyCode::KeyV,
+                    'W' => KeyCode::KeyW,
+                    _ => return None,
+                }
+            }
+        }
+    };
+    Some(k)
+}
+
+/// `t:Key`, `t:Key:hold` or `t:yaw=<rad>`, comma separated; bad entries are skipped. Sorted by time.
+pub fn parse_key_script(src: &str) -> Vec<(f32, ScriptAction)> {
+    let mut out: Vec<(f32, ScriptAction)> = src
+        .split(',')
+        .filter_map(|entry| {
+            let mut parts = entry.trim().split(':');
+            let at: f32 = parts.next()?.trim().parse().ok()?;
+            let what = parts.next()?.trim();
+            let action = match what.strip_prefix("yaw=") {
+                Some(y) => ScriptAction::Face(y.parse().ok()?),
+                None => {
+                    let hold = parts.next().map_or(Some(0.0), |h| h.trim().parse().ok())?;
+                    ScriptAction::Key(key_code(what)?, hold)
+                }
+            };
+            Some((at, action))
+        })
+        .collect();
+    out.sort_by(|a, b| a.0.total_cmp(&b.0));
+    out
+}
+
+fn run_key_script(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut script: ResMut<KeyScript>,
+    mut keys: ResMut<ButtonInput<KeyCode>>,
+) {
+    let now = time.elapsed_secs();
+    let script = &mut *script;
+    script.held.retain(|(k, until)| {
+        let keep = *until > now;
+        if !keep {
+            keys.release(*k);
+        }
+        keep
+    });
+    while let Some(&(at, action)) = script.steps.get(script.next) {
+        if at > now {
+            break;
+        }
+        script.next += 1;
+        info!("WOW_KEYS {at}: {action:?}");
+        match action {
+            ScriptAction::Key(k, hold) => {
+                keys.press(k);
+                // A tap is released on the next frame, after every system saw it.
+                script.held.push((k, now + hold.max(0.001)));
+            }
+            ScriptAction::Face(yaw) => commands.insert_resource(ScriptFace(yaw)),
+        }
+    }
+}
+
+fn face_from_script(
+    mut commands: Commands,
+    face: Option<Res<ScriptFace>>,
+    mut input: ResMut<PlayerInput>,
+) {
+    if let Some(f) = face {
+        input.face_yaw = Some(f.0);
+        commands.remove_resource::<ScriptFace>();
     }
 }
 
@@ -336,5 +470,26 @@ fn retarget_camera(
                 RenderTarget::Image(plan.target.clone().into()),
                 IsDefaultUiCamera,
             ));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn key_scripts_parse_taps_holds_and_turns_in_time_order() {
+        let s =
+            parse_key_script("5:Digit6, 1:KeyW:2.5, 3:yaw=-1.5, 4:F2, 9:Nope, x:KeyG, 6:Digit0");
+        assert_eq!(
+            s,
+            vec![
+                (1.0, ScriptAction::Key(KeyCode::KeyW, 2.5)),
+                (3.0, ScriptAction::Face(-1.5)),
+                (4.0, ScriptAction::Key(KeyCode::F2, 0.0)),
+                (5.0, ScriptAction::Key(KeyCode::Digit6, 0.0)),
+                (6.0, ScriptAction::Key(KeyCode::Digit0, 0.0)),
+            ]
+        );
     }
 }

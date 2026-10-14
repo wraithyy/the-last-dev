@@ -91,6 +91,8 @@ pub struct RoomState {
     pending: Vec<(Audience, Bytes)>,
     /// Position and facing last sent per unit (`Positions` carries only changes).
     sent_pos: HashMap<EntityId, ([i32; 3], u8)>,
+    /// QA: joiners' start levels in join order (`Config::dev_start_level`).
+    pub dev_start_level: Vec<u8>,
 }
 
 fn frame(msg: &ServerMsg) -> Option<Bytes> {
@@ -151,6 +153,7 @@ impl RoomState {
             snapshot_due: false,
             pending: Vec::new(),
             sent_pos: HashMap::new(),
+            dev_start_level: Vec::new(),
         }
     }
 
@@ -194,6 +197,14 @@ impl RoomState {
         let eid = self.sim.spawn_player(pos, yaw);
         if eid == 0 {
             return false;
+        }
+        let nth = (self.joins as usize).saturating_sub(1);
+        if let Some(level) = self
+            .dev_start_level
+            .get(nth)
+            .or(self.dev_start_level.last())
+        {
+            self.sim.set_level_of(eid, *level);
         }
         // Same respawn rule load_zone applies to everyone already in the group.
         if let Some((g, gy)) = geom.and_then(|g| g.anchor("graveyard")) {
@@ -289,8 +300,18 @@ impl RoomState {
                 jumping,
                 seq,
             } => self.on_move(player, pos, facing, moving, jumping, seq),
-            ClientMsg::Emote(emote) => {
-                self.broadcast(None, &ServerMsg::Emoted { player: eid, emote });
+            ClientMsg::Emote { emote, target } => {
+                // Aimed only at another member of this room; anything else is said to nobody.
+                let target =
+                    target.filter(|t| *t != eid && self.members.values().any(|m| m.eid == *t));
+                self.broadcast(
+                    None,
+                    &ServerMsg::Emoted {
+                        player: eid,
+                        emote,
+                        target,
+                    },
+                );
             }
             ClientMsg::Ping { t } => self.push(Audience::Only(player), &ServerMsg::Pong { t }),
             // The connection handles the handshake and leaving; these never reach a room.
@@ -1097,7 +1118,13 @@ mod tests {
         s.on_join(0, "a");
         s.on_join(1, "b");
         s.tick();
-        s.on_message(1, ClientMsg::Emote(Emote::Lgtm));
+        s.on_message(
+            1,
+            ClientMsg::Emote {
+                emote: Emote::Lgtm,
+                target: None,
+            },
+        );
         s.on_message(0, ClientMsg::Ping { t: 7 });
         let eid1 = eid_of(&s, 1);
         s.on_leave(1);
@@ -1105,9 +1132,58 @@ mod tests {
         let a = msgs(&s.tick(), 0);
         assert!(a.contains(&ServerMsg::Emoted {
             player: eid1,
-            emote: Emote::Lgtm
+            emote: Emote::Lgtm,
+            target: None,
         }));
         assert!(a.contains(&ServerMsg::Pong { t: 7 }));
         assert!(a.contains(&ServerMsg::PlayerLeft { id: eid1 }));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn emote_targets_must_be_other_members_of_the_room() {
+        let mut s = room();
+        s.on_join(0, "a");
+        s.on_join(1, "b");
+        s.tick();
+        let (a, b) = (eid_of(&s, 0), eid_of(&s, 1));
+        let mob = s.sim.units().find(|u| u.hostile).map(|u| u.id).unwrap();
+        for (target, kept) in [
+            (Some(b), Some(b)),
+            (Some(a), None),
+            (Some(mob), None),
+            (Some(9_999), None),
+            (None, None),
+        ] {
+            s.on_message(
+                0,
+                ClientMsg::Emote {
+                    emote: Emote::Sync,
+                    target,
+                },
+            );
+            let got = msgs(&s.tick(), 1);
+            assert!(
+                got.contains(&ServerMsg::Emoted {
+                    player: a,
+                    emote: Emote::Sync,
+                    target: kept
+                }),
+                "{target:?}"
+            );
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn dev_start_level_applies_to_joiners_only_when_set() {
+        let mut s = room();
+        s.on_join(0, "a");
+        assert_eq!(s.sim.unit(eid_of(&s, 0)).unwrap().level, 1);
+        s.dev_start_level = vec![9, 5, 2];
+        s.on_join(1, "b");
+        s.on_join(2, "c");
+        s.on_join(3, "d");
+        assert_eq!(s.sim.unit(eid_of(&s, 1)).unwrap().level, 5);
+        assert_eq!(s.sim.unit(eid_of(&s, 2)).unwrap().level, 2);
+        assert_eq!(s.sim.unit(eid_of(&s, 3)).unwrap().level, 2);
     }
 }

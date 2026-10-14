@@ -5,14 +5,14 @@
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
 use crate::combat::{CombatEvent, SimReady, SimUnit, SimView};
-use crate::combat_anim::CombatAnim;
 use crate::config::*;
+use crate::net::RemotePlayer;
 use crate::player::Player;
 use crate::presentation::{PresentEvent, PresentQueue};
 use crate::spell_fx::{self, Fx, FxBudget, ProjKind, TicketInfo};
 use crate::units::Unit;
 use bevy::prelude::*;
-use combat_core::{EntityId, Event, SpellId};
+use combat_core::{EntityId, Event, SpellId, SpellTarget};
 use std::f32::consts::FRAC_PI_2;
 
 pub struct VfxPlugin;
@@ -45,7 +45,7 @@ struct VfxAssets {
 #[derive(Component)]
 struct VfxAttached;
 #[derive(Component)]
-struct HandGlow;
+struct HandGlow(EntityId);
 #[derive(Component)]
 struct Telegraph(EntityId);
 /// Spinning stars over a stunned unit's head.
@@ -105,10 +105,19 @@ fn attach_vfx(
     fx: Option<Res<Fx>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     sim: SimView,
-    q: Query<(Entity, &SimUnit, Option<&Unit>, Has<Player>), Without<VfxAttached>>,
+    q: Query<
+        (
+            Entity,
+            &SimUnit,
+            Option<&Unit>,
+            Has<Player>,
+            Has<RemotePlayer>,
+        ),
+        Without<VfxAttached>,
+    >,
 ) {
     let Some(fx) = fx else { return };
-    for (entity, sim_unit, unit, is_player) in &q {
+    for (entity, sim_unit, unit, is_player, remote) in &q {
         let mut e = commands.entity(entity);
         e.insert(VfxAttached);
         let head = sim
@@ -133,11 +142,12 @@ fn attach_vfx(
             });
             spell_fx::attach_unit_fx(c, &fx, sim_unit.0, head, is_player);
         });
-        if is_player {
+        // Teammates' hands glow while they cast too, so their casts read from afar.
+        if is_player || remote {
             let glow_mat = materials.add(glow(Color::srgba(0.5, 0.8, 1.0, 0.9)));
             e.with_children(|c| {
                 c.spawn((
-                    HandGlow,
+                    HandGlow(sim_unit.0),
                     Mesh3d(assets.sphere.clone()),
                     MeshMaterial3d(glow_mat),
                     Transform::from_translation(Vec3::from(HAND_GLOW_POS))
@@ -287,10 +297,19 @@ fn spawn_from_events(
                         ticket,
                     });
                 }
-                if *caster == player.0 {
+                // Every group member's spell plays its burst, not just ours; helpful spells
+                // play on the teammate they landed on.
+                if sim.players().contains(caster) {
                     let tinfo = tgt.map(|(t, p)| (p, head_of(t)));
-                    spell_fx::cast_instant(&mut commands, &fx, &mut budget, spell.0, from, tinfo);
-                    if spell.0 == BLAME_SPELL {
+                    let helpful = sim.content().spell(*spell).is_some_and(|d| {
+                        matches!(d.target, SpellTarget::Ally | SpellTarget::DeadAlly)
+                    });
+                    let at = match tgt {
+                        Some((_, p)) if helpful => p,
+                        _ => from,
+                    };
+                    spell_fx::cast_instant(&mut commands, &fx, &mut budget, spell.0, at, tinfo);
+                    if spell.0 == BLAME_SPELL && *caster == player.0 {
                         blame.cast_pending = true;
                     }
                 }
@@ -395,6 +414,27 @@ fn spawn_from_events(
                     spell_fx::spread_arc(&mut commands, &fx, &mut budget, from, to);
                 }
             }
+            Event::Resurrected { unit, .. } => {
+                if let Some(at) = unit_pos(units.iter(), *unit) {
+                    let color = rgb(LEVEL_UP_COLOR).mix(&Color::WHITE, 0.5);
+                    spawn_ring(
+                        &mut commands,
+                        &assets,
+                        &mut materials,
+                        at + Vec3::Y * 0.1,
+                        (0.3, 2.6, 1.0),
+                        color.with_alpha(0.9),
+                    );
+                    spawn_transient(
+                        &mut commands,
+                        &assets,
+                        &mut materials,
+                        at + Vec3::Y * 1.0,
+                        (0.4, 1.6, 0.9),
+                        color.with_alpha(0.5),
+                    );
+                }
+            }
             Event::LevelUp { unit, .. } if *unit == player.0 => {
                 if let Some(at) = unit_pos(units.iter(), *unit) {
                     let gold = rgb(LEVEL_UP_COLOR);
@@ -447,11 +487,16 @@ struct BlameTrack {
 
 fn update_hand_glow(
     time: Res<Time>,
-    player: Single<&CombatAnim, With<Player>>,
-    mut glows: Query<(&mut Visibility, &mut Transform), With<HandGlow>>,
+    sim: SimView,
+    mut glows: Query<(&HandGlow, &mut Visibility, &mut Transform)>,
 ) {
-    for (mut vis, mut tf) in &mut glows {
-        *vis = if player.casting {
+    let coffee = sim.content().channel_spell().map(|s| s.id);
+    for (HandGlow(id), mut vis, mut tf) in &mut glows {
+        let casting = sim
+            .unit(*id)
+            .and_then(|u| u.cast)
+            .is_some_and(|c| Some(c.spell) != coffee);
+        *vis = if casting {
             Visibility::Inherited
         } else {
             Visibility::Hidden

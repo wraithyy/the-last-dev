@@ -7,7 +7,7 @@ use super::{
 };
 use crate::combat::{
     PendingCommands, SimRead, SimReady, SimUnit, SimView, UiNotice, can_act, cast_coffee_break,
-    cast_slot, toggle_auto_attack,
+    cast_resurrect, cast_slot, toggle_auto_attack,
 };
 use crate::config::*;
 use crate::copy;
@@ -18,7 +18,7 @@ use crate::targeting::Target;
 use bevy::prelude::*;
 use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
-use combat_core::{CastError, Content, Effect, SpellDef, SpellId};
+use combat_core::{CastError, Content, Effect, SpellDef, SpellId, SpellTarget};
 
 const KEY_LABELS: [&str; 10] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 /// Locked (silenced / school lockout) keycaps: dimmed under a padlock.
@@ -120,6 +120,21 @@ struct CoffeeRing;
 #[derive(Component)]
 struct CoffeeGlow;
 
+/// The co-op resurrect button, right of coffee; only shown while others are in the group.
+#[derive(Component)]
+struct RezRoot;
+#[derive(Component)]
+struct RezButton;
+#[derive(Component)]
+struct RezIcon;
+/// Cast progress of the reboot.
+#[derive(Component)]
+struct RezGauge;
+#[derive(Component)]
+struct RezRing;
+#[derive(Component)]
+struct RezGlow;
+
 pub struct ActionBarPlugin;
 
 impl Plugin for ActionBarPlugin {
@@ -130,9 +145,11 @@ impl Plugin for ActionBarPlugin {
                 click_slots,
                 click_attack,
                 click_coffee,
+                click_rez,
                 update_slots,
                 update_attack,
                 update_coffee,
+                update_rez,
                 update_tooltip,
             )
                 .chain()
@@ -428,6 +445,15 @@ const ATTACK_ACCENT: Accent = Accent {
     gauge: (SWING_BAR, Color::srgb(0.6, 0.45, 0.15)),
 };
 
+const REZ_ACCENT: Accent = Accent {
+    legend: "V",
+    plate: (Color::srgb(0.05, 0.1, 0.12), Color::srgb(0.02, 0.04, 0.05)),
+    face: (Color::srgb(0.3, 0.62, 0.66), Color::srgb(0.12, 0.3, 0.34)),
+    edge: REZ_EDGE,
+    gauge: (Color::srgb(0.55, 0.95, 0.7), Color::srgb(0.2, 0.6, 0.4)),
+};
+const REZ_EDGE: Color = Color::srgb(0.2, 0.42, 0.45);
+
 const COFFEE_ACCENT: Accent = Accent {
     legend: "C",
     plate: (Color::srgb(0.12, 0.08, 0.05), Color::srgb(0.04, 0.03, 0.03)),
@@ -464,6 +490,13 @@ fn spawn_accents(commands: &mut Commands) {
             CoffeeGauge,
         ),
     );
+    let rez = accent_key(
+        commands,
+        left + 2.0 * (ATTACK_PLATE + COFFEE_GAP),
+        &REZ_ACCENT,
+        (RezRing, RezButton, RezIcon, RezGlow, RezGauge),
+    );
+    commands.entity(rez).insert(RezRoot);
 }
 
 /// `markers` = (ring, button, icon, glow, gauge fill) components of the control being built.
@@ -472,7 +505,7 @@ fn accent_key<R: Bundle, B: Bundle, I: Bundle, G: Bundle, F: Bundle>(
     left: f32,
     look: &Accent,
     markers: (R, B, I, G, F),
-) {
+) -> Entity {
     let (ring_m, button_m, icon_m, glow_m, gauge_m) = markers;
     commands
         .spawn(Node {
@@ -573,7 +606,8 @@ fn accent_key<R: Bundle, B: Bundle, I: Bundle, G: Bundle, F: Bundle>(
                     vgrad(look.gauge.0, look.gauge.1),
                 )],
             ));
-        });
+        })
+        .id()
 }
 
 fn click_slots(
@@ -750,6 +784,84 @@ fn update_coffee(
         }
         None => percent(0),
     };
+}
+
+fn click_rez(
+    paused: Res<Paused>,
+    flow: Res<GameFlow>,
+    sim: SimView,
+    mut pending: ResMut<PendingCommands>,
+    player: Single<&SimUnit, With<Player>>,
+    button: Single<&Interaction, (With<RezButton>, Changed<Interaction>)>,
+) {
+    if !paused.0 && **button == Interaction::Pressed && can_act(&*sim, &flow, player.0) {
+        cast_resurrect(&*sim, &mut pending, player.0);
+    }
+}
+
+/// Shown only with company; lit while a teammate lies dead, the gauge fills with the cast.
+fn update_rez(
+    sim: SimView,
+    assets: Res<AssetServer>,
+    mut icons: ResMut<IconCache>,
+    player: Single<&SimUnit, With<Player>>,
+    mut root: Single<&mut Node, (With<RezRoot>, Without<RezButton>, Without<RezGauge>)>,
+    mut button: Single<
+        (&Interaction, &mut Node),
+        (With<RezButton>, Without<RezGauge>, Without<RezRoot>),
+    >,
+    mut icon: Single<&mut ImageNode, With<RezIcon>>,
+    mut glow: Single<&mut BackgroundColor, With<RezGlow>>,
+    mut gauge: Single<&mut Node, (With<RezGauge>, Without<RezButton>, Without<RezRoot>)>,
+) {
+    let Some(spell) = sim.content().resurrect_spell() else {
+        return;
+    };
+    let me = player.0;
+    let grouped = sim.players().len() > 1;
+    let want = if grouped {
+        Display::Flex
+    } else {
+        Display::None
+    };
+    if root.display != want {
+        root.display = want;
+    }
+    if !grouped {
+        return;
+    }
+    let handle = icons.get(&assets, &spell.icon);
+    if icon.image != handle {
+        icon.image = handle;
+    }
+    let someone_down = sim
+        .players()
+        .iter()
+        .any(|p| *p != me && sim.unit(*p).is_some_and(|u| !u.alive));
+    let ready = sim.unit(me).is_some_and(|u| u.alive && !u.in_combat);
+    icon.color = if someone_down && ready {
+        Color::WHITE
+    } else {
+        ICON_STUNNED
+    };
+    let (interaction, node) = &mut *button;
+    let (top, bottom) = key_travel(1.0, ATTACK_LIP, **interaction == Interaction::Pressed);
+    if node.top != top {
+        node.top = top;
+        node.bottom = bottom;
+    }
+    glow.0 = match **interaction {
+        Interaction::Pressed => PRESS,
+        Interaction::Hovered => HOVER,
+        Interaction::None => Color::NONE,
+    };
+    let cast = sim
+        .unit(me)
+        .and_then(|u| u.cast)
+        .filter(|c| c.spell == spell.id);
+    gauge.width = percent(cast.map_or(0.0, |c| {
+        100.0 * (c.elapsed_ms as f32 / c.total_ms.max(1) as f32).clamp(0.0, 1.0)
+    }));
 }
 
 /// Top and bottom offsets of a keycap face; pressing sinks it by `TRAVEL`.
@@ -990,6 +1102,7 @@ fn effect_ret(effect: &Effect, content: &Content) -> &'static str {
         Effect::Knockback { .. } => "Knockback",
         Effect::Teleport { .. } => "Teleport",
         Effect::Summon { .. } => "Summon",
+        Effect::Resurrect { .. } => "Reboot",
         _ => "Effect",
     }
 }
@@ -1005,7 +1118,12 @@ pub fn spell_signature(d: &SpellDef, content: &Content) -> (String, String) {
     } else {
         format!("({})", rets.join(", "))
     };
-    let arg = if d.range_m > 0.0 { "target" } else { "self" };
+    let arg = match d.target {
+        SpellTarget::Ally => "ally = self",
+        SpellTarget::DeadAlly => "dead_teammate",
+        _ if d.range_m > 0.0 => "target",
+        _ => "self",
+    };
     (asset_key(&d.name), format!("({arg}) -> {ret}"))
 }
 
@@ -1062,6 +1180,7 @@ fn update_tooltip(
     slots: Query<(&Slot, &Interaction)>,
     attack: Single<&Interaction, With<AttackButton>>,
     coffee: Single<&Interaction, With<CoffeeButton>>,
+    rez: Single<&Interaction, With<RezButton>>,
     mut tip: Single<&mut Node, With<Tooltip>>,
     mut lines: Query<(&TipLine, &mut Text)>,
     mut names: Query<&mut TextSpan, (With<TipName>, Without<TipSig>)>,
@@ -1077,6 +1196,7 @@ fn update_tooltip(
         .and_then(|id| content_db.spell(id).map(|d| (id, d)));
     let hovered_attack = **attack != Interaction::None;
     let hovered_coffee = **coffee != Interaction::None;
+    let hovered_rez = **rez != Interaction::None;
     let content = if let Some((id, d)) = hovered_slot {
         if sim.known_spells(player.0).contains(&id) {
             Some(spell_tip(d, content_db))
@@ -1110,6 +1230,10 @@ fn update_tooltip(
             })
     } else if hovered_coffee {
         content_db.channel_spell().map(coffee_tip)
+    } else if hovered_rez {
+        content_db
+            .resurrect_spell()
+            .map(|d| spell_tip(d, content_db))
     } else {
         None
     };
@@ -1121,6 +1245,8 @@ fn update_tooltip(
     // The attack control sits right of the bar, so its tooltip is anchored there instead of mid-bar.
     tip.margin.left = px(if hovered_slot.is_some() {
         -TOOLTIP_W / 2.0
+    } else if hovered_rez {
+        bar_width() / 2.0 + ATTACK_GAP + 3.0 * ATTACK_PLATE + 2.0 * COFFEE_GAP - TOOLTIP_W
     } else if hovered_coffee {
         bar_width() / 2.0 + ATTACK_GAP + 2.0 * ATTACK_PLATE + COFFEE_GAP - TOOLTIP_W
     } else {
@@ -1162,7 +1288,14 @@ mod tests {
                 .map(|d| spell_signature(d, &content))
         };
         assert_eq!(sig(6), Some(("git_blame".into(), "(target) -> Dot".into())));
-        assert_eq!(sig(7).map(|s| s.1), Some("(self) -> (Heal, Dispel)".into()));
+        assert_eq!(
+            sig(7).map(|s| s.1),
+            Some("(ally = self) -> (Heal, Dispel)".into())
+        );
+        assert_eq!(
+            sig(13).map(|s| s.1),
+            Some("(dead_teammate) -> Reboot".into())
+        );
         assert_eq!(sig(9).map(|s| s.1), Some("(target) -> Stun".into()));
         assert_eq!(sig(10).map(|s| s.1), Some("(target) -> Execute".into()));
     }

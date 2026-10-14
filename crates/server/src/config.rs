@@ -49,6 +49,9 @@ pub struct Config {
     pub failed_join_lockout: Duration,
     /// Loopback/private-range clients skip per-IP limits (LAN play); global caps still apply.
     pub lan_exempt: bool,
+    /// Dev/QA only: joining players start at these levels, in join order, the last one
+    /// repeating (unset in production).
+    pub dev_start_level: Vec<u8>,
 }
 
 impl Default for Config {
@@ -79,6 +82,7 @@ impl Default for Config {
             per_ip_failed_joins: 10,
             failed_join_lockout: Duration::from_secs(30),
             lan_exempt: true,
+            dev_start_level: Vec::new(),
         }
     }
 }
@@ -90,13 +94,14 @@ USAGE: the-last-dev-server [--bind ADDR] [--web-dir DIR] [--content FILE] [--max
                            [--allowed-origin ORIGIN]... [--trusted-proxy IP]...
                            [--trust-forwarded-for] [--healthz-details] [--per-ip-conns N]
                            [--per-ip-rooms-per-min N] [--per-ip-failed-joins N]
-                           [--no-lan-exempt]
+                           [--no-lan-exempt] [--dev-start-level N[,N..]]
 
 Each flag also has an environment variable: TLD_BIND, TLD_WEB_DIR, TLD_CONTENT,
 TLD_MAX_ROOMS, TLD_MAX_PLAYERS_PER_ROOM, TLD_MAX_CONNS, TLD_ALLOWED_ORIGINS
 (comma list), TLD_TRUSTED_PROXIES (comma list), TLD_TRUST_FORWARDED_FOR=1,
 TLD_HEALTHZ_DETAILS=1, TLD_PER_IP_CONNS, TLD_PER_IP_ROOMS_PER_MIN,
-TLD_PER_IP_FAILED_JOINS, TLD_NO_LAN_EXEMPT=1. Flags win. Per-IP limits: 0 disables.
+TLD_PER_IP_FAILED_JOINS, TLD_NO_LAN_EXEMPT=1, TLD_DEV_START_LEVEL (QA only: joiners start
+at these levels in join order, e.g. 5,1; the last repeats). Flags win. Per-IP limits: 0 disables.
 Without --bind/TLD_BIND, PORT (set by hosts like Render) binds 0.0.0.0:$PORT.
 Defaults: 0.0.0.0:7777, ./web, embedded content, 50, 5, 200, per-IP 16 / 6 / 10.";
 
@@ -134,6 +139,13 @@ impl Config {
                     c.max_players_per_room = v.parse().map_err(|_| bad("expected integer"))?
                 }
                 "--max-conns" => c.max_conns = v.parse().map_err(|_| bad("expected integer"))?,
+                "--dev-start-level" => {
+                    c.dev_start_level = v
+                        .split(',')
+                        .map(|l| l.trim().parse())
+                        .collect::<Result<_, _>>()
+                        .map_err(|_| bad("expected levels like 5 or 5,1"))?
+                }
                 "--per-ip-conns" => {
                     c.per_ip_conns = v.parse().map_err(|_| bad("expected integer"))?
                 }
@@ -174,6 +186,7 @@ impl Config {
             ("TLD_PER_IP_FAILED_JOINS", "--per-ip-failed-joins"),
             ("TLD_ALLOWED_ORIGINS", "--allowed-origin"),
             ("TLD_TRUSTED_PROXIES", "--trusted-proxy"),
+            ("TLD_DEV_START_LEVEL", "--dev-start-level"),
         ] {
             if let Some(v) = env(var) {
                 apply(&mut c, flag, &v)?;

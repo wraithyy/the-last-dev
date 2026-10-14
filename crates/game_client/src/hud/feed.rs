@@ -594,6 +594,21 @@ fn collect_events(
                     copy::yell_color(me == Some(*unit), hostile),
                 );
             }
+            Event::Resurrected { unit, by, .. } => push(
+                if Some(*unit) == me {
+                    format!(
+                        "{} turned you off and on again. You feel... rebooted.",
+                        subject(&*sim, *by)
+                    )
+                } else {
+                    format!(
+                        "{} turned {} off and on again.",
+                        subject(&*sim, *by),
+                        who(&*sim, *unit)
+                    )
+                },
+                Color::srgb(0.55, 0.95, 0.7),
+            ),
             Event::Heal {
                 source,
                 target,

@@ -91,7 +91,8 @@ impl Sim {
         let caster = Self::id_of(ci);
         if let Some(t) = ti {
             let u = &self.units[t];
-            if !u.state.alive || u.despawned || u.state.ai == Some(AiState::Evade) {
+            let revives = matches!(e, Effect::Resurrect { .. });
+            if (!u.state.alive && !revives) || u.despawned || u.state.ai == Some(AiState::Evade) {
                 return;
             }
         }
@@ -307,6 +308,9 @@ impl Sim {
                 };
                 self.deal_damage(caster, Self::id_of(ti), hit);
             }
+            (Effect::Resurrect { hp_pct, mana_pct }, Some(ti)) => {
+                self.resurrect(ti, caster, *hp_pct, *mana_pct);
+            }
             (Effect::DrainMana { pct }, Some(ti)) => {
                 let t = &mut self.units[ti].state;
                 let drain = (u64::from(t.max_mana) * u64::from(*pct) / 100) as u32;
@@ -314,6 +318,24 @@ impl Sim {
             }
             _ => {}
         }
+    }
+
+    /// Revives a dead player where it fell, keeping its cooldowns (unlike a graveyard release).
+    fn resurrect(&mut self, ti: usize, by: EntityId, hp_pct: u32, mana_pct: u32) {
+        let unit = Self::id_of(ti);
+        if self.units[ti].state.alive || !self.is_player(unit) {
+            return;
+        }
+        let regen_next = self.now + ticks(self.content.config.regen.interval_ms);
+        let u = &mut self.units[ti];
+        let pct = |max: u32, p: u32| (u64::from(max) * u64::from(p) / 100) as u32;
+        u.state.alive = true;
+        u.state.hp = pct(u.state.max_hp, hp_pct).max(1);
+        u.state.mana = pct(u.state.max_mana, mana_pct);
+        u.moving = false;
+        u.regen_next = regen_next;
+        let (hp, mana) = (u.state.hp, u.state.mana);
+        self.events.push(Event::Resurrected { unit, by, hp, mana });
     }
 
     /// Heals generate no threat; the event reports the effective amount (overheal dropped).

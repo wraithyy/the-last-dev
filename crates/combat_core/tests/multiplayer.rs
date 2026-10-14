@@ -4,7 +4,8 @@
 mod common;
 
 use combat_core::{
-    AiState, Audience, Command, EntityId, Event, GROUP_SHARE_RANGE_M, MAX_PLAYERS, Sim, Vec3,
+    AiState, Audience, CastError, Command, EntityId, Event, GROUP_SHARE_RANGE_M, MAX_PLAYERS, Sim,
+    SpellId, Vec3,
 };
 use common::*;
 
@@ -39,15 +40,15 @@ fn enemy_hp_scales_with_group_size_on_join_leave_and_spawn() {
     h.sim.set_wandering(false);
     assert_eq!(h.unit(h.mob).max_hp, 900);
     let p2 = h.sim.spawn_player(Vec3::new(1.0, 0.0, 0.0), 0.0);
-    assert_eq!((h.unit(h.mob).max_hp, h.unit(h.mob).hp), (1440, 1440));
+    assert_eq!((h.unit(h.mob).max_hp, h.unit(h.mob).hp), (1260, 1260));
     let p3 = h.sim.spawn_player(Vec3::new(2.0, 0.0, 0.0), 0.0);
-    assert_eq!(h.unit(h.mob).max_hp, 1980);
+    assert_eq!(h.unit(h.mob).max_hp, 1620);
     // Players themselves are not scaled.
     assert_eq!(h.unit(p2).max_hp, h.unit(h.player).max_hp);
     let late = h.sim.spawn_unit("ceo", Vec3::new(0.0, 0.0, -90.0), 0.0);
-    assert_eq!(late.map(|id| h.unit(id).max_hp), Ok(1980));
+    assert_eq!(late.map(|id| h.unit(id).max_hp), Ok(1620));
     assert!(h.sim.remove_player(p3));
-    assert_eq!(h.unit(h.mob).max_hp, 1440);
+    assert_eq!(h.unit(h.mob).max_hp, 1260);
 
     let mut c = H::new(1, -60.0, |c| c.config.group_hp_pct_per_player = 100);
     c.sim.spawn_player(Vec3::new(1.0, 0.0, 0.0), 0.0);
@@ -64,7 +65,7 @@ fn rescale_keeps_the_hp_fraction_of_a_wounded_enemy() {
     let before = h.unit(h.mob).clone();
     h.sim.spawn_player(Vec3::new(1.0, 0.0, 0.0), 0.0);
     let after = h.unit(h.mob);
-    assert_eq!(after.max_hp, before.max_hp * 160 / 100);
+    assert_eq!(after.max_hp, before.max_hp * 140 / 100);
     assert_eq!(after.hp, before.hp * after.max_hp / before.max_hp);
 }
 
@@ -331,4 +332,169 @@ fn zone_load_moves_the_whole_group_to_the_spawn_anchor() {
     assert!((b.pos.x - spawn.x).abs() < 4.0 && (b.pos.z - spawn.z).abs() < 4.0);
     assert_eq!((a.yaw, b.yaw), (1.5, 1.5));
     assert!(h.sim.unit(h.mob).is_none(), "old units despawn");
+}
+
+const ROLLBACK: SpellId = SpellId(7);
+const REZ: SpellId = SpellId(13);
+
+fn fails_of(ev: &[(Audience, Event)], who: EntityId) -> Vec<CastError> {
+    ev.iter()
+        .filter_map(|(_, e)| match e {
+            Event::CastFailed { caster, reason, .. } if *caster == who => Some(*reason),
+            _ => None,
+        })
+        .collect()
+}
+
+fn cast_as(sim: &mut Sim, who: EntityId, target: Option<EntityId>, spell: SpellId) {
+    sim.apply_as(who, Command::SetTarget { unit: who, target });
+    sim.apply_as(who, Command::Cast { caster: who, spell });
+}
+
+#[test]
+fn helpful_spells_land_on_a_targeted_teammate_or_fall_back_to_self() {
+    let mut h = H::new(1, -60.0, |_| {});
+    let p2 = h.sim.spawn_player(Vec3::new(10.0, 0.0, 0.0), 0.0);
+    assert!(h.sim.debug_apply_aura(p2, "code_smell", 10_000));
+    run_routed(&mut h.sim, 1);
+    cast_as(&mut h.sim, h.player, Some(p2), GR);
+    let ev = run_routed(&mut h.sim, 2);
+    assert!(ev.iter().any(|(_, e)| matches!(e,
+        Event::CastSucceeded { spell, target, .. } if *spell == GR && *target == Some(p2))));
+    assert!(h.unit(p2).auras.iter().any(|a| a.key == "guardrails"));
+    assert!(!h.unit(h.player).auras.iter().any(|a| a.key == "guardrails"));
+    // Rollback's dispel takes the teammate's debuff, not the caster's.
+    run_routed(&mut h.sim, 60);
+    cast_as(&mut h.sim, h.player, Some(p2), ROLLBACK);
+    let ev = run_routed(&mut h.sim, 2);
+    assert!(ev.iter().any(|(_, e)| matches!(e,
+        Event::AuraRemoved { target, key, .. } if *target == p2 && key == "code_smell")));
+    // An enemy (or no) target self-casts, exactly like single-player.
+    let mut s = H::new(1, -60.0, |_| {});
+    let p2 = s.sim.spawn_player(Vec3::new(10.0, 0.0, 0.0), 0.0);
+    cast_as(&mut s.sim, s.player, Some(s.mob), GR);
+    run_routed(&mut s.sim, 2);
+    assert!(s.unit(s.player).auras.iter().any(|a| a.key == "guardrails"));
+    assert!(!s.unit(p2).auras.iter().any(|a| a.key == "guardrails"));
+}
+
+#[test]
+fn ally_spells_check_range_line_of_sight_and_life() {
+    let mut h = H::new(1, -60.0, |_| {});
+    let far = h.sim.spawn_player(Vec3::new(40.0, 0.0, 0.0), 0.0);
+    let walled = h.sim.spawn_player(Vec3::new(0.0, 0.0, 10.0), 0.0);
+    h.sim.set_blockers(vec![combat_core::Aabb {
+        min: Vec3::new(-3.0, 0.0, 4.0),
+        max: Vec3::new(3.0, 3.0, 5.0),
+    }]);
+    cast_as(&mut h.sim, h.player, Some(far), GR);
+    let ev = run_routed(&mut h.sim, 1);
+    assert_eq!(fails_of(&ev, h.player), vec![CastError::OutOfRange]);
+    cast_as(&mut h.sim, h.player, Some(walled), GR);
+    let ev = run_routed(&mut h.sim, 1);
+    assert_eq!(fails_of(&ev, h.player), vec![CastError::NoLineOfSight]);
+    assert!(h.sim.debug_kill_player(far));
+    h.sim.apply_as(
+        far,
+        Command::PlayerMoved {
+            pos: Vec3::new(5.0, 0.0, 0.0),
+            yaw: 0.0,
+            moving: false,
+            jumping: false,
+        },
+    );
+    cast_as(&mut h.sim, h.player, Some(far), GR);
+    let ev = run_routed(&mut h.sim, 1);
+    assert_eq!(fails_of(&ev, h.player), vec![CastError::Dead]);
+}
+
+#[test]
+fn resurrect_revives_a_dead_teammate_where_they_fell_out_of_combat_only() {
+    let mut h = H::new(1, -20.0, |_| {});
+    h.sim.set_wandering(false);
+    let p2 = h.sim.spawn_player(Vec3::new(6.0, 0.0, 0.0), 0.0);
+    // Living, self, enemy and nothing are all refused.
+    for (t, want) in [
+        (Some(p2), CastError::TargetNotDead),
+        (Some(h.player), CastError::InvalidTarget),
+        (Some(h.mob), CastError::InvalidTarget),
+        (None, CastError::NoTarget),
+    ] {
+        cast_as(&mut h.sim, h.player, t, REZ);
+        let ev = run_routed(&mut h.sim, 1);
+        assert_eq!(fails_of(&ev, h.player), vec![want], "target {t:?}");
+    }
+    assert!(h.sim.debug_kill_player(p2));
+    run_routed(&mut h.sim, 1);
+    // In combat: no.
+    h.target(h.mob);
+    h.cast(CR);
+    assert!(h.run_until(120, |e| matches!(e, Event::EnterCombat { .. })));
+    cast_as(&mut h.sim, h.player, Some(p2), REZ);
+    let ev = run_routed(&mut h.sim, 1);
+    assert_eq!(fails_of(&ev, h.player), vec![CastError::InCombat]);
+    // Out of combat it works after the full cast, with 30% HP and 20% mana, in place.
+    let mut h = H::new(1, -60.0, |_| {});
+    let p2 = h.sim.spawn_player(Vec3::new(6.0, 0.0, 0.0), 0.0);
+    assert!(h.sim.debug_kill_player(p2));
+    run_routed(&mut h.sim, 1);
+    cast_as(&mut h.sim, h.player, Some(p2), REZ);
+    let ev = run_routed(&mut h.sim, 2);
+    assert!(ev.iter().any(|(_, e)| matches!(e,
+        Event::CastStarted { spell, total_ms: 6000, .. } if *spell == REZ)));
+    let ev = run_routed(&mut h.sim, 180);
+    let (max_hp, max_mana) = (h.unit(p2).max_hp, h.unit(p2).max_mana);
+    assert!(ev.iter().any(|(a, e)| *a == Audience::All && matches!(e,
+        Event::Resurrected { unit, by, hp, mana }
+            if *unit == p2 && *by == h.player && *hp == max_hp * 30 / 100 && *mana == max_mana * 20 / 100)));
+    let u = h.unit(p2);
+    assert!(u.alive && u.hp == max_hp * 30 / 100);
+    assert_eq!(u.pos, Vec3::new(6.0, 0.0, 0.0));
+    // A dead caster or a teammate who released meanwhile fails at completion.
+    assert!(h.sim.debug_kill_player(p2));
+    run_routed(&mut h.sim, 1);
+    cast_as(&mut h.sim, h.player, Some(p2), REZ);
+    run_routed(&mut h.sim, 30);
+    h.sim.apply_as(p2, Command::RespawnPlayer);
+    let ev = run_routed(&mut h.sim, 180);
+    assert_eq!(fails_of(&ev, h.player), vec![CastError::TargetNotDead]);
+    assert!(
+        !ev.iter()
+            .any(|(_, e)| matches!(e, Event::Resurrected { .. }))
+    );
+}
+
+#[test]
+fn enemy_damage_scales_with_group_size() {
+    let first_melee = |players: usize| {
+        let mut h = H::new(1, -2.0, |c| {
+            if let Some(ai) = def_mut(c, "ceo").ai.as_mut() {
+                ai.abilities.clear();
+            }
+        });
+        h.sim.set_wandering(false);
+        for k in 1..players {
+            h.sim
+                .spawn_player(Vec3::new(50.0 + k as f32, 0.0, 0.0), 0.0);
+        }
+        h.target(h.mob);
+        h.cast(CR);
+        let ev = run_routed(&mut h.sim, 300);
+        ev.into_iter()
+            .find_map(|(_, e)| match e {
+                Event::Damage {
+                    source,
+                    spell: None,
+                    amount,
+                    absorbed,
+                    ..
+                } if source != h.player => Some(amount + absorbed),
+                _ => None,
+            })
+            .unwrap_or(0)
+    };
+    let solo = first_melee(1);
+    assert!(solo > 0);
+    assert_eq!(first_melee(2), solo * 115 / 100);
+    assert_eq!(first_melee(3), solo * 130 / 100);
 }

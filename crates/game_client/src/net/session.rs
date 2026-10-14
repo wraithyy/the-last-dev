@@ -24,7 +24,7 @@ use bevy::platform::time::Instant;
 use bevy::prelude::*;
 use combat_core::{Command, EntityId, Event};
 use net_proto::{
-    ClientMsg, ErrorKind, MAX_RAW_NAME_BYTES, PROTOCOL_VERSION, ServerMsg, decode, encode,
+    ClientMsg, Emote, ErrorKind, MAX_RAW_NAME_BYTES, PROTOCOL_VERSION, ServerMsg, decode, encode,
     is_player_command, parse_room_code,
 };
 use std::sync::OnceLock;
@@ -188,6 +188,9 @@ pub fn online_step(
         );
     }
     for cmd in pending.drain(..) {
+        if let Command::Cast { spell, .. } = cmd {
+            world.predict_cast(spell, input.moving || input.jumping, wanted_target, clock());
+        }
         if is_player_command(&cmd) {
             send(client, &ClientMsg::Cmd(cmd));
         }
@@ -394,10 +397,14 @@ fn apply(
         ServerMsg::Auras { units } => world.apply_auras(&units),
         ServerMsg::Cooldowns { tick, gcd, spells } => world.apply_cooldowns(tick, gcd, &spells),
         ServerMsg::MoveCorrection { seq, pos } => world.correct_move(seq, pos, body_pos),
-        ServerMsg::Emoted { player, emote } => world.push_presentation(Event::Yell {
-            unit: player,
-            text: emote.text().into(),
-        }),
+        ServerMsg::Emoted {
+            player,
+            emote,
+            target,
+        } => {
+            let text = emote_line(world, emote, target);
+            world.push_presentation(Event::Yell { unit: player, text });
+        }
         ServerMsg::PlayerJoined(p) => {
             world.add_player(&p);
             let name = world.name_of(p.id).unwrap_or("A colleague");
@@ -416,8 +423,17 @@ fn apply(
     }
 }
 
+/// "Let's sync on this, Alice." when aimed at a known member, the plain phrase otherwise.
+pub fn emote_line(world: &NetWorld, emote: Emote, target: Option<EntityId>) -> String {
+    match target.and_then(|t| world.name_of(t)) {
+        Some(name) => emote.text_at(name),
+        None => emote.text().into(),
+    }
+}
+
 /// `WOW_ONLINE=<ws url>` connects at startup and creates a room; with `WOW_JOIN=<code>` it
-/// joins that room instead (default address `ws://127.0.0.1:7777/ws`).
+/// joins that room instead (default address `ws://127.0.0.1:7777/ws`). `WOW_NAME` sets the
+/// display name (the server sanitises it like any other).
 pub fn auto_connect(mut lobby: ResMut<Lobby>, mut client: ResMut<NetClient>) {
     let online = std::env::var("WOW_ONLINE").ok();
     let join = std::env::var("WOW_JOIN").ok();
@@ -433,6 +449,9 @@ pub fn auto_connect(mut lobby: ResMut<Lobby>, mut client: ResMut<NetClient>) {
         }
     };
     lobby.address = address;
+    if let Ok(name) = std::env::var("WOW_NAME") {
+        lobby.name = name;
+    }
     lobby.intent = Some(match join {
         Some(code) => {
             lobby.room = super::address::Field::Room.sanitize(&code);

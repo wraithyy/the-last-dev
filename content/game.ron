@@ -20,8 +20,10 @@
         player_yell_cooldown_ms: 20000,
         mob_scaling: (hp_pct_per_level: 12, damage_pct_per_level: 10, xp_pct_per_level: 10),
         xp_rules: (above_pct_per_level: 5, above_max_levels: 4, below_pct_per_level: 20, gray_level_diff: 3),
-        // Co-op: enemy max HP +60% per group member beyond the first (docs/FORMULAS.md).
-        group_hp_pct_per_player: 60,
+        // Co-op: enemy max HP +40% per group member beyond the first (docs/FORMULAS.md).
+        group_hp_pct_per_player: 40,
+        // Co-op: enemy damage +15% per group member beyond the first.
+        group_damage_pct_per_player: 15,
     ),
     // Player growth; index 0 = level 1. Bonuses are cumulative on top of senior_engineer's stats.
     levels: [
@@ -121,9 +123,9 @@
         ),
         (
             id: 3, name: "Guardrails", icon: "guardrails", school: Arcane,
-            range_m: 0.0, cast_ms: 0, mana: 40, gcd: true, cooldown_ms: 30000,
-            target: Caster, learn_level: 3,
-            description: "The thing leadership calls 'slowing down innovation'. Absorbs the next 100 damage for up to 10 sec.",
+            range_m: 30.0, cast_ms: 0, mana: 40, gcd: true, cooldown_ms: 30000,
+            target: Ally, learn_level: 3,
+            description: "The thing leadership calls 'slowing down innovation'. Absorbs the next 100 damage for up to 10 sec. Cast on a targeted teammate, or yourself.",
             effect: Absorb(aura: "guardrails", amount: 100, duration_ms: 10000),
             yells: [
                 "Adding tests. Yes, real ones.",
@@ -160,9 +162,9 @@
         ),
         (
             id: 7, name: "Rollback", icon: "rollback", school: Arcane,
-            range_m: 0.0, cast_ms: 0, mana: 45, gcd: true, cooldown_ms: 15000,
-            target: Caster, learn_level: 5,
-            description: "Back to the last version that worked. Instantly heals you and removes one harmful effect.",
+            range_m: 30.0, cast_ms: 0, mana: 45, gcd: true, cooldown_ms: 15000,
+            target: Ally, learn_level: 5,
+            description: "Back to the last version that worked. Instantly heals and removes one harmful effect. Targets a teammate if you have one selected, otherwise you.",
             effect: Heal(base: 80, coefficient_pct: 100),
             extra_effects: [Dispel(count: 1)],
             yells: [
@@ -174,9 +176,9 @@
         ),
         (
             id: 8, name: "On-Call Caffeine", icon: "caffeine", school: Arcane,
-            range_m: 0.0, cast_ms: 0, mana: 20, gcd: false, cooldown_ms: 90000,
-            target: Caster, learn_level: 6,
-            description: "The pager went off at 3 a.m. and so did you. Increases haste by 30% for 15 sec.",
+            range_m: 30.0, cast_ms: 0, mana: 20, gcd: false, cooldown_ms: 90000,
+            target: Ally, learn_level: 6,
+            description: "The pager went off at 3 a.m. and so did you. Increases haste by 30% for 15 sec. Can be forced on a targeted teammate, which is what on-call rotations are for.",
             effect: Aura(aura: "caffeine", duration_ms: 15000),
             yells: [
                 "Pager went off at 3 a.m. I have become coffee.",
@@ -225,6 +227,20 @@
                 "Writing it by hand. Like a craftsman. Like a lunatic.",
                 "Every character typed with intent and spite.",
                 "Artisanal, hand-crafted, fully reviewed code. Behold.",
+            ],
+        ),
+        // Off the action bar: own key (V). Co-op only: needs a dead teammate as the target.
+        (
+            id: 13, name: "Have You Tried Turning It Off and On Again", icon: "rack_failover", school: Arcane,
+            range_m: 30.0, cast_ms: 6000, mana: 60, gcd: true, cooldown_ms: 0,
+            target: DeadAlly, learn_level: 1,
+            description: "Level one IT support, applied to a colleague. Brings a dead teammate back where they fell with 30% health and 20% mana. 6 sec cast, out of combat only. No ticket required.",
+            effect: Resurrect(hp_pct: 30, mana_pct: 20),
+            yells: [
+                "Have you tried turning it off and on again?",
+                "Is it plugged in? Is YOU plugged in?",
+                "Rebooting colleague. Please do not unplug during the update.",
+                "Closing your ticket as 'works on my machine'.",
             ],
         ),
 

@@ -32,6 +32,8 @@ pub enum CastError {
     Silenced,
     NotLearned,
     FullMana,
+    InCombat,
+    TargetNotDead,
 }
 
 impl CastError {
@@ -56,6 +58,8 @@ impl CastError {
             CastError::Silenced => "Can't do that while silenced.",
             CastError::NotLearned => "You haven't learned that spell yet.",
             CastError::FullMana => "You are already at full mana.",
+            CastError::InCombat => "Can't do that while in combat.",
+            CastError::TargetNotDead => "Your target is not dead. Yet.",
         }
     }
 }
@@ -235,6 +239,13 @@ pub enum Event {
     },
     Respawned {
         unit: EntityId,
+    },
+    /// A group member brought `unit` back where it fell, with this much HP and mana.
+    Resurrected {
+        unit: EntityId,
+        by: EntityId,
+        hp: u32,
+        mana: u32,
     },
     Heal {
         source: EntityId,

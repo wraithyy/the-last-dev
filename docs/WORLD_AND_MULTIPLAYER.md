@@ -166,7 +166,7 @@ per-player:
 - **Loot:**
   - Each kill gives every player in the group their own roll, so nobody fights over loot.
   - XP is split across the group, with a classic small group bonus.
-- **Scaling:** enemy HP scales with group size (for example +60% per extra player), stored in content.
+- **Scaling:** enemy HP scales with group size (+40% HP and +15% damage per extra player), stored in content.
 - **Determinism:** the server is the only sim, so lockstep is not needed. Determinism remains useful for
   replays and tests.
 
@@ -187,14 +187,14 @@ Crate `crates/net_proto`, shared by the server and the client. Dependencies: `co
   then message validation. Random bytes never panic (tested).
 - **ClientMsg:** `Hello { version, name }` (must come first, within `HELLO_DEADLINE_MS` = 5 s),
   `CreateRoom`, `JoinRoom { code }`, `LeaveRoom`, `Cmd(Command)`, `Move { pos, facing, moving,
-  jumping, seq }`, `Emote(Emote)`, `Ping { t }`. `Cmd` accepts only `is_player_command` (no
+  jumping, seq }`, `Emote { emote, target: Option<EntityId> }`, `Ping { t }`. `Cmd` accepts only `is_player_command` (no
   `PlayerMoved`, quest ids up to 64 bytes); debug hooks are `Sim` methods and unreachable. The server
   applies commands with `Sim::apply_as`, which rebinds the actor to the sender. Non-finite floats in
   `Move` are rejected.
 - **ServerMsg:** `Welcome { you, room, zone, seed, players }`, `RoomCreated { code }`,
   `Error { kind, text }`, `PlayerJoined(PlayerInfo)`, `PlayerLeft { id }`, `Events { tick, events }`
   (the events whose `Audience` includes the client), `Snapshot { tick, units, players }`,
-  `MoveCorrection { seq, pos }`, `Emoted { player, emote }`, `Pong { t }`. Decoding caps lists
+  `MoveCorrection { seq, pos }`, `Emoted { player, emote, target }`, `Pong { t }`. Decoding caps lists
   (2048 events, 1024 snapshot units, 5 players, 64 loot items / offered quests) and texts (512 bytes)
   and rejects non-finite floats.
 - **Errors:** `ErrorKind::message()` is the text to send. Unknown room, full room and a malformed code
@@ -213,7 +213,9 @@ Crate `crates/net_proto`, shared by the server and the client. Dependencies: `co
   1, and returns the canonical form.
 - **Emotes:** `Emote` (`/sync`, `/circle back`, `/per my last email`, `/lgtm`, `/+1`, `/this could
   have been an email`, `/take this offline`, `/no bandwidth`, `/blocked`, `/ship it`) with
-  `command()`, `text()` and `from_command()`. No free text on the wire.
+  `command()`, `text()`, `text_at(name)` ("Let's sync on this, Alice.") and `from_command()`. No
+  free text on the wire. An emote can carry the targeted teammate's id; the server keeps it only for
+  another member of the room. `PROTOCOL_VERSION` is 3 since targeted emotes and `Resurrected`.
 
 ### Hosting and operations
 

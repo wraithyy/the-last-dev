@@ -67,10 +67,13 @@ pub struct Config {
     /// Extra enemy max HP per group member beyond the first, in percent (FORMULAS.md).
     #[serde(default = "default_group_hp_pct")]
     pub group_hp_pct_per_player: u32,
+    /// Extra enemy damage per group member beyond the first, in percent (FORMULAS.md).
+    #[serde(default)]
+    pub group_damage_pct_per_player: u32,
 }
 
 fn default_group_hp_pct() -> u32 {
-    60
+    40
 }
 
 /// Out-of-combat regeneration: every `interval_ms` a living unit that is not in
@@ -257,6 +260,11 @@ pub enum Effect {
     DrainMana {
         pct: u32,
     },
+    /// Brings a dead group member back where they fell with these percents of max HP and mana.
+    Resurrect {
+        hp_pct: u32,
+        mana_pct: u32,
+    },
     Nothing,
 }
 
@@ -292,6 +300,10 @@ pub enum SpellTarget {
     #[default]
     Enemy,
     Caster,
+    /// A living friendly player the caster targets (range and LoS checked), else the caster.
+    Ally,
+    /// A dead group member the caster targets; the caster must be out of combat.
+    DeadAlly,
 }
 
 /// Effects hit every matching living unit within `radius_m` of the caster instead of one target.
@@ -758,6 +770,13 @@ impl Content {
         self.spells.iter().find(|s| s.channel.is_some())
     }
 
+    /// The co-op resurrect (first `DeadAlly` spell), off the bar like Coffee Break.
+    pub fn resurrect_spell(&self) -> Option<&SpellDef> {
+        self.spells
+            .iter()
+            .find(|s| s.target == SpellTarget::DeadAlly)
+    }
+
     pub fn unit_def(&self, key: &str) -> Option<&UnitDef> {
         self.units.iter().find(|u| u.key == key)
     }
@@ -858,6 +877,17 @@ impl Content {
             {
                 return bad(format!(
                     "spell {} channel needs 0 < interval_ms <= cast_ms, mana_pct 1..=100 and target Caster",
+                    s.name
+                ));
+            }
+            let resurrects = s.effects().any(|e| matches!(e, Effect::Resurrect { .. }));
+            let bad_pct = s.effects().any(|e| {
+                matches!(e, Effect::Resurrect { hp_pct, mana_pct }
+                    if !(1..=100).contains(hp_pct) || *mana_pct > 100)
+            });
+            if resurrects != (s.target == SpellTarget::DeadAlly) || bad_pct {
+                return bad(format!(
+                    "spell {} needs Resurrect (hp_pct 1..=100, mana_pct <= 100) exactly when its target is DeadAlly",
                     s.name
                 ));
             }

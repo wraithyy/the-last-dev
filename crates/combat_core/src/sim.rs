@@ -5,10 +5,10 @@
 //! reused (despawned units stay in the vector, hidden from the public views).
 
 use crate::content::{
-    AuraDef, Content, ContentError, ItemTotals, Objective, School, SpellDef, SpellId, YELL_KINDS,
-    YellKind, ticks,
+    AuraDef, Content, ContentError, ItemTotals, Objective, School, SpellDef, SpellId, SpellTarget,
+    YELL_KINDS, YellKind, ticks,
 };
-use crate::geom::{Aabb, Vec3, in_range};
+use crate::geom::{Aabb, Vec3, in_range, line_of_sight};
 use crate::nav::{Nav, NavAgent};
 use crate::quests::QuestLog;
 use crate::rng::Rng;
@@ -752,6 +752,18 @@ impl Sim {
         true
     }
 
+    /// Debug/test: a living group member dies with no killer. False for anyone else.
+    pub fn debug_kill_player(&mut self, id: EntityId) -> bool {
+        let Some(ti) = self
+            .index(id)
+            .filter(|&i| self.is_player(id) && self.units[i].state.alive)
+        else {
+            return false;
+        };
+        self.die(ti, None);
+        true
+    }
+
     /// Debug/test: applies aura `key` to a living unit as if the unit cast it on itself (the
     /// `AuraApplied` event and the unit state follow on the next tick). False for unknown or
     /// dead units and unknown auras.
@@ -847,7 +859,16 @@ impl Sim {
         {
             return Err(CastError::OnCooldown);
         }
-        let target = if spell.targets_enemy() {
+        let target = if spell.target == SpellTarget::Ally {
+            Some(self.ally_target(ci, spell)?)
+        } else if spell.target == SpellTarget::DeadAlly {
+            if u.state.in_combat {
+                return Err(CastError::InCombat);
+            }
+            let tid = u.state.target.ok_or(CastError::NoTarget)?;
+            self.check_friend(ci, tid, spell)?;
+            Some(tid)
+        } else if spell.targets_enemy() {
             let tid = u.state.target.ok_or(CastError::NoTarget)?;
             let ti = self.index(tid).ok_or(CastError::InvalidTarget)?;
             let t = &self.units[ti];
@@ -886,6 +907,41 @@ impl Sim {
             return Err(CastError::FullMana);
         }
         Ok(target)
+    }
+
+    /// `Ally` spells: the targeted friendly player when there is one, else the caster
+    /// (an enemy, an NPC or no target self-casts, so single-player is unchanged).
+    fn ally_target(&self, ci: usize, spell: &SpellDef) -> Result<EntityId, CastError> {
+        let me = Self::id_of(ci);
+        match self.units[ci].state.target {
+            Some(t) if t != me && self.is_player(t) => {
+                self.check_friend(ci, t, spell)?;
+                Ok(t)
+            }
+            _ => Ok(me),
+        }
+    }
+
+    /// A friendly-player target of `spell` (not the caster): still in the group, alive for
+    /// `Ally` and dead for `DeadAlly`, in range and line of sight. No facing, as for heals in WoW.
+    fn check_friend(&self, ci: usize, tid: EntityId, spell: &SpellDef) -> Result<(), CastError> {
+        let ti = self
+            .index(tid)
+            .filter(|&ti| ti != ci && self.is_player(tid) && !self.units[ti].despawned)
+            .ok_or(CastError::InvalidTarget)?;
+        let (u, t) = (&self.units[ci].state, &self.units[ti].state);
+        match (spell.target == SpellTarget::DeadAlly, t.alive) {
+            (true, true) => return Err(CastError::TargetNotDead),
+            (false, false) => return Err(CastError::Dead),
+            _ => {}
+        }
+        if !in_range(u.pos, t.pos, spell.range_m) {
+            return Err(CastError::OutOfRange);
+        }
+        if !line_of_sight(u.pos, t.pos, &self.blockers) {
+            return Err(CastError::NoLineOfSight);
+        }
+        Ok(())
     }
 
     /// GCD or cast in progress: the error plus remaining ticks (for queueing).
@@ -1073,6 +1129,13 @@ impl Sim {
         spell: &SpellDef,
         target: Option<EntityId>,
     ) -> Result<(), CastError> {
+        let friendly = matches!(spell.target, SpellTarget::Ally | SpellTarget::DeadAlly);
+        if spell.target == SpellTarget::DeadAlly && self.units[ci].state.in_combat {
+            return Err(CastError::InCombat);
+        }
+        if let Some(t) = target.filter(|t| friendly && *t != Self::id_of(ci)) {
+            self.check_friend(ci, t, spell)?;
+        }
         if spell.targets_enemy() {
             let ti = target
                 .and_then(|t| self.index(t))

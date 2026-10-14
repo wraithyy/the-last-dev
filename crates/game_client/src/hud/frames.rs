@@ -733,6 +733,8 @@ fn update_frames(
                     Color::srgb(0.6, 0.6, 0.6)
                 } else if *who == Who::Player {
                     Color::WHITE
+                } else if sim.players().contains(&u.id) {
+                    crate::nameplates::PARTY_BLUE
                 } else if u.hostile {
                     Color::srgb(1.0, 0.25, 0.2)
                 } else {
@@ -846,11 +848,20 @@ struct BarView {
     spark: bool,
 }
 
+const CAST_LABEL_MAX: usize = 24;
+
 fn cast_view(sim: &dyn SimRead, cast: CastView, remaining_only: bool) -> BarView {
     let (name, icon) = sim
         .content()
         .spell(cast.spell)
         .map_or_else(Default::default, |d| (d.name.clone(), d.icon.clone()));
+    // One line on the narrow bars: "Have You Tried Turning It Off and On Again" would wrap.
+    let name = if name.chars().count() > CAST_LABEL_MAX {
+        let cut: String = name.chars().take(CAST_LABEL_MAX - 3).collect();
+        format!("{}...", cut.trim_end())
+    } else {
+        name
+    };
     let total = cast.total_ms.max(1);
     let secs = |ms: u32| ms as f32 / 1000.0;
     BarView {

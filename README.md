@@ -53,12 +53,14 @@ See [docs/PLAN.md](docs/PLAN.md), [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md), [d
 | Space | Jump |
 | Mouse wheel | Zoom |
 | Tab | Cycle nearby hostile targets (front arc first) |
-| Left click | Select unit |
+| Left click | Select unit (teammates too) |
+| F1 / F2-F5 / click a party frame | Target yourself / the other group members (online) |
+| V / reboot button | Have You Tried Turning It Off and On Again: resurrect the targeted dead teammate (6 s cast, out of combat, online) |
 | Right-click (no drag) on a hostile | Target it and start auto attack (Nitpick) |
 | Right-click (no drag) on a friendly / F near one | Talk to the NPC (within 6 m) |
 | T / Attack button | Toggle auto attack on the current target |
 | C / Coffee button | Coffee Break: channel up to 6 s, +8% max mana per second, 8 s cooldown; moving, jumping, casting or taking damage ends it |
-| 1-9, 0 (or numpad) | Action bar: Code Review, Refactor, Guardrails, Reject PR, git blame, Rollback, On-Call Caffeine, Rubber Duck, Postmortem, Write It By Hand (unlocked by level) |
+| 1-9, 0 (or numpad) | Action bar: Code Review, Refactor, Guardrails, Reject PR, git blame, Rollback, On-Call Caffeine, Rubber Duck, Postmortem, Write It By Hand (unlocked by level). Guardrails, Rollback and Caffeine land on a targeted teammate, otherwise on you |
 | F / right-click corpse | Loot (F on a friendly target talks) |
 | B | Toggle the `~/trophies` inventory window (B, `[x]` or Esc closes it) |
 | J | Toggle the `~/jira` quest log (abandon tickets there) |
@@ -66,7 +68,7 @@ See [docs/PLAN.md](docs/PLAN.md), [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md), [d
 | Up / Down, Enter, Backspace (ticket dialog) | Pick a ticket, accept / complete it, back to the list |
 | R (victory screen) | Start a new sprint |
 | M | Mute / unmute all audio |
-| F3 | Debug overlay (range, facing, LoS) |
+| F9 | Debug overlay (range, facing, LoS) |
 | Escape | Close the ticket dialog, quest log, map or trophies window, else clear target, else toggle the pause overlay (also holds the master / music / effects volume keycaps) |
 
 Rotation: Code Review applies Code Smell, and Refactor consumes it for +35% damage. Interrupt the big casts with Reject PR (level 2), shield with Guardrails, keep git blame ticking, finish with Postmortem below 25%.
@@ -101,6 +103,7 @@ docs/                 plan, version choices, known limitations
 | `WOW_KILL_BOSS=secs` | The zone boss dies (as a player kill) that many seconds in |
 | `WOW_SHOT_TIMES=t1,t2,..`, `WOW_SHOT_SIZE=WxH` | Several timed screenshots (`<path>_<n>.png`); offscreen target size (e.g. 2560x1080) |
 | `WOW_FPS=1` | Log average frame time and drawn meshes every 3 s |
+| `WOW_MUTE=1` | Start with audio muted (on the web: `?mute=1` in the URL) |
 | `WOW_LEVEL=n` | Start level (overrides the floor minimum) |
 | `WOW_PLAYER_AT=x,z,yaw_deg[,cam_deg]` | Start position after the first floor load; optional camera yaw offset (180 = front view) |
 | `WOW_CAM_DIST=m` | Start zoom |

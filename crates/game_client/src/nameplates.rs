@@ -20,6 +20,8 @@ const PLATE_GAP: f32 = 0.3;
 const BAR_W: f32 = 110.0;
 const HOSTILE: Color = Color::srgb(1.0, 0.3, 0.25);
 const FRIENDLY: Color = Color::srgb(0.4, 1.0, 0.45);
+/// Group members, as WoW's party blue, so a colleague never reads as an NPC.
+pub const PARTY_BLUE: Color = Color::srgb(0.35, 0.65, 1.0);
 
 #[derive(Component)]
 struct Nameplate {
@@ -65,6 +67,7 @@ fn spawn_plates(
         } else {
             None
         };
+        let party = sim.players().contains(&u.id);
         let title = sim
             .content()
             .unit_def(&u.key)
@@ -118,7 +121,13 @@ fn spawn_plates(
                 row.spawn((
                     PlateName(u.id),
                     label(format!("{} {}", u.level, u.name), 13.0),
-                    TextColor(if u.hostile { HOSTILE } else { FRIENDLY }),
+                    TextColor(if u.hostile {
+                        HOSTILE
+                    } else if party {
+                        PARTY_BLUE
+                    } else {
+                        FRIENDLY
+                    }),
                 ));
                 if u.hostile {
                     row.spawn((

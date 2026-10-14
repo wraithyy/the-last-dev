@@ -92,6 +92,7 @@ struct Inner {
     unjoined_ttl: Duration,
     code_gen: CodeGen,
     world: Arc<World>,
+    dev_start_level: Vec<u8>,
     rooms: Mutex<HashMap<String, Entry>>,
     shutdown: watch::Sender<bool>,
     /// Ring of tick durations in microseconds, across all rooms.
@@ -147,6 +148,7 @@ impl RoomRegistry {
             unjoined_ttl: cfg.unjoined_room_ttl,
             code_gen,
             world,
+            dev_start_level: cfg.dev_start_level.clone(),
             rooms: Mutex::new(HashMap::new()),
             shutdown: watch::channel(false).0,
             ticks_us: Mutex::new(VecDeque::with_capacity(TICK_SAMPLES)),
@@ -258,6 +260,7 @@ fn join_locked(
 async fn run_room(code: String, inner: Arc<Inner>, mut rx: mpsc::Receiver<RoomCmd>) {
     let tag = code_tag(&code);
     let mut state = RoomState::new(code.clone(), inner.world.clone());
+    state.dev_start_level.clone_from(&inner.dev_start_level);
     let mut joins = 0u32;
     let mut players: HashMap<PlayerId, mpsc::Sender<Bytes>> = HashMap::new();
     let mut empty_since = Some(Instant::now());
@@ -502,7 +505,13 @@ mod tests {
         settle().await;
         assert!(matches!(drain(&mut a)[0], ServerMsg::Welcome { .. }));
         assert!(matches!(drain(&mut b)[0], ServerMsg::Welcome { .. }));
-        assert_eq!(a.send(ClientMsg::Emote(Emote::ShipIt)), SendResult::Queued);
+        assert_eq!(
+            a.send(ClientMsg::Emote {
+                emote: Emote::ShipIt,
+                target: None,
+            }),
+            SendResult::Queued
+        );
         settle().await;
         assert!(drain(&mut b).iter().any(|m| matches!(
             m,
@@ -524,7 +533,10 @@ mod tests {
         let a = reg.create_and_join("a").unwrap();
         let mut b = reg.join(&a.code, "b").unwrap(); // never drained
         for _ in 0..5 {
-            a.send(ClientMsg::Emote(Emote::Sync));
+            a.send(ClientMsg::Emote {
+                emote: Emote::Sync,
+                target: None,
+            });
             tokio::time::sleep(Duration::from_millis(40)).await;
         }
         // Two queued messages remain readable, then the channel reports closed.
@@ -544,7 +556,10 @@ mod tests {
         let b = reg.join(&a.code, "b").unwrap(); // never drained
         let mut seen = false;
         for _ in 0..10 {
-            a.send(ClientMsg::Emote(Emote::Sync));
+            a.send(ClientMsg::Emote {
+                emote: Emote::Sync,
+                target: None,
+            });
             tokio::time::sleep(Duration::from_millis(40)).await;
             seen |= drain(&mut a)
                 .iter()

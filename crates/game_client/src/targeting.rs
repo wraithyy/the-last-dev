@@ -47,6 +47,7 @@ impl Plugin for TargetingPlugin {
                 (
                     drop_invalid_target,
                     handle_keys,
+                    party_keys,
                     click_select,
                     update_readout,
                     update_ring,
@@ -85,12 +86,60 @@ fn spawn_ring(
 }
 
 /// A despawned target is dropped, not left dangling. Dead targets stay
-/// selected on purpose: the corpse is what you loot.
-fn drop_invalid_target(mut target: ResMut<Target>, units: Query<&Unit>) {
+/// selected on purpose: the corpse is what you loot (or the teammate you resurrect).
+/// The player's own body (F1) has no `Unit` but is a valid target.
+fn drop_invalid_target(
+    mut target: ResMut<Target>,
+    units: Query<&Unit>,
+    player: Single<Entity, With<Player>>,
+) {
     if let Some(e) = target.0
         && !units.contains(e)
+        && e != *player
     {
         target.0 = None;
+    }
+}
+
+/// F1 targets yourself, F2-F5 the other group members in join order (as in WoW).
+pub const PARTY_KEYS: [KeyCode; 5] = [
+    KeyCode::F1,
+    KeyCode::F2,
+    KeyCode::F3,
+    KeyCode::F4,
+    KeyCode::F5,
+];
+
+/// Sim id behind party key `slot`: 0 is `you`, `k` the k-th other member.
+pub fn party_slot(players: &[EntityId], you: EntityId, slot: usize) -> Option<EntityId> {
+    if slot == 0 {
+        return Some(you);
+    }
+    players.iter().copied().filter(|p| *p != you).nth(slot - 1)
+}
+
+/// Bevy entity showing sim unit `id` (the player's own body included).
+pub fn entity_of_sim(units: &Query<(Entity, &SimUnit)>, id: EntityId) -> Option<Entity> {
+    units.iter().find(|(_, s)| s.0 == id).map(|(e, _)| e)
+}
+
+fn party_keys(
+    keys: Res<ButtonInput<KeyCode>>,
+    paused: Res<Paused>,
+    sim: SimView,
+    me: Single<&SimUnit, With<Player>>,
+    units: Query<(Entity, &SimUnit)>,
+    mut target: ResMut<Target>,
+) {
+    if paused.0 {
+        return;
+    }
+    let Some(slot) = PARTY_KEYS.iter().position(|k| keys.just_pressed(*k)) else {
+        return;
+    };
+    if let Some(e) = party_slot(sim.players(), me.0, slot).and_then(|id| entity_of_sim(&units, id))
+    {
+        target.0 = Some(e);
     }
 }
 
@@ -251,9 +300,17 @@ fn update_readout(
     });
 }
 
+/// Ring candidates: every sim-linked body, the player's own (no `Unit`) included.
+type RingUnits<'w, 's> = Query<
+    'w,
+    's,
+    (&'static Transform, Option<&'static Unit>),
+    (With<SimUnit>, Without<TargetRing>),
+>;
+
 fn update_ring(
     target: Res<Target>,
-    units: Query<(&Transform, &Unit), Without<TargetRing>>,
+    units: RingUnits,
     ring: Single<(
         &TargetRing,
         &mut Transform,
@@ -269,9 +326,25 @@ fn update_ring(
     *vis = Visibility::Inherited;
     // Intern is spawned with its centre at capsule height; the ring belongs on the floor.
     tf.translation = Vec3::new(unit_tf.translation.x, RING_HEIGHT, unit_tf.translation.z);
-    mat.0 = if unit.hostile {
+    mat.0 = if unit.is_some_and(|u| u.hostile) {
         data.hostile.clone()
     } else {
         data.friendly.clone()
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn party_keys_map_to_self_then_other_members_in_join_order() {
+        let players = [4, 2, 9];
+        assert_eq!(party_slot(&players, 2, 0), Some(2));
+        assert_eq!(party_slot(&players, 2, 1), Some(4));
+        assert_eq!(party_slot(&players, 2, 2), Some(9));
+        assert_eq!(party_slot(&players, 2, 3), None);
+        // Offline: just you.
+        assert_eq!(party_slot(&[7], 7, 1), None);
+    }
 }

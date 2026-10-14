@@ -184,7 +184,14 @@ impl Plugin for CombatPlugin {
             )
             .add_systems(
                 Update,
-                (cast_keys, auto_attack_key, coffee_key, interact_input).in_set(SimReady),
+                (
+                    cast_keys,
+                    auto_attack_key,
+                    coffee_key,
+                    resurrect_key,
+                    interact_input,
+                )
+                    .in_set(SimReady),
             );
         if std::env::var_os("WOW_AUTOFIGHT").is_some() {
             app.init_resource::<AutoFight>()
@@ -626,6 +633,30 @@ fn coffee_key(
 ) {
     if !paused.0 && keys.just_pressed(KeyCode::KeyC) && can_act(&*sim, &flow, player.0) {
         cast_coffee_break(&*sim, &mut pending, player.0);
+    }
+}
+
+/// Shared by the V key and the reboot button: the co-op resurrect on the current target.
+/// The sim checks the target (a dead teammate), range, line of sight and combat.
+pub fn cast_resurrect(sim: &dyn SimRead, pending: &mut PendingCommands, caster: EntityId) {
+    if let Some(spell) = sim.content().resurrect_spell() {
+        pending.0.push(Command::Cast {
+            caster,
+            spell: spell.id,
+        });
+    }
+}
+
+fn resurrect_key(
+    keys: Res<ButtonInput<KeyCode>>,
+    paused: Res<Paused>,
+    flow: Res<GameFlow>,
+    sim: SimView,
+    mut pending: ResMut<PendingCommands>,
+    player: Single<&SimUnit, With<Player>>,
+) {
+    if !paused.0 && keys.just_pressed(KeyCode::KeyV) && can_act(&*sim, &flow, player.0) {
+        cast_resurrect(&*sim, &mut pending, player.0);
     }
 }
 

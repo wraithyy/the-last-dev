@@ -7,6 +7,15 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - Phase 5 polish: profiling, wasm size reduction (no `wasm-opt` yet), settings menu.
 - Escape opens a minimal pause overlay only, with no real menu.
 
+## Co-op (online)
+
+- Player interaction is deliberately narrow: target a teammate (click, party frame, F1 self / F2-F5 members), cast the helpful spells on them (Guardrails, Rollback, On-Call Caffeine), resurrect with "Have You Tried Turning It Off and On Again" (V), and aim emotes at them. There is no trading, no free-text chat, no duels, no inspect and no item handover; trophies are personal.
+- Loot is per player and private: each member gets their own roll, only the looter sees `LootDropped`/`Looted`, and sparkles, the gold plate and the loot cursor follow your own unclaimed roll (a corpse a teammate still has to loot shows nothing for you). A corpse whose roll was empty for you looks like an empty corpse offline: no sparkles, and looting says there was nothing.
+- Quest credit: `Kill` objectives credit the killer and every living member within 60 m; `Loot` and `Talk` only the acting player; `ClearZone` everyone. There is no quest sharing; each member accepts tickets from the giver.
+- A resurrected teammate stands where they died, so enemies still standing there pull them again; resurrect after the area is clear.
+- Own casts are predicted from local knowledge (cooldowns, GCD, mana, target kind); the server can still refuse (range, line of sight, a cooldown the client missed) and the bar then vanishes with the error.
+- The resurrect key has no action-bar slot (the bar is full); it is a V keycap right of Coffee Break, shown only while someone else is in the group.
+
 ## Presentation
 
 - Floating numbers and hit reactions of projectile attacks wait for the projectile to land (1.5 s fallback). Health bars and the combat log stay sim-authoritative, so a log line and the HP drop can precede the visual by the flight time.

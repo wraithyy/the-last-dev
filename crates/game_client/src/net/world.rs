@@ -11,8 +11,8 @@ use crate::combat::SimRead;
 use bevy::prelude::Resource;
 use combat_core::{
     ActiveQuest, AiState, AuraView, CastError, CastView, Content, CooldownView, EntityId, Event,
-    ItemTotals, Objective, QuestLog, QuestStatus, SpellId, TICK_HZ, Tick, UnitState, Unlock, Vec3,
-    ZoneLinkView,
+    ItemTotals, Objective, QuestLog, QuestStatus, SpellId, SpellTarget, TICK_HZ, Tick, UnitState,
+    Unlock, Vec3, ZoneLinkView,
 };
 use net_proto::{
     AuraSnap, PlayerInfo, PlayerSnap, QuestSnap, UnitSnap, from_cm, sanitize_name, yaw_from_byte,
@@ -33,6 +33,18 @@ const MAX_UPDATE_GAP_S: f64 = 0.5;
 const MAX_TICK_LEAD_S: f64 = 2.0;
 /// Until the first Pong: a transatlantic-ish guess, so early cast bars are not far behind.
 const DEFAULT_RTT_S: f64 = 0.15;
+/// A predicted cast the server never answered (dropped by the rate limiter) is let go after this.
+const PREDICTION_TIMEOUT_S: f64 = 2.0;
+
+/// A cast shown before the server confirmed it (see `NetWorld::predict_cast`).
+#[derive(Clone, Copy, Debug)]
+struct Prediction {
+    spell: SpellId,
+    at: f64,
+    /// The GCD before the prediction started its own, restored if the server refuses.
+    gcd_before: (u64, u32),
+    bar: bool,
+}
 
 pub fn lerp(a: Vec3, b: Vec3, t: f32) -> Vec3 {
     Vec3::new(
@@ -186,6 +198,10 @@ pub struct NetWorld {
     pub move_ticks: u32,
     /// Last movement report (pos, yaw, moving, jumping): an idle player sends nothing.
     pub last_move: Option<(Vec3, f32, bool, bool)>,
+    prediction: Option<Prediction>,
+    /// Corpses holding this player's own loot roll (from `LootDropped`, which only this
+    /// player receives); the snapshot's lootable flag is about anybody's roll.
+    my_loot: BTreeSet<EntityId>,
 }
 
 impl NetWorld {
@@ -216,6 +232,8 @@ impl NetWorld {
             target_sent: None,
             move_ticks: 0,
             last_move: None,
+            prediction: None,
+            my_loot: BTreeSet::new(),
         };
         for p in players {
             w.add_player(p);
@@ -416,9 +434,14 @@ impl NetWorld {
             u.alive = s.has(UnitSnap::ALIVE);
             u.in_combat = s.has(UnitSnap::IN_COMBAT);
             u.stunned = s.has(UnitSnap::STUNNED);
-            u.lootable = s.has(UnitSnap::LOOTABLE);
+            if !s.has(UnitSnap::LOOTABLE) || u.alive {
+                self.my_loot.remove(&s.id);
+            }
+            u.lootable = !u.alive && self.my_loot.contains(&s.id);
             u.auto_attack = s.has(UnitSnap::AUTO_ATTACK);
-            if !s.has(UnitSnap::CASTING) {
+            // This snapshot may predate the server receiving our cast.
+            let predicted = s.id == self.you && self.prediction.is_some_and(|p| p.bar);
+            if !s.has(UnitSnap::CASTING) && !predicted {
                 u.cast = None;
             }
             if s.has(UnitSnap::EVADING) {
@@ -455,6 +478,11 @@ impl NetWorld {
             .last_advance
             .map_or(0, |last| ((now - last).max(0.0) * 1000.0) as u32);
         self.last_advance = Some(now);
+        if let Some(p) = self.prediction
+            && now - p.at > PREDICTION_TIMEOUT_S + self.rtt_s
+        {
+            self.drop_prediction(p);
+        }
         if dt_ms > 0 {
             for u in self.units.values_mut() {
                 for a in u.auras.iter_mut().filter(|a| a.total_ms > 0) {
@@ -475,6 +503,89 @@ impl NetWorld {
                 u.pos = pos;
                 u.yaw = yaw;
             }
+        }
+    }
+
+    /// Client-side prediction for this player's own cast: when the local picture says the
+    /// spell can go (learned, off cooldown and GCD, affordable, standing still for a cast
+    /// time, a plausible target), the cast bar and the GCD sweep start now instead of one
+    /// round trip later. The server's `CastStarted` takes over; its `CastFailed` undoes it.
+    pub fn predict_cast(
+        &mut self,
+        spell: SpellId,
+        moving: bool,
+        target: Option<EntityId>,
+        now: f64,
+    ) {
+        let you = self.you;
+        let Some(d) = self.content.spell(spell) else {
+            return;
+        };
+        if self.cooldown(you, spell).usable.is_err() || self.prediction.is_some() {
+            return;
+        }
+        let Some(me) = self.units.get(&you) else {
+            return;
+        };
+        let target_ok = match d.target {
+            SpellTarget::Enemy => target
+                .and_then(|t| self.units.get(&t))
+                .is_some_and(|t| t.hostile && t.alive),
+            SpellTarget::DeadAlly => {
+                !me.in_combat
+                    && target
+                        .filter(|t| *t != you && self.players.contains(t))
+                        .and_then(|t| self.units.get(&t))
+                        .is_some_and(|t| !t.alive)
+            }
+            SpellTarget::Caster | SpellTarget::Ally => true,
+        };
+        let busy = me.cast.is_some() && d.gcd;
+        if !target_ok || busy || me.silenced {
+            return;
+        }
+        let bar = d.cast_ms > 0 && !moving && (d.channel.is_none() || me.mana < me.max_mana);
+        if d.cast_ms > 0 && !bar {
+            return;
+        }
+        let gcd_before = self.gcd;
+        if d.gcd {
+            let gcd = self.content.gcd_ms(0);
+            self.gcd = (self.tick + ms_to_ticks(gcd), gcd);
+        }
+        if bar {
+            let total_ms = match d.channel {
+                Some(_) => d.cast_ms,
+                None => self.content.cast_ms(d, 0),
+            };
+            let interruptible = d.interruptible;
+            if let Some(u) = self.units.get_mut(&you) {
+                u.cast = Some(CastView {
+                    spell,
+                    elapsed_ms: 0,
+                    total_ms,
+                    interruptible,
+                });
+            }
+        }
+        if bar || d.gcd {
+            self.prediction = Some(Prediction {
+                spell,
+                at: now,
+                gcd_before,
+                bar,
+            });
+        }
+    }
+
+    fn drop_prediction(&mut self, p: Prediction) {
+        self.prediction = None;
+        self.gcd = p.gcd_before;
+        if p.bar
+            && let Some(u) = self.units.get_mut(&self.you)
+            && u.cast.is_some_and(|c| c.spell == p.spell)
+        {
+            u.cast = None;
         }
     }
 
@@ -519,9 +630,15 @@ impl NetWorld {
                 total_ms,
             } => {
                 let def = content.spell(*spell);
+                let confirmed =
+                    *caster == you && self.prediction.take_if(|p| p.spell == *spell).is_some();
                 if let Some(u) = self.units.get_mut(caster) {
-                    // The server started it about one way of the round trip ago.
-                    let late_ms = (self.rtt_s * 500.0) as u32;
+                    // The server started it about one way of the round trip ago; a predicted
+                    // bar is already further along and must not jump back.
+                    let mut late_ms = (self.rtt_s * 500.0) as u32;
+                    if confirmed && let Some(c) = u.cast.filter(|c| c.spell == *spell) {
+                        late_ms = late_ms.max(c.elapsed_ms);
+                    }
                     u.cast = Some(CastView {
                         spell: *spell,
                         elapsed_ms: late_ms.min(*total_ms),
@@ -534,7 +651,15 @@ impl NetWorld {
                     self.gcd = (self.tick + ms_to_ticks(gcd), gcd);
                 }
             }
+            Event::CastFailed { caster, spell, .. } if *caster == you => {
+                if let Some(p) = self.prediction.filter(|p| p.spell == *spell) {
+                    self.drop_prediction(p);
+                }
+            }
             Event::CastSucceeded { caster, spell, .. } => {
+                if *caster == you {
+                    self.prediction.take_if(|p| p.spell == *spell);
+                }
                 if let Some(u) = self.units.get_mut(caster)
                     && u.cast.is_some_and(|c| c.spell == *spell)
                 {
@@ -617,7 +742,6 @@ impl NetWorld {
                 }
             }
             Event::Death { unit, .. } => {
-                let is_player = self.players.contains(unit);
                 if let Some(u) = self.units.get_mut(unit) {
                     u.alive = false;
                     u.hp = 0;
@@ -625,18 +749,34 @@ impl NetWorld {
                     u.auras.clear();
                     u.in_combat = false;
                     u.auto_attack = false;
-                    u.lootable = !is_player;
+                    // Our own roll, if any, arrives as `LootDropped` right after.
+                    u.lootable = false;
                     if u.boss {
                         self.bosses_killed.insert(u.key.clone());
                     }
                 }
             }
             Event::Respawned { unit } => {
+                self.my_loot.remove(unit);
                 if let Some(u) = self.units.get_mut(unit) {
                     u.alive = true;
                     u.hp = u.max_hp;
                     u.mana = u.max_mana;
                     u.lootable = false;
+                }
+            }
+            Event::Resurrected { unit, hp, mana, .. } => {
+                if let Some(u) = self.units.get_mut(unit) {
+                    u.alive = true;
+                    u.hp = (*hp).min(u.max_hp);
+                    u.mana = (*mana).min(u.max_mana);
+                    u.lootable = false;
+                }
+            }
+            Event::LootDropped { corpse, .. } => {
+                self.my_loot.insert(*corpse);
+                if let Some(c) = self.units.get_mut(corpse) {
+                    c.lootable = !c.alive;
                 }
             }
             Event::XpGained { unit, amount } => {
@@ -657,6 +797,7 @@ impl NetWorld {
                 items,
             } => {
                 if *looter == you {
+                    self.my_loot.remove(corpse);
                     for item in items {
                         self.add_item(item);
                     }
@@ -679,6 +820,7 @@ impl NetWorld {
                 }
             }
             Event::Despawned { unit } => {
+                self.my_loot.remove(unit);
                 self.units.remove(unit);
                 self.interp.remove(unit);
             }
@@ -950,6 +1092,167 @@ mod tests {
         assert_eq!(elapsed(&w), Some(late + 1000));
         w.advance(5.0);
         assert_eq!(elapsed(&w), Some(2000));
+    }
+
+    /// You (id 1, the player def) plus `others` as (id, unit key, flags).
+    fn world_with(others: &[(EntityId, &str, u8)]) -> NetWorld {
+        let content = Content::from_ron(include_str!("../../../../content/game.ron")).unwrap();
+        let idx = |k: &str| content.units.iter().position(|u| u.key == k).unwrap() as u16;
+        let snap = |id, key: &str, flags| UnitSnap {
+            id,
+            key_idx: idx(key),
+            level: 1,
+            pos_cm: [0, 0, 0],
+            facing: 0,
+            hp: 100,
+            max_hp: 100,
+            target: None,
+            flags,
+            auras: Vec::new(),
+        };
+        let mut units = vec![snap(1, "senior_engineer", UnitSnap::ALIVE)];
+        units.extend(others.iter().map(|(id, k, f)| snap(*id, k, *f)));
+        let mut w = NetWorld::new(content, 1, "R".into(), &[]);
+        w.apply_snapshot(1, &units, &[], 0.0);
+        w
+    }
+
+    #[test]
+    fn own_cast_is_predicted_at_once_and_handed_to_the_server() {
+        let cr = SpellId(1);
+        let mut w = world_with(&[(2, "meatproxy", UnitSnap::ALIVE)]);
+        let bar = |w: &NetWorld| w.units[&1].cast.map(|c| (c.spell, c.elapsed_ms));
+        // Moving, or no enemy target: no prediction.
+        w.predict_cast(cr, true, Some(2), 0.0);
+        w.predict_cast(cr, false, None, 0.0);
+        assert_eq!(bar(&w), None);
+        assert_eq!(w.cooldown(1, cr).gcd_remaining_ms, 0);
+        w.predict_cast(cr, false, Some(2), 0.0);
+        assert_eq!(bar(&w), Some((cr, 0)));
+        assert!(w.cooldown(1, cr).gcd_remaining_ms > 0);
+        // A snapshot taken before the server saw the command does not wipe the bar.
+        let me = w.units[&1].clone();
+        let snap = UnitSnap::from_state(&me, &w.content).unwrap();
+        let snap = UnitSnap {
+            flags: UnitSnap::ALIVE,
+            ..snap
+        };
+        w.apply_snapshot(2, &[snap], &[], 0.1);
+        w.advance(0.0);
+        w.advance(0.3);
+        assert_eq!(bar(&w), Some((cr, 300)));
+        // The server's start keeps the bar where it is (no jump back) and takes over.
+        let started = Event::CastStarted {
+            caster: 1,
+            spell: cr,
+            total_ms: 2000,
+        };
+        w.receive_events(3, vec![started], 0.3);
+        assert_eq!(bar(&w), Some((cr, 300)));
+        assert!(w.prediction.is_none());
+
+        // A refusal removes the bar and gives the GCD back.
+        let mut w = world_with(&[(2, "meatproxy", UnitSnap::ALIVE)]);
+        w.predict_cast(cr, false, Some(2), 0.0);
+        let failed = Event::CastFailed {
+            caster: 1,
+            spell: cr,
+            reason: CastError::OutOfRange,
+        };
+        w.receive_events(2, vec![failed], 0.1);
+        assert_eq!(bar(&w), None);
+        assert_eq!(w.cooldown(1, cr).gcd_remaining_ms, 0);
+        // An answer that never comes times out.
+        w.predict_cast(cr, false, Some(2), 0.2);
+        w.advance(0.2);
+        w.advance(5.0);
+        assert_eq!(bar(&w), None);
+    }
+
+    #[test]
+    fn loot_markers_follow_this_players_roll_not_the_corpse_flag() {
+        let dead_lootable = UnitSnap::LOOTABLE;
+        let mut w = world_with(&[
+            (2, "meatproxy", UnitSnap::ALIVE),
+            (3, "meatproxy", UnitSnap::ALIVE),
+        ]);
+        let death = |unit| Event::Death {
+            unit,
+            killer: Some(1),
+        };
+        w.receive_events(
+            2,
+            vec![
+                death(2),
+                death(3),
+                Event::LootDropped {
+                    corpse: 2,
+                    items: vec![],
+                },
+            ],
+            0.0,
+        );
+        assert!(w.units[&2].lootable);
+        // Unit 3's roll went to someone else: the corpse flag alone shows nothing here.
+        w.apply_snapshot(
+            3,
+            &snaps_of(&w, &[(2, dead_lootable), (3, dead_lootable)]),
+            &[],
+            0.1,
+        );
+        assert!(w.units[&2].lootable && !w.units[&3].lootable);
+        w.receive_events(
+            4,
+            vec![Event::Looted {
+                looter: 1,
+                corpse: 2,
+                items: vec![],
+            }],
+            0.2,
+        );
+        // Still lootable for a teammate, but no longer for us.
+        w.apply_snapshot(5, &snaps_of(&w, &[(2, dead_lootable)]), &[], 0.3);
+        assert!(!w.units[&2].lootable);
+    }
+
+    fn snaps_of(w: &NetWorld, flags: &[(EntityId, u8)]) -> Vec<UnitSnap> {
+        let mut out: Vec<UnitSnap> = w
+            .units
+            .values()
+            .filter_map(|u| UnitSnap::from_state(u, &w.content))
+            .collect();
+        for s in &mut out {
+            if let Some((_, f)) = flags.iter().find(|(id, _)| *id == s.id) {
+                s.flags = *f;
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn resurrected_teammate_comes_back_with_the_servers_hp_and_mana() {
+        let mut w = world_with(&[(2, "senior_engineer", UnitSnap::ALIVE)]);
+        w.receive_events(
+            2,
+            vec![Event::Death {
+                unit: 2,
+                killer: None,
+            }],
+            0.0,
+        );
+        assert!(!w.units[&2].alive && !w.units[&2].lootable);
+        w.receive_events(
+            3,
+            vec![Event::Resurrected {
+                unit: 2,
+                by: 1,
+                hp: 30,
+                mana: 12,
+            }],
+            0.1,
+        );
+        let u = &w.units[&2];
+        assert!(u.alive && u.hp == 30 && u.mana == 12);
     }
 
     fn v(x: f32, z: f32) -> Vec3 {

@@ -1114,7 +1114,7 @@ pub fn cast_instant(
                 flash(commands, fx, budget, &m.red, at, (0.25, 0.3, 1.0));
             }
         }
-        7 => {
+        7 | 13 => {
             // Rewind: green cubes spiral inwards and drop into the player.
             for i in 0..14 {
                 let a = i as f32 * 0.9;

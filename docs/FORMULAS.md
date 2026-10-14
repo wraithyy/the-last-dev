@@ -149,14 +149,23 @@ Solo: `xp_each = kill_xp`, unchanged. Same level, reward 120: 2 players 60 each,
 
 Loot: every member rolls the unit's loot table separately, in join order, whatever their distance; each `LootDropped` and `Looted` goes to that member only. A leaver's unclaimed roll is dropped.
 
-Enemy HP scaling (`config.group_hp_pct_per_player`, default 60):
+Enemy HP scaling (`config.group_hp_pct_per_player`, default 40):
 
 ```
 group_pct = 100 + group_hp_pct_per_player * (players - 1)
 max_hp    = level_scaled_max_hp * group_pct / 100      // hostile AI units only, not friendlies or players
 ```
 
-Applied at spawn (zone load, `spawn_unit`, summons) and re-applied to every living enemy when a member joins or leaves, keeping its HP fraction (`hp = hp * new_max / old_max`, at least 1 while alive). Solo is 100% (no change); 5 players is 340%.
+Applied at spawn (zone load, `spawn_unit`, summons) and re-applied to every living enemy when a member joins or leaves, keeping its HP fraction (`hp = hp * new_max / old_max`, at least 1 while alive). Solo is 100% (no change); 5 players is 260%.
+
+Enemy damage scaling (`config.group_damage_pct_per_player`, content 15, serde default 0):
+
+```
+group_dmg_pct = 100 + group_damage_pct_per_player * (players - 1)
+dmg_pct       = level_dmg_pct * group_dmg_pct / 100     // hostile AI units only
+```
+
+Multiplies every damage and heal an enemy deals (melee, spells, periodic and expiry amounts snapshotted at application), re-applied with the HP scaling on every join and leave. Solo 100%, 2 players 115%, 5 players 160%.
 
 Quest rewards add `reward.xp` flat on turn-in: no level-difference adjustment, nothing at the cap, same carry-over and level-up rules as kills.
 

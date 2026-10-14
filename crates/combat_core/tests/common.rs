@@ -296,6 +296,9 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             items,
         } => format!("{} loots {} {items:?}", t(*looter), t(*corpse)),
         Event::Respawned { unit } => format!("{} respawns", t(*unit)),
+        Event::Resurrected { unit, by, hp, mana } => {
+            format!("{} resurrects {} ({hp} HP, {mana} mana)", t(*by), t(*unit))
+        }
         Event::Yell { unit, text } => format!("{} yells: {text}", t(*unit)),
         Event::Heal {
             source,

@@ -420,8 +420,8 @@ async fn pump(
                         Ok(m @ ClientMsg::Cmd(_)) => limits.cmd.try_take().then_some(m),
                         Ok(m @ ClientMsg::Move { .. }) => limits.mv.try_take().then_some(m),
                         // Emote spam is merely dropped: an impatient player is not an attacker.
-                        Ok(m @ ClientMsg::Emote(_)) if limits.emote.try_take() => Some(m),
-                        Ok(ClientMsg::Emote(_)) => continue,
+                        Ok(m @ ClientMsg::Emote { .. }) if limits.emote.try_take() => Some(m),
+                        Ok(ClientMsg::Emote { .. }) => continue,
                         Ok(ClientMsg::Hello { .. } | ClientMsg::CreateRoom | ClientMsg::JoinRoom { .. })
                         | Err(_) => None,
                     };

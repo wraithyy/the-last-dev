@@ -42,6 +42,7 @@ sends `X-Forwarded-For` without being a `--trusted-proxy` is treated as remote.
 | `--per-ip-rooms-per-min` | `TLD_PER_IP_ROOMS_PER_MIN` | 6 (0 disables) |
 | `--per-ip-failed-joins` | `TLD_PER_IP_FAILED_JOINS` | 10 per minute, then 30 s lockout (0 disables) |
 | `--no-lan-exempt` | `TLD_NO_LAN_EXEMPT=1` | LAN clients exempt from per-IP limits; always off when `--trust-forwarded-for` is on |
+| `--dev-start-level N[,N..]` | `TLD_DEV_START_LEVEL` | unset. QA only: joiners start at these levels in join order (the last repeats). Never set in production |
 
 Flags win over env (a list given as flags replaces the env list). Log level via `RUST_LOG` (default `info`). If the web dir is missing the server
 warns and still serves `/ws` and `/healthz`.
@@ -173,7 +174,8 @@ Binary WebSocket frames at `/ws`, each one `net_proto` frame (`PROTOCOL_VERSION`
      player stunned only knockback displacement (for 1 s after the knockback) plus 5 cm is accepted.
      The sim has no root effect; stuns are the only movement lock. Respawn, teleport and zone travel
      reset it to the sim position. Rejected: `MoveCorrection { seq, pos }` (last accepted spot).
-   - `Emote(e)`: `Emoted` to everyone. `Ping { t }`: `Pong { t }` straight from the connection.
+   - `Emote { emote, target }`: `Emoted { player, emote, target }` to everyone; `target` is kept only
+     when it names another member of the room, otherwise it becomes `None` (no error). `Ping { t }`: `Pong { t }` straight from the connection.
      `LeaveRoom`: close 1000, then `remove_player` and `PlayerLeft` to the others (also on disconnect).
 5. Every tick: `Sim::tick_routed`, one `Events { tick, events }` frame per player with the events meant
    for them (skipped when empty); a `Snapshot` (`UnitSnap` with auras + `PlayerSnap`) every second, on
