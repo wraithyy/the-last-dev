@@ -486,7 +486,8 @@ fn change_role_menu(
     mut picker: ResMut<Picker>,
     stage_assets: StageAssets,
     mut menu: Single<&mut Node, With<ChangeRoleMenu>>,
-    button: Single<&Interaction, (Changed<Interaction>, With<ChangeRoleButton>)>,
+    // A Query, not Single: a Single with Changed fails while idle and skips the whole system.
+    button: Query<&Interaction, (Changed<Interaction>, With<ChangeRoleButton>)>,
     mut hint: Single<&mut Text, With<ChangeRoleText>>,
 ) {
     let show = paused.0 && !lobby.open && !picker.open;
@@ -503,7 +504,7 @@ fn change_role_menu(
     if hint.0 != text {
         hint.0 = text.into();
     }
-    if show && !online && **button == Interaction::Pressed {
+    if show && !online && button.iter().any(|i| *i == Interaction::Pressed) {
         open_picker(&mut commands, &mut picker, stage_assets, true);
     }
 }
