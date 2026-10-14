@@ -1,6 +1,8 @@
-//! Player-only accessories, parented to skeleton bones so they follow every
-//! animation: over-ear headphones resting on the neck and a coffee mug in the
-//! left fist. Offsets are in bone space (model units; the model root is scaled).
+//! Accessories parented to skeleton bones so they follow every animation. The local player
+//! carries a coffee mug in the left fist; every class skin (player, teammates, role picker,
+//! lineup) gets its class kit: Fullstack headphones resting on the neck, Frontend glasses,
+//! Backend big over-ear headphones, a DevOps pager on the belt. Offsets are in bone space
+//! (model units; the model root is scaled).
 //!
 //! While the player channels Coffee Break the left arm is posed procedurally (two-bone IK
 //! towards the mouth, blended over the animation) and the mug tilts for a sip every few seconds.
@@ -14,6 +16,15 @@ use bevy::prelude::*;
 use std::f32::consts::FRAC_PI_2;
 
 const NECK_BONE: &str = "Neck";
+/// Class-kit offsets in bone space (model units, +Z forward), measured from the skin: the
+/// head spans x +-0.54, y -0.1..1.0 (hair included), the face front sits at z 0.5 and the
+/// eyes at y 0.3..0.6.
+const GLASSES_Y: f32 = 0.47;
+const GLASSES_Z: f32 = 0.54;
+const CANS_Y: f32 = 0.42;
+/// Hips-bone offset of the pager: clipped to the front of the belt (z 0.2), off to the side
+/// where the hanging arm does not cover it.
+const PAGER_AT: Vec3 = Vec3::new(0.27, 0.13, 0.27);
 const HAND_BONE: &str = "Fist.L";
 /// Yaw of the mug relative to the player, so the handle faces the camera side.
 /// Mug origin in bone space before the lift.
@@ -42,17 +53,48 @@ const ELBOW_POLE: Vec3 = Vec3::new(-0.7, -1.0, 0.0);
 #[derive(Component)]
 struct GearAttached;
 
+/// The class kit (a `Content::classes` key) a character skin wears.
+#[derive(Component, Clone, PartialEq, Eq)]
+pub struct Accessories(pub String);
+
+#[derive(Component)]
+struct AccessoriesAttached;
+
 pub struct GearPlugin;
 
 impl Plugin for GearPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (attach_gear, update_drink, animate_steam).chain())
-            .add_systems(
-                PostUpdate,
-                pose_arm_and_mug
-                    .after(AnimationSystems)
-                    .before(TransformSystems::Propagate),
-            );
+        app.add_systems(
+            Update,
+            (
+                regear,
+                attach_gear,
+                attach_accessories,
+                update_drink,
+                animate_steam,
+            )
+                .chain(),
+        )
+        .add_systems(
+            PostUpdate,
+            pose_arm_and_mug
+                .after(AnimationSystems)
+                .before(TransformSystems::Propagate),
+        );
+    }
+}
+
+/// A freshly spawned model (first spawn or a role change) gets its gear again: the old
+/// pieces went away with the old skeleton.
+fn regear(
+    mut commands: Commands,
+    respawned: Query<Entity, Added<crate::anim::ModelSpawned>>,
+    changed: Query<Entity, Changed<Accessories>>,
+) {
+    for e in respawned.iter().chain(changed.iter()) {
+        commands
+            .entity(e)
+            .remove::<(GearAttached, AccessoriesAttached)>();
     }
 }
 
@@ -70,8 +112,7 @@ fn attach_gear(
             .iter_descendants(*player)
             .find(|e| names.get(*e).is_ok_and(|n| n.as_str() == wanted))
     };
-    let (Some(neck), Some(hand), Some(upper), Some(lower), Some(head)) = (
-        bone(NECK_BONE),
+    let (Some(hand), Some(upper), Some(lower), Some(head)) = (
         bone(HAND_BONE),
         bone("UpperArm.L"),
         bone("LowerArm.L"),
@@ -89,21 +130,156 @@ fn attach_gear(
         },
         DrinkState::default(),
     ));
-    let mut mat = |color: Color| {
-        materials.add(StandardMaterial {
-            base_color: color,
-            perceptual_roughness: 0.6,
-            ..default()
-        })
-    };
-    let dark = mat(Color::srgb(0.32, 0.33, 0.37));
-    let cushion = mat(Color::srgb(0.1, 0.1, 0.12));
+    spawn_mug(&mut commands, &mut meshes, &mut materials, hand);
+}
+
+/// Class kit on the bones of any skin with `Accessories`, once the skeleton exists.
+fn attach_accessories(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    wearers: Query<(Entity, &Accessories), Without<AccessoriesAttached>>,
+    children: Query<&Children>,
+    names: Query<&Name>,
+) {
+    for (wearer, kit) in &wearers {
+        let bone = |wanted: &str| {
+            children
+                .iter_descendants(wearer)
+                .find(|e| names.get(*e).is_ok_and(|n| n.as_str() == wanted))
+        };
+        let (Some(neck), Some(head), Some(hips)) = (bone(NECK_BONE), bone("Head"), bone("Hips"))
+        else {
+            continue;
+        };
+        commands.entity(wearer).insert(AccessoriesAttached);
+        let mut mat = |color: Color, rough: f32| {
+            materials.add(StandardMaterial {
+                base_color: color,
+                perceptual_roughness: rough,
+                ..default()
+            })
+        };
+        match kit.0.as_str() {
+            "frontend" => {
+                let frame = mat(Color::srgb(0.95, 0.2, 0.6), 0.4);
+                let lens = materials.add(StandardMaterial {
+                    base_color: Color::srgba(0.75, 0.9, 1.0, 0.35),
+                    alpha_mode: AlphaMode::Blend,
+                    perceptual_roughness: 0.1,
+                    ..default()
+                });
+                let rim = meshes.add(Torus::new(0.11, 0.14));
+                let glass = meshes.add(Cylinder::new(0.115, 0.01));
+                let bridge = meshes.add(Cuboid::new(0.1, 0.03, 0.03));
+                commands.entity(head).with_children(|c| {
+                    for side in [-1.0f32, 1.0] {
+                        let at = Transform::from_xyz(side * 0.18, GLASSES_Y, GLASSES_Z)
+                            .with_rotation(Quat::from_rotation_x(FRAC_PI_2));
+                        c.spawn((
+                            Mesh3d(rim.clone()),
+                            MeshMaterial3d(frame.clone()),
+                            at,
+                            NotShadowCaster,
+                        ));
+                        c.spawn((
+                            Mesh3d(glass.clone()),
+                            MeshMaterial3d(lens.clone()),
+                            at,
+                            NotShadowCaster,
+                        ));
+                    }
+                    c.spawn((
+                        Mesh3d(bridge),
+                        MeshMaterial3d(frame.clone()),
+                        Transform::from_xyz(0.0, GLASSES_Y + 0.02, GLASSES_Z),
+                        NotShadowCaster,
+                    ));
+                });
+            }
+            "backend" => {
+                // Big studio cans over the ears, band over the top of the head.
+                let shell = mat(Color::srgb(0.08, 0.08, 0.1), 0.5);
+                let accent = mat(Color::srgb(0.85, 0.15, 0.12), 0.5);
+                let segment = meshes.add(Cuboid::new(0.24, 0.07, 0.14));
+                let cup = meshes.add(Cylinder::new(0.24, 0.16));
+                let ring = meshes.add(Torus::new(0.18, 0.23));
+                commands.entity(head).with_children(|c| {
+                    // The band is an arc of short segments over the hair, ear to ear.
+                    for k in 0..=6 {
+                        let a = -1.25 + 2.5 * k as f32 / 6.0;
+                        let r = 0.66;
+                        c.spawn((
+                            Mesh3d(segment.clone()),
+                            MeshMaterial3d(shell.clone()),
+                            Transform::from_xyz(a.sin() * r, CANS_Y + a.cos() * r, -0.02)
+                                .with_rotation(Quat::from_rotation_z(-a)),
+                            NotShadowCaster,
+                        ));
+                    }
+                    for side in [-1.0f32, 1.0] {
+                        let at = Transform::from_xyz(side * 0.6, CANS_Y, -0.02)
+                            .with_rotation(Quat::from_rotation_z(FRAC_PI_2));
+                        c.spawn((
+                            Mesh3d(cup.clone()),
+                            MeshMaterial3d(shell.clone()),
+                            at,
+                            NotShadowCaster,
+                        ));
+                        c.spawn((
+                            Mesh3d(ring.clone()),
+                            MeshMaterial3d(accent.clone()),
+                            at.with_translation(Vec3::new(side * 0.69, CANS_Y, -0.02)),
+                            NotShadowCaster,
+                        ));
+                    }
+                });
+            }
+            "devops" => {
+                // Pager clipped to the belt, its screen glowing an unread alert.
+                let case = mat(Color::srgb(0.12, 0.12, 0.14), 0.5);
+                let screen = materials.add(StandardMaterial {
+                    base_color: Color::BLACK,
+                    emissive: LinearRgba::rgb(0.4, 3.0, 0.6),
+                    ..default()
+                });
+                let body = meshes.add(Cuboid::new(0.22, 0.28, 0.08));
+                let lcd = meshes.add(Cuboid::new(0.16, 0.09, 0.01));
+                commands.entity(hips).with_children(|c| {
+                    c.spawn((
+                        Mesh3d(body),
+                        MeshMaterial3d(case),
+                        Transform::from_translation(PAGER_AT),
+                        NotShadowCaster,
+                    ))
+                    .with_child((
+                        Mesh3d(lcd),
+                        MeshMaterial3d(screen),
+                        Transform::from_xyz(0.0, 0.05, 0.045),
+                    ));
+                });
+            }
+            _ => {
+                let dark = mat(Color::srgb(0.32, 0.33, 0.37), 0.6);
+                let cushion = mat(Color::srgb(0.1, 0.1, 0.12), 0.6);
+                neck_headphones(&mut commands, &mut meshes, neck, dark, cushion);
+            }
+        }
+    }
+}
+
+/// Fullstack: headphones resting on the neck, band behind, cups at the collarbones.
+fn neck_headphones(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    neck: Entity,
+    dark: Handle<StandardMaterial>,
+    cushion: Handle<StandardMaterial>,
+) {
     let band = meshes.add(Torus::new(0.3, 0.345));
     let cup = meshes.add(Cylinder::new(0.17, 0.1));
     let pad = meshes.add(Cylinder::new(0.13, 0.04));
-
     commands.entity(neck).with_children(|c| {
-        // Band round the back of the neck, cups hanging at the collarbones.
         c.spawn((
             Mesh3d(band),
             MeshMaterial3d(dark.clone()),
@@ -126,7 +302,6 @@ fn attach_gear(
             ));
         }
     });
-    spawn_mug(&mut commands, &mut meshes, &mut materials, hand);
 }
 
 /// Keeps the mug upright in the world whatever the fist bone does.

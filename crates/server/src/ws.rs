@@ -218,8 +218,17 @@ async fn connection(
     let mut bucket = TokenBucket::new(st.cfg.rate_per_sec, st.cfg.rate_burst);
     let hs = st.cfg.handshake_timeout;
 
-    let name = match recv(&mut socket, Instant::now() + hs, &mut bucket).await {
-        Recv::Msg(ClientMsg::Hello { version, name }) if version == PROTOCOL_VERSION => name,
+    let (name, class) = match recv(&mut socket, Instant::now() + hs, &mut bucket).await {
+        Recv::Msg(ClientMsg::Hello {
+            version,
+            name,
+            class,
+        }) if version == PROTOCOL_VERSION => {
+            if !st.registry.knows_class(&class) {
+                return reject(&mut socket, ErrorKind::UnknownClass, 1008, "unknown class").await;
+            }
+            (name, class)
+        }
         Recv::Msg(ClientMsg::Hello { .. }) | Recv::Bad(ProtoError::BadVersion(_)) => {
             return reject(
                 &mut socket,
@@ -263,7 +272,7 @@ async fn connection(
                 )
                 .await;
             }
-            match st.registry.create_and_join(&name) {
+            match st.registry.create_and_join(&name, &class) {
                 Ok(j) => {
                     if !send_msg(
                         &mut socket,
@@ -282,8 +291,10 @@ async fn connection(
             }
         }
         // `decode` already normalised the code; a malformed one fails as BadRoomCode.
-        Recv::Msg(ClientMsg::JoinRoom { code }) => join(&st, ip, limited, Some(&code), &name),
-        Recv::Bad(ProtoError::BadRoomCode) => join(&st, ip, limited, None, &name),
+        Recv::Msg(ClientMsg::JoinRoom { code }) => {
+            join(&st, ip, limited, Some(&code), (&name, &class))
+        }
+        Recv::Bad(ProtoError::BadRoomCode) => join(&st, ip, limited, None, (&name, &class)),
         Recv::Timeout => {
             return reject(
                 &mut socket,
@@ -332,13 +343,15 @@ fn join(
     ip: IpAddr,
     limited: bool,
     code: Option<&str>,
-    name: &str,
+    (name, class): (&str, &str),
 ) -> Result<Joined, JoinError> {
     if limited && !st.join_fails.allowed(ip) {
         tracing::warn!(%ip, "join attempt while locked out");
         return Err(JoinError::Unavailable);
     }
-    let r = code.map_or(Err(JoinError::NoSuchRoom), |c| st.registry.join(c, name));
+    let r = code.map_or(Err(JoinError::NoSuchRoom), |c| {
+        st.registry.join(c, name, class)
+    });
     if let Err(e) = &r {
         if limited {
             st.join_fails.hit(ip);

@@ -1,7 +1,7 @@
-//! The Senior Engineer's hair thins with HP: the player model's hair is split
-//! into `Hair_1` (crown spot) .. `Hair_5` (last remaining sides), and every part
-//! up to the current stage is hidden. HP coming back restores it. Other players
-//! in an online room wear the same model and thin the same way.
+//! Player hair thins with HP: every class skin's hair is split into `Hair_1` (crown spot)
+//! .. `Hair_5` (last remaining sides), and every part up to the current stage is hidden.
+//! HP coming back restores it. Other players in an online room thin the same way; display
+//! skins (lineup, role picker) show a fixed `HairStage`.
 
 use crate::combat::{SimReady, SimUnit, SimView};
 use crate::hud::LogLineMsg;
@@ -10,8 +10,12 @@ use crate::player::Player;
 use bevy::gltf::GltfMaterialName;
 use bevy::prelude::*;
 
-/// The local player and the other players of an online room wear the same model.
-type Engineer = Or<(With<Player>, With<RemotePlayer>)>;
+/// Everyone wearing a player skin.
+type Engineer = Or<(With<Player>, With<RemotePlayer>, With<HairStage>)>;
+
+/// Fixed hair stage (0..=5) for a skin that has no sim unit (lineup, role picker).
+#[derive(Component)]
+pub struct HairStage(pub u8);
 
 /// Hair mesh entities of the player model with their stage (1..=5).
 #[derive(Component)]
@@ -21,7 +25,12 @@ pub struct HairPlugin;
 
 impl Plugin for HairPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (find_hair, thin_hair).chain().in_set(SimReady));
+        app.add_systems(
+            Update,
+            (rehair, find_hair, thin_hair, fixed_hair)
+                .chain()
+                .in_set(SimReady),
+        );
     }
 }
 
@@ -35,6 +44,27 @@ pub fn hair_stage(hp: u32, max_hp: u32) -> u8 {
         p if p > 30.0 => 3,
         p if p > 12.0 => 4,
         _ => 5,
+    }
+}
+
+/// A new model (role change) has new hair meshes; look them up again.
+fn rehair(mut commands: Commands, respawned: Query<Entity, Added<crate::anim::ModelSpawned>>) {
+    for e in &respawned {
+        commands.entity(e).remove::<HairParts>();
+    }
+}
+
+fn fixed_hair(skins: Query<(&HairStage, &HairParts)>, mut vis: Query<&mut Visibility>) {
+    for (stage, parts) in &skins {
+        for (e, k) in &parts.0 {
+            if let Ok(mut v) = vis.get_mut(*e) {
+                v.set_if_neq(if *k <= stage.0 {
+                    Visibility::Hidden
+                } else {
+                    Visibility::Inherited
+                });
+            }
+        }
     }
 }
 

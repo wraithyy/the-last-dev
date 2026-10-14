@@ -69,6 +69,34 @@ mod platform {
     pub fn page() -> Option<Page> {
         None
     }
+
+    pub fn load_hud() -> Option<u8> {
+        let p = path()?.with_file_name("hud.txt");
+        std::fs::read_to_string(p).ok()?.trim().parse().ok()
+    }
+
+    pub fn save_hud(bits: u8) {
+        let Some(p) = path().map(|p| p.with_file_name("hud.txt")) else {
+            return;
+        };
+        let _ = std::fs::write(p, bits.to_string());
+    }
+
+    pub fn load_class() -> Option<String> {
+        let p = path()?.with_file_name("class.txt");
+        let s = std::fs::read_to_string(p).ok()?;
+        Some(s.trim().to_string()).filter(|s| !s.is_empty())
+    }
+
+    pub fn save_class(class: &str) {
+        let Some(p) = path().map(|p| p.with_file_name("class.txt")) else {
+            return;
+        };
+        if let Some(dir) = p.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let _ = std::fs::write(p, class);
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -100,6 +128,34 @@ mod platform {
         }
     }
 
+    const HUD: &str = "tld.hud.windows";
+
+    pub fn load_hud() -> Option<u8> {
+        storage()?.get_item(HUD).ok().flatten()?.parse().ok()
+    }
+
+    pub fn save_hud(bits: u8) {
+        if let Some(s) = storage() {
+            let _ = s.set_item(HUD, &bits.to_string());
+        }
+    }
+
+    const CLASS: &str = "tld.class";
+
+    pub fn load_class() -> Option<String> {
+        storage()?
+            .get_item(CLASS)
+            .ok()
+            .flatten()
+            .filter(|s| !s.is_empty())
+    }
+
+    pub fn save_class(class: &str) {
+        if let Some(s) = storage() {
+            let _ = s.set_item(CLASS, class);
+        }
+    }
+
     pub fn page() -> Option<Page> {
         let loc = web_sys::window()?.location();
         Some(Page {
@@ -109,7 +165,7 @@ mod platform {
     }
 }
 
-pub use platform::{load, page, save};
+pub use platform::{load, load_class, load_hud, page, save, save_class, save_hud};
 
 #[cfg(test)]
 mod tests {

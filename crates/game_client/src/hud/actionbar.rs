@@ -1,4 +1,4 @@
-//! Action bar: slots are bound to `Content::action_bar()`; everything on a slot
+//! Action bar: slots are bound to the player's class bar; everything on a slot
 //! (icon, tint, sweep, seconds) is derived from the sim's `CooldownView`.
 
 use super::{
@@ -27,7 +27,6 @@ const TINT_LOCKED: Color = Color::srgba(0.02, 0.02, 0.05, 0.62);
 const ICON_STUNNED: Color = Color::srgb(0.35, 0.35, 0.38);
 const TINT_MANA: Color = Color::srgba(0.1, 0.2, 0.95, 0.5);
 const TINT_RANGE: Color = Color::srgba(0.85, 0.1, 0.1, 0.5);
-const ATTACK_ICON: &str = "nitpick";
 const SWING_BAR: Color = Color::srgb(0.95, 0.85, 0.5);
 const ATTACK_EDGE: Color = Color::srgb(0.75, 0.4, 0.26);
 const COFFEE_EDGE: Color = Color::srgb(0.5, 0.34, 0.2);
@@ -664,7 +663,12 @@ fn update_attack(
     mut glow: Single<&mut BackgroundColor, With<AttackGlow>>,
     mut swing: Single<&mut Node, (With<AttackSwing>, Without<AttackButton>)>,
 ) {
-    let handle = icons.get(&assets, ATTACK_ICON);
+    let attack_icon = sim
+        .unit(player.0)
+        .and_then(|u| sim.content().unit_def(&u.key))
+        .and_then(|d| d.auto_attack.as_ref())
+        .map_or("nitpick", |a| a.icon.as_str());
+    let handle = icons.get(&assets, attack_icon);
     if icon.image != handle {
         icon.image = handle;
     }
@@ -814,7 +818,7 @@ fn update_rez(
     mut glow: Single<&mut BackgroundColor, With<RezGlow>>,
     mut gauge: Single<&mut Node, (With<RezGauge>, Without<RezButton>, Without<RezRoot>)>,
 ) {
-    let Some(spell) = sim.content().resurrect_spell() else {
+    let Some(spell) = sim.resurrect_of(player.0) else {
         return;
     };
     let me = player.0;
@@ -900,7 +904,7 @@ fn update_slots(
     mut texts: Query<(&SlotPart, &mut Text)>,
 ) {
     let me = player.0;
-    let bar = sim.content().action_bar();
+    let bar = sim.bar_of(me);
     let known = sim.known_spells(me);
     let able = can_act(&*sim, &flow, me);
     let casting = sim.unit(me).and_then(|u| u.cast).map(|c| c.spell);
@@ -1192,7 +1196,7 @@ fn update_tooltip(
         .find(|(_, it)| **it != Interaction::None)
         .map(|(Slot(i), _)| *i)
         .or(forced.map(|f| f.0))
-        .and_then(|i| content_db.action_bar().get(i).copied())
+        .and_then(|i| sim.bar_of(player.0).get(i).copied())
         .and_then(|id| content_db.spell(id).map(|d| (id, d)));
     let hovered_attack = **attack != Interaction::None;
     let hovered_coffee = **coffee != Interaction::None;
@@ -1231,9 +1235,7 @@ fn update_tooltip(
     } else if hovered_coffee {
         content_db.channel_spell().map(coffee_tip)
     } else if hovered_rez {
-        content_db
-            .resurrect_spell()
-            .map(|d| spell_tip(d, content_db))
+        sim.resurrect_of(player.0).map(|d| spell_tip(d, content_db))
     } else {
         None
     };

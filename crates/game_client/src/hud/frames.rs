@@ -649,23 +649,38 @@ fn update_frames(
         (Without<FrameRoot>, Without<PoolRow>, Without<BossTag>),
     >,
     mut tags: Query<
-        (&BossTag, &mut Node, &mut Visibility),
-        (Without<FrameRoot>, Without<PoolRow>, Without<Fill>),
+        (
+            &BossTag,
+            &mut Node,
+            &mut Visibility,
+            &mut BorderColor,
+            &mut BackgroundGradient,
+        ),
+        (
+            Without<FrameRoot>,
+            Without<PoolRow>,
+            Without<Fill>,
+            Without<Disc>,
+        ),
     >,
-    mut texts: Query<(&TextOf, &mut Text, &mut TextColor), Without<BossTagText>>,
-    mut tag_texts: Query<(&BossTagText, &mut Text)>,
+    mut texts: Query<(&TextOf, &mut Text, &mut TextColor, &mut TextFont), Without<BossTagText>>,
+    mut tag_texts: Query<(&BossTagText, &mut Text, &mut TextColor), Without<TextOf>>,
     mut discs: Query<(&Disc, &mut BackgroundColor, &mut BorderColor)>,
 ) {
     let state = |who| tracked(who, &*sim, &target, &units).and_then(|id| sim.unit(id));
-    let boss = |who| state(who).is_some_and(|u| u.boss || copy::is_elite(&u.key));
-    for (BossTagText(who), mut text) in &mut tag_texts {
+    let role = |who| state(who).and_then(|u| crate::classes::role_of_unit(sim.content(), &u.key));
+    let boss =
+        |who| state(who).is_some_and(|u| u.boss || copy::is_elite(&u.key)) || role(who).is_some();
+    for (BossTagText(who), mut text, mut color) in &mut tag_texts {
         let Some(u) = state(*who) else { continue };
-        let tag = match (u.boss, u.phase) {
-            (true, p) if p > 1 => format!("PROD P{p}"),
-            (true, _) => "PROD".to_string(),
-            (false, _) => "ELITE".to_string(),
+        let tag = match (role(*who), u.boss, u.phase) {
+            (Some(r), _, _) => r.tag().to_string(),
+            (None, true, p) if p > 1 => format!("PROD P{p}"),
+            (None, true, _) => "PROD".to_string(),
+            (None, false, _) => "ELITE".to_string(),
         };
         set_text(&mut text, &tag);
+        color.0 = role(*who).map_or(ACCENT_WARM, crate::classes::role_color);
     }
     for (root, mut node) in &mut roots {
         node.display = if state(root.0).is_some() {
@@ -674,7 +689,22 @@ fn update_frames(
             Display::None
         };
     }
-    for (tag, mut node, mut vis) in &mut tags {
+    for (tag, mut node, mut vis, mut rim, mut bg) in &mut tags {
+        // Players wear their role tag on a neutral plate; bosses keep the red PROD plate.
+        let (edge, plate) = match role(tag.0) {
+            Some(r) => (
+                crate::classes::role_color(r),
+                vgrad(Color::srgb(0.12, 0.13, 0.17), Color::srgb(0.05, 0.05, 0.08)),
+            ),
+            None => (
+                ACCENT_WARM,
+                vgrad(Color::srgb(0.4, 0.08, 0.06), Color::srgb(0.16, 0.03, 0.03)),
+            ),
+        };
+        rim.set_all(edge);
+        if *bg != plate {
+            *bg = plate;
+        }
         let shown = boss(tag.0);
         node.display = if shown { Display::Flex } else { Display::None };
         vis.set_if_neq(if shown {
@@ -724,11 +754,20 @@ fn update_frames(
             node.width = w;
         }
     }
-    for (TextOf(who, field), mut text, mut color) in &mut texts {
+    for (TextOf(who, field), mut text, mut color, mut font) in &mut texts {
         let Some(u) = state(*who) else { continue };
         match field {
             Field::Name => {
                 set_text(&mut text, &u.name);
+                // Long names ("Fullstack Engineer") plus a role tag must still fit one line.
+                let size = bevy::text::FontSize::Px(if u.name.chars().count() > 14 {
+                    13.0
+                } else {
+                    15.0
+                });
+                if font.font_size != size {
+                    font.font_size = size;
+                }
                 color.0 = if !u.alive {
                     Color::srgb(0.6, 0.6, 0.6)
                 } else if *who == Who::Player {

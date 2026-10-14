@@ -4,7 +4,6 @@
 // scales HP, damage and XP by `mob_scaling` (see docs/FORMULAS.md).
 (
     config: (
-        player_unit: "senior_engineer",
         gcd_base_ms: 1500,
         gcd_floor_ms: 1000,
         queue_window_ms: 400,
@@ -25,7 +24,8 @@
         // Co-op: enemy damage +15% per group member beyond the first.
         group_damage_pct_per_player: 15,
     ),
-    // Player growth; index 0 = level 1. Bonuses are cumulative on top of senior_engineer's stats.
+    // Player growth; index 0 = level 1. Bonuses are cumulative on top of the class unit's stats
+    // (`hp_bonus` scaled by the class's `level_hp_pct`).
     levels: [
         (xp_to_next: 400, hp_bonus: 0, mana_bonus: 0, spell_power_bonus: 0),
         (xp_to_next: 600, hp_bonus: 35, mana_bonus: 40, spell_power_bonus: 10),
@@ -85,6 +85,22 @@
         (key: "alignment_training", name: "Alignment Training", icon: "alignment_training", harmful: false, reflect: true),
         (key: "self_improvement", name: "Recursive Self-Improvement", icon: "self_improvement", harmful: false,
             damage_done_pct: 8, max_stacks: 25),
+        // ---- player classes: Frontend, Backend, DevOps ----
+        (key: "specificity", name: "Specificity", icon: "specificity", harmful: true, max_stacks: 5),
+        (key: "dark_mode", name: "Dark Mode", icon: "dark_mode", harmful: false, damage_taken_pct: -50),
+        (key: "infinite_scroll", name: "Infinite Scroll", icon: "infinite_scroll", harmful: true, school: Physical,
+            periodic: Some((interval_ms: 2000, base: 8, coefficient_pct: 30))),
+        (key: "centered", name: "Perfectly Centered", icon: "center_div", harmful: true, stun: true),
+        (key: "rate_limiter", name: "429 Too Many Requests", icon: "rate_limiter", harmful: false, damage_taken_pct: -20),
+        (key: "db_lock", name: "Database Lock", icon: "db_lock", harmful: true, stun: true),
+        (key: "horizontal_scaling", name: "Horizontal Scaling", icon: "horizontal_scaling", harmful: false, max_hp_pct: 30),
+        (key: "retry_backoff", name: "Retry With Exponential Backoff", icon: "retry_backoff", harmful: false,
+            periodic: Some((interval_ms: 2000, base: 14, coefficient_pct: 40, heal: true))),
+        (key: "auto_scaling", name: "Auto-scaling", icon: "auto_scaling", harmful: false,
+            periodic: Some((interval_ms: 3000, base: 14, coefficient_pct: 35, heal: true))),
+        (key: "chaos_monkey", name: "Chaos Monkey", icon: "chaos_monkey", harmful: true,
+            periodic: Some((interval_ms: 3000, base: 12, coefficient_pct: 35))),
+        (key: "circuit_breaker", name: "Circuit Breaker", icon: "circuit_breaker", harmful: false),
     ],
     spells: [
         // ---- player ----
@@ -101,7 +117,7 @@
                 "Line one: no. Line two: also no.",
                 "This function has forty parameters and a vibe.",
                 "Did anyone, at any point, read this?",
-                "Nit: the entire file.",
+                "Fullstack means I review the CSS and the SQL. Both are wrong.",
                 "Why is the password in the README? Why is there a README?",
             ],
         ),
@@ -117,7 +133,7 @@
                 "Rewriting this before it becomes load-bearing.",
                 "Deleting three thousand lines of generated code. Feels great.",
                 "Same behavior. Half the hallucinations.",
-                "Turning slop into software.",
+                "Frontend, backend, blame: I own the whole stack.",
                 "Three abstraction layers for one if-statement. Not anymore.",
             ],
         ),
@@ -212,7 +228,7 @@
             yells: [
                 "Root cause: a prompt. Contributing factor: also a prompt.",
                 "Blameless postmortem. I'm only blaming the process. And you.",
-                "Action item one: stop.",
+                "Root cause: I know a little about everything, so it is my fault.",
                 "Timeline: shipped Friday. Died Friday. Learned nothing.",
             ],
         ),
@@ -241,6 +257,412 @@
                 "Is it plugged in? Is YOU plugged in?",
                 "Rebooting colleague. Please do not unplug during the update.",
                 "Closing your ticket as 'works on my machine'.",
+            ],
+        ),
+
+        // ---- Frontend (melee) ----
+        (
+            id: 20, name: "Pixel Push", icon: "pixel_push", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 18, gcd: true, cooldown_ms: 0,
+            description: "Nudges the target one pixel to the left, hard. Deals physical damage and adds a stack of Specificity (up to 5).",
+            effect: Damage(
+                base: 28, coefficient_pct: 50,
+                apply_aura: Some((aura: "specificity", duration_ms: 20000)),
+            ),
+            yells: [
+                "One pixel. The designer will notice. The AI never does.",
+                "Moving it left. No, the other left. Shipping it.",
+                "It looked fine in the Figma.",
+                "Margin: -1px. Problem solved, forever, probably.",
+            ],
+        ),
+        (
+            id: 21, name: "CSS Combo", icon: "css_combo", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 28, gcd: true, cooldown_ms: 6000,
+            description: "Three selectors, two pseudo-classes and a prayer. Deals physical damage and adds two stacks of Specificity.",
+            effect: Damage(
+                base: 40, coefficient_pct: 60,
+                apply_aura: Some((aura: "specificity", duration_ms: 20000)),
+            ),
+            extra_effects: [Aura(aura: "specificity", duration_ms: 20000)],
+            yells: [
+                "div > div > div:nth-child(3) ~ span. You're welcome.",
+                "Cascading. Like my sprint commitments.",
+                "The AI wrote it inline. I'm writing it with spite.",
+                "Flexbox in, grid out, flexbox again.",
+            ],
+        ),
+        (
+            id: 22, name: "!important", icon: "important", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 30, gcd: true, cooldown_ms: 0,
+            learn_level: 2,
+            description: "Overrides everything, fixes nothing. Deals physical damage, +60% per stack of Specificity it consumes.",
+            effect: Damage(
+                base: 30, coefficient_pct: 50,
+                consume_aura: Some((aura: "specificity", bonus_pct: 60)),
+            ),
+            yells: [
+                "!important. Like every ticket the PM files.",
+                "Specificity war won. Codebase lost.",
+                "When in doubt: !important. When not in doubt: also !important.",
+                "Overridden. Like the design system.",
+            ],
+        ),
+        (
+            id: 23, name: "Lighthouse Audit", icon: "lighthouse_audit", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 15000,
+            learn_level: 3,
+            description: "Scores the target's cast 12/100 for accessibility. Interrupts spellcasting and locks that school for 4 sec.",
+            effect: Interrupt(lockout_ms: 4000),
+            yells: [
+                "Performance: 12. Accessibility: no.",
+                "Your cast blocks the main thread.",
+                "Largest Contentful Pain detected.",
+                "That spell has no alt text.",
+            ],
+        ),
+        (
+            id: 24, name: "Hot Reload", icon: "hot_reload", school: Physical,
+            range_m: 25.0, cast_ms: 0, mana: 15, gcd: true, cooldown_ms: 15000,
+            learn_level: 4,
+            description: "Saves the file and is instantly somewhere else, state lost. Dashes to the target, deals physical damage and adds a stack of Specificity.",
+            effect: Charge(stop_m: 2.0),
+            extra_effects: [Damage(
+                base: 20, coefficient_pct: 30,
+                apply_aura: Some((aura: "specificity", duration_ms: 20000)),
+            )],
+            yells: [
+                "Saved. Reloaded. Where was I? Here. Now.",
+                "Hot reload: state lost, enthusiasm intact.",
+                "Webpack took four minutes. I took one second.",
+                "Change detected. Me.",
+            ],
+        ),
+        (
+            id: 25, name: "Dark Mode", icon: "dark_mode", school: Physical,
+            range_m: 0.0, cast_ms: 0, mana: 25, gcd: false, cooldown_ms: 20000,
+            target: Caster, learn_level: 5,
+            description: "Nobody can hit what they can't see on #121212, and your eyes finally rest. Heals you and reduces damage taken by 50% for 6 sec.",
+            effect: Aura(aura: "dark_mode", duration_ms: 6000),
+            extra_effects: [Heal(base: 90, coefficient_pct: 120)],
+            yells: [
+                "Switching to dark mode. My soul was already there.",
+                "Contrast ratio too low to be targeted.",
+                "Light mode is for people who sleep.",
+            ],
+        ),
+        (
+            id: 26, name: "Responsive Layout", icon: "responsive_layout", school: Physical,
+            range_m: 0.0, cast_ms: 0, mana: 35, gcd: true, cooldown_ms: 8000,
+            target: Caster, area: Some((radius_m: 6.0, allies: false)), learn_level: 6,
+            description: "Breakpoints for everyone. Deals physical damage to all enemies within 6 m.",
+            effect: Damage(base: 35, coefficient_pct: 45),
+            yells: [
+                "Mobile, tablet, desktop, smart fridge. All of you.",
+                "Media query: everyone within six metres.",
+                "It's responsive. It responds by hitting you.",
+            ],
+        ),
+        (
+            id: 27, name: "Infinite Scroll", icon: "infinite_scroll", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 22, gcd: true, cooldown_ms: 0,
+            learn_level: 7,
+            description: "The footer is a myth. Deals physical damage every 2 sec for 12 sec.",
+            effect: Aura(aura: "infinite_scroll", duration_ms: 12000),
+            yells: [
+                "Keep scrolling. There's no footer. There never was.",
+                "Engagement metrics: up. Your HP: down.",
+                "Lazy-loading your suffering.",
+            ],
+        ),
+        (
+            id: 28, name: "Center the Div", icon: "center_div", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 20, gcd: true, cooldown_ms: 25000,
+            learn_level: 8,
+            description: "The hardest problem in computer science, solved on the target. Stuns for 3 sec. Bosses refuse to be centered.",
+            effect: Aura(aura: "centered", duration_ms: 3000),
+            yells: [
+                "Vertically AND horizontally. Witness me.",
+                "The AI suggested a table. I suggested violence.",
+                "place-items: center. Hold still.",
+            ],
+        ),
+        (
+            id: 29, name: "Rewrite It in a New Framework", icon: "new_framework", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 55, gcd: true, cooldown_ms: 30000,
+            learn_level: 9,
+            description: "Same app, new framework, all-new bugs, released this morning. Deals enormous physical damage.",
+            effect: Damage(base: 150, coefficient_pct: 150),
+            yells: [
+                "This framework came out today. It's already legacy.",
+                "Rewriting in something with a cooler logo.",
+                "Same bugs, better developer experience.",
+                "npm install hope. 1,400 vulnerabilities found.",
+            ],
+        ),
+
+        // ---- Backend (tank) ----
+        (
+            id: 30, name: "Blocking Call", icon: "blocking_call", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 15, gcd: true, cooldown_ms: 0,
+            description: "Synchronous, single-threaded, and right in their face. Deals physical damage and a lot of extra threat.",
+            effect: Damage(base: 25, coefficient_pct: 40),
+            extra_effects: [Threat(amount: 30)],
+            yells: [
+                "Nothing proceeds until I return. I may not return.",
+                "await you. Forever.",
+                "This call blocks. So do I.",
+                "Timeout set to infinity. Like this meeting.",
+            ],
+        ),
+        (
+            id: 31, name: "Rate Limiter", icon: "rate_limiter", school: Physical,
+            range_m: 0.0, cast_ms: 0, mana: 30, gcd: true, cooldown_ms: 20000,
+            target: Caster,
+            description: "429 Too Many Requests. Absorbs the next 120 damage and reduces damage taken by 20% for up to 10 sec.",
+            effect: Absorb(aura: "rate_limiter", amount: 120, duration_ms: 10000),
+            yells: [
+                "429. Try again later. Or never.",
+                "You've exceeded your quota of hitting me.",
+                "One punch per second, per IP, per lifetime.",
+            ],
+        ),
+        (
+            id: 32, name: "Who Touched Prod?", icon: "who_touched_prod", school: Physical,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 8000,
+            learn_level: 2,
+            description: "The one question that makes everyone turn around. Forces the target to attack you, with 10% more threat than its current favourite.",
+            effect: Taunt,
+            yells: [
+                "WHO TOUCHED PROD?",
+                "Somebody deployed on a Friday. Look at me.",
+                "Eyes on me. Not the intern. Me.",
+                "Which one of you merged without a review?",
+            ],
+        ),
+        (
+            id: 33, name: "Connection Pool", icon: "connection_pool", school: Physical,
+            range_m: 0.0, cast_ms: 0, mana: 30, gcd: true, cooldown_ms: 6000,
+            target: Caster, area: Some((radius_m: 8.0, allies: false)), learn_level: 3,
+            description: "Max pool size: everyone. Deals physical damage and heavy threat to all enemies within 8 m.",
+            effect: Damage(base: 20, coefficient_pct: 30),
+            extra_effects: [Threat(amount: 60)],
+            yells: [
+                "Pool size twenty. You're all checked out.",
+                "Everybody gets a connection. Nobody gets released.",
+                "Join the pool. The pool is me.",
+            ],
+        ),
+        (
+            id: 34, name: "Kill Query", icon: "kill_query", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 15000,
+            learn_level: 4,
+            description: "SELECT * without a WHERE, terminated with prejudice. Interrupts spellcasting and locks that school for 4 sec.",
+            effect: Interrupt(lockout_ms: 4000),
+            yells: [
+                "KILL QUERY. It was scanning the whole table.",
+                "That query ran for six hours. Not anymore.",
+                "No index? No cast.",
+            ],
+        ),
+        (
+            id: 35, name: "Database Lock", icon: "db_lock", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 20, gcd: true, cooldown_ms: 25000,
+            learn_level: 5,
+            description: "An exclusive lock on the whole table, held during lunch. Stuns for 4 sec. Bosses have their own replica.",
+            effect: Aura(aura: "db_lock", duration_ms: 4000),
+            yells: [
+                "Table locked. Go get a coffee. You can't.",
+                "Deadlock detected. You lose.",
+                "LOCK TABLES you WRITE.",
+            ],
+        ),
+        (
+            id: 36, name: "Horizontal Scaling", icon: "horizontal_scaling", school: Physical,
+            range_m: 0.0, cast_ms: 0, mana: 20, gcd: false, cooldown_ms: 90000,
+            target: Caster, learn_level: 6,
+            description: "Throws more instances at it, like finance throws more budget at AI. Increases max HP by 30% for 15 sec.",
+            effect: Aura(aura: "horizontal_scaling", duration_ms: 15000),
+            yells: [
+                "Spinning up three more of me. The bill comes later.",
+                "Scale out. Never scale back.",
+                "More replicas, more problems, more HP.",
+            ],
+        ),
+        (
+            id: 37, name: "Retry With Exponential Backoff", icon: "retry_backoff", school: Physical,
+            range_m: 0.0, cast_ms: 0, mana: 35, gcd: true, cooldown_ms: 30000,
+            target: Caster, learn_level: 7,
+            description: "Fails, waits, fails better. Heals you every 2 sec for 12 sec.",
+            effect: Aura(aura: "retry_backoff", duration_ms: 12000),
+            yells: [
+                "Retry one. Retry two. Retry eight. Fine.",
+                "Backing off. Exponentially. Like my will to live.",
+                "Idempotent recovery. Mostly.",
+            ],
+        ),
+        (
+            id: 38, name: "Cache Invalidation", icon: "cache_invalidation", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 35, gcd: true, cooldown_ms: 8000,
+            learn_level: 8,
+            description: "One of the two hard problems, applied to the target's face. Deals heavy physical damage and extra threat.",
+            effect: Damage(base: 70, coefficient_pct: 80),
+            extra_effects: [Threat(amount: 50)],
+            yells: [
+                "There are two hard problems. You are both.",
+                "Your state is stale. Evicting.",
+                "TTL expired. So did you.",
+            ],
+        ),
+        (
+            id: 39, name: "DROP TABLE", icon: "drop_table", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 50, gcd: true, cooldown_ms: 30000,
+            learn_level: 9,
+            description: "No backup, no WHERE, no regrets. Deals enormous physical damage and a lot of threat.",
+            effect: Damage(base: 140, coefficient_pct: 140),
+            extra_effects: [Threat(amount: 100)],
+            yells: [
+                "DROP TABLE strategy; -- finally.",
+                "Backups? The AI said we didn't need those.",
+                "Little Bobby Tables sends his regards.",
+            ],
+        ),
+
+        // ---- DevOps (healer) ----
+        (
+            id: 40, name: "kill -9", icon: "kill_9", school: Arcane,
+            range_m: 30.0, cast_ms: 2000, mana: 30, gcd: true, cooldown_ms: 0,
+            description: "SIGKILL. No graceful shutdown, no exit hooks, no goodbye. Deals arcane damage.",
+            effect: Damage(base: 55, coefficient_pct: 70),
+            yells: [
+                "kill -9. No questions, no shutdown hooks.",
+                "Your process has been reaped.",
+                "Graceful shutdown is for people with time.",
+                "PID found. PID gone.",
+            ],
+        ),
+        (
+            id: 41, name: "Hotfix", icon: "hotfix", school: Arcane,
+            range_m: 40.0, cast_ms: 1500, mana: 30, gcd: true, cooldown_ms: 0,
+            target: Ally,
+            description: "Straight to prod, no review, no tests, works. Heals a targeted teammate, or yourself.",
+            effect: Heal(base: 60, coefficient_pct: 80),
+            yells: [
+                "Hotfix deployed. Nobody review it. Ever.",
+                "Patched in prod. The pipeline can catch up.",
+                "It's not a hack if it's in the changelog.",
+                "Applying the fix the AI said was impossible.",
+            ],
+        ),
+        (
+            id: 42, name: "SIGSTOP", icon: "sigstop", school: Arcane,
+            range_m: 25.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 20000,
+            learn_level: 2,
+            description: "Freezes the process mid-sentence, like a demo on conference wifi. Interrupts spellcasting and locks that school for 4 sec.",
+            effect: Interrupt(lockout_ms: 4000),
+            yells: [
+                "SIGSTOP. Hold that thought. Forever.",
+                "Paused. Like every roadmap.",
+                "Ctrl+Z, process edition.",
+            ],
+        ),
+        (
+            id: 43, name: "Auto-scaling", icon: "auto_scaling", school: Arcane,
+            range_m: 40.0, cast_ms: 0, mana: 35, gcd: true, cooldown_ms: 0,
+            target: Ally, learn_level: 3,
+            description: "Adds capacity before anyone notices, removes it before finance does. Heals a teammate (or you) every 3 sec for 15 sec.",
+            effect: Aura(aura: "auto_scaling", duration_ms: 15000),
+            yells: [
+                "Scaling you up. The invoice scales too.",
+                "Min replicas: one. Max: whatever you need.",
+                "Capacity added. Nobody will thank me.",
+            ],
+        ),
+        (
+            id: 44, name: "Chaos Monkey", icon: "chaos_monkey", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 25, gcd: true, cooldown_ms: 0,
+            learn_level: 4,
+            description: "Randomly terminates the target's instances, on purpose, for resilience. Deals arcane damage every 3 sec for 15 sec.",
+            effect: Aura(aura: "chaos_monkey", duration_ms: 15000),
+            yells: [
+                "Releasing the monkey. It's for resilience.",
+                "Your instances were not resilient.",
+                "Chaos engineering: chaos guaranteed, engineering optional.",
+            ],
+        ),
+        (
+            id: 45, name: "Revert Commit", icon: "revert_commit", school: Arcane,
+            range_m: 40.0, cast_ms: 0, mana: 40, gcd: true, cooldown_ms: 20000,
+            target: Ally, learn_level: 5,
+            description: "git revert on the last five seconds. Restores a teammate (or you) to the health they had 5 sec ago. Never lowers it.",
+            effect: RestoreHp(ms_ago: 5000),
+            yells: [
+                "git revert HEAD. You were fine five seconds ago.",
+                "Reverting the last five seconds. They were bad.",
+                "This never happened. Check the log. Actually don't.",
+                "Rolled back. Postmortem at nine.",
+            ],
+        ),
+        (
+            id: 46, name: "Feature Flag Off", icon: "feature_flag", school: Arcane,
+            range_m: 40.0, cast_ms: 0, mana: 30, gcd: true, cooldown_ms: 8000,
+            target: Ally, learn_level: 6,
+            description: "That AI feature was never enabled. Removes up to two harmful effects from a teammate (or you) and heals a little.",
+            effect: Dispel(count: 2),
+            extra_effects: [Heal(base: 30, coefficient_pct: 30)],
+            yells: [
+                "Flag off. Feature never happened.",
+                "Disabling the AI summary. Everyone can breathe.",
+                "Toggled. Without a deploy. Like a wizard.",
+            ],
+        ),
+        (
+            id: 47, name: "Circuit Breaker", icon: "circuit_breaker", school: Arcane,
+            range_m: 40.0, cast_ms: 0, mana: 40, gcd: true, cooldown_ms: 25000,
+            target: Ally, learn_level: 7,
+            description: "Stops the cascade before it reaches you. Absorbs the next 160 damage on a teammate (or you) for up to 10 sec.",
+            effect: Absorb(aura: "circuit_breaker", amount: 160, duration_ms: 10000),
+            yells: [
+                "Circuit open. Failures stop here.",
+                "Tripping the breaker before you trip.",
+                "Fail fast, but not on my watch.",
+            ],
+        ),
+        (
+            id: 48, name: "Blue-Green Deploy", icon: "blue_green", school: Arcane,
+            range_m: 0.0, cast_ms: 2500, mana: 60, gcd: true, cooldown_ms: 10000,
+            target: Caster, area: Some((radius_m: 30.0, allies: true)), learn_level: 8,
+            description: "Swaps the whole group onto the healthy environment. Heals you and every friendly within 30 m.",
+            effect: Heal(base: 70, coefficient_pct: 60),
+            yells: [
+                "Switching traffic to green. Everyone is green now.",
+                "Zero downtime. Mostly zero.",
+                "Blue was on fire. Welcome to green.",
+            ],
+        ),
+        (
+            id: 49, name: "terraform destroy", icon: "terraform_destroy", school: Arcane,
+            range_m: 30.0, cast_ms: 3000, mana: 70, gcd: true, cooldown_ms: 20000,
+            learn_level: 9,
+            description: "Plan: 0 to add, 0 to change, everything to destroy. Deals enormous arcane damage.",
+            effect: Damage(base: 180, coefficient_pct: 180),
+            yells: [
+                "Do you really want to destroy all resources? yes.",
+                "Infrastructure as code. Destruction as code.",
+                "State file says you exist. Not for long.",
+            ],
+        ),
+        // DevOps's own resurrect, off the action bar on the resurrect key (V).
+        (
+            id: 50, name: "Restart Pod", icon: "restart_pod", school: Arcane,
+            range_m: 30.0, cast_ms: 3000, mana: 50, gcd: true, cooldown_ms: 0,
+            target: DeadAlly, learn_level: 1,
+            description: "CrashLoopBackOff, but for a colleague. Brings a dead teammate back where they fell with 50% health and 40% mana. 3 sec cast, out of combat only.",
+            effect: Resurrect(hp_pct: 50, mana_pct: 40),
+            yells: [
+                "kubectl delete pod you. Restarting.",
+                "Liveness probe failed. Readiness restored.",
+                "Restart count: 47. Still healthy.",
             ],
         ),
 
@@ -688,16 +1110,73 @@
             effect: Aura(aura: "self_improvement", duration_ms: 600000),
         ),
     ],
-    // Keys 1..=0 in order; `learn_level` decides which are usable.
-    action_bar: [1, 2, 3, 4, 6, 7, 8, 9, 10, 11],
+    // Playable classes; the first is the default. Base stats and auto attack come from `unit`.
+    // Bars are keys 1..=0 in order; each spell's `learn_level` decides when it is usable.
+    classes: [
+        (
+            key: "fullstack", name: "Fullstack Engineer", role: Ranged, unit: "senior_engineer",
+            blurb: "Knows everything a little, gets blamed for all of it.\nReviews, refactors and rolls back from 30 m away.",
+            action_bar: [1, 2, 3, 4, 6, 7, 8, 9, 10, 11], resurrect: 13,
+        ),
+        (
+            key: "frontend", name: "Frontend Developer", role: Melee, unit: "frontend_dev",
+            // Melee eats every swing a caster kites; a little armour evens it out.
+            damage_taken_pct: -10,
+            blurb: "Twelve frameworks this year, one div still a pixel off.\nStacks Specificity up close, cashes it in with !important.",
+            action_bar: [20, 21, 22, 23, 24, 25, 26, 27, 28, 29], resurrect: 13,
+        ),
+        (
+            key: "backend", name: "Backend Engineer", role: Tank, unit: "backend_dev",
+            // Holds aggro over a DPS doing roughly twice the damage (docs/FORMULAS.md).
+            threat_pct: 350, damage_taken_pct: -20, level_hp_pct: 160,
+            blurb: "Nobody notices the API until it is down. Then only you.\nTaunts, rate-limits and soaks what the DPS keep pulling.",
+            action_bar: [30, 31, 32, 33, 34, 35, 36, 37, 38, 39], resurrect: 13,
+        ),
+        (
+            key: "devops", name: "DevOps Engineer", role: Healer, unit: "devops_eng",
+            blurb: "Keeps prod alive at 3 a.m. so the AI can take credit at 9.\nHotfixes, auto-scales and reverts your last five seconds.",
+            action_bar: [40, 41, 42, 43, 44, 45, 46, 47, 48, 49], resurrect: 50,
+        ),
+    ],
     units: [
         (
-            key: "senior_engineer", name: "Senior Engineer", title: "The Last Dev", level: 1, hostile: false,
+            key: "senior_engineer", name: "Fullstack Engineer", title: "Knows Everything a Little", level: 1, hostile: false,
             max_hp: 300, max_mana: 250, spell_power: 20, crit_pct: 5, haste_pct: 0,
             mana_regen_per_5s_combat: 60,
             xp_reward: 0, loot: [], ai: None,
             auto_attack: Some((
                 name: "Nitpick", range_m: 25.0, swing_ms: 1800,
+                damage_min: 9, damage_max: 14,
+            )),
+        ),
+
+        (
+            key: "frontend_dev", name: "Frontend Developer", title: "Centers Divs for a Living", level: 1, hostile: false,
+            max_hp: 360, max_mana: 220, spell_power: 20, crit_pct: 8, haste_pct: 0,
+            mana_regen_per_5s_combat: 70,
+            xp_reward: 0, loot: [], ai: None,
+            auto_attack: Some((
+                name: "Rubber-band Selection", icon: "rubber_band", range_m: 4.0, swing_ms: 1600,
+                damage_min: 15, damage_max: 21,
+            )),
+        ),
+        (
+            key: "backend_dev", name: "Backend Engineer", title: "Owns Prod, Fears Prod", level: 1, hostile: false,
+            max_hp: 440, max_mana: 200, spell_power: 18, crit_pct: 5, haste_pct: 0,
+            mana_regen_per_5s_combat: 60,
+            xp_reward: 0, loot: [], ai: None,
+            auto_attack: Some((
+                name: "Stack Trace", icon: "stack_trace", range_m: 4.0, swing_ms: 2000,
+                damage_min: 16, damage_max: 22,
+            )),
+        ),
+        (
+            key: "devops_eng", name: "DevOps Engineer", title: "On Call Since 2019", level: 1, hostile: false,
+            max_hp: 290, max_mana: 300, spell_power: 22, crit_pct: 5, haste_pct: 0,
+            mana_regen_per_5s_combat: 80,
+            xp_reward: 0, loot: [], ai: None,
+            auto_attack: Some((
+                name: "Health Check Ping", icon: "health_ping", range_m: 25.0, swing_ms: 1800,
                 damage_min: 9, damage_max: 14,
             )),
         ),

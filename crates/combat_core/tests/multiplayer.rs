@@ -27,9 +27,17 @@ fn run_routed(sim: &mut Sim, n: u32) -> Vec<(Audience, Event)> {
 fn spawn_player_caps_at_max_players_and_player_stays_the_first() {
     let mut h = H::new(1, -60.0, |_| {});
     for k in 1..MAX_PLAYERS {
-        assert_ne!(h.sim.spawn_player(Vec3::new(k as f32, 0.0, 0.0), 0.0), 0);
+        assert_ne!(
+            h.sim
+                .spawn_player("fullstack", Vec3::new(k as f32, 0.0, 0.0), 0.0),
+            0
+        );
     }
-    assert_eq!(h.sim.spawn_player(Vec3::new(9.0, 0.0, 0.0), 0.0), 0);
+    assert_eq!(
+        h.sim
+            .spawn_player("fullstack", Vec3::new(9.0, 0.0, 0.0), 0.0),
+        0
+    );
     assert_eq!(h.sim.players().len(), MAX_PLAYERS);
     assert_eq!(h.sim.player(), Some(h.player));
 }
@@ -39,9 +47,13 @@ fn enemy_hp_scales_with_group_size_on_join_leave_and_spawn() {
     let mut h = H::new(1, -60.0, |_| {});
     h.sim.set_wandering(false);
     assert_eq!(h.unit(h.mob).max_hp, 900);
-    let p2 = h.sim.spawn_player(Vec3::new(1.0, 0.0, 0.0), 0.0);
+    let p2 = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(1.0, 0.0, 0.0), 0.0);
     assert_eq!((h.unit(h.mob).max_hp, h.unit(h.mob).hp), (1260, 1260));
-    let p3 = h.sim.spawn_player(Vec3::new(2.0, 0.0, 0.0), 0.0);
+    let p3 = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(2.0, 0.0, 0.0), 0.0);
     assert_eq!(h.unit(h.mob).max_hp, 1620);
     // Players themselves are not scaled.
     assert_eq!(h.unit(p2).max_hp, h.unit(h.player).max_hp);
@@ -51,7 +63,8 @@ fn enemy_hp_scales_with_group_size_on_join_leave_and_spawn() {
     assert_eq!(h.unit(h.mob).max_hp, 1260);
 
     let mut c = H::new(1, -60.0, |c| c.config.group_hp_pct_per_player = 100);
-    c.sim.spawn_player(Vec3::new(1.0, 0.0, 0.0), 0.0);
+    c.sim
+        .spawn_player("fullstack", Vec3::new(1.0, 0.0, 0.0), 0.0);
     assert_eq!(c.unit(c.mob).max_hp, 1800);
 }
 
@@ -63,7 +76,8 @@ fn rescale_keeps_the_hp_fraction_of_a_wounded_enemy() {
     h.cast(CR);
     assert!(h.run_until(120, |e| matches!(e, Event::Damage { .. })));
     let before = h.unit(h.mob).clone();
-    h.sim.spawn_player(Vec3::new(1.0, 0.0, 0.0), 0.0);
+    h.sim
+        .spawn_player("fullstack", Vec3::new(1.0, 0.0, 0.0), 0.0);
     let after = h.unit(h.mob);
     assert_eq!(after.max_hp, before.max_hp * 140 / 100);
     assert_eq!(after.hp, before.hp * after.max_hp / before.max_hp);
@@ -80,7 +94,9 @@ fn mobs_follow_top_threat_across_players_and_reset_on_wipe() {
     });
     h.sim.set_wandering(false);
     let p1 = h.player;
-    let p2 = h.sim.spawn_player(Vec3::new(1.0, 0.0, -5.0), 0.0);
+    let p2 = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(1.0, 0.0, -5.0), 0.0);
     h.sim.push(Command::PlayerMoved {
         pos: Vec3::new(0.0, 0.0, 4.0),
         yaw: 0.0,
@@ -141,7 +157,9 @@ fn mobs_follow_top_threat_across_players_and_reset_on_wipe() {
 fn second_player_aggro_alone_and_leaving_mid_fight_resets_the_mob() {
     let mut h = H::new(4, -60.0, |_| {});
     h.sim.set_wandering(false);
-    let p2 = h.sim.spawn_player(Vec3::new(0.0, 0.0, -50.0), 0.0);
+    let p2 = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(0.0, 0.0, -50.0), 0.0);
     let mob = h.mob;
     // Only p2 walks into aggro range; the mob picks p2 though p1 joined first.
     assert!(h.run_until(
@@ -175,8 +193,12 @@ fn every_member_rolls_own_loot_and_loots_only_their_share() {
         }
     });
     let (p1, mob) = (h.player, h.mob);
-    let p2 = h.sim.spawn_player(Vec3::new(1.0, 0.0, 0.0), 0.0);
-    let p3 = h.sim.spawn_player(Vec3::new(-1.0, 0.0, 0.0), 0.0);
+    let p2 = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(1.0, 0.0, 0.0), 0.0);
+    let p3 = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(-1.0, 0.0, 0.0), 0.0);
     assert!(h.sim.debug_kill(mob));
     let ev = h.sim.tick_routed();
     let drops: Vec<(Audience, usize)> = ev
@@ -244,8 +266,12 @@ fn kill_xp_is_split_with_group_bonus_among_members_in_range() {
 
     // Three in range: 120 * 116% / 3 = 46 each.
     let mut h = H::new(6, -30.0, |_| {});
-    let p2 = h.sim.spawn_player(Vec3::new(1.0, 0.0, 0.0), 0.0);
-    let p3 = h.sim.spawn_player(Vec3::new(2.0, 0.0, 0.0), 0.0);
+    let p2 = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(1.0, 0.0, 0.0), 0.0);
+    let p3 = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(2.0, 0.0, 0.0), 0.0);
     assert!(h.sim.debug_kill(h.mob));
     let ev = h.sim.tick_routed();
     for p in [h.player, p2, p3] {
@@ -254,10 +280,14 @@ fn kill_xp_is_split_with_group_bonus_among_members_in_range() {
 
     // One member out of range: two share 120 * 100% / 2 = 60, the third gets nothing.
     let mut h = H::new(6, -30.0, |_| {});
-    let p2 = h.sim.spawn_player(Vec3::new(1.0, 0.0, 0.0), 0.0);
-    let far = h
+    let p2 = h
         .sim
-        .spawn_player(Vec3::new(0.0, 0.0, GROUP_SHARE_RANGE_M + 70.0), 0.0);
+        .spawn_player("fullstack", Vec3::new(1.0, 0.0, 0.0), 0.0);
+    let far = h.sim.spawn_player(
+        "fullstack",
+        Vec3::new(0.0, 0.0, GROUP_SHARE_RANGE_M + 70.0),
+        0.0,
+    );
     assert!(h.sim.debug_kill(h.mob));
     let ev = h.sim.tick_routed();
     assert_eq!(xp_of(&ev, h.player), vec![60]);
@@ -268,7 +298,9 @@ fn kill_xp_is_split_with_group_bonus_among_members_in_range() {
 #[test]
 fn commands_act_per_player_and_failures_route_to_the_caster() {
     let mut h = H::new(7, -60.0, |_| {});
-    let p2 = h.sim.spawn_player(Vec3::new(1.0, 0.0, 0.0), 0.0);
+    let p2 = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(1.0, 0.0, 0.0), 0.0);
     h.sim.apply_as(
         p2,
         Command::PlayerMoved {
@@ -324,7 +356,9 @@ fn zone_load_moves_the_whole_group_to_the_spawn_anchor() {
         }
     };
     let mut h = H::new(8, -60.0, |_| {});
-    let p2 = h.sim.spawn_player(Vec3::new(100.0, 0.0, 0.0), 0.0);
+    let p2 = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(100.0, 0.0, 0.0), 0.0);
     assert!(h.sim.load_zone("tower/1", &anchor, Vec::new()).is_ok());
     let (a, b) = (h.unit(h.player).clone(), h.unit(p2).clone());
     assert_eq!(a.pos, spawn);
@@ -354,7 +388,9 @@ fn cast_as(sim: &mut Sim, who: EntityId, target: Option<EntityId>, spell: SpellI
 #[test]
 fn helpful_spells_land_on_a_targeted_teammate_or_fall_back_to_self() {
     let mut h = H::new(1, -60.0, |_| {});
-    let p2 = h.sim.spawn_player(Vec3::new(10.0, 0.0, 0.0), 0.0);
+    let p2 = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(10.0, 0.0, 0.0), 0.0);
     assert!(h.sim.debug_apply_aura(p2, "code_smell", 10_000));
     run_routed(&mut h.sim, 1);
     cast_as(&mut h.sim, h.player, Some(p2), GR);
@@ -371,7 +407,9 @@ fn helpful_spells_land_on_a_targeted_teammate_or_fall_back_to_self() {
         Event::AuraRemoved { target, key, .. } if *target == p2 && key == "code_smell")));
     // An enemy (or no) target self-casts, exactly like single-player.
     let mut s = H::new(1, -60.0, |_| {});
-    let p2 = s.sim.spawn_player(Vec3::new(10.0, 0.0, 0.0), 0.0);
+    let p2 = s
+        .sim
+        .spawn_player("fullstack", Vec3::new(10.0, 0.0, 0.0), 0.0);
     cast_as(&mut s.sim, s.player, Some(s.mob), GR);
     run_routed(&mut s.sim, 2);
     assert!(s.unit(s.player).auras.iter().any(|a| a.key == "guardrails"));
@@ -381,8 +419,12 @@ fn helpful_spells_land_on_a_targeted_teammate_or_fall_back_to_self() {
 #[test]
 fn ally_spells_check_range_line_of_sight_and_life() {
     let mut h = H::new(1, -60.0, |_| {});
-    let far = h.sim.spawn_player(Vec3::new(40.0, 0.0, 0.0), 0.0);
-    let walled = h.sim.spawn_player(Vec3::new(0.0, 0.0, 10.0), 0.0);
+    let far = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(40.0, 0.0, 0.0), 0.0);
+    let walled = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(0.0, 0.0, 10.0), 0.0);
     h.sim.set_blockers(vec![combat_core::Aabb {
         min: Vec3::new(-3.0, 0.0, 4.0),
         max: Vec3::new(3.0, 3.0, 5.0),
@@ -412,7 +454,9 @@ fn ally_spells_check_range_line_of_sight_and_life() {
 fn resurrect_revives_a_dead_teammate_where_they_fell_out_of_combat_only() {
     let mut h = H::new(1, -20.0, |_| {});
     h.sim.set_wandering(false);
-    let p2 = h.sim.spawn_player(Vec3::new(6.0, 0.0, 0.0), 0.0);
+    let p2 = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(6.0, 0.0, 0.0), 0.0);
     // Living, self, enemy and nothing are all refused.
     for (t, want) in [
         (Some(p2), CastError::TargetNotDead),
@@ -435,7 +479,9 @@ fn resurrect_revives_a_dead_teammate_where_they_fell_out_of_combat_only() {
     assert_eq!(fails_of(&ev, h.player), vec![CastError::InCombat]);
     // Out of combat it works after the full cast, with 30% HP and 20% mana, in place.
     let mut h = H::new(1, -60.0, |_| {});
-    let p2 = h.sim.spawn_player(Vec3::new(6.0, 0.0, 0.0), 0.0);
+    let p2 = h
+        .sim
+        .spawn_player("fullstack", Vec3::new(6.0, 0.0, 0.0), 0.0);
     assert!(h.sim.debug_kill_player(p2));
     run_routed(&mut h.sim, 1);
     cast_as(&mut h.sim, h.player, Some(p2), REZ);
@@ -475,7 +521,7 @@ fn enemy_damage_scales_with_group_size() {
         h.sim.set_wandering(false);
         for k in 1..players {
             h.sim
-                .spawn_player(Vec3::new(50.0 + k as f32, 0.0, 0.0), 0.0);
+                .spawn_player("fullstack", Vec3::new(50.0 + k as f32, 0.0, 0.0), 0.0);
         }
         h.target(h.mob);
         h.cast(CR);

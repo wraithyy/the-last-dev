@@ -112,7 +112,14 @@ pub(crate) struct Unit {
     pub last_player_hit: Option<(u32, School)>,
     pub wander: Wander,
     pub nav: NavAgent,
+    /// Index into `Content::classes` for players; `None` for everyone else.
+    pub class: Option<usize>,
+    /// Player HP once per second, newest first (Revert Commit looks back in it).
+    pub hp_hist: [u32; HP_HIST_LEN],
 }
+
+/// Seconds of HP history kept per player.
+pub(crate) const HP_HIST_LEN: usize = 8;
 
 /// One resolved damage instance, before modifiers and absorbs.
 pub(crate) struct Hit {
@@ -187,19 +194,19 @@ impl Sim {
         self.rebuild_nav();
     }
 
-    /// Adds a group member at level 1. Returns 0 (never a valid id) once `MAX_PLAYERS` are in.
-    /// Enemy HP is rescaled for the new group size.
-    pub fn spawn_player(&mut self, pos: Vec3, yaw: f32) -> EntityId {
+    /// Adds a group member of class `class` (a `Content::classes` key) at level 1. Returns 0
+    /// (never a valid id) for an unknown class or once `MAX_PLAYERS` are in. Enemy HP is
+    /// rescaled for the new group size.
+    pub fn spawn_player(&mut self, class: &str, pos: Vec3, yaw: f32) -> EntityId {
         if self.players.len() >= MAX_PLAYERS {
             return 0;
         }
-        let key = self.content.config.player_unit.clone();
-        let def = self
-            .content
-            .units
-            .iter()
-            .position(|u| u.key == key)
-            .unwrap_or(0);
+        let Some(ci) = self.content.classes.iter().position(|c| c.key == class) else {
+            return 0;
+        };
+        let Ok(def) = self.def_index(&self.content.classes[ci].unit.clone()) else {
+            return 0;
+        };
         let id = self.spawn(
             def,
             pos,
@@ -216,7 +223,10 @@ impl Sim {
         self.players.push(id);
         // Re-apply now that the unit is known to be the player (level table stats).
         if let Some(i) = self.index(id) {
+            self.units[i].class = Some(ci);
             self.apply_level(i, 1);
+            let hp = self.units[i].state.hp;
+            self.units[i].hp_hist = [hp; HP_HIST_LEN];
         }
         self.rescale_group_hp();
         id
@@ -249,6 +259,16 @@ impl Sim {
 
     pub(crate) fn is_player(&self, id: EntityId) -> bool {
         self.players.contains(&id)
+    }
+
+    /// The class of a group member; `None` for anyone else.
+    pub fn class_of(&self, id: EntityId) -> Option<&crate::content::ClassDef> {
+        let i = self.index(id)?;
+        self.content.classes.get(self.units[i].class?)
+    }
+
+    pub(crate) fn class_at(&self, i: usize) -> Option<&crate::content::ClassDef> {
+        self.content.classes.get(self.units[i].class?)
     }
 
     fn first_player(&self) -> Option<EntityId> {
@@ -369,6 +389,8 @@ impl Sim {
             last_player_hit: None,
             wander: Wander::new(self.seed, id),
             nav: NavAgent::default(),
+            class: None,
+            hp_hist: [0; HP_HIST_LEN],
         });
         let i = self.units.len() - 1;
         // Neighbouring NPCs of the same kind start at different lines, so they banter.
@@ -536,6 +558,7 @@ impl Sim {
         self.update_wander();
         self.update_auras();
         self.update_regen();
+        self.update_hp_history();
         self.update_combat_flags();
         self.flush_yells();
         self.sync_views();
@@ -1446,6 +1469,19 @@ impl Sim {
             u.regen_acc += d.mana_regen_per_5s_combat + u.item_bonus.mana_regen;
             u.state.mana = (u.state.mana + u.regen_acc / 150).min(u.state.max_mana);
             u.regen_acc %= 150;
+        }
+    }
+
+    /// Once per second; no rng, so replays are unaffected.
+    fn update_hp_history(&mut self) {
+        if !self.now.is_multiple_of(ticks(1000)) {
+            return;
+        }
+        for &p in &self.players {
+            let Some(i) = self.index(p) else { continue };
+            let u = &mut self.units[i];
+            u.hp_hist.rotate_right(1);
+            u.hp_hist[0] = u.state.hp;
         }
     }
 

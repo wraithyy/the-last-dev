@@ -53,7 +53,7 @@ impl H {
         legacy_ceo(&mut c);
         tweak(&mut c);
         let mut sim = Sim::new(c, seed);
-        let player = sim.spawn_player(Vec3::new(0.0, 0.0, 0.0), 0.0);
+        let player = sim.spawn_player("fullstack", Vec3::new(0.0, 0.0, 0.0), 0.0);
         let mob = match sim.spawn_unit("ceo", Vec3::new(0.0, 0.0, mob_z), 0.0) {
             Ok(id) => id,
             Err(e) => panic!("spawn failed: {e}"),

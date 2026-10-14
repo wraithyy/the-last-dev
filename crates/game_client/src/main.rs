@@ -3,6 +3,7 @@ mod arena;
 mod audio;
 mod camera;
 mod catalog;
+mod classes;
 mod collision;
 mod combat;
 mod combat_anim;
@@ -93,7 +94,7 @@ fn main() {
             rigs::RigsPlugin,
             yell::YellPlugin,
         ))
-        .add_plugins((net::NetPlugin, touch::TouchPlugin))
+        .add_plugins((net::NetPlugin, touch::TouchPlugin, classes::ClassesPlugin))
         .run();
 }
 

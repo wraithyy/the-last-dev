@@ -7,6 +7,13 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - Phase 5 polish: profiling, wasm size reduction (no `wasm-opt` yet), settings menu.
 - Escape opens a minimal pause overlay only, with no real menu.
 
+## Classes
+
+- Hot Reload reuses the sim's `Teleported` event to move the dashing player, so the event feed prints the Reorg line ("reorganised to a new location") for a dash.
+- Class kits (glasses, studio headphones, pager, Fullstack neck headphones) are primitives on bones; only the local player carries the coffee mug.
+- Heals still generate no threat, so a healer never pulls aggro off the tank by healing.
+- The role picker's stage camera is a second `Camera3d`; while the picker is open, systems that expect exactly one 3D camera (camera follow, nameplate placement) pause. The run is paused underneath anyway.
+
 ## Co-op (online)
 
 - Player interaction is deliberately narrow: target a teammate (click, party frame, F1 self / F2-F5 members), cast the helpful spells on them (Guardrails, Rollback, On-Call Caffeine), resurrect with "Have You Tried Turning It Off and On Again" (V), and aim emotes at them. There is no trading, no free-text chat, no duels, no inspect and no item handover; trophies are personal.
@@ -15,8 +22,11 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - A resurrected teammate stands where they died, so enemies still standing there pull them again; resurrect after the area is clear.
 - Own casts are predicted from local knowledge (cooldowns, GCD, mana, target kind); the server can still refuse (range, line of sight, a cooldown the client missed) and the bar then vanishes with the error.
 - The resurrect key has no action-bar slot (the bar is full); it is a V keycap right of Coffee Break, shown only while someone else is in the group.
+- `~/metrics` counts the damage and heal events the client receives; damage/heal events are broadcast to every member, so all group members appear. Bars use party blue; per-class colours are not wired. Fights end 4 s after the group leaves combat, and the report resets on a new game or when the session changes (entity ids differ).
 
 ## Presentation
+
+- The chat window shows speech, emotes, joins/leaves and progress notices; quest dialog text is not mirrored into it (only ticket accepted/ready/closed). Logs scroll with the mouse wheel only; the touch layout has a tap strip that cycles chat, combat log and collapsed, without touch scrolling or the meter.
 
 - Floating numbers and hit reactions of projectile attacks wait for the projectile to land (1.5 s fallback). Health bars and the combat log stay sim-authoritative, so a log line and the HP drop can precede the visual by the flight time.
 - Chair colliders float 0.12 m above the floor so the shared blocker list (movement, camera, combat LoS) does not stop ground-level LoS rays. A dedicated movement-only list would be cleaner but needs `player.rs`/`combat.rs` changes.

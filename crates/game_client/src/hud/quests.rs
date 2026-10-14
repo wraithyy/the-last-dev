@@ -943,7 +943,7 @@ mod tests {
     #[test]
     fn markers_follow_quest_status() {
         let mut s = sim();
-        s.spawn_player(combat_core::Vec3::new(0.0, 0.0, 0.0), 0.0);
+        s.spawn_player("fullstack", combat_core::Vec3::new(0.0, 0.0, 0.0), 0.0);
         assert_eq!(giver_mark(&s, "intern", "campus").map(|m| m.0), Some("!"));
         // The chain behind onboarding is locked, so Facilities has nothing yet.
         assert_eq!(giver_mark(&s, "facilities_guy", "campus"), None);

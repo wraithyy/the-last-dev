@@ -34,11 +34,6 @@ pub fn yell_color(is_player: bool, hostile: bool) -> Color {
     }
 }
 
-/// Hostiles yell, everyone else talks.
-pub fn speech_verb(hostile: bool) -> &'static str {
-    if hostile { "yells" } else { "says" }
-}
-
 /// Mini-bosses are ordinary (stunnable) units in the sim; the HUD still marks them.
 pub fn is_elite(key: &str) -> bool {
     matches!(key, "hr_partner" | "marketing_lead" | "ciso")
@@ -141,8 +136,6 @@ mod tests {
     fn speech_colours_and_verbs_differ_by_speaker() {
         assert_ne!(yell_color(true, false), yell_color(false, true));
         assert_ne!(yell_color(false, false), yell_color(false, true));
-        assert_eq!(speech_verb(true), "yells");
-        assert_eq!(speech_verb(false), "says");
         assert!(is_elite("ciso") && !is_elite("ceo"));
     }
 

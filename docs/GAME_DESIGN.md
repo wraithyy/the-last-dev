@@ -50,6 +50,17 @@ Bosses:
 | 4 | VP of Synergy | Phase 1 with two Middle Manager adds; phase 2 at 50%: *Reorg* teleports you and resets add threat. |
 | 5 | CEO | Existing encounter plus phase 2 at 40%: *Pivot to AGI* summons Chatbot Minions, Hallucination Blast cast time shortens. |
 
+## Classes
+
+Four roles, picked on first launch ("Choose your role"; Esc > Change role restarts the run). Each has ten spells unlocked over levels 1-9 and can finish the offline campaign solo.
+
+| Class | Role | Kit (level) | Signature |
+|---|---|---|---|
+| Fullstack Engineer | RANGED | the spells below | knows everything a little, gets blamed for all of it |
+| Frontend Developer | MELEE | Pixel Push 1, CSS Combo 1, !important 2, Lighthouse Audit 3, Hot Reload 4, Dark Mode 5, Responsive Layout 6, Infinite Scroll 7, Center the Div 8, Rewrite It in a New Framework 9 | stacks Specificity (5), cashes it in with !important; dash, self-heal defensive |
+| Backend Engineer | TANK | Blocking Call 1, Rate Limiter 1, Who Touched Prod? 2, Connection Pool 3, Kill Query 4, Database Lock 5, Horizontal Scaling 6, Retry With Exponential Backoff 7, Cache Invalidation 8, DROP TABLE 9 | 350% threat, armour, taunt, AoE threat, temporary max HP |
+| DevOps Engineer | HEALER | kill -9 1, Hotfix 1, SIGSTOP 2, Auto-scaling 3, Chaos Monkey 4, Revert Commit 5, Feature Flag Off 6, Circuit Breaker 7, Blue-Green Deploy 8, terraform destroy 9 | ally heals, HoT, group heal, restore HP of 5 s ago, own faster resurrect (Restart Pod) |
+
 ## Player progression
 
 Levels 1-10, XP from kills (trash and bosses). Each level raises max HP and mana; new spells unlock.

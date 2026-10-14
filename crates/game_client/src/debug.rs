@@ -3,6 +3,9 @@
 //!   `WOW_SHOT_TIMES=t1,t2,..` instead saves one `<path>_<n>.png` per time (seconds since start).
 //! - `WOW_LINEUP=1|2`: bare stage with half of the cast in two rows (see `units.rs`); `0` leaves the stage empty.
 //! - `WOW_LINEUP=3`: only the campus/data center/lab units, three rows (use `WOW_CAM_DIST=20`).
+//! - `WOW_LINEUP=4`: the four class skins with their kits, plus the Backend's five hair stages.
+//! - `WOW_CLASS=fullstack|frontend|backend|devops`: play that class and skip the role picker;
+//!   `WOW_PICKER=1` opens the picker even when a role is stored (see `classes.rs`).
 //!   `WOW_SHOT_SIZE=<w>x<h>` changes the target size (e.g. 2560x1080 for ultrawide checks).
 //! - `WOW_ZONE=<id>`: start in a zone (campus, tower/1..5, datacenter/1..2, lab/1..2), sim-backed and
 //!   playable, see `game.rs` (also `WOW_QUESTS`, `WOW_UNLOCK_ALL`); works with `WOW_TOPDOWN`
@@ -20,6 +23,9 @@
 //! - `WOW_LOOT_DEMO=1`: show the loot window and log lines for three sample items (display only; see `hud/feed.rs`).
 //! - `WOW_COFFEE=<secs>`: drain mana to 30 and start a Coffee Break that many seconds in (1 if not a number).
 //! - `WOW_AUTORUN=1`: hold "forward" so animation and camera can be checked without input.
+//! - `WOW_METER_MODE=0|1|2`, `WOW_METER_SCOPE=overall`: initial `~/metrics` mode and scope (open it with `WOW_KEYS=t:KeyK`).
+//! - `WOW_TOUCH=1`: start in the touch layout (native only; the web build detects a coarse pointer);
+//!   `WOW_TOUCH_PANEL=chat|log` also expands that log panel.
 //! - `WOW_KEYS=t:Key,t:Key:hold,t:yaw=<rad>`: scripted input for two-client co-op shots. At `t`
 //!   seconds a key (`KeyW`, `Digit6`, `F2`, `Tab`, ...) is tapped, or held for `hold` seconds,
 //!   or the player turns to `yaw`. Goes through the real input paths (online too).
@@ -98,9 +104,14 @@ impl Plugin for DebugPlugin {
         if env::var("WOW_LINEUP").is_ok() {
             app.add_systems(
                 PostStartup,
-                |mut body: Single<&mut PlayerBody>, mut cam: Single<&mut OrbitCamera>| {
-                    body.teleport_facing(Vec3::new(0.0, 0.0, 2.0), 0.0);
+                |mut player: Single<(&mut PlayerBody, &mut Visibility)>,
+                 mut cam: Single<&mut OrbitCamera>| {
+                    player.0.teleport_facing(Vec3::new(0.0, 0.0, 2.0), 0.0);
                     cam.set_yaw(0.0);
+                    // The class lineup is about the skins; the player would stand in front of them.
+                    if env::var("WOW_LINEUP").is_ok_and(|v| v == "4") {
+                        *player.1 = Visibility::Hidden;
+                    }
                 },
             );
         }
@@ -249,6 +260,9 @@ fn key_code(name: &str) -> Option<KeyCode> {
                     'C' => KeyCode::KeyC,
                     'F' => KeyCode::KeyF,
                     'G' => KeyCode::KeyG,
+                    'H' => KeyCode::KeyH,
+                    'K' => KeyCode::KeyK,
+                    'L' => KeyCode::KeyL,
                     'S' => KeyCode::KeyS,
                     'T' => KeyCode::KeyT,
                     'V' => KeyCode::KeyV,
@@ -460,7 +474,7 @@ fn screenshot_and_exit(
 fn retarget_camera(
     mut commands: Commands,
     plan: Res<ShotPlan>,
-    cams: Query<Entity, Added<Camera3d>>,
+    cams: Query<Entity, (Added<Camera3d>, Without<crate::classes::StageCamera>)>,
 ) {
     for cam in &cams {
         commands

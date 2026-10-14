@@ -72,6 +72,7 @@ enum RoomCmd {
     Join {
         player: PlayerId,
         name: String,
+        class: String,
         out: mpsc::Sender<Bytes>,
     },
     Leave(PlayerId),
@@ -155,8 +156,13 @@ impl RoomRegistry {
         }))
     }
 
+    /// True for a class key of the server's content (checked at `Hello`).
+    pub fn knows_class(&self, class: &str) -> bool {
+        self.0.world.content.class(class).is_some()
+    }
+
     /// Creates a fresh room and joins it as its first player.
-    pub fn create_and_join(&self, name: &str) -> Result<Joined, JoinError> {
+    pub fn create_and_join(&self, name: &str, class: &str) -> Result<Joined, JoinError> {
         let inner = &self.0;
         let mut rooms = inner.lock();
         if rooms.len() >= inner.max_rooms {
@@ -176,7 +182,7 @@ impl RoomRegistry {
                 tx,
             },
         );
-        let joined = join_locked(inner, &mut rooms, &code, name);
+        let joined = join_locked(inner, &mut rooms, &code, name, class);
         match joined {
             Ok(j) => {
                 tokio::spawn(run_room(code.clone(), inner.clone(), rx));
@@ -190,9 +196,9 @@ impl RoomRegistry {
         }
     }
 
-    pub fn join(&self, code: &str, name: &str) -> Result<Joined, JoinError> {
+    pub fn join(&self, code: &str, name: &str, class: &str) -> Result<Joined, JoinError> {
         let mut rooms = self.0.lock();
-        join_locked(&self.0, &mut rooms, code, name)
+        join_locked(&self.0, &mut rooms, code, name, class)
     }
 
     pub async fn leave(&self, joined: &Joined) {
@@ -236,6 +242,7 @@ fn join_locked(
     rooms: &mut HashMap<String, Entry>,
     code: &str,
     name: &str,
+    class: &str,
 ) -> Result<Joined, JoinError> {
     let e = rooms.get_mut(code).ok_or(JoinError::NoSuchRoom)?;
     if e.players >= inner.max_players {
@@ -244,8 +251,14 @@ fn join_locked(
     let (out, outbound) = mpsc::channel(inner.outbound_queue);
     let player = e.next_player;
     let name = name.to_string();
-    e.tx.try_send(RoomCmd::Join { player, name, out })
-        .map_err(|_| JoinError::Unavailable)?;
+    let class = class.to_string();
+    e.tx.try_send(RoomCmd::Join {
+        player,
+        name,
+        class,
+        out,
+    })
+    .map_err(|_| JoinError::Unavailable)?;
     e.next_player += 1;
     e.players += 1;
     tracing::info!(room = %code_tag(code), player, players = e.players, "player joined");
@@ -273,8 +286,13 @@ async fn run_room(code: String, inner: Arc<Inner>, mut rx: mpsc::Receiver<RoomCm
         tokio::select! {
             cmd = rx.recv() => match cmd {
                 None => break,
-                Some(RoomCmd::Join { player, name, out }) => {
-                    if !state.on_join(player, &name) {
+                Some(RoomCmd::Join {
+                    player,
+                    name,
+                    class,
+                    out,
+                }) => {
+                    if !state.on_join(player, &name, &class) {
                         // Dropping `out` closes the connection after the error frame.
                         if let Some(b) = cannot_join_frame() {
                             let _ = out.try_send(b);
@@ -424,34 +442,43 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn create_join_full_leave() {
         let reg = reg(&cfg(2, 2));
-        let a = reg.create_and_join("a").unwrap();
-        let b = reg.join(&a.code, "b").unwrap();
+        let a = reg.create_and_join("a", "fullstack").unwrap();
+        let b = reg.join(&a.code, "b", "fullstack").unwrap();
         assert_ne!(a.player, b.player);
-        assert_eq!(reg.join(&a.code, "c").err(), Some(JoinError::RoomFull));
-        assert_eq!(reg.join("NOPE", "c").err(), Some(JoinError::NoSuchRoom));
+        assert_eq!(
+            reg.join(&a.code, "c", "fullstack").err(),
+            Some(JoinError::RoomFull)
+        );
+        assert_eq!(
+            reg.join("NOPE", "c", "fullstack").err(),
+            Some(JoinError::NoSuchRoom)
+        );
         assert_eq!(reg.counts(), (1, 2));
         reg.leave(&b).await;
         assert_eq!(reg.counts(), (1, 1));
-        assert!(reg.join(&a.code, "c").is_ok());
+        assert!(reg.join(&a.code, "c", "fullstack").is_ok());
     }
 
     #[tokio::test(start_paused = true)]
     async fn player_cap_is_the_sims() {
         let reg = reg(&cfg(2, 50));
-        let a = reg.create_and_join("a").unwrap();
+        let a = reg.create_and_join("a", "fullstack").unwrap();
         let rest: Vec<_> = (0..MAX_PLAYERS - 1)
-            .map(|_| reg.join(&a.code, "x").unwrap())
+            .map(|_| reg.join(&a.code, "x", "fullstack").unwrap())
             .collect();
-        assert_eq!(reg.join(&a.code, "x").err(), Some(JoinError::RoomFull));
+        assert_eq!(
+            reg.join(&a.code, "x", "fullstack").err(),
+            Some(JoinError::RoomFull)
+        );
         drop(rest);
     }
 
     #[tokio::test(start_paused = true)]
     async fn room_limit() {
         let reg = reg(&cfg(1, 5));
-        let _a = reg.create_and_join("a").unwrap();
+        let _a = reg.create_and_join("a", "fullstack").unwrap();
         assert_eq!(
-            reg.create_and_join("b").err(),
+            reg.create_and_join("b", "fullstack").err(),
             Some(JoinError::TooManyRooms)
         );
     }
@@ -459,7 +486,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn lonely_room_expires_after_a_minute() {
         let reg = reg(&cfg(5, 5));
-        let a = reg.create_and_join("a").unwrap();
+        let a = reg.create_and_join("a", "fullstack").unwrap();
         settle().await;
         reg.leave(&a).await;
         tokio::time::sleep(Duration::from_secs(55)).await;
@@ -471,8 +498,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn empty_room_expires_after_ttl() {
         let reg = reg(&cfg(5, 5));
-        let a = reg.create_and_join("a").unwrap();
-        let b = reg.join(&a.code, "b").unwrap();
+        let a = reg.create_and_join("a", "fullstack").unwrap();
+        let b = reg.join(&a.code, "b", "fullstack").unwrap();
         let code = a.code.clone();
         settle().await;
         reg.leave(&a).await;
@@ -481,17 +508,20 @@ mod tests {
         assert_eq!(reg.counts().0, 1, "still alive before ttl");
         tokio::time::sleep(Duration::from_secs(2)).await;
         assert_eq!(reg.counts().0, 0);
-        assert_eq!(reg.join(&code, "c").err(), Some(JoinError::NoSuchRoom));
+        assert_eq!(
+            reg.join(&code, "c", "fullstack").err(),
+            Some(JoinError::NoSuchRoom)
+        );
     }
 
     #[tokio::test(start_paused = true)]
     async fn rejoin_resets_expiry() {
         let reg = reg(&cfg(5, 5));
-        let a = reg.create_and_join("a").unwrap();
+        let a = reg.create_and_join("a", "fullstack").unwrap();
         settle().await;
         reg.leave(&a).await;
         tokio::time::sleep(Duration::from_secs(50)).await;
-        let b = reg.join(&a.code, "b").unwrap();
+        let b = reg.join(&a.code, "b", "fullstack").unwrap();
         tokio::time::sleep(Duration::from_secs(700)).await;
         assert_eq!(reg.counts(), (1, 1));
         drop(b);
@@ -500,8 +530,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn messages_reach_the_room() {
         let reg = reg(&cfg(5, 5));
-        let mut a = reg.create_and_join("a").unwrap();
-        let mut b = reg.join(&a.code, "b").unwrap();
+        let mut a = reg.create_and_join("a", "fullstack").unwrap();
+        let mut b = reg.join(&a.code, "b", "fullstack").unwrap();
         settle().await;
         assert!(matches!(drain(&mut a)[0], ServerMsg::Welcome { .. }));
         assert!(matches!(drain(&mut b)[0], ServerMsg::Welcome { .. }));
@@ -530,8 +560,8 @@ mod tests {
             ..cfg(5, 5)
         };
         let reg = reg(&cfg);
-        let a = reg.create_and_join("a").unwrap();
-        let mut b = reg.join(&a.code, "b").unwrap(); // never drained
+        let a = reg.create_and_join("a", "fullstack").unwrap();
+        let mut b = reg.join(&a.code, "b", "fullstack").unwrap(); // never drained
         for _ in 0..5 {
             a.send(ClientMsg::Emote {
                 emote: Emote::Sync,
@@ -552,8 +582,8 @@ mod tests {
             ..cfg(5, 5)
         };
         let reg = reg(&cfg);
-        let mut a = reg.create_and_join("a").unwrap();
-        let b = reg.join(&a.code, "b").unwrap(); // never drained
+        let mut a = reg.create_and_join("a", "fullstack").unwrap();
+        let b = reg.join(&a.code, "b", "fullstack").unwrap(); // never drained
         let mut seen = false;
         for _ in 0..10 {
             a.send(ClientMsg::Emote {
@@ -572,7 +602,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn flooding_sender_gets_full_instead_of_blocking() {
         let reg = reg(&cfg(5, 5));
-        let a = reg.create_and_join("a").unwrap();
+        let a = reg.create_and_join("a", "fullstack").unwrap();
         // Single-threaded runtime and no await: the room task cannot drain.
         let results: Vec<_> = (0..CMD_QUEUE + 10)
             .map(|_| a.send(ClientMsg::Ping { t: 0 }))

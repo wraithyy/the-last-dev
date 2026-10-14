@@ -1,5 +1,6 @@
 //! Event-driven HUD: combat log, error banner, death prompt, loot window, XP bar.
 
+use super::logs::{ChatKind, ChatLog, CombatLog, LogBuf, classify_yell};
 use super::{
     ACCENT, DIM, IconCache, KEY_RIM, KEY_TOP, KEY_TOP_HI, PANEL_EDGE, drop_shadow, label, panel_bg,
     set_text, vgrad,
@@ -9,20 +10,14 @@ use crate::config::*;
 use crate::copy;
 use bevy::prelude::*;
 use combat_core::{AuraEnd, Command, EntityId, Event, ITEM_STACK_CAP, School};
-use std::collections::VecDeque;
 
 const XP_BAR_H: f32 = 14.0;
 const XP_TICKS: usize = 10;
 const XP_PURPLE: Color = Color::srgb(0.6, 0.25, 0.85);
 
-#[derive(Resource, Default)]
-struct CombatLog(VecDeque<(String, Color)>);
-
-/// A client-side line for the combat log (no sim event behind it).
+/// A client-side system notice for the chat window (no sim event behind it).
 #[derive(Message)]
 pub struct LogLineMsg(pub String, pub Color);
-#[derive(Component)]
-struct LogLine(usize);
 
 #[derive(Resource, Default)]
 struct ErrorBanner {
@@ -58,8 +53,7 @@ pub struct FeedPlugin;
 
 impl Plugin for FeedPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<CombatLog>()
-            .add_message::<LogLineMsg>()
+        app.add_message::<LogLineMsg>()
             .init_resource::<ErrorBanner>()
             .init_resource::<LootState>()
             .add_systems(Startup, spawn_feed)
@@ -74,7 +68,6 @@ impl Plugin for FeedPlugin {
                 Update,
                 (
                     collect_events,
-                    update_log,
                     update_error,
                     update_death,
                     update_loot,
@@ -86,83 +79,7 @@ impl Plugin for FeedPlugin {
     }
 }
 
-/// Hidden on touch layouts, where the action bar needs the width.
-#[derive(Component)]
-pub struct CombatLogRoot;
-
 fn spawn_feed(mut commands: Commands) {
-    commands
-        .spawn((
-            CombatLogRoot,
-            Node {
-                position_type: PositionType::Absolute,
-                left: px(12),
-                bottom: px(20),
-                width: px(COMBAT_LOG_W),
-                flex_direction: FlexDirection::Column,
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(6)),
-                overflow: Overflow::clip(),
-                ..default()
-            },
-            BorderColor::all(PANEL_EDGE),
-            drop_shadow(),
-        ))
-        .with_children(|root| {
-            // Terminal title bar: window dots plus the command that "produces" the log.
-            root.spawn((
-                Node {
-                    height: px(20),
-                    padding: UiRect::horizontal(px(8)),
-                    column_gap: px(5),
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
-                vgrad(Color::srgb(0.17, 0.18, 0.23), Color::srgb(0.12, 0.13, 0.17)),
-            ))
-            .with_children(|bar| {
-                for c in [
-                    Color::srgb(1.0, 0.37, 0.34),
-                    Color::srgb(1.0, 0.75, 0.2),
-                    Color::srgb(0.3, 0.8, 0.35),
-                ] {
-                    bar.spawn((
-                        Node {
-                            width: px(8),
-                            height: px(8),
-                            border_radius: BorderRadius::MAX,
-                            ..default()
-                        },
-                        BackgroundColor(c),
-                    ));
-                }
-                bar.spawn((
-                    Node {
-                        margin: UiRect::left(px(6)),
-                        ..default()
-                    },
-                    label("~/prod $ tail -f combat.log", 11.0),
-                    TextColor(DIM),
-                ));
-            });
-            root.spawn((
-                Node {
-                    padding: UiRect::axes(px(8), px(6)),
-                    flex_direction: FlexDirection::Column,
-                    justify_content: JustifyContent::FlexEnd,
-                    ..default()
-                },
-                vgrad(
-                    Color::srgba(0.03, 0.04, 0.06, 0.82),
-                    Color::srgba(0.02, 0.025, 0.04, 0.78),
-                ),
-            ))
-            .with_children(|c| {
-                for i in 0..COMBAT_LOG_LINES {
-                    c.spawn((LogLine(i), label("", 12.0)));
-                }
-            });
-        });
     commands.spawn((
         ErrorText,
         Node {
@@ -372,45 +289,87 @@ fn aura_name(sim: &dyn SimRead, target: EntityId, key: &str) -> String {
         })
 }
 
+/// Where a sim event is reported: damage, heals, auras and casts are combat; progress and speech are chat.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Sink {
+    Chat,
+    Combat,
+}
+
+pub fn event_sink(ev: &Event) -> Sink {
+    match ev {
+        Event::Yell { .. }
+        | Event::XpGained { .. }
+        | Event::LevelUp { .. }
+        | Event::SpellLearned { .. }
+        | Event::Resurrected { .. }
+        | Event::ZoneCleared { .. }
+        | Event::Unlocked { .. }
+        | Event::QuestAccepted { .. }
+        | Event::QuestReady { .. }
+        | Event::QuestCompleted { .. }
+        | Event::Looted { .. } => Sink::Chat,
+        _ => Sink::Combat,
+    }
+}
+
+/// Routes formatted lines of one event into the chat or the combat buffer.
+struct Out<'a> {
+    chat: &'a mut LogBuf,
+    combat: &'a mut LogBuf,
+    sink: Sink,
+}
+
+impl Out<'_> {
+    fn push(&mut self, text: String, color: Color) {
+        match self.sink {
+            Sink::Chat => self.chat.push("", color, &text, color),
+            Sink::Combat => self.combat.push("", color, &text, color),
+        }
+    }
+
+    fn say(&mut self, kind: ChatKind, name: &str, text: &str) {
+        let (head, head_color, body_color) = kind.style();
+        let head = format!("{name}{head}");
+        self.chat.push(&head, head_color, text, body_color);
+    }
+}
+
 fn collect_events(
     mut events: MessageReader<CombatEvent>,
     mut notices: MessageReader<UiNotice>,
     mut extra: MessageReader<LogLineMsg>,
     sim: SimView,
-    mut log: ResMut<CombatLog>,
+    mut chat: ResMut<ChatLog>,
+    mut combat: ResMut<CombatLog>,
     mut banner: ResMut<ErrorBanner>,
     mut loot: ResMut<LootState>,
     mut xp_gains: Local<usize>,
-    mut last: Local<(String, u32)>,
     // Mana ticks of the running Coffee Break, reported once as a single line.
     mut coffee_mana: Local<u32>,
 ) {
     let me = sim.player();
     let coffee = sim.content().channel_spell().map(|s| s.id);
-    let mut push = |text: String, color: Color| {
-        // Identical consecutive lines collapse into one with a repeat count.
-        if last.1 > 0
-            && last.0 == text
-            && let Some(back) = log.0.back_mut()
-        {
-            last.1 += 1;
-            back.0 = format!("{text} x{}", last.1);
-            return;
-        }
-        *last = (text.clone(), 1);
-        log.0.push_back((text, color));
-        while log.0.len() > COMBAT_LOG_LINES {
-            log.0.pop_front();
-        }
+    let mut out = Out {
+        chat: &mut chat.0,
+        combat: &mut combat.0,
+        sink: Sink::Chat,
     };
     for LogLineMsg(text, color) in extra.read() {
-        push(text.clone(), *color);
+        out.push(text.clone(), *color);
     }
     for n in notices.read() {
         banner.text.clone_from(&n.0);
         banner.left = ERROR_TEXT_SECS;
     }
-    for CombatEvent(ev) in events.read() {
+    let batch: Vec<&Event> = events.read().map(|CombatEvent(ev)| ev).collect();
+    // A dash (e.g. Hot Reload) moves you via Teleported in the same batch as your own cast;
+    // only an unexplained move deserves the "reorganised" line.
+    let own_cast = batch
+        .iter()
+        .any(|e| matches!(e, Event::CastSucceeded { caster, .. } if Some(*caster) == me));
+    for ev in batch {
+        out.sink = event_sink(ev);
         match ev {
             Event::Damage {
                 source,
@@ -455,7 +414,7 @@ fn collect_events(
                 } else {
                     Color::srgb(1.0, 0.95, 0.7)
                 };
-                push(line, color);
+                out.push(line, color);
             }
             Event::Miss {
                 source,
@@ -490,31 +449,31 @@ fn collect_events(
                         who(&*sim, *target)
                     ),
                 };
-                push(line, Color::srgb(0.8, 0.8, 0.85));
+                out.push(line, Color::srgb(0.8, 0.8, 0.85));
             }
             Event::CastStarted { caster, spell, .. }
                 if Some(*caster) == me && Some(*spell) == coffee =>
             {
                 *coffee_mana = 0;
-                push(copy::COFFEE_START.into(), copy::COFFEE_COLOR);
+                out.push(copy::COFFEE_START.into(), copy::COFFEE_COLOR);
             }
             Event::ManaGain { unit, amount, .. } if Some(*unit) == me => *coffee_mana += amount,
             Event::CastSucceeded { caster, spell, .. }
                 if Some(*caster) == me && Some(*spell) == coffee =>
             {
-                push(copy::coffee_restored(*coffee_mana), copy::COFFEE_COLOR);
+                out.push(copy::coffee_restored(*coffee_mana), copy::COFFEE_COLOR);
                 *coffee_mana = 0;
             }
             Event::CastInterrupted { caster, spell, .. }
                 if Some(*caster) == me && Some(*spell) == coffee =>
             {
-                push(copy::COFFEE_INTERRUPTED.into(), Color::srgb(1.0, 0.85, 0.2));
+                out.push(copy::COFFEE_INTERRUPTED.into(), Color::srgb(1.0, 0.85, 0.2));
                 if *coffee_mana > 0 {
-                    push(copy::coffee_restored(*coffee_mana), copy::COFFEE_COLOR);
+                    out.push(copy::coffee_restored(*coffee_mana), copy::COFFEE_COLOR);
                 }
                 *coffee_mana = 0;
             }
-            Event::CastStarted { caster, spell, .. } if Some(*caster) != me => push(
+            Event::CastStarted { caster, spell, .. } if Some(*caster) != me => out.push(
                 format!(
                     "{} begins to cast {}.",
                     subject(&*sim, *caster),
@@ -526,7 +485,7 @@ fn collect_events(
                 caster, spell, by, ..
             } => {
                 let by = by.map_or(String::new(), |b| format!(" by {}", who(&*sim, b)));
-                push(
+                out.push(
                     format!(
                         "{} {} is interrupted{by}.",
                         possessive(&*sim, *caster),
@@ -548,7 +507,7 @@ fn collect_events(
                     (false, true) => format!("{} is afflicted by {name}.", who(&*sim, *target)),
                     (false, false) => format!("{} gains {name}.", who(&*sim, *target)),
                 };
-                push(line, Color::srgb(0.6, 0.85, 1.0));
+                out.push(line, Color::srgb(0.6, 0.85, 1.0));
             }
             Event::AuraRemoved {
                 target,
@@ -562,12 +521,12 @@ fn collect_events(
                     AuraEnd::Depleted => "is depleted on",
                     AuraEnd::Death => "ends on",
                 };
-                push(
+                out.push(
                     format!("{name} {how} {}.", who(&*sim, *target)),
                     Color::srgb(0.6, 0.7, 0.8),
                 );
             }
-            Event::Death { unit, .. } => push(
+            Event::Death { unit, .. } => out.push(
                 if Some(*unit) == me {
                     "You die.".to_string()
                 } else {
@@ -576,25 +535,23 @@ fn collect_events(
                 Color::srgb(0.9, 0.9, 0.9),
             ),
             Event::XpGained { unit, amount } if Some(*unit) == me => {
-                push(
+                out.push(
                     format!("You gain {amount} experience."),
                     Color::srgb(0.75, 0.45, 1.0),
                 );
-                push(copy::xp_quip(*xp_gains).into(), Color::srgb(0.5, 0.4, 0.6));
+                out.push(copy::xp_quip(*xp_gains).into(), Color::srgb(0.5, 0.4, 0.6));
                 *xp_gains += 1;
             }
             Event::Yell { unit, text } => {
-                // "you" would read oddly in "<name> yells", so use the unit's own name.
+                // Unit names, not "you": "you yells" would read oddly, and chat lines name the speaker.
                 let (name, hostile) = sim.unit(*unit).map_or_else(
                     || ("Someone".to_string(), false),
                     |u| (u.name.clone(), u.hostile),
                 );
-                push(
-                    format!("{name} {}: {text}", copy::speech_verb(hostile)),
-                    copy::yell_color(me == Some(*unit), hostile),
-                );
+                let member = me == Some(*unit) || sim.players().contains(unit);
+                out.say(classify_yell(member, hostile), &name, text);
             }
-            Event::Resurrected { unit, by, .. } => push(
+            Event::Resurrected { unit, by, .. } => out.push(
                 if Some(*unit) == me {
                     format!(
                         "{} turned you off and on again. You feel... rebooted.",
@@ -619,19 +576,19 @@ fn collect_events(
                     Some(s) => format!("{} {}", possessive(&*sim, *source), spell_name(&*sim, *s)),
                     None => subject(&*sim, *source),
                 };
-                push(
+                out.push(
                     format!("{by} heals {} for {amount}.", who(&*sim, *target)),
                     Color::srgb(0.4, 1.0, 0.45),
                 );
             }
             Event::LevelUp { unit, level } if Some(*unit) == me => {
-                push(copy::level_up_line(*level), Color::srgb(1.0, 0.82, 0.3));
+                out.push(copy::level_up_line(*level), Color::srgb(1.0, 0.82, 0.3));
             }
-            Event::SpellLearned { unit, spell } if Some(*unit) == me => push(
+            Event::SpellLearned { unit, spell } if Some(*unit) == me => out.push(
                 format!("You learned {}.", spell_name(&*sim, *spell)),
                 Color::srgb(1.0, 0.9, 0.5),
             ),
-            Event::PhaseChanged { unit, phase } => push(
+            Event::PhaseChanged { unit, phase } => out.push(
                 if *phase > 1 {
                     format!("{} enters phase {phase}.", subject(&*sim, *unit))
                 } else {
@@ -639,7 +596,7 @@ fn collect_events(
                 },
                 Color::srgb(1.0, 0.55, 0.2),
             ),
-            Event::Summoned { unit, summoner } => push(
+            Event::Summoned { unit, summoner } => out.push(
                 format!(
                     "{} summons {}.",
                     subject(&*sim, *summoner),
@@ -648,32 +605,32 @@ fn collect_events(
                 Color::srgb(0.85, 0.7, 1.0),
             ),
             Event::Knockback { unit, .. } if Some(*unit) == me => {
-                push("You are knocked back.".into(), Color::srgb(1.0, 0.6, 0.4));
+                out.push("You are knocked back.".into(), Color::srgb(1.0, 0.6, 0.4));
             }
-            Event::Teleported { unit, .. } if Some(*unit) == me => push(
+            Event::Teleported { unit, .. } if Some(*unit) == me && !own_cast => out.push(
                 "You have been reorganised to a new location.".into(),
                 Color::srgb(1.0, 0.6, 0.4),
             ),
-            Event::ZoneCleared { zone } => push(
+            Event::ZoneCleared { zone } => out.push(
                 format!("{} cleared.", crate::game::zone_label(sim.content(), zone)),
                 Color::srgb(0.4, 1.0, 0.5),
             ),
-            Event::Unlocked { zone } => push(
+            Event::Unlocked { zone } => out.push(
                 format!(
                     "Access granted: {}.",
                     crate::game::zone_label(sim.content(), zone)
                 ),
                 Color::srgb(1.0, 0.82, 0.3),
             ),
-            Event::QuestAccepted { quest } => push(
+            Event::QuestAccepted { quest } => out.push(
                 format!("Ticket assigned to you: {}.", quest_name(&*sim, quest)),
                 QUEST_YELLOW,
             ),
-            Event::QuestReady { quest } => push(
+            Event::QuestReady { quest } => out.push(
                 format!("{}: ready for review.", quest_name(&*sim, quest)),
                 QUEST_YELLOW,
             ),
-            Event::QuestCompleted { quest } => push(
+            Event::QuestCompleted { quest } => out.push(
                 format!("Ticket closed: {}.", quest_name(&*sim, quest)),
                 QUEST_YELLOW,
             ),
@@ -689,13 +646,13 @@ fn collect_events(
                     } else {
                         copy::bonus_text(&def.bonus.totals(1))
                     };
-                    push(
+                    out.push(
                         format!("You receive trophy: [{item}] ({bonus})"),
                         copy::BONUS_GREEN,
                     );
                 }
                 if items.is_empty() {
-                    push(
+                    out.push(
                         "You find nothing to loot. The AI already expensed it.".into(),
                         Color::srgb(0.7, 0.7, 0.7),
                     );
@@ -705,22 +662,6 @@ fn collect_events(
                 }
             }
             _ => {}
-        }
-    }
-}
-
-fn update_log(log: Res<CombatLog>, mut lines: Query<(&LogLine, &mut Text, &mut TextColor)>) {
-    if !log.is_changed() {
-        return;
-    }
-    let skip = COMBAT_LOG_LINES - log.0.len();
-    for (LogLine(i), mut text, mut color) in &mut lines {
-        match i.checked_sub(skip).and_then(|k| log.0.get(k)) {
-            Some((s, c)) => {
-                set_text(&mut text, s);
-                color.0 = *c;
-            }
-            None => set_text(&mut text, ""),
         }
     }
 }
@@ -893,4 +834,39 @@ fn loot_demo(
         loot.items.push(name.to_string());
     }
     loot.dirty = true;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn speech_and_progress_go_to_chat_while_fighting_stays_in_the_combat_log() {
+        let chat = [
+            Event::Yell {
+                unit: 1,
+                text: "hi".into(),
+            },
+            Event::XpGained { unit: 1, amount: 5 },
+            Event::QuestCompleted { quest: "q".into() },
+        ];
+        for e in &chat {
+            assert_eq!(event_sink(e), Sink::Chat, "{e:?}");
+        }
+        let combat = [
+            Event::Heal {
+                source: 1,
+                target: 1,
+                spell: None,
+                amount: 3,
+            },
+            Event::Death {
+                unit: 2,
+                killer: None,
+            },
+        ];
+        for e in &combat {
+            assert_eq!(event_sink(e), Sink::Combat, "{e:?}");
+        }
+    }
 }

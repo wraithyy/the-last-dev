@@ -50,7 +50,7 @@ fn t_with(level: u8, tweak: impl FnOnce(&mut Content)) -> T {
     tweak(&mut c);
     let mut sim = Sim::new(c, 3);
     sim.set_wandering(false);
-    let p = sim.spawn_player(Vec3::new(0.0, 0.0, 20.0), 0.0);
+    let p = sim.spawn_player("fullstack", Vec3::new(0.0, 0.0, 20.0), 0.0);
     sim.set_player_level(level);
     T {
         sim,

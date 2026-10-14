@@ -29,7 +29,9 @@ use bevy::prelude::*;
 // Touch UIs drive the emote menu through these.
 #[allow(unused_imports)]
 pub use emotes::{EmoteRequest, ToggleEmoteMenu};
+pub use lobby::Lobby;
 pub use session::{GameMode, LeaveRequest, MoveInput, online_step};
+pub use store::{load_class, load_hud, save_class, save_hud};
 pub use transport::{NetClient, NetEvent};
 pub use world::NetWorld;
 

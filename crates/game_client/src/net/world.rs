@@ -1021,9 +1021,12 @@ impl SimRead for NetWorld {
         })
     }
     fn known_spells(&self, unit: EntityId) -> Vec<SpellId> {
-        let level = self.units.get(&unit).map_or(1, |u| u.level);
+        let (level, key) = self
+            .units
+            .get(&unit)
+            .map_or((1, ""), |u| (u.level, u.key.as_str()));
         self.content
-            .action_bar()
+            .bar_for_unit(key)
             .iter()
             .copied()
             .filter(|id| {
@@ -1050,6 +1053,7 @@ mod tests {
             w.add_player(&PlayerInfo {
                 id,
                 name: raw.into(),
+                class: "devops".into(),
             });
             assert_eq!(w.name_of(id), Some(want));
         }

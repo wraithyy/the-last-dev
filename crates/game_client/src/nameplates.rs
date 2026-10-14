@@ -60,14 +60,15 @@ fn spawn_plates(
 ) {
     for (anchor, su) in &added {
         let Some(u) = sim.unit(su.0) else { continue };
+        let party = sim.players().contains(&u.id);
+        let role = crate::classes::role_of_unit(sim.content(), &u.key).filter(|_| party);
         let tag = if u.boss {
             Some(("BOSS", ACCENT_WARM))
         } else if copy::is_elite(&u.key) {
             Some(("ELITE", Color::srgb(0.8, 0.55, 1.0)))
         } else {
-            None
+            role.map(|r| (r.tag(), crate::classes::role_color(r)))
         };
-        let party = sim.players().contains(&u.id);
         let title = sim
             .content()
             .unit_def(&u.key)

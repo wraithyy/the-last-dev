@@ -49,12 +49,41 @@ impl Sim {
         pct_mod(u64::from(hasted), self.aura_sum(i, |a| a.cast_time_pct)) as u32
     }
 
-    /// Attacker's damage-done and the target's damage-taken auras, multiplied.
+    /// Max-HP percent from auras (Horizontal Scaling); players only.
+    pub(crate) fn max_hp_aura_pct(&self, i: usize) -> i64 {
+        if self.units[i].class.is_none() {
+            return 0;
+        }
+        self.aura_sum(i, |a| a.max_hp_pct)
+    }
+
+    /// Rebuilds max HP after a max-HP aura came or went: a gain also heals by the
+    /// difference, a loss only clamps.
+    fn refresh_max_hp(&mut self, i: usize) {
+        let u = &self.units[i].state;
+        let (old, hp, mana, level) = (u.max_hp, u.hp, u.mana, u.level);
+        self.apply_level(i, level);
+        let u = &mut self.units[i].state;
+        u.mana = mana;
+        u.hp = if !u.alive {
+            0
+        } else if u.max_hp > old {
+            hp + (u.max_hp - old)
+        } else {
+            hp.min(u.max_hp)
+        };
+    }
+
+    /// Attacker's damage-done and the target's damage-taken auras (plus the target's class
+    /// armour), multiplied.
     pub(crate) fn modified_damage(&self, source: EntityId, ti: usize, amount: u32) -> u32 {
         let done = self
             .index(source)
             .map_or(0, |si| self.aura_sum(si, |a| a.damage_done_pct));
-        let taken = self.aura_sum(ti, |a| a.damage_taken_pct);
+        let armour = self
+            .class_at(ti)
+            .map_or(0, |c| i64::from(c.damage_taken_pct));
+        let taken = self.aura_sum(ti, |a| a.damage_taken_pct) + armour;
         pct_mod(pct_mod(u64::from(amount), done), taken) as u32
     }
 
@@ -119,10 +148,17 @@ impl Sim {
                 let crit_pct = self.content.units[self.units[ci].def].crit_pct;
                 let mut amount = self.power(ci, *base, *coefficient_pct);
                 let mut combo = false;
-                if let Some(c) = consume_aura
+                let stacks = consume_aura.as_ref().and_then(|c| {
+                    self.units[ti]
+                        .auras
+                        .iter()
+                        .find(|a| a.key == c.aura)
+                        .map(|a| u64::from(a.stacks))
+                });
+                if let (Some(c), Some(n)) = (consume_aura, stacks)
                     && self.remove_aura(ti, &c.aura, AuraEnd::Consumed)
                 {
-                    amount = amount * (100 + u64::from(c.bonus_pct)) / 100;
+                    amount = amount * (100 + u64::from(c.bonus_pct) * n) / 100;
                     combo = true;
                 }
                 if let Some(x) = execute {
@@ -311,6 +347,38 @@ impl Sim {
             (Effect::Resurrect { hp_pct, mana_pct }, Some(ti)) => {
                 self.resurrect(ti, caster, *hp_pct, *mana_pct);
             }
+            (Effect::Taunt, Some(ti)) => self.taunt(ti, caster),
+            (Effect::Threat { amount }, Some(ti)) => {
+                let t = &self.units[ti];
+                if t.state.hostile && self.content.units[t.def].ai.is_some() {
+                    self.add_threat(ti, caster, *amount);
+                }
+            }
+            (Effect::Charge { stop_m }, Some(ti)) => {
+                let (from, to) = (self.units[ci].state.pos, self.units[ti].state.pos);
+                let d = dist_xz(from, to);
+                if d > *stop_m {
+                    let k = (d - stop_m) / d;
+                    let pos = Vec3::new(
+                        from.x + (to.x - from.x) * k,
+                        from.y,
+                        from.z + (to.z - from.z) * k,
+                    );
+                    self.units[ci].state.pos = pos;
+                    self.events.push(Event::Teleported { unit: caster, pos });
+                }
+            }
+            (Effect::RestoreHp { ms_ago }, Some(ti)) => {
+                let k = (*ms_ago / 1000) as usize;
+                let u = &self.units[ti];
+                let then = if u.class.is_some() {
+                    u.hp_hist[k.min(crate::sim::HP_HIST_LEN - 1)]
+                } else {
+                    0
+                };
+                let amount = then.saturating_sub(u.state.hp);
+                self.heal(caster, ti, Some(spell.id), amount);
+            }
             (Effect::DrainMana { pct }, Some(ti)) => {
                 let t = &mut self.units[ti].state;
                 let drain = (u64::from(t.max_mana) * u64::from(*pct) / 100) as u32;
@@ -336,6 +404,28 @@ impl Sim {
         u.regen_next = regen_next;
         let (hp, mana) = (u.state.hp, u.state.mana);
         self.events.push(Event::Resurrected { unit, by, hp, mana });
+    }
+
+    /// Who Touched Prod?: 10% over the current top threat (enough to take aggro at once).
+    fn taunt(&mut self, ti: usize, caster: EntityId) {
+        let t = &self.units[ti];
+        if !t.state.hostile || self.content.units[t.def].ai.is_none() {
+            return;
+        }
+        let top = t.threat.values().copied().max().unwrap_or(0);
+        let mine = t.threat.get(&caster).copied().unwrap_or(0);
+        let want = top + top / 10 + 1;
+        if want > mine {
+            // Raw entry, not `add_threat`: the class multiplier must not inflate a taunt.
+            if t.threat.is_empty() {
+                self.add_threat(ti, caster, 1);
+            }
+            self.units[ti].threat.insert(caster, want);
+            self.units[ti].state.target = Some(caster);
+            if self.units[ti].state.ai == Some(AiState::Idle) {
+                self.set_ai(ti, AiState::Chase);
+            }
+        }
     }
 
     /// Heals generate no threat; the event reports the effective amount (overheal dropped).
@@ -452,6 +542,9 @@ impl Sim {
             target: Self::id_of(ti),
             key: key.to_string(),
         });
+        if def.max_hp_pct != 0 {
+            self.refresh_max_hp(ti);
+        }
         // A debuff pulls like a hit does (a DoT must not wait for its first tick to aggro).
         let pulls = def.harmful
             && self.content.units[self.units[ti].def].ai.is_some()
@@ -476,6 +569,9 @@ impl Sim {
                 key: key.to_string(),
                 reason,
             });
+            if self.content.aura(key).is_some_and(|d| d.max_hp_pct != 0) {
+                self.refresh_max_hp(ti);
+            }
         }
         removed
     }

@@ -98,7 +98,7 @@ fn run_scenario(seed: u64) -> String {
     legacy_ceo(&mut c);
     def_mut(&mut c, "ceo").level = 3;
     let mut sim = Sim::new(c, seed);
-    let player = sim.spawn_player(Vec3::new(0.0, 0.0, 0.0), 0.0);
+    let player = sim.spawn_player("fullstack", Vec3::new(0.0, 0.0, 0.0), 0.0);
     sim.set_player_level(3);
     let mob = match sim.spawn_unit("ceo", Vec3::new(0.0, 0.0, -20.0), 0.0) {
         Ok(id) => id,
@@ -161,13 +161,13 @@ fn scenario_log_contains_every_spec_beat() {
         "failed Code Review: Invalid target.",
         "begins Code Review (2000 ms)",
         "COMBO",
-        "Senior Engineer auto attack on",
-        "Senior Engineer auto attack off",
-        "Senior Engineer misses CEO",
+        "Fullstack Engineer auto attack on",
+        "Fullstack Engineer auto attack off",
+        "Fullstack Engineer misses CEO",
         "gains guardrails",
         "Hallucination Blast for 0 (absorbed 45)",
         "casts Reject PR",
-        "interrupted by Senior Engineer (lockout 4000 ms)",
+        "interrupted by Fullstack Engineer (lockout 4000 ms)",
         "CEO dies",
         "gains 120 xp",
         "loots CEO",
@@ -176,7 +176,7 @@ fn scenario_log_contains_every_spec_beat() {
         assert!(log.contains(beat), "missing beat {beat:?} in:\n{log}");
     }
     assert!(
-        !log.contains("Senior Engineer dies"),
+        !log.contains("Fullstack Engineer dies"),
         "player must survive the scenario"
     );
 }

@@ -6,8 +6,8 @@ Simplified, WotLK-inspired rules for gameplay feel. They are **not** Blizzard's 
 
 ```
 raw      = base + floor(spell_power * coefficient_pct / 100)
-combo    : if the spell consumes an aura present on the target
-             raw = floor(raw * (100 + bonus_pct) / 100)   // Refactor on Code Smell: +35%
+combo    : if the spell consumes an aura present on the target (with n stacks)
+             raw = floor(raw * (100 + bonus_pct * n) / 100) // Refactor on Code Smell: +35%; !important: +60% per Specificity stack
 hit      : roll below(100) < spell_hit_pct (96); first roll, a miss ends the spell before anything below
 crit     : roll below(100) < crit_pct   (rolled on every hit, crit or not)
              raw = floor(raw * crit_damage_pct / 100)       // 150%
@@ -85,15 +85,23 @@ mana += max_mana * mana_pct / 100   (5%, rounded down, capped at max_mana)
 
 The first tick comes one interval after spawn, respawn, or `LeaveCombat` (the phase restarts every time the unit leaves combat); `interval_ms: 0` disables it. No event is emitted; read `UnitState.hp/mana`. Hostile units use the same rule (a no-op at full HP; evade already heals).
 
-There is no continuous out-of-combat mana regen and no 5-second rule. In combat the percent tick does not run; the only regen is the legacy per-tick mana trickle: `acc += mana_regen_per_5s_combat; mana += acc / 150; acc %= 150` (Senior Engineer: 25 mana per 5 s). A unit is in combat while it is in an enemy threat table (player) or has a non-empty table (enemy).
+There is no continuous out-of-combat mana regen and no 5-second rule. In combat the percent tick does not run; the only regen is the legacy per-tick mana trickle: `acc += mana_regen_per_5s_combat; mana += acc / 150; acc %= 150` (Fullstack Engineer: 60 mana per 5 s). A unit is in combat while it is in an enemy threat table (player) or has a non-empty table (enemy).
 
 ## Threat and AI
 
-Threat = full pre-absorb damage dealt (minimum 1) to the enemy; initial aggro adds 1. Target = highest threat, ties to the lowest unit id; dead units drop out of the table. Applying a harmful aura to an enemy without threat on the caster adds 1 (a DoT pulls at once). Heals generate no threat; self-damage generates none. Social aggro: the first threat on a pack member gives every idle member of the pack 1 threat on the same source. Empty table while engaged, or distance from spawn > `leash_m`, starts Evade: cast cancelled, all auras removed, phase reset to 1, threat dropped, walk home at chase speed, heal to full on arrival (summons despawn instead), damage ignored meanwhile.
+Threat = full pre-absorb damage dealt (minimum 1) to the enemy; initial aggro adds 1. Every threat a player adds is scaled by its class `threat_pct` (`max(1, floor(t * pct / 100))`; Backend 350, others 100), including the extra `Threat { amount }` of Blocking Call, Connection Pool, Cache Invalidation and DROP TABLE. A taunt (Who Touched Prod?) sets the caster's entry to `top + floor(top / 10) + 1` without the class factor, so the target turns at once. Target = highest threat, ties to the lowest unit id; dead units drop out of the table. Applying a harmful aura to an enemy without threat on the caster adds 1 (a DoT pulls at once). Heals generate no threat; self-damage generates none. Social aggro: the first threat on a pack member gives every idle member of the pack 1 threat on the same source. Empty table while engaged, or distance from spawn > `leash_m`, starts Evade: cast cancelled, all auras removed, phase reset to 1, threat dropped, walk home at chase speed, heal to full on arrival (summons despawn instead), damage ignored meanwhile.
 
 AI abilities: each rule's first use is rolled `U[initial_ms]` (default the cooldown range) at the pull, or at the start of the phase it is gated to; afterwards `U[cooldown_min_ms, cooldown_max_ms]` is re-rolled at each use. Hallucination Blast: `U[8000, 12000]` both times. A school lockout, stun or silence blocks the attempt until it ends; rng draws happen only when a rule actually fires (plus `RandomHostile`/`RandomAura` picks).
 
 Yells (boss and player spell yells) are presentation-only: line selection is a round-robin cursor and never draws from the rng (see COMBAT_API.md, Yells).
+
+## Classes
+
+- Base stats and auto attack come from the class `unit` (Fullstack 300 HP / 250 mana / 20 SP; Frontend 360 / 220 / 20, crit 8%; Backend 440 / 200 / 18; DevOps 290 / 300 / 22).
+- Max HP = `unit.max_hp + floor(levels[l].hp_bonus * level_hp_pct / 100) + trophies`, then `* (100 + sum of max_hp_pct auras) / 100` (Horizontal Scaling +30%; a gain also heals by the difference, a loss only clamps). Backend `level_hp_pct` is 160, the rest 100.
+- Class armour: `damage_taken_pct` (Backend -20, Frontend -10) is added to the damage-taken aura sum of every hit the player takes.
+- Revert Commit heals up to the player's HP sampled 5 s earlier (one sample per second, kept 8 s); it never lowers HP.
+- Players may cast only their class bar, its resurrect and Coffee Break (`NotLearned` otherwise).
 
 ## Trophies
 

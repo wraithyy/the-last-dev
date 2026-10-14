@@ -34,7 +34,7 @@ fn world(level: u8, tweak: impl FnOnce(&mut Content)) -> W {
     def_mut(&mut c, "senior_engineer").crit_pct = 0;
     tweak(&mut c);
     let mut sim = Sim::new(c, 1);
-    let p = sim.spawn_player(Vec3::new(0.0, 0.0, 0.0), 0.0);
+    let p = sim.spawn_player("fullstack", Vec3::new(0.0, 0.0, 0.0), 0.0);
     sim.set_player_level(level);
     W {
         sim,

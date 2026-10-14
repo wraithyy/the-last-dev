@@ -132,7 +132,7 @@ fn bonuses_survive_floor_loads_respawn_and_level_ups_but_not_a_new_sim() {
 
 fn fresh_sim() -> combat_core::Sim {
     let mut s = combat_core::Sim::new(content(), 1);
-    s.spawn_player(Vec3::new(0.0, 0.0, 0.0), 0.0);
+    s.spawn_player("fullstack", Vec3::new(0.0, 0.0, 0.0), 0.0);
     s
 }
 

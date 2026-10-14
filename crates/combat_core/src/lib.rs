@@ -21,11 +21,12 @@ mod wander;
 mod zones;
 
 pub use content::{
-    AiAbility, AiDef, AiTarget, ApplyAura, Area, AuraDef, AutoAttackDef, Config, ConsumeAura,
-    Content, ContentError, Effect, Execute, ITEM_DESC_MAX, ITEM_STACK_CAP, IdlePose, ItemBonus,
-    ItemDef, ItemTotals, LevelDef, LootEntry, MAX_ACTION_BAR, MobScaling, Objective, PackDef,
-    PeriodicDef, PhaseDef, QuestDef, QuestGiver, QuestReward, School, SpellDef, SpellId,
-    SpellTarget, UnitDef, Unlock, XpRules, YellDef, ZoneDef, ZoneKind, ZoneLink, ZoneSpawn,
+    AiAbility, AiDef, AiTarget, ApplyAura, Area, AuraDef, AutoAttackDef, ClassDef, Config,
+    ConsumeAura, Content, ContentError, Effect, Execute, ITEM_DESC_MAX, ITEM_STACK_CAP, IdlePose,
+    ItemBonus, ItemDef, ItemTotals, LevelDef, LootEntry, MAX_ACTION_BAR, MobScaling, Objective,
+    PackDef, PeriodicDef, PhaseDef, QuestDef, QuestGiver, QuestReward, Role, School, SpellDef,
+    SpellId, SpellTarget, UnitDef, Unlock, XpRules, YellDef, ZoneDef, ZoneKind, ZoneLink,
+    ZoneSpawn,
 };
 pub use floors::pack_offsets;
 pub use geom::{Aabb, Vec3, distance, forward, in_range, is_facing, line_of_sight};

@@ -32,7 +32,7 @@ fn snapshot(sim: &Sim) -> ServerMsg {
             .players()
             .iter()
             .filter_map(|p| sim.unit(*p))
-            .map(PlayerSnap::from_state)
+            .map(|u| PlayerSnap::from_state(u, sim.content()))
             .collect(),
     }
 }
@@ -82,7 +82,7 @@ fn fake_server_round_trip_keeps_networld_in_step() {
     // Handshake as the session runs it.
     let (phase, out) = advance(Phase::Idle, &Step::Opened);
     assert_eq!(out, Outcome::SendHello);
-    let hello = hello_frames(Intent::Create, "Dana", "");
+    let hello = hello_frames(Intent::Create, "Dana", "", "fullstack");
     assert!(matches!(wire(&hello[0]), ClientMsg::Hello { .. }));
     assert_eq!(wire(&hello[1]), ClientMsg::CreateRoom);
 
@@ -95,8 +95,8 @@ fn fake_server_round_trip_keeps_networld_in_step() {
     let Some((intern_at, _)) = layout.anchor("npc_1") else {
         panic!("npc_1")
     };
-    let you = sim.spawn_player(to_core(intern_at), 0.0);
-    let bob = sim.spawn_player(to_core(intern_at), 0.0);
+    let you = sim.spawn_player("fullstack", to_core(intern_at), 0.0);
+    let bob = sim.spawn_player("fullstack", to_core(intern_at), 0.0);
     let anchors = |n: &str| layout.anchor(n).map(|(p, y)| (to_core(p), y));
     if let Err(e) = sim.load_zone("campus", &anchors, layout.blockers.clone()) {
         panic!("load_zone: {e:?}");
@@ -111,10 +111,12 @@ fn fake_server_round_trip_keeps_networld_in_step() {
             PlayerInfo {
                 id: you,
                 name: "Dana".into(),
+                class: "fullstack".into(),
             },
             PlayerInfo {
                 id: bob,
                 name: "Bob".into(),
+                class: "fullstack".into(),
             },
         ],
         quests: QuestSnap::default(),
@@ -265,8 +267,8 @@ fn campus_room() -> (Sim, EntityId, EntityId, NetWorld) {
     let Some((spawn, _)) = layout.anchor("player_spawn") else {
         panic!("player_spawn")
     };
-    let you = sim.spawn_player(to_core(spawn), 0.0);
-    let bob = sim.spawn_player(to_core(spawn), 0.0);
+    let you = sim.spawn_player("fullstack", to_core(spawn), 0.0);
+    let bob = sim.spawn_player("fullstack", to_core(spawn), 0.0);
     let anchors = |n: &str| layout.anchor(n).map(|(p, y)| (to_core(p), y));
     if let Err(e) = sim.load_zone("campus", &anchors, layout.blockers.clone()) {
         panic!("load_zone: {e:?}");
@@ -276,10 +278,12 @@ fn campus_room() -> (Sim, EntityId, EntityId, NetWorld) {
         PlayerInfo {
             id: you,
             name: "Dana".into(),
+            class: "fullstack".into(),
         },
         PlayerInfo {
             id: bob,
             name: "Bob".into(),
+            class: "fullstack".into(),
         },
     ];
     let world = NetWorld::new(sim.content().clone(), you, "R".into(), &players);

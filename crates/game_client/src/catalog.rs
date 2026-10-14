@@ -65,8 +65,12 @@ const SUIT_M: &str = "models/characters/Suit_Male.glb";
 const SUIT_M_BALD: &str = "models/characters/Suit_Male_Bald.glb";
 const SUIT_F: &str = "models/characters/Suit_Female.glb";
 const CASUAL3: &str = "models/characters/Casual3_Male.glb";
-/// Player: Casual2 body with baked colours and hair split into thinning stages (`hair.rs`).
+/// Player skins: Casual2 body with baked colours and hair split into thinning stages
+/// (`hair.rs`); one per class (scripts/split_hair.py, scripts/class_skins.py).
 const ENGINEER: &str = "models/characters/Engineer.glb";
+const FRONTEND: &str = "models/characters/Frontend.glb";
+const BACKEND: &str = "models/characters/Backend.glb";
+const DEVOPS: &str = "models/characters/DevOps.glb";
 const CASUAL_F: &str = "models/characters/Casual_Female.glb";
 const CASUAL2: &str = "models/characters/Casual2_Male.glb";
 const CASUAL_M: &str = "models/characters/Casual_Male.glb";
@@ -77,8 +81,11 @@ const WORKER: &str = "models/characters/Worker_Male.glb";
 const PRIM: &str = "prim/";
 
 /// Every character GLB the catalog references.
-pub const CHARACTER_MODELS: [&str; 11] = [
+pub const CHARACTER_MODELS: [&str; 14] = [
     ENGINEER,
+    FRONTEND,
+    BACKEND,
+    DEVOPS,
     SUIT_M,
     SUIT_M_BALD,
     SUIT_F,
@@ -114,10 +121,34 @@ static TABLE: &[(&str, UnitVisual)] = &[
         v(
             ENGINEER,
             1.8,
-            "Senior Engineer",
-            "<Last of the Seniors>",
+            "Fullstack Engineer",
+            "<Knows Everything a Little>",
             &[],
         ),
+    ),
+    (
+        "frontend_dev",
+        v(
+            FRONTEND,
+            1.8,
+            "Frontend Developer",
+            "<Centers Divs for a Living>",
+            &[],
+        ),
+    ),
+    (
+        "backend_dev",
+        v(
+            BACKEND,
+            1.8,
+            "Backend Engineer",
+            "<Owns Prod, Fears Prod>",
+            &[],
+        ),
+    ),
+    (
+        "devops_eng",
+        v(DEVOPS, 1.8, "DevOps Engineer", "<On Call Since 2019>", &[]),
     ),
     (
         "intern",
@@ -885,6 +916,9 @@ mod tests {
 
     const CONTRACT: &[&str] = &[
         "senior_engineer",
+        "frontend_dev",
+        "backend_dev",
+        "devops_eng",
         "intern",
         "meatproxy",
         "vibe_junior",
@@ -949,9 +983,9 @@ mod tests {
             }
             assert!(dir.join(vis.model).exists(), "{k}: {}", vis.model);
             assert!(CHARACTER_MODELS.contains(&vis.model), "{k}: {}", vis.model);
-            assert!(!vis.title.is_empty() || k == "senior_engineer");
+            assert!(!vis.title.is_empty());
         }
-        assert!(CHARACTER_MODELS.len() <= 11);
+        assert!(CHARACTER_MODELS.len() <= 14);
     }
 
     #[test]

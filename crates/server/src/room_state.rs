@@ -54,6 +54,7 @@ const EXIT_DWELL: std::time::Duration = std::time::Duration::from_secs(3);
 struct Member {
     eid: EntityId,
     name: String,
+    class: String,
     /// Last accepted position; the sim only sees it at its next tick.
     pos: Vec3,
     /// Metres this player may still move before more time passes (token bucket).
@@ -179,12 +180,14 @@ impl RoomState {
             .map(|m| PlayerInfo {
                 id: m.eid,
                 name: m.name.clone(),
+                class: m.class.clone(),
             })
             .collect()
     }
 
-    /// False when the sim has no room for another player; the caller drops the connection.
-    pub fn on_join(&mut self, player: PlayerId, raw_name: &str) -> bool {
+    /// False when the sim has no room for another player (or `class` is unknown, which the
+    /// handshake already rules out); the caller drops the connection.
+    pub fn on_join(&mut self, player: PlayerId, raw_name: &str, class: &str) -> bool {
         self.joins += 1;
         let zone = self.sim.zone().unwrap_or(START_ZONE).to_string();
         let geom = self.world.zone(&zone);
@@ -194,7 +197,7 @@ impl RoomState {
         let k = self.members.len();
         let (dx, dz) = pack_offsets(k + 1).get(k).copied().unwrap_or_default();
         let pos = Vec3::new(base.x + dx, base.y, base.z + dz);
-        let eid = self.sim.spawn_player(pos, yaw);
+        let eid = self.sim.spawn_player(class, pos, yaw);
         if eid == 0 {
             return false;
         }
@@ -214,12 +217,14 @@ impl RoomState {
         let info = PlayerInfo {
             id: eid,
             name: name.clone(),
+            class: class.to_string(),
         };
         self.members.insert(
             player,
             Member {
                 eid,
                 name,
+                class: class.to_string(),
                 pos,
                 budget: JITTER_M,
                 last_move: Instant::now(),
@@ -481,10 +486,12 @@ impl RoomState {
             .collect();
         for (player, eid) in members {
             let content = self.sim.content();
-            let spells = content
-                .action_bar()
+            let class = self.sim.class_of(eid);
+            let spells = class
+                .map_or(content.action_bar(), |c| &c.action_bar)
                 .iter()
                 .copied()
+                .chain(class.map(|c| c.resurrect))
                 .chain(content.channel_spell().map(|s| s.id));
             let msg = cooldowns_msg(self.sim.now().0, spells, |s| self.sim.cooldown(eid, s));
             self.push(Audience::Only(player), &msg);
@@ -633,7 +640,7 @@ impl RoomState {
             .players()
             .iter()
             .filter_map(|id| self.sim.unit(*id))
-            .map(PlayerSnap::from_state)
+            .map(|u| PlayerSnap::from_state(u, content))
             .collect();
         frame(&ServerMsg::Snapshot {
             tick: self.sim.now().0,
@@ -670,8 +677,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn join_welcomes_and_announces() {
         let mut s = room();
-        assert!(s.on_join(0, "Dana"));
-        assert!(s.on_join(1, "<bad>"));
+        assert!(s.on_join(0, "Dana", "fullstack"));
+        assert!(s.on_join(1, "<bad>", "fullstack"));
         let out = s.tick();
         let a = msgs(&out, 0);
         assert!(
@@ -688,19 +695,57 @@ mod tests {
         );
     }
 
+    /// Each player keeps the class of its `Hello`: the sim spawns that class's unit, and the
+    /// welcome, join notice and snapshots carry the class key for frames and nameplates.
+    #[tokio::test(start_paused = true)]
+    async fn players_join_as_their_own_class() {
+        let mut s = room();
+        assert!(s.on_join(0, "Tank", "backend"));
+        assert!(s.on_join(1, "Ops", "devops"));
+        let out = s.tick();
+        let b = msgs(&out, 1);
+        let classes =
+            |players: &[PlayerInfo]| players.iter().map(|p| p.class.clone()).collect::<Vec<_>>();
+        assert!(
+            matches!(&b[0], ServerMsg::Welcome { players, .. } if classes(players) == ["backend", "devops"])
+        );
+        let snap = b.iter().find_map(|m| match m {
+            ServerMsg::Snapshot { players, .. } => Some(players.clone()),
+            _ => None,
+        });
+        let snap_classes: Vec<String> = snap
+            .unwrap_or_default()
+            .into_iter()
+            .map(|p| p.class)
+            .collect();
+        assert_eq!(snap_classes, ["backend", "devops"]);
+        assert!(msgs(&out, 0).iter().any(
+            |m| matches!(m, ServerMsg::PlayerJoined(p) if p.name == "Ops" && p.class == "devops")
+        ));
+        let keys: Vec<String> = s
+            .sim
+            .players()
+            .iter()
+            .filter_map(|id| s.sim.unit(*id).map(|u| u.key.clone()))
+            .collect();
+        assert_eq!(keys, ["backend_dev", "devops_eng"]);
+        // The handshake rejects unknown classes; the room still refuses to spawn one.
+        assert!(!s.on_join(2, "Rock", "10x_rockstar"));
+    }
+
     #[tokio::test(start_paused = true)]
     async fn sixth_player_is_refused_by_the_sim() {
         let mut s = room();
         for p in 0..5 {
-            assert!(s.on_join(p, "x"));
+            assert!(s.on_join(p, "x", "fullstack"));
         }
-        assert!(!s.on_join(5, "x"));
+        assert!(!s.on_join(5, "x", "fullstack"));
     }
 
     #[tokio::test(start_paused = true)]
     async fn moves_are_checked() {
         let mut s = room();
-        s.on_join(0, "a");
+        s.on_join(0, "a", "fullstack");
         s.tick();
         let start = s.members[&0].pos;
         let mv = |pos: Vec3, seq| ClientMsg::Move {
@@ -761,7 +806,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn stunned_players_cannot_walk() {
         let mut s = room();
-        s.on_join(0, "a");
+        s.on_join(0, "a", "fullstack");
         s.tick();
         let eid = eid_of(&s, 0);
         assert!(s.sim.debug_apply_aura(eid, "standup", 5_000));
@@ -782,7 +827,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn moves_through_thin_walls_are_corrected() {
         let mut s = room();
-        s.on_join(0, "a");
+        s.on_join(0, "a", "fullstack");
         s.tick();
         let g = s.world.zone("campus").unwrap();
         // A tall, thin wall with walkable ground on both sides of its middle.
@@ -816,7 +861,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn claimed_height_cannot_lift_a_player_over_a_wall() {
         let mut s = room();
-        s.on_join(0, "a");
+        s.on_join(0, "a", "fullstack");
         s.tick();
         let g = s.world.zone("campus").unwrap();
         let found = g.blockers.iter().find_map(|b| {
@@ -856,7 +901,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn moving_units_go_out_as_positions_between_snapshots() {
         let mut s = room();
-        s.on_join(0, "a");
+        s.on_join(0, "a", "fullstack");
         s.sim.set_wandering(false);
         // Run past the join snapshot to a full snapshot, which resets the change tracking.
         while !s.sim.now().0.is_multiple_of(SNAPSHOT_EVERY_TICKS) || s.sim.now().0 == 0 {
@@ -883,8 +928,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn auras_and_cooldowns_carry_their_timers() {
         let mut s = room();
-        s.on_join(0, "a");
-        s.on_join(1, "b");
+        s.on_join(0, "a", "fullstack");
+        s.on_join(1, "b", "fullstack");
         s.tick();
         let mob = s
             .sim
@@ -937,7 +982,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn late_joiner_gets_its_own_log_zone_state_and_aura_timers() {
         let mut s = room();
-        s.on_join(0, "a");
+        s.on_join(0, "a", "fullstack");
         s.tick();
         assert!(
             s.sim
@@ -973,7 +1018,7 @@ mod tests {
         for _ in 0..30 {
             s.tick();
         }
-        assert!(s.on_join(1, "late"));
+        assert!(s.on_join(1, "late", "fullstack"));
         let out = s.tick();
         let m = msgs(&out, 1);
         let ServerMsg::Welcome {
@@ -1005,8 +1050,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn walking_into_an_open_door_moves_the_group() {
         let mut s = room();
-        s.on_join(0, "a");
-        s.on_join(1, "b");
+        s.on_join(0, "a", "fullstack");
+        s.on_join(1, "b", "fullstack");
         s.tick();
         let door = *s
             .world
@@ -1059,8 +1104,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn lone_dweller_moves_the_group_after_three_seconds() {
         let mut s = room();
-        s.on_join(0, "a");
-        s.on_join(1, "b");
+        s.on_join(0, "a", "fullstack");
+        s.on_join(1, "b", "fullstack");
         s.tick();
         let door = *s
             .world
@@ -1095,7 +1140,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn locked_door_does_nothing() {
         let mut s = room();
-        s.on_join(0, "a");
+        s.on_join(0, "a", "fullstack");
         s.tick();
         let door = *s
             .world
@@ -1115,8 +1160,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn leave_emote_ping() {
         let mut s = room();
-        s.on_join(0, "a");
-        s.on_join(1, "b");
+        s.on_join(0, "a", "fullstack");
+        s.on_join(1, "b", "fullstack");
         s.tick();
         s.on_message(
             1,
@@ -1142,8 +1187,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn emote_targets_must_be_other_members_of_the_room() {
         let mut s = room();
-        s.on_join(0, "a");
-        s.on_join(1, "b");
+        s.on_join(0, "a", "fullstack");
+        s.on_join(1, "b", "fullstack");
         s.tick();
         let (a, b) = (eid_of(&s, 0), eid_of(&s, 1));
         let mob = s.sim.units().find(|u| u.hostile).map(|u| u.id).unwrap();
@@ -1176,12 +1221,12 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn dev_start_level_applies_to_joiners_only_when_set() {
         let mut s = room();
-        s.on_join(0, "a");
+        s.on_join(0, "a", "fullstack");
         assert_eq!(s.sim.unit(eid_of(&s, 0)).unwrap().level, 1);
         s.dev_start_level = vec![9, 5, 2];
-        s.on_join(1, "b");
-        s.on_join(2, "c");
-        s.on_join(3, "d");
+        s.on_join(1, "b", "fullstack");
+        s.on_join(2, "c", "fullstack");
+        s.on_join(3, "d", "fullstack");
         assert_eq!(s.sim.unit(eid_of(&s, 1)).unwrap().level, 5);
         assert_eq!(s.sim.unit(eid_of(&s, 2)).unwrap().level, 2);
         assert_eq!(s.sim.unit(eid_of(&s, 3)).unwrap().level, 2);

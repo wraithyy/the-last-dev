@@ -914,7 +914,7 @@ fn drive(sim: &mut combat_core::Sim, player: u64, mob: u64) {
 
 fn final_state(frames_us: &[u64]) -> (String, u64) {
     let mut sim = combat_core::Sim::new(content(), 99);
-    let player = sim.spawn_player(Vec3::default(), 0.0);
+    let player = sim.spawn_player("fullstack", Vec3::default(), 0.0);
     let mob = match sim.spawn_unit("ceo", Vec3::new(0.0, 0.0, -15.0), 0.0) {
         Ok(id) => id,
         Err(e) => panic!("{e}"),
@@ -1062,8 +1062,10 @@ fn one_hit_depletes_every_exhausted_absorb_aura() {
         mana: 0,
         ..c.spells[2].clone()
     });
+    // Players only cast their class's spells.
+    c.classes[0].action_bar.push(SpellId(99));
     let mut sim = combat_core::Sim::new(c, 1);
-    let player = sim.spawn_player(Vec3::default(), 0.0);
+    let player = sim.spawn_player("fullstack", Vec3::default(), 0.0);
     let _mob = sim.spawn_unit("ceo", Vec3::new(0.0, 0.0, -2.0), 0.0);
     sim.push(Command::Cast {
         caster: player,

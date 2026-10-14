@@ -10,11 +10,15 @@ Content is data-driven: `content/game.ron` (spells, auras, units, items, levels,
 pub struct SpellId(pub u32);              // Copy, Eq, Hash, Ord, Debug
 pub enum School { Physical, Arcane }      // only two; a school lockout locks one of them
 
-pub struct Content { pub config, pub auras, pub spells, pub units, pub items, pub action_bar, pub levels, pub zones, pub quests }
+pub struct Content { pub config, pub auras, pub spells, pub units, pub items, pub classes, pub levels, pub zones, pub quests }
 impl Content {
     pub fn from_ron(src: &str) -> Result<Content, ContentError>;
     pub fn spell(&self, id: SpellId) -> Option<&SpellDef>;
-    pub fn action_bar(&self) -> &[SpellId];          // full bar, keys 1..=0 in order (10 slots); see Sim::known_spells
+    pub fn action_bar(&self) -> &[SpellId];          // the default (first) class's bar, keys 1..=0 (10 slots)
+    pub fn class(&self, key: &str) -> Option<&ClassDef>; // fullstack | frontend | backend | devops
+    pub fn class_of_unit(&self, unit_key: &str) -> Option<&ClassDef>;
+    pub fn bar_for_unit(&self, unit_key: &str) -> &[SpellId];          // class bar of a player unit
+    pub fn resurrect_for_unit(&self, unit_key: &str) -> Option<&SpellDef>; // class resurrect (V key)
     pub fn channel_spell(&self) -> Option<&SpellDef>;  // Coffee Break (first spell with a `channel`), off the bar
     pub fn resurrect_spell(&self) -> Option<&SpellDef>; // co-op resurrect (first `DeadAlly` spell), off the bar
     pub fn unit_def(&self, key: &str) -> Option<&UnitDef>;
@@ -36,7 +40,8 @@ pub struct Sim { /* ... */ }
 impl Sim {
     pub fn new(content: Content, seed: u64) -> Sim;
     pub fn set_blockers(&mut self, blockers: Vec<Aabb>);
-    pub fn spawn_player(&mut self, pos: Vec3, yaw: f32) -> EntityId;      // level 1, 0 XP; adds a group member, 0 once MAX_PLAYERS (5) are in
+    pub fn spawn_player(&mut self, class: &str, pos: Vec3, yaw: f32) -> EntityId; // level 1, 0 XP; adds a group member of that class, 0 for an unknown class or once MAX_PLAYERS (5) are in
+    pub fn class_of(&self, id: EntityId) -> Option<&ClassDef>;           // a group member's class
     pub fn remove_player(&mut self, id: EntityId) -> bool;                // leave mid-session, see Co-op group
     pub fn players(&self) -> &[EntityId];                                 // join order
     pub fn apply_as(&mut self, player: EntityId, cmd: Command);           // queued like push, as that player
@@ -225,7 +230,7 @@ Event order on a zone boss kill: `Death`, `AiState Dead`, `XpGained`/`LevelUp`/`
 
 ## Levels and spells
 
-- `spawn_player` starts at level 1. Stats = the `senior_engineer` def plus the cumulative `levels[level-1]` bonus (HP, mana, spell power). Level-ups refill HP and mana.
+- `spawn_player(class, ..)` starts at level 1. Stats = the class `unit` def plus the cumulative `levels[level-1]` bonus (HP scaled by the class `level_hp_pct`, mana, spell power). Level-ups refill HP and mana. `ClassDef { key, name, role: Tank|Healer|Melee|Ranged, unit, blurb, threat_pct, damage_taken_pct, level_hp_pct, action_bar, resurrect }`; the first class is the default. Fullstack (`senior_engineer`) is the pre-class player and plays bit-identically (golden replays differ only by the display name).
 - Kill XP goes to players only, split across the group (see FORMULAS.md). The player's `UnitState.xp` is progress inside the current level; `xp_to_next` is the bar maximum (`config.xp_per_level` is kept as the level-1 value). Overflow carries into the next level; at the cap XP stays 0 and kills emit no `XpGained`.
 - Event order on a kill: `Death`, `AiState Dead`, `XpGained`, then per level gained `LevelUp { level }` followed by one `SpellLearned` per bar spell whose `learn_level` equals the new level, then `LootDropped`, then `FloorCleared` (boss only).
 - `SpellDef.learn_level`; the bar is `[Code Review 1, Refactor 1, Guardrails 3, Reject PR 2, git blame 4, Rollback 5, On-Call Caffeine 6, Rubber Duck 7, Postmortem 8, Write It By Hand 9]`. Reject PR unlocks at 2 and Guardrails at 3 (swapped versus GAME_DESIGN.md) so the floor-1 boss's 4,000-Line Diff can be interrupted at the floor's levels. `Sim::known_spells(player)` lists the learned subset; casting an unlearned spell fails with `NotLearned`, and `CooldownView.usable` says so too, so the HUD can grey the slot.
@@ -238,7 +243,7 @@ Event order on a zone boss kill: `Death`, `AiState Dead`, `XpGained`/`LevelUp`/`
 - `target: Enemy` spells need a hostile, living, non-evading target and check range, facing (at start) and LoS; `Caster` spells target the caster.
 - `target: Ally` (Guardrails, Rollback, On-Call Caffeine): when the caster's target is another group member, that member must be alive (`Dead`), within `range_m` (`OutOfRange`) and in LoS (`NoLineOfSight`), no facing; checked again (range, LoS, alive) at completion. Any other target (an enemy, an NPC, yourself, none) self-casts, so single-player is unchanged. `CastSucceeded.target` names who it landed on.
 - `target: DeadAlly` (spell 13, "Have You Tried Turning It Off and On Again", 6 s cast, 30 m, learned at level 1, off the bar; the client binds it to V): the target must be another member that is dead (`TargetNotDead`, `InvalidTarget` for yourself, NPCs or enemies, `NoTarget`), in range and LoS, and the caster out of combat (`InCombat`), at start and at completion. Its `Resurrect { hp_pct, mana_pct }` effect (30 / 20) revives the member where it fell, keeping its cooldowns, and emits `Resurrected { unit, by, hp, mana }` (broadcast). A member who released meanwhile makes the cast fail with `TargetNotDead`. Content validation: `Resurrect` exactly in `DeadAlly` spells, `hp_pct` 1..=100, `mana_pct` <= 100. With `area` set, the target-side effects hit every living unit within `radius_m` of the caster on the caster's side (`allies: true`, caster included) or the other side.
-- Effects: `Damage { base, coefficient_pct, apply_aura?, consume_aura?, execute? }`, `Absorb`, `Interrupt { lockout_ms }`, `Heal { base, coefficient_pct }`, `Aura { aura, duration_ms }`, `RandomAura { auras, duration_ms }` (rng pick), `Dispel { count }` (removes up to `count` harmful auras, newest first, reason `Consumed`), `Lockout { lockout_ms, school? }` (locks `school`, or the school of the target's last cast spell; cancels a cast of that school), `Knockback { strength_m }`, `Teleport { distance_m }` (to `distance_m` in front of the caster's spawn point), `Summon { unit, count, max_alive }`, `ResetAllyThreat { radius_m }`, `ThreatSwap`, `ForwardLastSpell { pct }`, `DrainMana { pct }` (removes `pct` percent of the target's max mana, no event), `Nothing`. `Summon`, `ResetAllyThreat` and `ThreatSwap` act once around the caster; the rest act on each target.
+- Effects: `Damage { base, coefficient_pct, apply_aura?, consume_aura?, execute? }`, `Absorb`, `Interrupt { lockout_ms }`, `Heal { base, coefficient_pct }`, `Aura { aura, duration_ms }`, `RandomAura { auras, duration_ms }` (rng pick), `Dispel { count }` (removes up to `count` harmful auras, newest first, reason `Consumed`), `Lockout { lockout_ms, school? }` (locks `school`, or the school of the target's last cast spell; cancels a cast of that school), `Knockback { strength_m }`, `Teleport { distance_m }` (to `distance_m` in front of the caster's spawn point), `Summon { unit, count, max_alive }`, `ResetAllyThreat { radius_m }`, `ThreatSwap`, `ForwardLastSpell { pct }`, `DrainMana { pct }` (removes `pct` percent of the target's max mana, no event), `Taunt` (see FORMULAS.md, Threat), `Threat { amount }` (extra threat, class-scaled), `Charge { stop_m }` (moves the caster to `stop_m` short of the target, `Teleported` for the caster), `RestoreHp { ms_ago }` (heal to the HP of `ms_ago` earlier, at most 7 s), `Nothing`. `ConsumeAura.bonus_pct` applies per stack. `AuraDef.max_hp_pct` changes a player's max HP while it lasts. `Summon`, `ResetAllyThreat` and `ThreatSwap` act once around the caster; the rest act on each target.
 - Only `Damage` and `ForwardLastSpell` roll `spell_hit_pct`; heals, auras, dispels, knockbacks and interrupts always land.
 - `AuraDef` flags (all default off): `stun`, `silence`, `periodic: (interval_ms, base, coefficient_pct, heal)`, `school` (of periodic and expiry damage), `cast_time_pct`, `damage_taken_pct`, `damage_done_pct`, `haste_pct` (all per stack), `max_stacks` (default 1), `spread_radius_m`, `expire_damage`, `stack_on_repeat_cast`, `reflect`.
 - Re-applying an aura refreshes its duration; a stacking aura gains one stack (up to `max_stacks`) and `AuraApplied` is emitted again. Periodic and expiry amounts are snapshotted from the caster when applied. The first periodic tick comes one interval after application; a tick due on the expiry tick still lands.

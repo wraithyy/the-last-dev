@@ -81,15 +81,13 @@ pub const PICK_SPHERE_HEIGHT: f32 = 1.3;
 pub const SIM_SEED: u64 = 0x5EED_0000_C0DE;
 
 // HUD layout (logical px)
-pub const FRAME_W: f32 = 230.0;
+pub const FRAME_W: f32 = 250.0;
 pub const FRAME_BAR_H: f32 = 13.0;
 pub const PORTRAIT_SIZE: f32 = 44.0;
 pub const ACTION_SLOT: f32 = 46.0;
 pub const ACTION_GAP: f32 = 5.0;
 pub const AURA_ICON: f32 = 30.0;
 pub const AURA_SLOTS: usize = 8;
-pub const COMBAT_LOG_LINES: usize = 8;
-pub const COMBAT_LOG_W: f32 = 392.0;
 pub const CAST_BAR_W: f32 = 300.0;
 pub const CAST_BAR_H: f32 = 22.0;
 /// Seconds the "success" / "interrupted" state of the player cast bar lingers.
@@ -120,11 +118,11 @@ pub const LEVEL_UP_COLOR: [f32; 3] = [1.0, 0.8, 0.25];
 
 // HUD scaling
 pub const UI_REFERENCE_HEIGHT: f32 = 900.0;
-/// Narrowest logical width where the combat log and the action bar do not overlap.
-pub const UI_REFERENCE_WIDTH: f32 = 1400.0;
+/// Narrowest logical width where the combat log (right of the action bar) and the keycaps do not overlap.
+pub const UI_REFERENCE_WIDTH: f32 = 1600.0;
 pub const UI_MIN_SCALE: f32 = 0.7;
 pub const UI_MAX_SCALE: f32 = 2.0;
-/// Touch layout: the log is hidden, so only the action bar sets the minimum width.
+/// Touch layout: the logs collapse into a tap strip, so only the action bar sets the minimum width.
 pub const TOUCH_UI_REFERENCE_HEIGHT: f32 = 500.0;
 pub const TOUCH_UI_REFERENCE_WIDTH: f32 = 1000.0;
 pub const TOUCH_UI_MIN_SCALE: f32 = 0.45;

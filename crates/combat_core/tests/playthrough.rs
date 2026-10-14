@@ -25,6 +25,35 @@ const NO_KICK: [SpellId; 4] = [SpellId(112), SpellId(150), SpellId(154), SpellId
 /// The AGI's telegraph for its spell reflect window.
 const ALIGNMENT: SpellId = SpellId(187);
 const PACK_SPACING: f32 = 70.0;
+const PIXEL_PUSH: SpellId = SpellId(20);
+const CSS_COMBO: SpellId = SpellId(21);
+const IMPORTANT: SpellId = SpellId(22);
+const LIGHTHOUSE: SpellId = SpellId(23);
+const HOT_RELOAD: SpellId = SpellId(24);
+const DARK_MODE: SpellId = SpellId(25);
+const RESPONSIVE: SpellId = SpellId(26);
+const INFINITE_SCROLL: SpellId = SpellId(27);
+const CENTER_DIV: SpellId = SpellId(28);
+const NEW_FRAMEWORK: SpellId = SpellId(29);
+const BLOCKING_CALL: SpellId = SpellId(30);
+const RATE_LIMITER: SpellId = SpellId(31);
+const TAUNT: SpellId = SpellId(32);
+const CONN_POOL: SpellId = SpellId(33);
+const KILL_QUERY: SpellId = SpellId(34);
+const DB_LOCK: SpellId = SpellId(35);
+const HORIZONTAL: SpellId = SpellId(36);
+const RETRY: SpellId = SpellId(37);
+const CACHE_INVAL: SpellId = SpellId(38);
+const DROP_TABLE: SpellId = SpellId(39);
+const KILL_9: SpellId = SpellId(40);
+const HOTFIX: SpellId = SpellId(41);
+const SIGSTOP: SpellId = SpellId(42);
+const AUTO_SCALING: SpellId = SpellId(43);
+const CHAOS_MONKEY: SpellId = SpellId(44);
+const REVERT: SpellId = SpellId(45);
+const FEATURE_FLAG: SpellId = SpellId(46);
+const CIRCUIT: SpellId = SpellId(47);
+const TERRAFORM: SpellId = SpellId(49);
 
 /// Packs on a straight corridor toward -Z, the boss at the end, NPCs off to the side.
 fn anchor(name: &str) -> Option<(Vec3, f32)> {
@@ -62,6 +91,7 @@ struct Bot {
     in_boss: bool,
     /// Loot every corpse after a pull (quest runs only; the golden predates looting).
     looting: bool,
+    class: &'static str,
 }
 
 fn yaw_to(from: Vec3, to: Vec3) -> f32 {
@@ -70,11 +100,16 @@ fn yaw_to(from: Vec3, to: Vec3) -> f32 {
 
 impl Bot {
     fn new(zone: &str, level: u8, seed: u64) -> Bot {
+        Bot::new_as("fullstack", zone, level, seed)
+    }
+
+    fn new_as(class: &'static str, zone: &str, level: u8, seed: u64) -> Bot {
         let mut sim = Sim::new(content(), seed);
         // The balance gate and golden pin fight timing, which wandering would shift.
         sim.set_wandering(false);
         let start = Vec3::new(0.0, 0.0, 20.0);
-        let player = sim.spawn_player(start, 0.0);
+        let player = sim.spawn_player(class, start, 0.0);
+        assert_ne!(player, 0, "unknown class {class}");
         sim.set_player_level(level);
         sim.set_respawn_point(start, 0.0);
         if let Err(e) = sim.load_zone(zone, &anchor, Vec::new()) {
@@ -89,6 +124,7 @@ impl Bot {
             report: Report::default(),
             in_boss: false,
             looting: false,
+            class,
         }
     }
 
@@ -177,6 +213,196 @@ impl Bot {
     }
 
     fn act(&mut self) {
+        match self.class {
+            "frontend" => self.act_frontend(),
+            "backend" => self.act_backend(),
+            "devops" => self.act_devops(),
+            _ => self.act_fullstack(),
+        }
+    }
+
+    /// Shared start of every policy: target pick, then the living target if any.
+    fn engage(&mut self) -> Option<(combat_core::UnitState, combat_core::UnitState)> {
+        let me = self.me();
+        if !me.alive || me.stunned {
+            return None;
+        }
+        if let Some(t) = self.pick_target() {
+            self.set_target(t);
+        }
+        let t = self.target.and_then(|t| self.sim.unit(t)).cloned()?;
+        Some((me, t))
+    }
+
+    /// Kick an interruptible cast worth kicking with `kick`, else stun a non-boss with `stun`.
+    fn try_kick(&mut self, t: &combat_core::UnitState, kick: SpellId, stun: SpellId) -> bool {
+        let Some(c) = t.cast else { return false };
+        if !c.interruptible || NO_KICK.contains(&c.spell) {
+            return false;
+        }
+        for s in [kick, stun] {
+            if (s == kick || !t.boss) && self.ready(s) {
+                self.cast(s);
+                return true;
+            }
+        }
+        false
+    }
+
+    fn busy(&self, me: &combat_core::UnitState) -> bool {
+        me.cast.is_some() || self.sim.cooldown(self.player, CR).gcd_remaining_ms > 0
+    }
+
+    fn enemies_near(&self, r: f32) -> usize {
+        self.sim
+            .units()
+            .filter(|u| {
+                u.hostile && u.alive && u.in_combat && combat_core::distance(u.pos, self.pos) <= r
+            })
+            .count()
+    }
+
+    fn reflecting(t: &combat_core::UnitState) -> bool {
+        t.auras.iter().any(|a| a.key == "alignment_training")
+            || t.cast.is_some_and(|c| c.spell == ALIGNMENT)
+    }
+
+    fn act_frontend(&mut self) {
+        let Some((me, t)) = self.engage() else { return };
+        let hp_pct = me.hp * 100 / me.max_hp.max(1);
+        let deadline = me
+            .auras
+            .iter()
+            .any(|a| a.key == "deadline" && a.remaining_ms < 1500);
+        let swarmed = self.enemies_near(6.0) >= 3 && hp_pct < 80;
+        if (hp_pct < 45 || deadline || swarmed) && self.ready(DARK_MODE) {
+            self.cast(DARK_MODE);
+        }
+        if Self::reflecting(&t) {
+            return;
+        }
+        if self.try_kick(&t, LIGHTHOUSE, CENTER_DIV) || self.busy(&me) {
+            return;
+        }
+        let d = combat_core::distance(me.pos, t.pos);
+        if d > 6.0 && self.ready(HOT_RELOAD) {
+            return self.cast(HOT_RELOAD);
+        }
+        let stacks = t
+            .auras
+            .iter()
+            .find(|a| a.key == "specificity")
+            .map_or(0, |a| a.stacks);
+        let t_pct = t.hp * 100 / t.max_hp.max(1);
+        if self.enemies_near(6.0) >= 3 && self.ready(RESPONSIVE) {
+            return self.cast(RESPONSIVE);
+        }
+        if t.max_hp > 1000 && self.ready(NEW_FRAMEWORK) {
+            return self.cast(NEW_FRAMEWORK);
+        }
+        let scrolled = t.auras.iter().any(|a| a.key == "infinite_scroll");
+        if !scrolled && t.hp > 200 && self.ready(INFINITE_SCROLL) {
+            return self.cast(INFINITE_SCROLL);
+        }
+        if (stacks >= 4 || (stacks >= 1 && t_pct < 20)) && self.ready(IMPORTANT) {
+            return self.cast(IMPORTANT);
+        }
+        if self.ready(CSS_COMBO) {
+            return self.cast(CSS_COMBO);
+        }
+        if self.ready(PIXEL_PUSH) {
+            self.cast(PIXEL_PUSH);
+        }
+    }
+
+    fn act_backend(&mut self) {
+        let Some((me, t)) = self.engage() else { return };
+        let hp_pct = me.hp * 100 / me.max_hp.max(1);
+        if hp_pct < 50 && self.ready(HORIZONTAL) {
+            self.cast(HORIZONTAL);
+        }
+        if t.target != Some(self.player) && self.ready(TAUNT) {
+            self.cast(TAUNT);
+        }
+        if self.try_kick(&t, KILL_QUERY, DB_LOCK) || self.busy(&me) {
+            return;
+        }
+        let shielded = me.auras.iter().any(|a| a.key == "rate_limiter");
+        if !shielded && hp_pct < 90 && self.ready(RATE_LIMITER) {
+            return self.cast(RATE_LIMITER);
+        }
+        let retrying = me.auras.iter().any(|a| a.key == "retry_backoff");
+        if !retrying && hp_pct < 60 && self.ready(RETRY) {
+            return self.cast(RETRY);
+        }
+        if Self::reflecting(&t) {
+            return;
+        }
+        if self.enemies_near(8.0) >= 2 && self.ready(CONN_POOL) {
+            return self.cast(CONN_POOL);
+        }
+        if t.max_hp > 1000 && self.ready(DROP_TABLE) {
+            return self.cast(DROP_TABLE);
+        }
+        if self.ready(CACHE_INVAL) {
+            return self.cast(CACHE_INVAL);
+        }
+        if self.ready(BLOCKING_CALL) {
+            self.cast(BLOCKING_CALL);
+        }
+    }
+
+    fn act_devops(&mut self) {
+        let Some((me, t)) = self.engage() else { return };
+        let reflecting = Self::reflecting(&t);
+        if reflecting
+            && me
+                .cast
+                .is_some_and(|c| c.spell == KILL_9 || c.spell == TERRAFORM)
+        {
+            self.sim.push(Command::StopCasting {
+                caster: self.player,
+            });
+        }
+        if !reflecting && self.try_kick(&t, SIGSTOP, SIGSTOP) {
+            return;
+        }
+        if self.busy(&me) {
+            return;
+        }
+        let hp_pct = me.hp * 100 / me.max_hp.max(1);
+        let has = |k: &str| me.auras.iter().any(|a| a.key == k);
+        if has("deadline") && self.ready(FEATURE_FLAG) {
+            return self.cast(FEATURE_FLAG);
+        }
+        if hp_pct < 50 && self.ready(REVERT) {
+            return self.cast(REVERT);
+        }
+        if hp_pct < 70 && !has("circuit_breaker") && self.ready(CIRCUIT) {
+            return self.cast(CIRCUIT);
+        }
+        if hp_pct < 85 && !has("auto_scaling") && self.ready(AUTO_SCALING) {
+            return self.cast(AUTO_SCALING);
+        }
+        if hp_pct < 60 && self.ready(HOTFIX) {
+            return self.cast(HOTFIX);
+        }
+        if reflecting {
+            return;
+        }
+        let monkeyed = t.auras.iter().any(|a| a.key == "chaos_monkey");
+        if !monkeyed && t.hp > 150 && self.ready(CHAOS_MONKEY) {
+            return self.cast(CHAOS_MONKEY);
+        }
+        if t.max_hp > 1000 && hp_pct > 60 && self.ready(TERRAFORM) {
+            return self.cast(TERRAFORM);
+        }
+        if self.ready(KILL_9) {
+            self.cast(KILL_9);
+        }
+    }
+
+    fn act_fullstack(&mut self) {
         let me = self.me();
         if !me.alive || me.stunned {
             return;
@@ -284,7 +510,13 @@ impl Bot {
         if boss {
             self.report.boss_min_hp_pct = 100;
         }
-        self.pos = Vec3::new(at.x, 0.0, at.z + 20.0);
+        // Melee walks up into the pack's aggro radius; casters open from 20 m.
+        let gap = if matches!(self.class, "frontend" | "backend") {
+            4.0
+        } else {
+            20.0
+        };
+        self.pos = Vec3::new(at.x, 0.0, at.z + gap);
         self.tick();
         let first = self
             .sim
@@ -459,10 +691,80 @@ fn every_zone_is_cleared_at_its_max_level() {
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
 }
 
-/// Campus from level 1: visit every giver, clear the packs looting everything, hand in, and
-/// leave and return after the trash respawn timer until the campus chain is done.
+/// Every zone at its max level for one class over three seeds; returns failures and the
+/// lowest boss-fight HP % per zone.
+fn clear_zones(class: &'static str, zones: &[&str]) -> (Vec<String>, Vec<(String, u32)>) {
+    let mut failures = Vec::new();
+    let mut lowest = Vec::new();
+    for zid in zones {
+        let Some(z) = content().zone(zid).cloned() else {
+            panic!("no zone {zid}");
+        };
+        let mut low = 100;
+        for seed in [7, 42, 1234] {
+            let max = z.level_range.1;
+            let (r, log) = Bot::new_as(class, &z.id, max, seed).run(&z.id);
+            println!(
+                "{class} seed {seed} {} at level {max}: boss min HP {}%, rests {}/{} pulls, after each pull {:?}",
+                z.id, r.boss_min_hp_pct, r.rests, r.pulls, r.after
+            );
+            if z.boss.is_some() {
+                low = low.min(r.boss_min_hp_pct);
+            }
+            if r.died || (z.boss.is_some() && !r.cleared) {
+                let tail: Vec<&str> = log.lines().rev().take(40).collect();
+                failures.push(format!(
+                    "{class} seed {seed} {}: {r:?}\n{}",
+                    z.id,
+                    tail.into_iter().rev().collect::<Vec<_>>().join("\n")
+                ));
+            }
+            if r.rests >= r.pulls {
+                failures.push(format!(
+                    "{class} seed {seed} {}: rested after every pull",
+                    z.id
+                ));
+            }
+        }
+        lowest.push((z.id.clone(), low));
+    }
+    (failures, lowest)
+}
+
+/// Frontend, Backend and DevOps clear every zone solo at its max level, like the Fullstack
+/// gate above (the campus chain from level 1 is covered per class below). `WOW_CLASS_ZONES`
+/// (comma list) narrows it while tuning.
+#[test]
+fn other_classes_clear_every_zone() {
+    let zones: Vec<String> = std::env::var("WOW_CLASS_ZONES").map_or_else(
+        |_| content().zones.into_iter().map(|z| z.id).collect(),
+        |v| v.split(',').map(String::from).collect(),
+    );
+    let zones: Vec<&str> = zones.iter().map(String::as_str).collect();
+    let mut failures = Vec::new();
+    for class in ["frontend", "backend", "devops"] {
+        let (f, lowest) = clear_zones(class, &zones);
+        println!("{class}: lowest boss-fight HP % per zone over 3 seeds: {lowest:?}");
+        failures.extend(f);
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+}
+
 #[test]
 fn campus_quest_chain_from_level_one() {
+    campus_chain("fullstack");
+}
+
+#[test]
+fn campus_quest_chain_from_level_one_other_classes() {
+    for class in ["frontend", "backend", "devops"] {
+        campus_chain(class);
+    }
+}
+
+/// Campus from level 1: visit every giver, clear the packs looting everything, hand in, and
+/// leave and return after the trash respawn timer until the campus chain is done.
+fn campus_chain(class: &'static str) {
     // Human in the Loop is left out: its MeatProxies are spread over the campus and the tower.
     const CAMPUS: [&str; 5] = [
         "onboarding",
@@ -472,7 +774,7 @@ fn campus_quest_chain_from_level_one() {
         "content_moderation",
     ];
     for seed in [7, 42, 1234] {
-        let mut bot = Bot::new("campus", 1, seed);
+        let mut bot = Bot::new_as(class, "campus", 1, seed);
         bot.looting = true;
         let mut rounds = 0;
         while rounds < 6 && !bot.report.died {
@@ -495,23 +797,27 @@ fn campus_quest_chain_from_level_one() {
             .collect();
         let me = bot.me();
         println!(
-            "seed {seed}: campus chain in {rounds} clears, level {}, {} trophies, {} rests / {} pulls",
+            "{class} seed {seed}: campus chain in {rounds} clears, level {}, {} trophies, {} rests / {} pulls",
             me.level,
             me.inventory.len(),
             bot.report.rests,
             bot.report.pulls
         );
-        assert!(!bot.report.died, "seed {seed}: died on the campus");
-        assert!(left.is_empty(), "seed {seed}: unfinished {left:?}");
+        assert!(!bot.report.died, "{class} seed {seed}: died on the campus");
+        assert!(left.is_empty(), "{class} seed {seed}: unfinished {left:?}");
         assert!(
             rounds <= 3,
             "seed {seed}: {rounds} clears is too much farming"
         );
         // The campus is the tutorial: a fresh hire leaves it at level 3 and walks into tower/1
         // (levels 1-2) slightly over-levelled, never at 4+ with the floor turned grey.
-        assert_eq!(
-            me.level, 3,
-            "seed {seed}: the campus should take a fresh hire to level 3"
+        // Other classes draw a different rng stream (other hit counts), so a 50% quest drop
+        // can need the third clear allowed above, which is worth one extra level.
+        let levels = if class == "fullstack" { 3..=3 } else { 3..=4 };
+        assert!(
+            levels.contains(&me.level),
+            "{class} seed {seed}: the campus should take a fresh hire to level 3 (got {})",
+            me.level
         );
     }
 }

@@ -178,7 +178,7 @@ fn is_upper_body(name: &str) -> bool {
 struct Models(HashMap<ModelKind, ModelData>);
 
 #[derive(Component)]
-struct ModelSpawned;
+pub(crate) struct ModelSpawned;
 
 /// Lives on the entity holding the `AnimationPlayer`.
 #[derive(Component)]
@@ -212,8 +212,37 @@ impl Plugin for AnimPlugin {
             .add_systems(Startup, load_models)
             .add_systems(
                 Update,
-                (spawn_models, attach_players, apply_paints, pose_lean, drive).chain(),
+                (
+                    reskin,
+                    spawn_models,
+                    attach_players,
+                    apply_paints,
+                    pose_lean,
+                    drive,
+                )
+                    .chain(),
             );
+    }
+}
+
+type Reskinned = (Changed<Character>, With<ModelSpawned>);
+
+/// A character whose model kind changed (role change) drops its spawned scene, so
+/// `spawn_models` builds the new one; gear and hair re-attach on their own.
+fn reskin(
+    mut commands: Commands,
+    changed: Query<(Entity, &Children), Reskinned>,
+    roots: Query<(), With<ModelRoot>>,
+) {
+    for (e, children) in &changed {
+        let mut had_root = false;
+        for c in children.iter().filter(|c| roots.contains(*c)) {
+            commands.entity(c).despawn();
+            had_root = true;
+        }
+        if had_root {
+            commands.entity(e).remove::<(ModelSpawned, Painted)>();
+        }
     }
 }
 

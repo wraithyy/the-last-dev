@@ -1,97 +1,97 @@
 # encounter replay, seed 42, 30 Hz
-[00001] Senior Engineer failed Code Review: Invalid target.
-[00002] Senior Engineer auto attack on
-[00002] Senior Engineer swings at CEO
-[00002] Senior Engineer hits CEO with melee for 9 (absorbed 0)
+[00001] Fullstack Engineer failed Code Review: Invalid target.
+[00002] Fullstack Engineer auto attack on
+[00002] Fullstack Engineer swings at CEO
+[00002] Fullstack Engineer hits CEO with melee for 9 (absorbed 0)
 [00002] CEO ai Chase
-[00002] Senior Engineer enters combat
+[00002] Fullstack Engineer enters combat
 [00002] CEO enters combat
 [00002] CEO yells: You there! Why aren't you using AI yet?
-[00003] Senior Engineer begins Code Review (2000 ms)
-[00063] Senior Engineer casts Code Review
-[00063] Senior Engineer yells: Who approved this? Oh. The AI approved itself.
-[00063] Senior Engineer hits CEO with Code Review for 93 (absorbed 0)
+[00003] Fullstack Engineer begins Code Review (2000 ms)
+[00063] Fullstack Engineer casts Code Review
+[00063] Fullstack Engineer yells: Who approved this? Oh. The AI approved itself.
+[00063] Fullstack Engineer hits CEO with Code Review for 93 (absorbed 0)
 [00063] CEO gains code_smell
-[00063] Senior Engineer swings at CEO
-[00063] Senior Engineer hits CEO with melee for 10 (absorbed 0)
-[00064] Senior Engineer begins Refactor (2500 ms)
+[00063] Fullstack Engineer swings at CEO
+[00063] Fullstack Engineer hits CEO with melee for 10 (absorbed 0)
+[00064] Fullstack Engineer begins Refactor (2500 ms)
 [00090] CEO ai Attack
-[00090] CEO swings at Senior Engineer
-[00090] CEO hits Senior Engineer with melee for 14 (absorbed 0)
-[00150] CEO swings at Senior Engineer
-[00150] CEO hits Senior Engineer with melee for 14 (absorbed 0)
-[00169] Senior Engineer casts Refactor
+[00090] CEO swings at Fullstack Engineer
+[00090] CEO hits Fullstack Engineer with melee for 14 (absorbed 0)
+[00150] CEO swings at Fullstack Engineer
+[00150] CEO hits Fullstack Engineer with melee for 14 (absorbed 0)
+[00169] Fullstack Engineer casts Refactor
 [00169] CEO loses code_smell (Consumed)
-[00169] Senior Engineer hits CEO with Refactor for 174 (absorbed 0) COMBO
-[00169] Senior Engineer swings at CEO
-[00169] Senior Engineer misses CEO with melee
-[00170] Senior Engineer begins Code Review (2000 ms)
-[00210] CEO swings at Senior Engineer
-[00210] CEO hits Senior Engineer with melee for 14 (absorbed 0)
-[00245] Senior Engineer casts Code Review
-[00245] Senior Engineer hits CEO with Code Review for 93 (absorbed 0)
+[00169] Fullstack Engineer hits CEO with Refactor for 174 (absorbed 0) COMBO
+[00169] Fullstack Engineer swings at CEO
+[00169] Fullstack Engineer misses CEO with melee
+[00170] Fullstack Engineer begins Code Review (2000 ms)
+[00210] CEO swings at Fullstack Engineer
+[00210] CEO hits Fullstack Engineer with melee for 14 (absorbed 0)
+[00245] Fullstack Engineer casts Code Review
+[00245] Fullstack Engineer hits CEO with Code Review for 93 (absorbed 0)
 [00245] CEO gains code_smell
-[00245] Senior Engineer swings at CEO
-[00245] Senior Engineer hits CEO with melee for 9 (absorbed 0)
-[00246] Senior Engineer begins Refactor (2500 ms)
+[00245] Fullstack Engineer swings at CEO
+[00245] Fullstack Engineer hits CEO with melee for 9 (absorbed 0)
+[00246] Fullstack Engineer begins Refactor (2500 ms)
 [00259] CEO begins Hallucination Blast (2500 ms)
 [00259] CEO ai Casting
 [00259] CEO yells: Behold: our new AI strategy deck!
-[00260] Senior Engineer Refactor interrupted by movement/cancel (lockout 0 ms)
-[00292] Senior Engineer casts Guardrails
-[00292] Senior Engineer gains guardrails
-[00299] Senior Engineer swings at CEO
-[00299] Senior Engineer hits CEO with melee for 10 (absorbed 0)
+[00260] Fullstack Engineer Refactor interrupted by movement/cancel (lockout 0 ms)
+[00292] Fullstack Engineer casts Guardrails
+[00292] Fullstack Engineer gains guardrails
+[00299] Fullstack Engineer swings at CEO
+[00299] Fullstack Engineer hits CEO with melee for 10 (absorbed 0)
 [00334] CEO casts Hallucination Blast
-[00334] CEO hits Senior Engineer with Hallucination Blast for 0 (absorbed 45)
+[00334] CEO hits Fullstack Engineer with Hallucination Blast for 0 (absorbed 45)
 [00334] CEO ai Attack
-[00334] CEO swings at Senior Engineer
-[00334] CEO misses Senior Engineer with melee
-[00338] Senior Engineer begins Refactor (2500 ms)
-[00394] CEO swings at Senior Engineer
-[00394] CEO hits Senior Engineer with melee for 0 (absorbed 14)
-[00413] Senior Engineer casts Refactor
+[00334] CEO swings at Fullstack Engineer
+[00334] CEO misses Fullstack Engineer with melee
+[00338] Fullstack Engineer begins Refactor (2500 ms)
+[00394] CEO swings at Fullstack Engineer
+[00394] CEO hits Fullstack Engineer with melee for 0 (absorbed 14)
+[00413] Fullstack Engineer casts Refactor
 [00413] CEO loses code_smell (Consumed)
-[00413] Senior Engineer hits CEO with Refactor for 174 (absorbed 0) COMBO
-[00413] Senior Engineer swings at CEO
-[00413] Senior Engineer hits CEO with melee for 14 (absorbed 0)
-[00414] Senior Engineer begins Code Review (2000 ms)
-[00454] CEO swings at Senior Engineer
-[00454] CEO hits Senior Engineer with melee for 0 (absorbed 14)
-[00474] Senior Engineer casts Code Review
-[00474] Senior Engineer hits CEO with Code Review for 93 (absorbed 0)
+[00413] Fullstack Engineer hits CEO with Refactor for 174 (absorbed 0) COMBO
+[00413] Fullstack Engineer swings at CEO
+[00413] Fullstack Engineer hits CEO with melee for 14 (absorbed 0)
+[00414] Fullstack Engineer begins Code Review (2000 ms)
+[00454] CEO swings at Fullstack Engineer
+[00454] CEO hits Fullstack Engineer with melee for 0 (absorbed 14)
+[00474] Fullstack Engineer casts Code Review
+[00474] Fullstack Engineer hits CEO with Code Review for 93 (absorbed 0)
 [00474] CEO gains code_smell
-[00474] Senior Engineer swings at CEO
-[00474] Senior Engineer hits CEO with melee for 13 (absorbed 0)
+[00474] Fullstack Engineer swings at CEO
+[00474] Fullstack Engineer hits CEO with melee for 13 (absorbed 0)
 [00474] CEO yells: Impossible! The AI said this quarter would be flawless!
-[00475] Senior Engineer begins Refactor (2500 ms)
-[00514] CEO swings at Senior Engineer
-[00514] CEO hits Senior Engineer with melee for 0 (absorbed 14)
+[00475] Fullstack Engineer begins Refactor (2500 ms)
+[00514] CEO swings at Fullstack Engineer
+[00514] CEO hits Fullstack Engineer with melee for 0 (absorbed 14)
 [00542] CEO begins Hallucination Blast (2500 ms)
 [00542] CEO ai Casting
-[00543] Senior Engineer casts Reject PR
-[00543] CEO Hallucination Blast interrupted by Senior Engineer (lockout 4000 ms)
+[00543] Fullstack Engineer casts Reject PR
+[00543] CEO Hallucination Blast interrupted by Fullstack Engineer (lockout 4000 ms)
 [00543] CEO ai Attack
-[00550] Senior Engineer casts Refactor
+[00550] Fullstack Engineer casts Refactor
 [00550] CEO loses code_smell (Consumed)
-[00550] Senior Engineer hits CEO with Refactor for 174 (absorbed 0) COMBO
-[00550] Senior Engineer swings at CEO
-[00550] Senior Engineer hits CEO with melee for 11 (absorbed 0)
-[00551] Senior Engineer begins Code Review (2000 ms)
-[00574] CEO swings at Senior Engineer
-[00574] CEO hits Senior Engineer with melee for 1 (absorbed 13)
-[00574] Senior Engineer loses guardrails (Depleted)
-[00626] Senior Engineer casts Code Review
-[00626] Senior Engineer hits CEO with Code Review for 93 (absorbed 0)
-[00626] Senior Engineer auto attack off
-[00626] CEO dies (killer Senior Engineer)
+[00550] Fullstack Engineer hits CEO with Refactor for 174 (absorbed 0) COMBO
+[00550] Fullstack Engineer swings at CEO
+[00550] Fullstack Engineer hits CEO with melee for 11 (absorbed 0)
+[00551] Fullstack Engineer begins Code Review (2000 ms)
+[00574] CEO swings at Fullstack Engineer
+[00574] CEO hits Fullstack Engineer with melee for 1 (absorbed 13)
+[00574] Fullstack Engineer loses guardrails (Depleted)
+[00626] Fullstack Engineer casts Code Review
+[00626] Fullstack Engineer hits CEO with Code Review for 93 (absorbed 0)
+[00626] Fullstack Engineer auto attack off
+[00626] CEO dies (killer Fullstack Engineer)
 [00626] CEO ai Dead
-[00626] Senior Engineer gains 120 xp
+[00626] Fullstack Engineer gains 120 xp
 [00626] CEO drops ["Prompt Fragment"]
-[00626] Senior Engineer leaves combat
+[00626] Fullstack Engineer leaves combat
 [00626] CEO leaves combat
 [00626] CEO yells: But... the slide deck... promised... ROI...
-[00627] Senior Engineer loots CEO ["Prompt Fragment"]
+[00627] Fullstack Engineer loots CEO ["Prompt Fragment"]
 [00901] AI-Native Intern yells: My prompt has 4,000 words and it still won't center the div.
 [01076] CEO respawns
 [01076] CEO ai Idle

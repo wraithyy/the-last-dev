@@ -53,6 +53,10 @@ pub struct EnterZone {
 #[derive(Message)]
 pub struct GameRestarted;
 
+/// Asks for a fresh solo run as the current `PlayerClass` (the role picker after a change).
+#[derive(Message)]
+pub struct RestartRun;
+
 /// The system that swaps the sim to a new zone; client zone visuals load right after it.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FloorSwap;
@@ -205,6 +209,7 @@ impl Plugin for GamePlugin {
         app.init_resource::<GameFlow>()
             .add_message::<EnterZone>()
             .add_message::<GameRestarted>()
+            .add_message::<RestartRun>()
             .add_systems(Startup, (setup_doors, spawn_overlays))
             .add_systems(
                 PostStartup,
@@ -894,7 +899,8 @@ fn update_victory(
     };
 }
 
-/// A fresh sim (level 1, campus); the Bevy player entity is kept and relinked.
+/// A fresh sim (level 1, campus, current class) after victory + R or a `RestartRun`; the
+/// Bevy player entity is kept and relinked.
 fn restart_on_r(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
@@ -905,12 +911,16 @@ fn restart_on_r(
     mut target: ResMut<Target>,
     mut enter: MessageWriter<EnterZone>,
     mut restarted: MessageWriter<GameRestarted>,
+    mut requests: MessageReader<RestartRun>,
+    class: Res<crate::classes::PlayerClass>,
     mode: Res<GameMode>,
     player: Single<(Entity, &PlayerBody), With<Player>>,
     visuals: Query<Entity, (With<SimUnit>, Without<Player>)>,
 ) {
     // The server owns an online run; R only restarts the solo game.
-    if !flow.victory || !keys.just_pressed(KeyCode::KeyR) || mode.is_online() {
+    let asked = requests.read().count() > 0;
+    let on_r = flow.victory && keys.just_pressed(KeyCode::KeyR);
+    if !(asked || on_r) || mode.is_online() {
         return;
     }
     let fresh = match new_sim() {
@@ -922,7 +932,7 @@ fn restart_on_r(
     };
     sim.0 = fresh;
     let (entity, body) = *player;
-    let id = sim.0.spawn_player(to_core(body.pos), body.yaw);
+    let id = sim.0.spawn_player(&class.0, to_core(body.pos), body.yaw);
     commands.entity(entity).insert(SimUnit(id));
     // New sim ids restart at 1, so old visuals must go before the sync could match them.
     for e in &visuals {

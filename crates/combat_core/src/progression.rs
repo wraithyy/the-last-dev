@@ -45,6 +45,8 @@ impl Sim {
         let is_player = self.is_player(Self::id_of(i));
         let group_pct = self.group_hp_pct();
         let group_dmg_pct = self.group_damage_pct();
+        let hp_level_pct = self.class_at(i).map_or(100, |c| c.level_hp_pct);
+        let hp_aura_pct = self.max_hp_aura_pct(i);
         let d = &self.content.units[self.units[i].def];
         let u = &mut self.units[i];
         u.state.level = level;
@@ -56,7 +58,13 @@ impl Sim {
                 (b.hp_bonus, b.mana_bonus, b.spell_power_bonus)
             });
             let t = u.item_bonus;
-            u.state.max_hp = d.max_hp + hp + t.max_hp;
+            let hp = (u64::from(hp) * u64::from(hp_level_pct) / 100) as u32;
+            let base_hp = d.max_hp + hp + t.max_hp;
+            u.state.max_hp = if hp_aura_pct == 0 {
+                base_hp
+            } else {
+                (i64::from(base_hp) * (100 + hp_aura_pct).max(10) / 100) as u32
+            };
             u.state.max_mana = d.max_mana + mana + t.max_mana;
             u.sp = d.spell_power + sp + t.spell_power;
             u.dmg_pct = 100;
@@ -148,13 +156,12 @@ impl Sim {
         }
     }
 
-    /// The player's learned action-bar spells in bar order; every bar spell for other units.
+    /// The player's learned class-bar spells in bar order; every default-bar spell for others.
     pub fn known_spells(&self, unit: EntityId) -> Vec<SpellId> {
         let Some(i) = self.index(unit) else {
             return Vec::new();
         };
-        self.content
-            .action_bar()
+        self.bar_at(i)
             .iter()
             .copied()
             .filter(|id| {
@@ -165,8 +172,21 @@ impl Sim {
             .collect()
     }
 
+    /// The class bar of unit `i` (the default bar for non-players).
+    pub(crate) fn bar_at(&self, i: usize) -> &[SpellId] {
+        self.class_at(i)
+            .map_or_else(|| self.content.action_bar(), |c| &c.action_bar)
+    }
+
+    /// Players cast only their own class's spells, once their level allows.
     pub(crate) fn is_learned(&self, i: usize, spell: &SpellDef) -> bool {
-        !self.is_player(Self::id_of(i)) || spell.learn_level <= self.units[i].state.level
+        if !self.is_player(Self::id_of(i)) {
+            return true;
+        }
+        let in_class = self
+            .class_at(i)
+            .is_none_or(|c| c.knows(&self.content, spell.id));
+        in_class && spell.learn_level <= self.units[i].state.level
     }
 
     /// Group members sharing a kill by a player: the killer (even dead, for quest credit) plus
@@ -235,8 +255,7 @@ impl Sim {
             }
             self.events.push(Event::LevelUp { unit: id, level });
             let learned: Vec<SpellId> = self
-                .content
-                .action_bar()
+                .bar_at(killer)
                 .iter()
                 .copied()
                 .filter(|s| {

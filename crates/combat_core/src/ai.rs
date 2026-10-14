@@ -37,6 +37,15 @@ impl Sim {
             return;
         }
         let first = self.units[ti].threat.is_empty();
+        let pct = self
+            .index(source)
+            .and_then(|si| self.class_at(si))
+            .map_or(100, |c| c.threat_pct);
+        let amount = if pct == 100 {
+            amount
+        } else {
+            (u64::from(amount) * u64::from(pct) / 100).max(1) as u32
+        };
         *self.units[ti].threat.entry(source).or_insert(0) += amount;
         if !first {
             return;

@@ -132,6 +132,7 @@ fn hello_msg(name: &str) -> Message {
     enc(&ClientMsg::Hello {
         version: PROTOCOL_VERSION,
         name: name.into(),
+        class: "fullstack".into(),
     })
 }
 
@@ -792,10 +793,21 @@ async fn hello_is_required_in_time() {
     old.send(enc(&ClientMsg::Hello {
         version: PROTOCOL_VERSION + 1,
         name: "x".into(),
+        class: "fullstack".into(),
     }))
     .await
     .unwrap();
     assert_eq!(join_refusal(&mut old).await.0, ErrorKind::BadVersion);
+    let mut rockstar = connect(s.addr, "").await;
+    rockstar
+        .send(enc(&ClientMsg::Hello {
+            version: PROTOCOL_VERSION,
+            name: "x".into(),
+            class: "10x_rockstar".into(),
+        }))
+        .await
+        .unwrap();
+    assert_eq!(join_refusal(&mut rockstar).await.0, ErrorKind::UnknownClass);
     // Hello but no room request in time.
     let mut slow = connect(s.addr, "").await;
     slow.send(hello_msg("x")).await.unwrap();

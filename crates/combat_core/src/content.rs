@@ -45,7 +45,6 @@ impl std::error::Error for ContentError {}
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Config {
-    pub player_unit: String,
     pub gcd_base_ms: u32,
     pub gcd_floor_ms: u32,
     pub queue_window_ms: u32,
@@ -165,6 +164,9 @@ pub struct AuraDef {
     /// Spell damage aimed at the bearer hits the caster instead (Alignment Training).
     #[serde(default)]
     pub reflect: bool,
+    /// Per stack, on the bearer's max HP while it lasts (players only; Horizontal Scaling).
+    #[serde(default)]
+    pub max_hp_pct: i32,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -173,6 +175,7 @@ pub struct ApplyAura {
     pub duration_ms: u32,
 }
 
+/// Removes the aura for extra damage: `bonus_pct` per stack it had.
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConsumeAura {
     pub aura: String,
@@ -264,6 +267,21 @@ pub enum Effect {
     Resurrect {
         hp_pct: u32,
         mana_pct: u32,
+    },
+    /// Taunt: the caster's threat on the target becomes 10% above the current top, so the
+    /// target turns on the caster at once.
+    Taunt,
+    /// Extra threat on the target (scaled by the caster's class), without damage.
+    Threat {
+        amount: u32,
+    },
+    /// Dash: the caster lands `stop_m` short of the target (player gap-closer).
+    Charge {
+        stop_m: f32,
+    },
+    /// Heals a player back up to the HP it had `ms_ago` (at most 7 s); never lowers HP.
+    RestoreHp {
+        ms_ago: u32,
     },
     Nothing,
 }
@@ -513,10 +531,16 @@ pub struct AiDef {
     pub phases: Vec<PhaseDef>,
 }
 
-/// Ranged "wand" attack that swings on its own timer while a target is held.
+fn nitpick_icon() -> String {
+    "nitpick".to_string()
+}
+
+/// Auto attack that swings on its own timer while a target is held (ranged or melee by range).
 #[derive(Clone, Debug, Deserialize)]
 pub struct AutoAttackDef {
     pub name: String,
+    #[serde(default = "nitpick_icon")]
+    pub icon: String,
     pub range_m: f32,
     pub swing_ms: u32,
     pub damage_min: u32,
@@ -735,6 +759,64 @@ pub struct QuestDef {
 
 pub const MAX_ACTION_BAR: usize = 10;
 
+/// Party role of a class; the HUD shows it as a tag.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Role {
+    Tank,
+    Healer,
+    Melee,
+    Ranged,
+}
+
+impl Role {
+    pub fn tag(self) -> &'static str {
+        match self {
+            Role::Tank => "TANK",
+            Role::Healer => "HEALER",
+            Role::Melee => "MELEE",
+            Role::Ranged => "RANGED",
+        }
+    }
+}
+
+fn hundred() -> u32 {
+    100
+}
+
+/// A playable class: base stats and auto attack come from its `unit`, the rest is here.
+#[derive(Clone, Debug, Deserialize)]
+pub struct ClassDef {
+    pub key: String,
+    pub name: String,
+    pub role: Role,
+    /// Unit definition with the base stats, auto attack and (client side) the model.
+    pub unit: String,
+    /// Two short lines for the role picker.
+    pub blurb: String,
+    /// Threat this class generates, in percent (tanks above 100).
+    #[serde(default = "hundred")]
+    pub threat_pct: u32,
+    /// Added to all damage the class takes, in percent (negative: armour).
+    #[serde(default)]
+    pub damage_taken_pct: i32,
+    /// Scales the level table's `hp_bonus`, in percent.
+    #[serde(default = "hundred")]
+    pub level_hp_pct: u32,
+    /// Keys 1..=0 in order; each spell's `learn_level` decides when it is usable.
+    pub action_bar: Vec<SpellId>,
+    /// The class's `DeadAlly` spell, off the bar like Coffee Break.
+    pub resurrect: SpellId,
+}
+
+impl ClassDef {
+    /// Every spell a member of this class may cast: the bar, the resurrect and Coffee Break.
+    pub fn knows(&self, content: &Content, spell: SpellId) -> bool {
+        self.action_bar.contains(&spell)
+            || self.resurrect == spell
+            || content.channel_spell().is_some_and(|c| c.id == spell)
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct Content {
     pub config: Config,
@@ -742,7 +824,8 @@ pub struct Content {
     pub spells: Vec<SpellDef>,
     pub units: Vec<UnitDef>,
     pub items: Vec<ItemDef>,
-    pub action_bar: Vec<SpellId>,
+    /// Playable classes; the first is the default (single-player before a pick, old saves).
+    pub classes: Vec<ClassDef>,
     pub levels: Vec<LevelDef>,
     pub zones: Vec<ZoneDef>,
     pub quests: Vec<QuestDef>,
@@ -760,9 +843,31 @@ impl Content {
         self.spells.iter().find(|s| s.id == id)
     }
 
-    /// The player's full bar in key order (1..=0, up to 10); see `Sim::known_spells`.
+    /// The default class's bar in key order (1..=0, up to 10); see `Sim::known_spells`.
     pub fn action_bar(&self) -> &[SpellId] {
-        &self.action_bar
+        self.classes.first().map_or(&[][..], |c| &c.action_bar)
+    }
+
+    pub fn class(&self, key: &str) -> Option<&ClassDef> {
+        self.classes.iter().find(|c| c.key == key)
+    }
+
+    /// The class a player unit (by unit key) belongs to.
+    pub fn class_of_unit(&self, unit_key: &str) -> Option<&ClassDef> {
+        self.classes.iter().find(|c| c.unit == unit_key)
+    }
+
+    /// The bar of the class wearing `unit_key`; the default bar for anything else.
+    pub fn bar_for_unit(&self, unit_key: &str) -> &[SpellId] {
+        self.class_of_unit(unit_key)
+            .map_or_else(|| self.action_bar(), |c| &c.action_bar)
+    }
+
+    /// The resurrect of the class wearing `unit_key` (the default class's for anything else).
+    pub fn resurrect_for_unit(&self, unit_key: &str) -> Option<&SpellDef> {
+        self.class_of_unit(unit_key)
+            .or_else(|| self.classes.first())
+            .and_then(|c| self.spell(c.resurrect))
     }
 
     /// The player's mana channel (Coffee Break); it lives off the action bar.
@@ -880,6 +985,14 @@ impl Content {
                     s.name
                 ));
             }
+            if s.effects()
+                .any(|e| matches!(e, Effect::RestoreHp { ms_ago } if *ms_ago > 7000))
+            {
+                return bad(format!(
+                    "spell {} restores HP further back than 7 s",
+                    s.name
+                ));
+            }
             let resurrects = s.effects().any(|e| matches!(e, Effect::Resurrect { .. }));
             let bad_pct = s.effects().any(|e| {
                 matches!(e, Effect::Resurrect { hp_pct, mana_pct }
@@ -895,12 +1008,7 @@ impl Content {
                 return bad(format!("spell {} learn_level out of range", s.name));
             }
         }
-        if self.action_bar.len() > MAX_ACTION_BAR {
-            return bad(format!("action bar longer than {MAX_ACTION_BAR}"));
-        }
-        if let Some(id) = self.action_bar.iter().find(|id| self.spell(**id).is_none()) {
-            return bad(format!("action bar references unknown spell {}", id.0));
-        }
+        self.validate_classes()?;
         let c = &self.config;
         if c.white_hit_pct > 100 || c.spell_hit_pct > 100 {
             return bad("hit chance above 100%".to_string());
@@ -920,12 +1028,6 @@ impl Content {
         let (last, rest) = self.levels.split_last().unwrap_or((&self.levels[0], &[]));
         if last.xp_to_next != 0 || rest.iter().any(|l| l.xp_to_next == 0) {
             return bad("only the last level has xp_to_next 0".to_string());
-        }
-        if self.unit_def(&self.config.player_unit).is_none() {
-            return bad(format!(
-                "player unit {} not defined",
-                self.config.player_unit
-            ));
         }
         for (i, u) in self.units.iter().enumerate() {
             if self.units[..i].iter().any(|o| o.key == u.key) {
@@ -977,6 +1079,46 @@ impl Content {
 }
 
 impl Content {
+    fn validate_classes(&self) -> Result<(), ContentError> {
+        let bad = |m: String| Err(ContentError::Invalid(m));
+        if self.classes.is_empty() || self.classes.len() > usize::from(u8::MAX) {
+            return bad("classes must list 1..=255 entries".to_string());
+        }
+        for (i, c) in self.classes.iter().enumerate() {
+            if self.classes[..i]
+                .iter()
+                .any(|o| o.key == c.key || o.unit == c.unit)
+            {
+                return bad(format!("duplicate class key or unit {}", c.key));
+            }
+            if self
+                .unit_def(&c.unit)
+                .is_none_or(|u| u.hostile || u.ai.is_some())
+            {
+                return bad(format!("class {} needs a friendly unit without ai", c.key));
+            }
+            if c.action_bar.len() > MAX_ACTION_BAR {
+                return bad(format!("class {} bar longer than {MAX_ACTION_BAR}", c.key));
+            }
+            if let Some(id) = c.action_bar.iter().find(|id| self.spell(**id).is_none()) {
+                return bad(format!(
+                    "class {} bar references unknown spell {}",
+                    c.key, id.0
+                ));
+            }
+            if self
+                .spell(c.resurrect)
+                .is_none_or(|s| s.target != SpellTarget::DeadAlly)
+            {
+                return bad(format!(
+                    "class {} resurrect must be a DeadAlly spell",
+                    c.key
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn validate_zones(&self) -> Result<(), ContentError> {
         let bad = |m: String| Err(ContentError::Invalid(m));
         for (i, z) in self.zones.iter().enumerate() {
@@ -993,7 +1135,7 @@ impl Content {
                 .chain(z.boss.iter().map(|b| &b.unit))
                 .chain(z.friendly.iter().map(|s| &s.unit));
             for k in keys {
-                if self.unit_def(k).is_none() || *k == self.config.player_unit {
+                if self.unit_def(k).is_none() || self.class_of_unit(k).is_some() {
                     return bad(format!("zone {} spawns invalid unit {k}", z.id));
                 }
             }
@@ -1118,6 +1260,7 @@ mod tests {
             .map(|id| c.spell(*id).unwrap().learn_level)
             .collect();
         assert_eq!(learn, [1, 1, 3, 2, 4, 5, 6, 7, 8, 9]);
+        assert_eq!(c.classes[0].key, "fullstack");
         let p = c.unit_def("senior_engineer").unwrap();
         assert_eq!(
             (p.max_hp, p.max_mana, p.spell_power, p.crit_pct),
@@ -1154,6 +1297,7 @@ mod tests {
             "action_bar: [1, 2, 3, 4, 6, 7, 8, 9, 10, 11]",
             "action_bar: [1, 99]",
         );
+        assert_ne!(broken, SRC);
         assert!(matches!(
             Content::from_ron(&broken),
             Err(ContentError::Invalid(_))

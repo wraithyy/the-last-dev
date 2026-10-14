@@ -6,7 +6,7 @@
 use crate::arena::Colliders;
 use crate::camera::OrbitCamera;
 use crate::config::CAM_ORBIT_SENS;
-use crate::hud::{ACCENT, CombatLogRoot, KEY_RIM, KEY_TOP, KeyHint, label};
+use crate::hud::{ACCENT, KEY_RIM, KEY_TOP, KeyHint, label};
 use crate::input::{Paused, PlayerInput, collect_input};
 use crate::targeting::{Target, pick_unit};
 use crate::units::Unit;
@@ -81,7 +81,7 @@ pub struct TouchPlugin;
 impl Plugin for TouchPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(TouchMode {
-            active: is_mobile(),
+            active: is_mobile() || std::env::var_os("WOW_TOUCH").is_some(),
             mobile: is_mobile(),
         })
         .init_resource::<TouchState>()
@@ -387,8 +387,8 @@ fn spawn_hud(mut commands: Commands) {
 
 fn apply_mode(
     mode: Res<TouchMode>,
-    mut hud: Query<&mut Node, (With<TouchHud>, Without<CombatLogRoot>)>,
-    mut log: Query<&mut Node, (Or<(With<CombatLogRoot>, With<KeyHint>)>, Without<TouchHud>)>,
+    mut hud: Query<&mut Node, (With<TouchHud>, Without<KeyHint>)>,
+    mut hint: Query<&mut Node, (With<KeyHint>, Without<TouchHud>)>,
 ) {
     if !mode.is_changed() {
         return;
@@ -400,7 +400,7 @@ fn apply_mode(
             Display::None
         };
     }
-    for mut n in &mut log {
+    for mut n in &mut hint {
         n.display = if mode.active {
             Display::None
         } else {

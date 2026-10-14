@@ -14,13 +14,15 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 3;
+pub const PROTOCOL_VERSION: u16 = 4;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
 pub const MAX_QUEST_ID_BYTES: usize = 64;
 /// Raw display names longer than this are rejected before sanitising.
 pub const MAX_RAW_NAME_BYTES: usize = 64;
+/// Class keys (`Content::classes`) are short; anything longer is not a real class.
+pub const MAX_CLASS_BYTES: usize = 32;
 /// The server drops a connection whose first message is not `Hello` or that sends none in time.
 pub const HELLO_DEADLINE_MS: u64 = 5_000;
 /// Collection caps checked by `decode`, well above what one room produces.
@@ -38,10 +40,11 @@ const HEADER: usize = 2;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum ClientMsg {
     /// Must be the first message, within `HELLO_DEADLINE_MS`; `name` is raw and goes
-    /// through `sanitize_name`.
+    /// through `sanitize_name`. `class` is a `Content::classes` key the server checks.
     Hello {
         version: u16,
         name: String,
+        class: String,
     },
     CreateRoom,
     /// `code` is normalised by `decode` (`parse_room_code`); a bad code fails the decode,
@@ -149,6 +152,8 @@ pub struct PlayerInfo {
     pub id: EntityId,
     /// Already sanitised by the server.
     pub name: String,
+    /// `Content::classes` key, validated by the server at `Hello`.
+    pub class: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -163,6 +168,8 @@ pub enum ErrorKind {
     RateLimited,
     /// Something other than `Hello` came first, or `Hello` missed `HELLO_DEADLINE_MS`.
     HelloRequired,
+    /// `Hello` named a class the server's content does not have.
+    UnknownClass,
 }
 
 impl ErrorKind {
@@ -176,6 +183,7 @@ impl ErrorKind {
             ErrorKind::NotInRoom => "You are not in a room.",
             ErrorKind::RateLimited => "Slow down.",
             ErrorKind::HelloRequired => "Handshake missing.",
+            ErrorKind::UnknownClass => "Unknown role. Pick another one.",
         }
     }
 }
@@ -442,6 +450,8 @@ impl UnitSnap {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlayerSnap {
     pub id: EntityId,
+    /// `Content::classes` key of the player's class (empty if its unit has none).
+    pub class: String,
     pub mana: u32,
     pub max_mana: u32,
     pub xp: u32,
@@ -449,9 +459,13 @@ pub struct PlayerSnap {
 }
 
 impl PlayerSnap {
-    pub fn from_state(u: &UnitState) -> PlayerSnap {
+    pub fn from_state(u: &UnitState, content: &Content) -> PlayerSnap {
         PlayerSnap {
             id: u.id,
+            class: content
+                .class_of_unit(&u.key)
+                .map(|c| c.key.clone())
+                .unwrap_or_default(),
             mana: u.mana,
             max_mana: u.max_mana,
             xp: u.xp,
@@ -561,6 +575,9 @@ impl Msg for ClientMsg {
             ClientMsg::Hello { name, .. } if name.len() > MAX_RAW_NAME_BYTES => {
                 Err(ProtoError::BadName)
             }
+            ClientMsg::Hello { class, .. } if class.len() > MAX_CLASS_BYTES => {
+                Err(ProtoError::BadName)
+            }
             ClientMsg::JoinRoom { code } => Ok(ClientMsg::JoinRoom {
                 code: parse_room_code(&code)?,
             }),
@@ -594,7 +611,9 @@ impl Msg for ServerMsg {
                 short(room)
                     && zone.as_deref().is_none_or(short)
                     && players.len() <= MAX_PLAYERS
-                    && players.iter().all(|p| short(&p.name))
+                    && players
+                        .iter()
+                        .all(|p| short(&p.name) && p.class.len() <= MAX_CLASS_BYTES)
                     && quests.active.len() <= MAX_LIST_LEN
                     && quests
                         .active
@@ -612,7 +631,7 @@ impl Msg for ServerMsg {
             ServerMsg::Cooldowns { spells, .. } => spells.len() <= MAX_LIST_LEN,
             ServerMsg::RoomCreated { code } => short(code),
             ServerMsg::Error { text, .. } => short(text),
-            ServerMsg::PlayerJoined(p) => short(&p.name),
+            ServerMsg::PlayerJoined(p) => short(&p.name) && p.class.len() <= MAX_CLASS_BYTES,
             ServerMsg::Events { events, .. } => {
                 if events.len() > MAX_EVENTS_PER_FRAME {
                     return Err(ProtoError::TooMany);
@@ -622,6 +641,7 @@ impl Msg for ServerMsg {
             ServerMsg::Snapshot { units, players, .. } => {
                 units.len() <= MAX_SNAPSHOT_UNITS
                     && players.len() <= MAX_PLAYERS
+                    && players.iter().all(|p| p.class.len() <= MAX_CLASS_BYTES)
                     && units.iter().all(|u| u.auras.len() <= MAX_LIST_LEN)
             }
             ServerMsg::MoveCorrection { pos, .. } => {
@@ -806,6 +826,7 @@ mod tests {
             ClientMsg::Hello {
                 version: PROTOCOL_VERSION,
                 name: "Dana".into(),
+                class: "backend".into(),
             },
             ClientMsg::CreateRoom,
             ClientMsg::JoinRoom {
@@ -872,6 +893,7 @@ mod tests {
         let p = PlayerInfo {
             id: 1,
             name: "Dana".into(),
+            class: "devops".into(),
         };
         let unit = UnitSnap {
             id: 5,
@@ -989,6 +1011,7 @@ mod tests {
                 units: vec![unit],
                 players: vec![PlayerSnap {
                     id: 1,
+                    class: "frontend".into(),
                     mana: 50,
                     max_mana: 200,
                     xp: 10,
@@ -1096,8 +1119,15 @@ mod tests {
         let long_name = ClientMsg::Hello {
             version: PROTOCOL_VERSION,
             name: "n".repeat(MAX_RAW_NAME_BYTES + 1),
+            class: "fullstack".into(),
         };
         assert_eq!(roundtrip(&long_name), Err(ProtoError::BadName));
+        let long_class = ClientMsg::Hello {
+            version: PROTOCOL_VERSION,
+            name: "Dana".into(),
+            class: "c".repeat(MAX_CLASS_BYTES + 1),
+        };
+        assert_eq!(roundtrip(&long_class), Err(ProtoError::BadName));
     }
 
     #[test]
@@ -1260,7 +1290,8 @@ mod tests {
             players: vec![
                 PlayerInfo {
                     id: 1,
-                    name: "a".into()
+                    name: "a".into(),
+                    class: "fullstack".into(),
                 };
                 players
             ],
@@ -1306,7 +1337,7 @@ mod tests {
             panic!("content")
         };
         let mut sim = combat_core::Sim::new(content, 1);
-        let p = sim.spawn_player(Vec3::new(12.345, 0.0, -630.004), 1.0);
+        let p = sim.spawn_player("fullstack", Vec3::new(12.345, 0.0, -630.004), 1.0);
         let Some(u) = sim.unit(p).cloned() else {
             panic!("no player")
         };
@@ -1319,8 +1350,10 @@ mod tests {
         assert!(s.has(UnitSnap::ALIVE) && !s.has(UnitSnap::IN_COMBAT));
         assert_eq!(
             sim.content().units[usize::from(s.key_idx)].key,
-            sim.content().config.player_unit
+            sim.content().classes[0].unit
         );
+        let ps = PlayerSnap::from_state(&u, sim.content());
+        assert_eq!(ps.class, "fullstack");
         assert_eq!(quantize_yaw(-std::f32::consts::FRAC_PI_2), 192);
         assert_eq!(from_cm(pos_cm(u.pos)), s.pos());
         assert!((yaw_from_byte(s.facing) - s.yaw()).abs() < 1e-6);

@@ -103,8 +103,8 @@ pub fn advance(phase: Phase, step: &Step) -> (Phase, Outcome) {
 }
 
 /// `Hello` plus the room request. The name is cut to what `decode` accepts; the server
-/// sanitises the rest.
-pub fn hello_frames(intent: Intent, name: &str, room: &str) -> Vec<ClientMsg> {
+/// sanitises the rest and checks the class.
+pub fn hello_frames(intent: Intent, name: &str, room: &str, class: &str) -> Vec<ClientMsg> {
     let mut name = name.trim().to_string();
     while name.len() > MAX_RAW_NAME_BYTES {
         name.pop();
@@ -119,6 +119,7 @@ pub fn hello_frames(intent: Intent, name: &str, room: &str) -> Vec<ClientMsg> {
         ClientMsg::Hello {
             version: PROTOCOL_VERSION,
             name,
+            class: class.to_string(),
         },
         request,
     ]
@@ -218,6 +219,7 @@ pub struct Switch<'w, 's> {
     notices: MessageWriter<'w, UiNotice>,
     player: Single<'w, 's, (Entity, &'static PlayerBody), With<Player>>,
     visuals: Query<'w, 's, Entity, (With<SimUnit>, Without<Player>)>,
+    class: Res<'w, crate::classes::PlayerClass>,
 }
 
 impl Switch<'_, '_> {
@@ -330,6 +332,7 @@ pub fn run_session(
                     lobby.intent.unwrap_or(Intent::Create),
                     lobby.display_name(),
                     &room,
+                    &switch.class.0,
                 ) {
                     send(&client, &msg);
                 }
@@ -507,18 +510,24 @@ mod tests {
 
     #[test]
     fn hello_frames_follow_the_intent_and_cap_the_name() {
-        let create = hello_frames(Intent::Create, "  Dana ", "");
+        let create = hello_frames(Intent::Create, "  Dana ", "", "devops");
         assert_eq!(
             create,
             vec![
                 ClientMsg::Hello {
                     version: PROTOCOL_VERSION,
-                    name: "Dana".into()
+                    name: "Dana".into(),
+                    class: "devops".into(),
                 },
                 ClientMsg::CreateRoom
             ]
         );
-        let join = hello_frames(Intent::Join, &"x".repeat(100), "SCOPE-CREEP-7K3M9QZA");
+        let join = hello_frames(
+            Intent::Join,
+            &"x".repeat(100),
+            "SCOPE-CREEP-7K3M9QZA",
+            "fullstack",
+        );
         let ClientMsg::Hello { name, .. } = &join[0] else {
             panic!("no hello")
         };

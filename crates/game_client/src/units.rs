@@ -157,10 +157,41 @@ fn headphones(c: &mut ChildSpawnerCommands, assets: &UnitAssets, h: f32) {
 #[derive(Resource)]
 struct Lineup(u32);
 
+/// Player skins in class order (`Content::classes`): (class key, unit key).
+pub const CLASS_SKINS: [(&str, &str); 4] = [
+    ("fullstack", "senior_engineer"),
+    ("frontend", "frontend_dev"),
+    ("backend", "backend_dev"),
+    ("devops", "devops_eng"),
+];
+
+/// A player skin with its class kit and a fixed hair stage, for display only.
+pub fn spawn_skin(commands: &mut Commands, class: usize, pos: Vec3, yaw: f32, hair: u8) -> Entity {
+    let (key, unit) = CLASS_SKINS[class.min(CLASS_SKINS.len() - 1)];
+    let e = spawn_visual(commands, unit, pos, yaw, IdlePose::Standing);
+    commands.entity(e).insert((
+        crate::gear::Accessories(key.to_string()),
+        crate::hair::HairStage(hair),
+    ));
+    e
+}
+
 /// `WOW_LINEUP=1|2`: half of the cast per screenshot, two rows facing the player.
+/// `WOW_LINEUP=4`: the four class skins in front, the Backend's five hair stages behind.
 fn spawn_lineup(mut commands: Commands, lineup: Res<Lineup>) {
     // 0: bare stage, only the player (pose close-ups).
     if lineup.0 == 0 {
+        return;
+    }
+    if lineup.0 == 4 {
+        for k in 0..CLASS_SKINS.len() {
+            let x = (k as f32 - 1.5) * 1.5;
+            spawn_skin(&mut commands, k, Vec3::new(x, 0.0, -1.0), PI, 0);
+        }
+        for stage in 1..=5u8 {
+            let x = (f32::from(stage) - 3.0) * 1.3;
+            spawn_skin(&mut commands, 2, Vec3::new(x, 0.0, -3.6), PI, stage);
+        }
         return;
     }
     // 3: only the campus, data center and lab units (everything after the tower cast), wider
@@ -173,7 +204,7 @@ fn spawn_lineup(mut commands: Commands, lineup: Res<Lineup>) {
             .collect()
     } else {
         catalog::unit_keys()
-            .filter(|k| *k != "senior_engineer")
+            .filter(|k| !CLASS_SKINS.iter().any(|(_, u)| u == k))
             .collect()
     };
     let half = keys.len().div_ceil(2);

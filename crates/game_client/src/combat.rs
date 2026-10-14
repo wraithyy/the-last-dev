@@ -24,7 +24,7 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use combat_core::{
     AiState, CastError, Command, Content, ContentError, CooldownView, EntityId, Event, ItemTotals,
-    QuestLog, QuestStatus, Sim, SpellId, Tick, UnitState, ZoneLinkView,
+    QuestLog, QuestStatus, Sim, SpellDef, SpellId, Tick, UnitState, ZoneLinkView,
 };
 use std::collections::HashSet;
 
@@ -52,6 +52,20 @@ pub trait SimRead: Send + Sync {
     fn zone_links(&self, zone: &str) -> Vec<ZoneLinkView>;
     fn known_spells(&self, unit: EntityId) -> Vec<SpellId>;
     fn now(&self) -> Tick;
+
+    /// The action bar of `unit`'s class (keys 1..9, 0); the default bar for unknown units.
+    fn bar_of(&self, unit: EntityId) -> &[SpellId] {
+        match self.unit(unit) {
+            Some(u) => self.content().bar_for_unit(&u.key),
+            None => self.content().action_bar(),
+        }
+    }
+
+    /// The resurrect of `unit`'s class.
+    fn resurrect_of(&self, unit: EntityId) -> Option<&SpellDef> {
+        let key = self.unit(unit).map_or("", |u| u.key.as_str());
+        self.content().resurrect_for_unit(key)
+    }
 }
 
 impl SimRead for Sim {
@@ -220,11 +234,12 @@ fn create_sim(mut commands: Commands, mut exit: MessageWriter<AppExit>) {
 /// The game flow moves the player to the floor spawn right after this.
 pub fn spawn_sim_player(
     mut commands: Commands,
+    class: Res<crate::classes::PlayerClass>,
     mut sim: ResMut<CombatSim>,
     player: Single<(Entity, &PlayerBody), With<Player>>,
 ) {
     let (player_entity, body) = *player;
-    let id = sim.0.spawn_player(to_core(body.pos), body.yaw);
+    let id = sim.0.spawn_player(&class.0, to_core(body.pos), body.yaw);
     commands
         .entity(player_entity)
         .insert((SimUnit(id), CombatAnim::default()));
@@ -392,12 +407,15 @@ fn sync_units(
             commands.entity(e).despawn();
         }
     }
-    let fresh: Vec<(UnitState, bool)> = view
+    let fresh: Vec<(UnitState, bool, Option<String>)> = view
         .units()
         .filter(|u| Some(u.id) != player && !shown.contains(&u.id))
-        .map(|u| (u.clone(), view.players().contains(&u.id)))
+        .map(|u| {
+            let class = view.content().class_of_unit(&u.key).map(|c| c.key.clone());
+            (u.clone(), view.players().contains(&u.id), class)
+        })
         .collect();
-    for (state, is_player) in &fresh {
+    for (state, is_player, class) in &fresh {
         let pos = v3(state.pos);
         let pose = if *is_player {
             IdlePose::Standing
@@ -440,6 +458,11 @@ fn sync_units(
         ));
         if *is_player {
             commands.entity(e).insert(crate::net::RemotePlayer);
+            if let Some(c) = class {
+                commands
+                    .entity(e)
+                    .insert(crate::gear::Accessories(c.clone()));
+            }
         }
     }
 }
@@ -536,7 +559,7 @@ pub fn can_act(sim: &dyn SimRead, flow: &GameFlow, player: EntityId) -> bool {
 
 /// Physical key positions, so the number row works on any layout (e.g. the Czech
 /// "+ěščřžýáíé" row without Shift); the numpad is an alternative for layouts where
-/// that row types letters. Slot order matches `Content::action_bar()` (keys 1..9, 0).
+/// that row types letters. Slot order matches the class bar (`SimRead::bar_of`, keys 1..9, 0).
 pub const CAST_KEYS: [[KeyCode; 2]; 10] = [
     [KeyCode::Digit1, KeyCode::Numpad1],
     [KeyCode::Digit2, KeyCode::Numpad2],
@@ -570,7 +593,7 @@ fn cast_keys(
 
 /// Shared by keys and action-button clicks.
 pub fn cast_slot(sim: &dyn SimRead, pending: &mut PendingCommands, caster: EntityId, slot: usize) {
-    if let Some(&spell) = sim.content().action_bar().get(slot) {
+    if let Some(&spell) = sim.bar_of(caster).get(slot) {
         pending.0.push(Command::Cast { caster, spell });
     }
 }
@@ -639,7 +662,7 @@ fn coffee_key(
 /// Shared by the V key and the reboot button: the co-op resurrect on the current target.
 /// The sim checks the target (a dead teammate), range, line of sight and combat.
 pub fn cast_resurrect(sim: &dyn SimRead, pending: &mut PendingCommands, caster: EntityId) {
-    if let Some(spell) = sim.content().resurrect_spell() {
+    if let Some(spell) = sim.resurrect_of(caster) {
         pending.0.push(Command::Cast {
             caster,
             spell: spell.id,
@@ -919,12 +942,22 @@ fn autofight(
         pending.0.push(Command::StartAutoAttack { unit: me });
     }
     let yaw = yaw_to(body.pos, enemy_pos);
-    // Code Review's verdict stands in for "can I shoot from here" (range and line of sight).
+    // Other classes play their bar generically: the first slot probes range, the highest
+    // ready slot fires (enough for screenshots and smoke runs).
+    let bar: Vec<combat_core::SpellId> = SimRead::bar_of(&sim.0, me).to_vec();
+    let fullstack = bar.first() == Some(&combat_core::SpellId(CODE_REVIEW));
+    let probe = bar
+        .first()
+        .copied()
+        .unwrap_or(combat_core::SpellId(CODE_REVIEW));
+    let probe_range = sim.0.content().spell(probe).map_or(20.0, |s| s.range_m);
+    let stand_off = autofight_range().min(probe_range * 0.6);
+    // The probe's verdict stands in for "can I hit from here" (range and line of sight).
     let blocked = matches!(
-        sim.0.cooldown(me, combat_core::SpellId(CODE_REVIEW)).usable,
+        sim.0.cooldown(me, probe).usable,
         Err(CastError::NoLineOfSight | CastError::OutOfRange)
     );
-    if (blocked || body.pos.distance(enemy_pos) > autofight_range()) && my.cast.is_none() {
+    if (blocked || body.pos.distance(enemy_pos) > stand_off) && my.cast.is_none() {
         state.steer = Some(walk_yaw(&sim.0, &mut state, body.pos, enemy_pos, dt));
         return;
     }
@@ -937,7 +970,16 @@ fn autofight(
     let has = |u: &UnitState, key: &str| u.auras.iter().any(|a| a.key == key);
     let hp = |u: &UnitState| u.hp as f32 / u.max_hp.max(1) as f32;
     let kick = enemy.cast.is_some_and(|c| c.interruptible);
-    let spell = if kick && ready(REJECT_PR) {
+    let generic = || {
+        bar.iter()
+            .rev()
+            .map(|s| s.0)
+            .find(|id| ready(*id))
+            .filter(|_| my.cast.is_none())
+    };
+    let spell = if !fullstack {
+        generic()
+    } else if kick && ready(REJECT_PR) {
         Some(REJECT_PR)
     } else if kick && !enemy.boss && ready(RUBBER_DUCK) {
         Some(RUBBER_DUCK)

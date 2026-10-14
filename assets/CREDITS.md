@@ -10,7 +10,7 @@ Ultimate Animated Character Pack (Nov 2019) by Quaternius (https://quaternius.co
 assets/models/LICENSE-quaternius.txt. The glTF files were repacked into single .glb files
 (scripts/gltf_to_glb.py), and the "Skin" and "Face" material colours were changed to skin tones and dark eyes. Suit_Male_Bald.glb (the CEO) is derived from Suit_Male by scripts/ceo_hair.py: short hair, receding hairline, grey-to-black vertex colours.
 
-Nine base models cover the whole cast; per-unit shirt, hair and skin colours are applied at runtime
+The base models cover the whole cast (plus one skin per playable class); per-unit shirt, hair and skin colours are applied at runtime
 (`crates/game_client/src/catalog.rs`). Skin tones differ per base model for variety.
 
 | File | Character | Used for |
@@ -18,7 +18,10 @@ Nine base models cover the whole cast; per-unit shirt, hair and skin colours are
 | assets/models/characters/Suit_Male.glb | Suit_Male | CEO, Customer, CISO, Middle Manager, Project Manager |
 | assets/models/characters/Suit_Female.glb | Suit_Female | VP of Synergy, Head of Marketing, HR Business Partner, Sales Rep, Account Manager |
 | assets/models/characters/Casual3_Male.glb | Casual3_Male | Product Owner |
-| assets/models/characters/Engineer.glb | Casual2_Male body with the Casual3_Male hair, recoloured (black tee, jeans) and hair split into Hair_1..Hair_5 by scripts/split_hair.py | Senior Engineer (player) |
+| assets/models/characters/Engineer.glb | Casual2_Male body with the Casual3_Male hair, recoloured (black tee, jeans) and hair split into Hair_1..Hair_5 by scripts/split_hair.py | Fullstack Engineer (player) |
+| assets/models/characters/Frontend.glb | Casual2_Male body with the Casual2_Female hair, recoloured (magenta hoodie, teal sleeves), small procedural stripe texture and hood added, hair split into Hair_1..Hair_5 by scripts/class_skins.py | Frontend Developer (player) |
+| assets/models/characters/Backend.glb | Casual2_Male body with the Casual3_Female hair, recoloured (charcoal hoodie, dark trousers), torso widened, hood and eye shadows added, hair split into Hair_1..Hair_5 by scripts/class_skins.py | Backend Engineer (player) |
+| assets/models/characters/DevOps.glb | Casual2_Male body with the Casual_Male hair, recoloured (plaid flannel via small procedural texture, jeans), eye shadows added, hair split into Hair_1..Hair_5 by scripts/class_skins.py | DevOps Engineer (player) |
 | assets/models/characters/Casual_Female.glb | Casual_Female | AI-Native Intern, Agile Coach, LinkedIn Influencer |
 | assets/models/characters/Casual2_Male.glb | Casual2_Male | Vibe Coder, Vibe-Coding Junior, Scrum Master, Crypto Bro, Growth Hacker, IT Support |
 | assets/models/characters/Casual_Male.glb | Casual_Male | MeatProxy, Copilot Drone, Chatbot Minion, Unreviewed PR |
@@ -106,6 +109,41 @@ found at http://opengameart.org. Used under CC BY 3.0
 | assets/icons/synergy_storm.png | part 3, wind-sky-1 | https://opengameart.org/content/painterly-spell-icons-part-3 |
 | assets/icons/thought_leadership.png | part 2, beam-magenta-1 | https://opengameart.org/content/painterly-spell-icons-part-2 |
 | assets/icons/unread_spec.png | part 1, enchant-eerie-1 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/pixel_push.png | part 2, lightning-orange-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/css_combo.png | part 1, enchant-magenta-2 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/specificity.png | part 3, runes-magenta-2 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/important.png | part 3, explosion-orange-2 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/hot_reload.png | part 2, haste-fire-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/lighthouse_audit.png | part 2, beam-orange-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/dark_mode.png | part 1, protect-eerie-2 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/responsive_layout.png | part 3, wind-magenta-2 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/infinite_scroll.png | part 2, lighting-fire-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/center_div.png | part 1, enchant-orange-2 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/new_framework.png | part 3, explosion-magenta-2 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/rubber_band.png | part 2, beam-magenta-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/blocking_call.png | part 2, rock-plain-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/who_touched_prod.png | part 1, evil-eye-red-2 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/connection_pool.png | part 3, wind-blue-2 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/rate_limiter.png | part 1, protect-blue-2 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/db_lock.png | part 2, ice-blue-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/kill_query.png | part 2, lightning-blue-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/horizontal_scaling.png | part 1, enchant-blue-2 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/retry_backoff.png | part 1, heal-royal-2 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/cache_invalidation.png | part 2, rock-plain-3 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/drop_table.png | part 3, explosion-red-2 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/stack_trace.png | part 2, beam-red-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/kill_9.png | part 2, lightning-jade-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/hotfix.png | part 1, heal-jade-2 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/sigstop.png | part 2, ice-sky-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/auto_scaling.png | part 2, vines-jade-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/chaos_monkey.png | part 3, leaf-acid-2 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/revert_commit.png | part 2, haste-sky-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
+| assets/icons/feature_flag.png | part 1, enchant-jade-2 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/circuit_breaker.png | part 1, protect-jade-2 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/blue_green.png | part 1, heal-sky-2 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/terraform_destroy.png | part 1, fireball-acid-2 | https://opengameart.org/content/painterly-spell-icons-part-1 |
+| assets/icons/restart_pod.png | part 3, leaf-jade-2 | https://opengameart.org/content/painterly-spell-icons-part-3 |
+| assets/icons/health_ping.png | part 2, beam-jade-2 | https://opengameart.org/content/painterly-spell-icons-part-2 |
 | assets/icons/viral_loop.png | part 3, leaf-acid-1 | https://opengameart.org/content/painterly-spell-icons-part-3 |
 | assets/icons/wellness_survey.png | part 1, protect-orange-1 | https://opengameart.org/content/painterly-spell-icons-part-1 |
 | assets/icons/write_by_hand.png | part 2, lightning-magenta-1 | https://opengameart.org/content/painterly-spell-icons-part-2 |
