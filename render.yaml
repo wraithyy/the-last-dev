@@ -6,6 +6,9 @@ services:
     name: the-last-dev-server
     runtime: docker
     plan: free
+    # Closest region to the players (Central Europe); every action is a round trip to here.
+    # Render cannot move an existing service: changing this needs a new service.
+    region: frankfurt
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /healthz

@@ -88,11 +88,15 @@ Render hosts the WebSocket server; the client stays on GitHub Pages. The repo ha
 1. Push the repo to GitHub (Render reads it from there).
 2. In the Render dashboard: **New > Blueprint**, connect GitHub, pick the repo, keep the branch, and
    confirm. Render reads `render.yaml` and creates the `the-last-dev-server` web service (Docker,
-   free plan, health check `/healthz`, env `TLD_ALLOWED_ORIGINS=https://wraithyy.github.io`,
+   free plan, region Frankfurt, health check `/healthz`, env `TLD_ALLOWED_ORIGINS=https://wraithyy.github.io`,
    `TLD_TRUST_FORWARDED_FOR=1`, `RUST_LOG=info`). The first build takes several minutes.
    Without the Blueprint: **New > Web Service**, pick the repo, Language **Docker**, Instance Type
-   **Free**, Health Check Path `/healthz` (under Advanced), and add the three environment variables
+   **Free**, Region **Frankfurt** (or whatever is closest to the players), Health Check Path
+   `/healthz` (under Advanced), and add the three environment variables
    by hand.
+   Region matters: every cast, target change and movement correction is a round trip to the
+   server. From Central Europe, Oregon (Render's default) adds roughly 150-200 ms to each.
+   Render cannot move a service to another region; to switch, delete it and create it again.
 3. When the deploy is live, the service URL is `https://<name>.onrender.com`. In the game open
    Esc > Co-op and enter `wss://<name>.onrender.com` (the client adds `/ws`; `https://` works too).
 4. Optional: prefill that address for everyone. In the GitHub repo, Settings > Secrets and variables >

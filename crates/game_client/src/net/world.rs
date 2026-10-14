@@ -31,6 +31,8 @@ const DEFAULT_UPDATE_INTERVAL_S: f64 = 0.1;
 const MAX_UPDATE_GAP_S: f64 = 0.5;
 /// The locally advanced tick never runs further than this ahead of the last server frame.
 const MAX_TICK_LEAD_S: f64 = 2.0;
+/// Until the first Pong: a transatlantic-ish guess, so early cast bars are not far behind.
+const DEFAULT_RTT_S: f64 = 0.15;
 
 pub fn lerp(a: Vec3, b: Vec3, t: f32) -> Vec3 {
     Vec3::new(
@@ -165,6 +167,8 @@ pub struct NetWorld {
     /// Last server tick and when it arrived, for advancing `tick` between frames.
     tick_at: (u64, f64),
     last_advance: Option<f64>,
+    /// Smoothed round trip to the server from Ping/Pong, seconds.
+    rtt_s: f64,
     quests: QuestLog,
     cleared: BTreeSet<String>,
     bosses_killed: BTreeSet<String>,
@@ -198,6 +202,7 @@ impl NetWorld {
             last_positions_at: None,
             tick_at: (0, 0.0),
             last_advance: None,
+            rtt_s: DEFAULT_RTT_S,
             quests: QuestLog::default(),
             cleared: BTreeSet::new(),
             bosses_killed: BTreeSet::new(),
@@ -455,6 +460,10 @@ impl NetWorld {
                 for a in u.auras.iter_mut().filter(|a| a.total_ms > 0) {
                     a.remaining_ms = a.remaining_ms.saturating_sub(dt_ms);
                 }
+                // Casts only get start and end events; the bar fills locally in between.
+                if let Some(c) = u.cast.as_mut() {
+                    c.elapsed_ms = (c.elapsed_ms + dt_ms).min(c.total_ms);
+                }
             }
         }
         let t = now - (INTERP_DELAY_S + self.update_interval);
@@ -466,6 +475,14 @@ impl NetWorld {
                 u.pos = pos;
                 u.yaw = yaw;
             }
+        }
+    }
+
+    /// `sent_ms` is the client clock (ms) echoed back in `Pong`.
+    pub fn record_pong(&mut self, sent_ms: u64, now: f64) {
+        let rtt = now - sent_ms as f64 / 1000.0;
+        if (0.0..5.0).contains(&rtt) {
+            self.rtt_s = 0.7 * self.rtt_s + 0.3 * rtt;
         }
     }
 
@@ -503,9 +520,11 @@ impl NetWorld {
             } => {
                 let def = content.spell(*spell);
                 if let Some(u) = self.units.get_mut(caster) {
+                    // The server started it about one way of the round trip ago.
+                    let late_ms = (self.rtt_s * 500.0) as u32;
                     u.cast = Some(CastView {
                         spell: *spell,
-                        elapsed_ms: 0,
+                        elapsed_ms: late_ms.min(*total_ms),
                         total_ms: *total_ms,
                         interruptible: def.is_none_or(|d| d.interruptible),
                     });
@@ -892,6 +911,45 @@ mod tests {
             });
             assert_eq!(w.name_of(id), Some(want));
         }
+    }
+
+    #[test]
+    fn cast_bars_fill_between_server_events_and_start_late_by_half_the_ping() {
+        let content = Content::from_ron(include_str!("../../../../content/game.ron")).unwrap();
+        let mut w = NetWorld::new(content, 1, "R".into(), &[]);
+        let unit = UnitSnap {
+            id: 1,
+            key_idx: 0,
+            level: 1,
+            pos_cm: [0, 0, 0],
+            facing: 0,
+            hp: 100,
+            max_hp: 100,
+            target: None,
+            flags: UnitSnap::ALIVE,
+            auras: Vec::new(),
+        };
+        w.apply_snapshot(1, &[unit], &[], 0.0);
+        w.record_pong(0, 0.2);
+        let rtt = w.rtt_s;
+        w.receive_events(
+            2,
+            vec![Event::CastStarted {
+                caster: 1,
+                spell: SpellId(1),
+                total_ms: 2000,
+            }],
+            0.0,
+        );
+        let elapsed = |w: &NetWorld| w.units[&1].cast.map(|c| c.elapsed_ms);
+        let late = (rtt * 500.0) as u32;
+        assert!(late > 0 && late < 200, "{late}");
+        assert_eq!(elapsed(&w), Some(late));
+        w.advance(0.0);
+        w.advance(1.0);
+        assert_eq!(elapsed(&w), Some(late + 1000));
+        w.advance(5.0);
+        assert_eq!(elapsed(&w), Some(2000));
     }
 
     fn v(x: f32, z: f32) -> Vec3 {

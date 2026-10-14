@@ -286,6 +286,8 @@ pub fn run_session(
                         let (phase, outcome) = advance(session.phase, &Step::Welcome);
                         session.phase = phase;
                         if outcome == Outcome::EnterRoom {
+                            // Ping at once: cast bars use the round trip from the first second.
+                            session.ping = PING_SECS;
                             info!("joined room as {you}, {} player(s)", players.len());
                             let mut world =
                                 NetWorld::new(sim.0.content().clone(), you, room.clone(), &players);
@@ -409,10 +411,8 @@ fn apply(
             ));
             world.remove_player(id);
         }
-        ServerMsg::Pong { .. }
-        | ServerMsg::Welcome { .. }
-        | ServerMsg::RoomCreated { .. }
-        | ServerMsg::Error { .. } => {}
+        ServerMsg::Pong { t } => world.record_pong(t, clock()),
+        ServerMsg::Welcome { .. } | ServerMsg::RoomCreated { .. } | ServerMsg::Error { .. } => {}
     }
 }
 
