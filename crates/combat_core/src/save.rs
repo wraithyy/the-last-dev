@@ -25,6 +25,13 @@ pub struct SaveData {
     pub quests_done: Vec<String>,
     pub cleared: Vec<String>,
     pub bosses: Vec<String>,
+    /// Open quests with their objective counts, accept order.
+    pub quests_active: Vec<(String, Vec<u32>)>,
+    /// Kills per unit key (quest retro credit).
+    pub kills: Vec<(String, u32)>,
+    /// Unlocked achievement keys and the one whose title is worn ("" for none).
+    pub achievements: Vec<String>,
+    pub title: String,
 }
 
 fn list(v: &str) -> Vec<String> {
@@ -42,8 +49,17 @@ impl SaveData {
             .iter()
             .map(|(n, c)| format!("{n}*{c}"))
             .collect();
-        format!(
-            "{HEADER}\nversion={SAVE_VERSION}\nclass={}\nlevel={}\nxp={}\nsp={}\nbag={}\nequipped={}\ntrophies={}\nquests_done={}\ncleared={}\nbosses={}\n",
+        let active: Vec<String> = self
+            .quests_active
+            .iter()
+            .map(|(id, c)| {
+                let c: Vec<String> = c.iter().map(u32::to_string).collect();
+                format!("{id}:{}", c.join(","))
+            })
+            .collect();
+        let kills: Vec<String> = self.kills.iter().map(|(n, c)| format!("{n}*{c}")).collect();
+        let mut out = format!(
+            "{HEADER}\nversion={SAVE_VERSION}\nclass={}\nlevel={}\nxp={}\nsp={}\nbag={}\nequipped={}\ntrophies={}\nquests_done={}\ncleared={}\nbosses={}\nquests_active={}\nkills={}\n",
             self.class,
             self.level,
             self.xp,
@@ -59,7 +75,15 @@ impl SaveData {
             self.quests_done.join("|"),
             self.cleared.join("|"),
             self.bosses.join("|"),
-        )
+            active.join("|"),
+            kills.join("|"),
+        );
+        out.push_str(&format!(
+            "achievements={}\ntitle={}\n",
+            self.achievements.join("|"),
+            self.title
+        ));
+        out
     }
 
     /// `None` for anything that is not a save of this version.
@@ -106,6 +130,27 @@ impl SaveData {
                 "quests_done" => s.quests_done = list(v),
                 "cleared" => s.cleared = list(v),
                 "bosses" => s.bosses = list(v),
+                "achievements" => s.achievements = list(v),
+                "title" => s.title = v.chars().take(crate::world::WORLD_KEY_MAX).collect(),
+                "quests_active" => {
+                    s.quests_active = list(v)
+                        .into_iter()
+                        .filter_map(|q| {
+                            let (id, c) = q.split_once(':')?;
+                            let c = c.split(',').filter_map(|n| n.trim().parse().ok());
+                            Some((id.to_string(), c.collect()))
+                        })
+                        .collect()
+                }
+                "kills" => {
+                    s.kills = list(v)
+                        .into_iter()
+                        .filter_map(|t| {
+                            let (n, c) = t.rsplit_once('*')?;
+                            Some((n.to_string(), c.parse().ok()?))
+                        })
+                        .collect()
+                }
                 _ => {}
             }
         }
@@ -131,6 +176,20 @@ impl Sim {
             quests_done: self.quests_of(player).completed.clone(),
             cleared,
             bosses: self.world.bosses_killed.iter().cloned().collect(),
+            achievements: s.achievements.clone(),
+            title: s.title.clone(),
+            quests_active: self
+                .quests_of(player)
+                .active
+                .iter()
+                .map(|q| (q.id.clone(), q.counts.clone()))
+                .collect(),
+            kills: self
+                .quests_of(player)
+                .kills
+                .iter()
+                .map(|(k, c)| (k.clone(), *c))
+                .collect(),
         })
     }
 
@@ -182,9 +241,34 @@ impl Sim {
         {
             self.world.bosses_killed.insert(b.clone());
         }
+        let active: Vec<crate::quests::ActiveQuest> = save
+            .quests_active
+            .iter()
+            .filter(|(id, _)| !quests.contains(id))
+            .filter_map(|(id, counts)| {
+                let def = self.content.quest(id)?;
+                let counts = def
+                    .objectives
+                    .iter()
+                    .enumerate()
+                    .map(|(k, o)| counts.get(k).copied().unwrap_or(0).min(o.need()))
+                    .collect();
+                Some(crate::quests::ActiveQuest {
+                    id: id.clone(),
+                    counts,
+                })
+            })
+            .collect();
+        let kills = save
+            .kills
+            .iter()
+            .filter(|(k, _)| self.content.unit_def(k).is_some())
+            .map(|(k, c)| (k.clone(), *c))
+            .collect();
         let log = self.quest_logs.entry(player).or_default();
-        log.active.clear();
+        log.active = active;
         log.completed = quests;
+        log.kills = kills;
         let opened: Vec<String> = self
             .content
             .zones
@@ -199,6 +283,20 @@ impl Sim {
         u.bag = bag;
         u.equipped = equipped;
         u.inventory = trophies;
+        let known = |k: &String| self.content.achievement(k).is_some();
+        let achievements: Vec<String> = save
+            .achievements
+            .iter()
+            .filter(|k| known(k))
+            .cloned()
+            .collect();
+        let title = Some(&save.title)
+            .filter(|t| achievements.contains(t))
+            .cloned()
+            .unwrap_or_default();
+        let u = &mut self.units[i].state;
+        u.achievements = achievements;
+        u.title = title;
         self.set_level_of(player, level);
         let need = self.content.xp_to_next(level);
         self.units[i].state.xp = if need == 0 { 0 } else { save.xp.min(need - 1) };

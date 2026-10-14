@@ -204,6 +204,8 @@ pub struct NetWorld {
     my_loot: BTreeSet<EntityId>,
     /// On-use item (or `"consumable"`) cooldowns from `ItemCooldown`: (end tick, total ms).
     item_cds: HashMap<String, (u64, u32)>,
+    /// Animated emotes from `Emoted`, taken by the pose system (`office::ride`).
+    pub poses: Vec<(EntityId, net_proto::Emote)>,
 }
 
 impl NetWorld {
@@ -237,6 +239,7 @@ impl NetWorld {
             prediction: None,
             my_loot: BTreeSet::new(),
             item_cds: HashMap::new(),
+            poses: Vec::new(),
         };
         for p in players {
             w.add_player(p);
@@ -398,6 +401,8 @@ impl NetWorld {
             bag: Vec::new(),
             equipped: Vec::new(),
             buyback: Vec::new(),
+            achievements: Vec::new(),
+            title: String::new(),
         })
     }
 
@@ -470,6 +475,7 @@ impl NetWorld {
                 u.xp = p.xp;
                 u.xp_to_next = p.xp_to_next;
                 u.equipped = p.equipped(&self.content);
+                u.title.clone_from(&p.title);
             }
         }
     }
@@ -888,6 +894,18 @@ impl NetWorld {
             Event::GearChanged { unit, equipped } => {
                 if let Some(u) = self.units.get_mut(unit) {
                     u.equipped = equipped.clone();
+                }
+            }
+            Event::Achievement { unit, key } => {
+                if let Some(u) = self.units.get_mut(unit)
+                    && !u.achievements.contains(key)
+                {
+                    u.achievements.push(key.clone());
+                }
+            }
+            Event::TitleChanged { unit, title } => {
+                if let Some(u) = self.units.get_mut(unit) {
+                    u.title.clone_from(title);
                 }
             }
             Event::ItemCooldown { item, ms } => {

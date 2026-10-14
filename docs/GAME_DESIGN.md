@@ -106,6 +106,20 @@ Vendors: Procurement (campus plaza, "3-6 weeks") sells consumables (Ibuprofen, E
 
 Offline progress (level, gear, bag, SP, trophies, quests and cleared zones) is saved per class (native file next to the co-op settings, localStorage on the web) and loaded at start; after the final victory the character stays and the world resets. Online play is session-only: joiners start fresh as before and the server holds everyone's gear for the room.
 
+## Quests
+
+48 Jira tickets in campaign order, each zone's work handed out at its arrival: campus (intern, Facilities Guy, Barista, Smoking-Corner Dev), IT Support Lead (Open Space), Facilities Manager (Meeting Rooms), Office Manager (Sales), Night-Shift Sysadmin (Data Center entrance, both halls), PMO Intern (PMO), Executive Assistant (Penthouse), Lab Safety Officer (Innovation Lab entrance). Breadcrumbs ("Escalation Path", "Next Floor, Please", ...) walk you to the next giver. Mix per zone: kill N, quest-only drops (only while the ticket wants them), an elite bounty (group recommended), the boss as "clear the zone", short chains. Rewards: XP, Story Points, trophies and "choose one of 2-3" gear of the zone's tier for your role. Kills, clears and carried items done before accepting count at once (retro credit), so taking a ticket late never strands you. XP budget per full clear (test `quest_and_kill_xp_track_the_zone_levels`): campus 1 -> 3, Open Space 3 -> 4, Meeting Rooms 4 -> 6, Sales 6 -> 7, Data Center 7 -> 9, PMO 9 -> 10.
+
+The HUD tracks up to six tickets WoW-style under the minimap ("MeatProxies terminated 5/10", a gold "Ready to close" line), toasts progress mid-screen, and paints tracked objectives yellow on the minimap and map; J opens `~/jira` with track toggles.
+
+## The interactive office
+
+Every class can ride a shared **e-scooter** (Y, 1.5 s, +60% speed out of combat; campus and the data center halls only, the tower and the lab are "No scooters in the office (Facilities)"; damage, casting or combat ends the ride) and has **Rush to Standup** (X, +70% speed for 4 s, 30 s cooldown); both sit above the attack and coffee keycaps. Four scooters parked on campus can be borrowed with right-click / F ("Unlocked with your face. The AI recognised you as 'Scooter Owner'"); they come back a minute later.
+
+Props answer right-click / F with a tooltip on hover: coffee machines on campus and in the Open Space (Fresh Brew: in-combat mana for 2 min, or 10% "Descaling required. Since 2019."), snack vending machines (5-8 SP for a random snack buff, an Energy Drink, a motivational quote or nothing), the jammed PMO printer (ten clicks in a row: "PC LOAD LETTER Survivor"), buzzword whiteboards (a generated strategy line in chat), the AI billboard (marketing copy at you), foosball and ping-pong (a round and a dance), the elevator music button, the "Days without an AI incident" signs (reset to 0), the Meeting Rooms fire alarm (pulls the whole floor; the tooltip warns), the smoking-corner bench (/sit, ambient lines), the AI-powered car (honks, "Recalculating...") and the lonely bike rack (keep it company for a minute).
+
+Five hidden NPCs (Last Human QA, Intern Who Read The Docs, Ghost of a Deprecated API, Sysadmin Who Knows Where the Cables Go, Retired COBOL Contractor) pay a few SP once. 19 secret achievements list in the trophies window (B, second tab) with hints while locked; each gives a cosmetic title worn under the name ("<Survived Another Reorg>"), chosen there, saved with the offline progress. Emotes /sit, /dance and /facepalm animate (G menu), and co-op players see each other's rides, sits and titles.
+
 ## Engine needs (combat_core)
 
 Effects: damage over time, heal and heal over time, stun, silence (school lock exists), cast-time

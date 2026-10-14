@@ -22,6 +22,7 @@ mod keybinds;
 mod loot_fx;
 mod nameplates;
 mod net;
+mod office;
 mod player;
 mod presentation;
 mod rigs;
@@ -104,6 +105,7 @@ fn main() {
             keybinds::KeybindsPlugin,
             telegraph_fx::TelegraphFxPlugin,
             economy::EconomyPlugin,
+            office::OfficePlugin,
         ))
         .run();
 }

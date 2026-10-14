@@ -27,6 +27,7 @@ const DEFAULT_ZOOM: usize = 2;
 const HOSTILE_RANGE: f32 = 40.0;
 const POOL: usize = 64;
 const HOSTILE: Color = Color::srgb(1.0, 0.28, 0.25);
+const QUEST_TARGET: Color = Color::srgb(1.0, 0.9, 0.2);
 const LOOT: Color = Color::srgb(1.0, 0.82, 0.25);
 const DOOR_OPEN: Color = Color::srgb(0.4, 1.0, 0.5);
 const DOOR_LOCKED: Color = Color::srgb(1.0, 0.42, 0.36);
@@ -220,7 +221,11 @@ fn spawn_radar(mut commands: Commands) {
 }
 
 enum Kind {
-    Hostile { boss: bool },
+    /// `quest`: a tracked quest still needs it (drawn yellow, at any distance in view).
+    Hostile {
+        boss: bool,
+        quest: bool,
+    },
     Party,
     Loot,
     Glyph(&'static str, Color),
@@ -247,6 +252,7 @@ fn update_radar(
     flow: Res<GameFlow>,
     mut radar: ResMut<Radar>,
     mut windows: ResMut<QuestWindows>,
+    track: Res<super::quests::QuestTrack>,
     mut images: ResMut<Assets<Image>>,
     player: Single<&PlayerBody, With<Player>>,
     (open, zooms): (
@@ -321,6 +327,7 @@ fn update_radar(
     let half = RADII[radar.zoom];
     let in_view = |p: Vec2| (p - me).abs().max_element() <= half;
     let mut marks: Vec<(Vec2, Kind)> = Vec::new();
+    let wanted = super::quests::objective_units(&*sim, &track);
     for u in sim.units() {
         let p = Vec2::new(u.pos.x, u.pos.z);
         if Some(u.id) == sim.player() || !in_view(p) {
@@ -333,8 +340,15 @@ fn update_radar(
         } else if sim.players().contains(&u.id) {
             marks.push((p, Kind::Party));
         } else if u.hostile {
-            if p.distance(me) <= HOSTILE_RANGE {
-                marks.push((p, Kind::Hostile { boss: u.boss }));
+            let quest = wanted.contains(&u.key);
+            if quest || p.distance(me) <= HOSTILE_RANGE {
+                marks.push((
+                    p,
+                    Kind::Hostile {
+                        boss: u.boss,
+                        quest,
+                    },
+                ));
             }
         } else if let Some((g, c)) = giver_mark(&*sim, &u.key, &flow.zone) {
             marks.push((p, Kind::Glyph(g, c)));
@@ -355,10 +369,11 @@ fn update_radar(
     }
     // Draw order is pool order: hostiles at the bottom, the group on top.
     let rank = |k: &Kind| match k {
-        Kind::Hostile { .. } => 0,
-        Kind::Loot => 1,
-        Kind::Glyph(..) => 2,
-        Kind::Party => 3,
+        Kind::Hostile { quest: false, .. } => 0,
+        Kind::Hostile { quest: true, .. } => 1,
+        Kind::Loot => 2,
+        Kind::Glyph(..) => 3,
+        Kind::Party => 4,
     };
     marks.sort_by_key(|(_, k)| rank(k));
     marks.truncate(POOL);
@@ -372,9 +387,16 @@ fn update_radar(
             continue;
         };
         let (size, fill, edge, turn, glyph) = match kind {
-            Kind::Hostile { boss } => {
-                let s = if *boss { 9.0 } else { 5.0 };
-                (s, HOSTILE, Color::srgba(0.0, 0.0, 0.0, 0.8), 0.0, None)
+            Kind::Hostile { boss, quest } => {
+                let s = if *boss {
+                    9.0
+                } else if *quest {
+                    7.0
+                } else {
+                    5.0
+                };
+                let fill = if *quest { QUEST_TARGET } else { HOSTILE };
+                (s, fill, Color::srgba(0.0, 0.0, 0.0, 0.8), 0.0, None)
             }
             Kind::Party => (7.0, PARTY_BLUE, Color::WHITE, 0.0, None),
             Kind::Loot => (6.0, LOOT, Color::srgba(0.0, 0.0, 0.0, 0.8), 45.0, None),

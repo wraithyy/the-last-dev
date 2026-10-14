@@ -1,7 +1,8 @@
-//! Quests in Jira clothes: the giver dialog (a ticket with Accept / Complete), the
-//! "Sprint backlog" tracker on the right, progress toasts, the "Ticket closed" banner and the
-//! `~/jira` log (J). Everything is read from the sim each frame; widgets are rebuilt only when
-//! the shown state changes.
+//! Quests in Jira clothes: the giver dialog (a ticket with Accept / Complete and a "choose one"
+//! gear reward), the WoW-style objective tracker on the right ("MeatProxies terminated 5/10"),
+//! progress toasts, the "Ticket closed" banner and the `~/jira` log (J) with track toggles.
+//! Everything is read from the sim (or the online mirror) each frame; widgets are rebuilt only
+//! when the shown state changes.
 
 use super::{
     ACCENT, BAR_BG, Banner, DIM, IconCache, PANEL_EDGE, asset_key, drop_shadow, label, panel_bg,
@@ -9,19 +10,32 @@ use super::{
 };
 use crate::combat::{CombatEvent, PendingCommands, SimRead, SimReady, SimView, Talked};
 use crate::copy;
+use crate::economy::goods;
 use crate::game::{GameFlow, zone_label};
 use crate::input::{Paused, QuestWindows, TrophiesOpen};
 use crate::player::Player;
+use crate::touch::TouchMode;
 use bevy::prelude::*;
-use combat_core::{Command, Content, Event, Objective, QuestStatus};
+use combat_core::{Command, Content, Event, Objective, QuestDef, QuestStatus};
 
 pub const GOLD: Color = Color::srgb(1.0, 0.82, 0.3);
 pub const GREY_MARK: Color = Color::srgb(0.62, 0.64, 0.7);
 const DONE_GREEN: Color = Color::srgb(0.4, 1.0, 0.5);
+const DONE_GREY: Color = Color::srgb(0.5, 0.53, 0.58);
 const WINDOW_W: f32 = 460.0;
-const TRACKER_W: f32 = 300.0;
-const TRACKER_MAX: usize = 5;
+const TRACKER_W: f32 = 290.0;
+/// Quests the tracker shows at most; touch screens have less room under the minimap.
+const TRACKER_MAX: usize = 6;
+const TRACKER_MAX_TOUCH: usize = 3;
 const TOAST_SECS: f32 = 2.5;
+const TRACKER_TOP: f32 = super::BELOW_MINIMAP + 34.0;
+/// Height kept free for the chat / combat log / meter windows docked bottom right.
+const DOCK_RESERVE: f32 = 230.0;
+/// Touch layout: under the player frame on the left, above the move stick.
+const TOUCH_TOP: f32 = 120.0;
+const TOUCH_RESERVE: f32 = 340.0;
+/// Rough height of one tracker text line, for the fit check.
+const LINE_PX: f32 = 16.0;
 
 /// "SPRINT-101": the quest's position in content, so ids are stable across runs.
 pub fn ticket_id(content: &Content, id: &str) -> String {
@@ -35,41 +49,108 @@ pub fn unit_name(content: &Content, key: &str) -> String {
         .map_or_else(|| key.to_string(), |u| u.name.clone())
 }
 
+/// English plural of a display name: "MeatProxy" -> "MeatProxies", "Agile Coach" -> "Agile
+/// Coaches". Names ending in a bracket or an "s" stay as they are.
+pub fn plural(name: &str) -> String {
+    let lower = name.to_ascii_lowercase();
+    let consonant_y = lower.ends_with('y')
+        && !lower.ends_with("ay")
+        && !lower.ends_with("ey")
+        && !lower.ends_with("oy");
+    if name.ends_with(')') || lower.ends_with('s') {
+        name.to_string()
+    } else if consonant_y {
+        format!("{}ies", &name[..name.len() - 1])
+    } else if lower.ends_with("ch") || lower.ends_with("sh") || lower.ends_with('x') {
+        format!("{name}es")
+    } else {
+        format!("{name}s")
+    }
+}
+
 /// What an objective asks for, without the count.
 pub fn objective_label(content: &Content, o: &Objective) -> String {
     match o {
-        Objective::Kill(k, _) => format!("{} neutralised", unit_name(content, k)),
+        Objective::Kill(k, n) => {
+            let name = unit_name(content, k);
+            let who = if *n > 1 { plural(&name) } else { name };
+            format!("{who} terminated")
+        }
+        Objective::Loot(item, n) if *n > 1 => plural(item),
         Objective::Loot(item, _) => item.clone(),
-        Objective::Talk(k) => format!("Sync with {} (in person)", unit_name(content, k)),
+        Objective::Talk(k) => format!("Talk to {}", unit_name(content, k)),
         Objective::ClearZone(z) => format!("Clear {}", zone_label(content, z)),
     }
 }
 
-/// "3/5 Access Badges" for the progress toast.
-pub fn progress_line(content: &Content, o: &Objective, count: u32, need: u32) -> String {
-    let mut what = objective_label(content, o);
-    if matches!(o, Objective::Loot(..))
-        && need > 1
-        && what.ends_with(|c: char| c.is_ascii_lowercase() && c != 's')
-    {
-        what.push('s');
+/// One tracker/toast line: "MeatProxies terminated 5/10", "Access Badges 2/5"; talk and clear
+/// objectives read as a plain task ("Talk to Facilities Guy") until done.
+pub fn objective_line(content: &Content, o: &Objective, have: u32, need: u32) -> String {
+    let what = objective_label(content, o);
+    match o {
+        Objective::Kill(..) | Objective::Loot(..) => format!("{what} {have}/{need}"),
+        Objective::Talk(_) | Objective::ClearZone(_) => what,
     }
-    format!("{count}/{need} {what}")
 }
 
-/// The giver's quests the player can act on in `zone`, content order.
+/// Kept for the toast and tests: the same text as the tracker line.
+pub fn progress_line(content: &Content, o: &Objective, count: u32, need: u32) -> String {
+    objective_line(content, o, count, need)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Line {
+    Pending,
+    Done,
+    /// "Ready to close" in gold.
+    Ready,
+}
+
+/// The tracker body of one quest: every objective with its state, then the turn-in line once
+/// all are done.
+pub fn tracker_lines(content: &Content, def: &QuestDef, counts: &[u32]) -> Vec<(String, Line)> {
+    let mut out: Vec<(String, Line)> = def
+        .objectives
+        .iter()
+        .enumerate()
+        .map(|(k, o)| {
+            let need = o.need();
+            let have = counts.get(k).copied().unwrap_or(0).min(need);
+            let state = if have >= need {
+                Line::Done
+            } else {
+                Line::Pending
+            };
+            (objective_line(content, o, have, need), state)
+        })
+        .collect();
+    if out.iter().all(|(_, l)| *l == Line::Done) {
+        out.push((
+            format!(
+                "Ready to close \u{2014} return to {}",
+                unit_name(content, &def.ender().npc)
+            ),
+            Line::Ready,
+        ));
+    }
+    out
+}
+
+/// The NPC's quests the player can act on in `zone`, content order: pick-ups at their giver,
+/// open and finished work at whoever takes it (the giver, or a breadcrumb's target).
 pub fn giver_quests(sim: &dyn SimRead, npc_key: &str, zone: &str) -> Vec<(String, QuestStatus)> {
     sim.content()
         .quests
         .iter()
-        .filter(|q| q.giver.npc == npc_key && q.giver.zone == zone)
-        .map(|q| (q.id.clone(), sim.quest_status(&q.id)))
-        .filter(|(_, s)| {
-            matches!(
-                s,
-                QuestStatus::Available | QuestStatus::Active | QuestStatus::Ready
-            )
+        .map(|q| (q, sim.quest_status(&q.id)))
+        .filter(|(q, s)| match s {
+            QuestStatus::Available => q.giver.npc == npc_key && q.giver.zone == zone,
+            QuestStatus::Active | QuestStatus::Ready => {
+                q.ender().npc == npc_key && q.ender().zone == zone
+            }
+            _ => false,
         })
+        .map(|(q, s)| (q.id.clone(), s))
         .collect()
 }
 
@@ -88,6 +169,70 @@ pub fn giver_mark(sim: &dyn SimRead, npc_key: &str, zone: &str) -> Option<(&'sta
     }
 }
 
+/// Which quests the tracker follows: auto-tracked on accept, untracked from the log (J).
+#[derive(Resource, Default)]
+pub struct QuestTrack {
+    pub untracked: Vec<String>,
+    pub collapsed: bool,
+    /// Quest the log (J) opens on, from a tracker title click.
+    pub focus: Option<String>,
+}
+
+impl QuestTrack {
+    pub fn is_tracked(&self, id: &str) -> bool {
+        !self.untracked.iter().any(|u| u == id)
+    }
+}
+
+/// Tracked open quests in accept order.
+pub fn tracked<'a>(sim: &'a dyn SimRead, track: &QuestTrack) -> Vec<&'a combat_core::ActiveQuest> {
+    sim.quests()
+        .active
+        .iter()
+        .filter(|q| track.is_tracked(&q.id))
+        .collect()
+}
+
+/// Unit keys the tracked quests still need (kill targets, droppers of wanted items, bosses of
+/// zones to clear, NPCs to talk to): the minimap and map paint these in quest yellow.
+pub fn objective_units(sim: &dyn SimRead, track: &QuestTrack) -> Vec<String> {
+    let content = sim.content();
+    let mut out: Vec<String> = Vec::new();
+    let mut add = |k: &str| {
+        if !out.iter().any(|o| o == k) {
+            out.push(k.to_string());
+        }
+    };
+    for q in tracked(sim, track) {
+        let Some(def) = content.quest(&q.id) else {
+            continue;
+        };
+        for (k, o) in def.objectives.iter().enumerate() {
+            if q.counts.get(k).copied().unwrap_or(0) >= o.need() {
+                continue;
+            }
+            match o {
+                Objective::Kill(u, _) | Objective::Talk(u) => add(u),
+                Objective::Loot(it, _) => {
+                    for u in content
+                        .units
+                        .iter()
+                        .filter(|u| u.loot.iter().any(|l| l.item == *it))
+                    {
+                        add(&u.key);
+                    }
+                }
+                Objective::ClearZone(z) => {
+                    if let Some(b) = content.zone(z).and_then(|z| z.boss.as_ref()) {
+                        add(&b.unit);
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
 fn status_chip(s: QuestStatus) -> (&'static str, Color) {
     match s {
         QuestStatus::Available => ("TO DO", Color::srgb(0.7, 0.74, 0.82)),
@@ -104,6 +249,12 @@ enum Action {
     Accept(String),
     Complete(String),
     Abandon(String),
+    /// Gear reward pick in the open ticket.
+    Choose(u8),
+    ToggleTrack(String),
+    /// Tracker title: open the log on that ticket.
+    Open(String),
+    Collapse,
     Back,
     Close,
     CloseLog,
@@ -118,6 +269,8 @@ struct LogWindow;
 #[derive(Component)]
 struct Tracker;
 #[derive(Component)]
+struct TrackerArea;
+#[derive(Component)]
 struct ProgressToast;
 #[derive(Component)]
 struct TrophyHint;
@@ -128,6 +281,7 @@ struct TrophyRow;
 struct DialogState {
     selected: Option<String>,
     cursor: usize,
+    choice: u8,
     shown: String,
 }
 
@@ -144,6 +298,7 @@ impl Plugin for QuestsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DialogState>()
             .init_resource::<Shown>()
+            .init_resource::<QuestTrack>()
             .add_systems(Startup, spawn_quest_ui)
             .add_systems(
                 Update,
@@ -207,14 +362,29 @@ fn spawn_quest_ui(mut commands: Commands) {
         drop_shadow(),
         GlobalZIndex(31),
     ));
+    // The area is laid out between the minimap and the bottom-right dock; its computed height
+    // decides how many whole quests fit (`update_tracker`), whatever the screen size or UI scale.
+    let area = commands
+        .spawn((
+            TrackerArea,
+            Node {
+                position_type: PositionType::Absolute,
+                right: px(12),
+                // Below the minimap and the player's aura row (top right).
+                top: px(TRACKER_TOP),
+                bottom: px(DOCK_RESERVE),
+                width: px(TRACKER_W),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Stretch,
+                overflow: Overflow::clip(),
+                ..default()
+            },
+        ))
+        .id();
     commands.spawn((
         Tracker,
+        ChildOf(area),
         Node {
-            position_type: PositionType::Absolute,
-            right: px(12),
-            // Below the minimap and the player's aura row (top right).
-            top: px(super::BELOW_MINIMAP + 34.0),
-            width: px(TRACKER_W),
             padding: UiRect::all(px(8)),
             flex_direction: FlexDirection::Column,
             row_gap: px(3),
@@ -303,31 +473,98 @@ fn objectives(c: &mut ChildSpawnerCommands, content: &Content, sim: &dyn SimRead
         text(
             c,
             format!(
-                "{} {}  {have}/{need}",
+                "{} {}",
                 if ok { "[x]" } else { "[ ]" },
-                objective_label(content, o)
+                objective_line(content, o, have.min(need), need)
             ),
             13.0,
             if ok { DONE_GREEN } else { Color::WHITE },
         );
     }
+    if def.group {
+        text(
+            c,
+            "Group recommended: elite work. Bring a friend, or a lot of potions.",
+            11.0,
+            Color::srgb(1.0, 0.55, 0.25),
+        );
+    }
 }
 
+/// Reward block: XP and SP, the trophy (hover for its joke) and the "choose one" gear row.
 fn reward(
     c: &mut ChildSpawnerCommands,
-    content: &Content,
+    sim: &dyn SimRead,
     id: &str,
+    choice: u8,
     assets: &AssetServer,
     icons: &mut IconCache,
 ) {
+    let content = sim.content();
     let Some(def) = content.quest(id) else { return };
     section(c, "reward");
+    let sp = (u64::from(def.reward.xp) * u64::from(content.economy.quest_sp_pct) / 100) as u32
+        + def.reward.sp;
     let xp = if def.reward.xp > 0 {
-        format!("+{} XP", def.reward.xp)
+        format!("+{} XP   +{sp} SP", def.reward.xp)
     } else {
         "Exposure".into()
     };
     text(c, xp, 13.0, Color::srgb(0.75, 0.6, 1.0));
+    let role = sim
+        .player()
+        .and_then(|p| sim.unit(p))
+        .and_then(|u| content.class_of_unit(&u.key))
+        .map(|c| c.role);
+    let choices = content.quest_gear_choices(def, role);
+    if !choices.is_empty() {
+        text(c, "Choose one:", 12.0, DIM);
+        for (k, name) in choices.iter().enumerate() {
+            let picked = usize::from(choice).min(choices.len() - 1) == k;
+            let lines = goods::tooltip(content, name, &[], role);
+            c.spawn((
+                ActionButton(Action::Choose(k as u8)),
+                Button,
+                Node {
+                    column_gap: px(8),
+                    padding: UiRect::all(px(4)),
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(px(3)),
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BorderColor::all(if picked {
+                    GOLD
+                } else {
+                    PANEL_EDGE.with_alpha(0.4)
+                }),
+                BackgroundColor(BAR_BG),
+            ))
+            .with_children(|r| {
+                r.spawn((
+                    ImageNode::new(icons.get(assets, goods::icon_of(content, name))),
+                    Node {
+                        width: px(30),
+                        height: px(30),
+                        ..default()
+                    },
+                ));
+                r.spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    ..default()
+                })
+                .with_children(|t| {
+                    // Name, rarity/slot line and the stat lines; the rest lives in the bag tooltip.
+                    for (k, (line, color)) in lines.iter().take(4).enumerate() {
+                        t.spawn((
+                            label(line.clone(), if k == 0 { 13.0 } else { 11.0 }),
+                            TextColor(*color),
+                        ));
+                    }
+                });
+            });
+        }
+    }
     let Some(item) = def.reward.trophy.as_deref().and_then(|t| content.item(t)) else {
         return;
     };
@@ -393,6 +630,7 @@ fn open_on_talk(
         windows.log = false;
         state.selected = (list.len() == 1).then(|| list[0].0.clone());
         state.cursor = 0;
+        state.choice = 0;
         state.shown.clear();
     }
 }
@@ -418,6 +656,7 @@ fn handle_actions(
     flow: Res<GameFlow>,
     mut windows: ResMut<QuestWindows>,
     mut state: ResMut<DialogState>,
+    mut track: ResMut<QuestTrack>,
     mut pending: ResMut<PendingCommands>,
     buttons: Query<(&Interaction, &ActionButton), Changed<Interaction>>,
 ) {
@@ -462,11 +701,31 @@ fn handle_actions(
     }
     for action in actions {
         match action {
-            Action::Select(id) => state.selected = Some(id),
+            Action::Select(id) => {
+                state.selected = Some(id);
+                state.choice = 0;
+            }
             Action::Back => state.selected = None,
             Action::Close => windows.dialog = None,
-            Action::CloseLog => windows.log = false,
+            Action::CloseLog => {
+                windows.log = false;
+                track.focus = None;
+            }
             Action::Abandon(quest) => pending.0.push(Command::AbandonQuest { quest }),
+            Action::Choose(k) => state.choice = k,
+            Action::ToggleTrack(id) => {
+                if track.is_tracked(&id) {
+                    track.untracked.push(id);
+                } else {
+                    track.untracked.retain(|u| *u != id);
+                }
+            }
+            Action::Open(id) => {
+                track.focus = Some(id);
+                windows.log = true;
+                windows.dialog = None;
+            }
+            Action::Collapse => track.collapsed = !track.collapsed,
             Action::Accept(ref quest) | Action::Complete(ref quest) => {
                 pending.0.push(if matches!(action, Action::Accept(_)) {
                     Command::AcceptQuest {
@@ -475,6 +734,7 @@ fn handle_actions(
                 } else {
                     Command::TurnInQuest {
                         quest: quest.clone(),
+                        choice: state.choice,
                     }
                 });
                 // Back to the list when the giver has more to hand out, else done talking.
@@ -546,8 +806,8 @@ fn update_dialog(
         .flat_map(|q| q.counts.clone())
         .collect();
     let sig = format!(
-        "{}|{:?}|{}|{list:?}|{counts:?}",
-        npc.id, state.selected, state.cursor
+        "{}|{:?}|{}|{}|{list:?}|{counts:?}",
+        npc.id, state.selected, state.cursor, state.choice
     );
     if sig == state.shown {
         return;
@@ -557,6 +817,7 @@ fn update_dialog(
     let npc_name = npc.name.clone();
     let selected = state.selected.clone();
     let cursor = state.cursor;
+    let choice = state.choice;
     commands.entity(*root).with_children(|c| {
         let Some(id) = selected else {
             c.spawn(Node {
@@ -655,7 +916,7 @@ fn update_dialog(
         text(c, body.clone(), 13.0, Color::srgb(0.86, 0.89, 0.95));
         section(c, "acceptance criteria");
         objectives(c, content, &*sim, &id);
-        reward(c, content, &id, &assets, &mut icons);
+        reward(c, &*sim, &id, choice, &assets, &mut icons);
         c.spawn(Node {
             column_gap: px(8),
             margin: UiRect::top(px(6)),
@@ -683,6 +944,7 @@ fn update_log(
     mut commands: Commands,
     sim: SimView,
     windows: Res<QuestWindows>,
+    track: Res<QuestTrack>,
     mut shown: ResMut<Shown>,
     mut window: Single<(Entity, &mut Node), With<LogWindow>>,
 ) {
@@ -694,12 +956,20 @@ fn update_log(
     }
     node.display = Display::Flex;
     let log = sim.quests();
-    let sig = format!("{:?}|{:?}", log.active, log.completed);
+    let sig = format!(
+        "{:?}|{:?}|{:?}|{:?}",
+        log.active, log.completed, track.untracked, track.focus
+    );
     if sig == shown.log {
         return;
     }
     shown.log = sig;
     let content = sim.content();
+    // The ticket clicked in the tracker comes first.
+    let mut order: Vec<&combat_core::ActiveQuest> = log.active.iter().collect();
+    if let Some(f) = &track.focus {
+        order.sort_by_key(|q| q.id != *f);
+    }
     commands.entity(*root).despawn_related::<Children>();
     commands.entity(*root).with_children(|c| {
         c.spawn(Node {
@@ -710,10 +980,11 @@ fn update_log(
             h.spawn((label("~/jira  (J to close)", 14.0), TextColor(DIM)));
             button(h, "", "x", Action::CloseLog, false);
         });
+        let tracked_n = log.active.iter().filter(|q| track.is_tracked(&q.id)).count();
         text(
             c,
             format!(
-                "{} open, {} closed. Velocity: whatever the dashboard needs it to be.",
+                "{} open ({tracked_n} tracked), {} closed. Velocity: whatever the dashboard needs it to be.",
                 log.active.len(),
                 log.completed.len()
             ),
@@ -728,12 +999,14 @@ fn update_log(
                 Color::WHITE,
             );
         }
-        for q in &log.active {
+        for q in order {
             let Some(def) = content.quest(&q.id) else {
                 continue;
             };
             let status = sim.quest_status(&q.id);
             let (chip, color) = status_chip(status);
+            let focused = track.focus.as_deref() == Some(q.id.as_str());
+            let is_tracked = track.is_tracked(&q.id);
             c.spawn((
                 Node {
                     flex_direction: FlexDirection::Column,
@@ -743,19 +1016,25 @@ fn update_log(
                     border_radius: BorderRadius::all(px(3)),
                     ..default()
                 },
-                BorderColor::all(PANEL_EDGE.with_alpha(0.6)),
+                BorderColor::all(if focused {
+                    ACCENT
+                } else {
+                    PANEL_EDGE.with_alpha(0.6)
+                }),
                 BackgroundColor(BAR_BG),
             ))
             .with_children(|t| {
                 t.spawn(Node {
                     justify_content: JustifyContent::SpaceBetween,
                     align_items: AlignItems::Center,
+                    column_gap: px(6),
                     ..default()
                 })
                 .with_children(|h| {
                     h.spawn(Node {
                         column_gap: px(8),
                         align_items: AlignItems::Center,
+                        flex_shrink: 1.0,
                         ..default()
                     })
                     .with_children(|l| {
@@ -763,11 +1042,24 @@ fn update_log(
                         l.spawn((label(def.name.clone(), 14.0), TextColor(Color::WHITE)));
                         l.spawn((label(chip, 10.0), TextColor(color)));
                     });
-                    button(h, "", "Abandon", Action::Abandon(q.id.clone()), false);
+                    h.spawn(Node {
+                        column_gap: px(4),
+                        ..default()
+                    })
+                    .with_children(|b| {
+                        button(
+                            b,
+                            "",
+                            if is_tracked { "Tracked" } else { "Track" },
+                            Action::ToggleTrack(q.id.clone()),
+                            is_tracked,
+                        );
+                        button(b, "", "Abandon", Action::Abandon(q.id.clone()), false);
+                    });
                 });
                 objectives(t, content, &*sim, &q.id);
                 let hint = if status == QuestStatus::Ready {
-                    format!("Turn in to {}.", unit_name(content, &def.giver.npc))
+                    format!("Turn in to {}.", unit_name(content, &def.ender().npc))
                 } else {
                     def.progress_text.clone()
                 };
@@ -782,72 +1074,122 @@ fn update_tracker(
     sim: SimView,
     windows: Res<QuestWindows>,
     trophies: Res<TrophiesOpen>,
+    track: Res<QuestTrack>,
+    touch: Res<TouchMode>,
+    mut area: Single<(&mut Node, &ComputedNode), (With<TrackerArea>, Without<Tracker>)>,
     mut shown: ResMut<Shown>,
     mut tracker: Single<(Entity, &mut Node), With<Tracker>>,
 ) {
+    let (area_node, computed) = &mut *area;
+    // Touch: the right side holds the buttons, so the tracker moves under the player frame
+    // and stops above the stick.
+    let (left, right, top, bottom) = if touch.active {
+        (px(12), Val::Auto, px(TOUCH_TOP), px(TOUCH_RESERVE))
+    } else {
+        (Val::Auto, px(12), px(TRACKER_TOP), px(DOCK_RESERVE))
+    };
+    if area_node.left != left || area_node.top != top {
+        area_node.left = left;
+        area_node.right = right;
+        area_node.top = top;
+        area_node.bottom = bottom;
+    }
+    let room = computed.size().y * computed.inverse_scale_factor();
     let (root, node) = &mut *tracker;
-    let log = sim.quests();
-    let visible = !log.active.is_empty() && !trophies.0 && !windows.map;
+    let list = tracked(&*sim, &track);
+    let visible = !list.is_empty() && !trophies.0 && !windows.map;
     node.display = if visible {
         Display::Flex
     } else {
         Display::None
     };
-    let sig = format!("{:?}", log.active);
+    let max = if touch.active {
+        TRACKER_MAX_TOUCH
+    } else {
+        TRACKER_MAX
+    };
+    // Whole quests only, as many as fit the area; before its first layout it reads 0: show all.
+    let room = if room > 0.0 { room } else { f32::MAX };
+    let sig = format!("{list:?}|{}|{max}|{room:.0}", track.collapsed);
     if !visible || sig == shown.tracker {
         return;
     }
     shown.tracker = sig;
     let content = sim.content();
+    let mut used = LINE_PX * 2.0;
+    let entries: Vec<(String, String, Vec<(String, Line)>)> = list
+        .iter()
+        .take(max)
+        .filter_map(|q| {
+            let def = content.quest(&q.id)?;
+            Some((
+                q.id.clone(),
+                def.name.clone(),
+                tracker_lines(content, def, &q.counts),
+            ))
+        })
+        .take_while(|(_, _, lines)| {
+            used += LINE_PX * (lines.len() + 1) as f32 + 3.0;
+            used <= room
+        })
+        .collect();
+    let more = list.len() - entries.len();
+    let collapsed = track.collapsed;
     commands.entity(*root).despawn_related::<Children>();
     commands.entity(*root).with_children(|c| {
-        c.spawn((label("~/jira - Sprint backlog", 12.0), TextColor(ACCENT)));
-        for q in log.active.iter().take(TRACKER_MAX) {
-            let Some(def) = content.quest(&q.id) else {
-                continue;
-            };
-            let ready = sim.quest_status(&q.id) == QuestStatus::Ready;
-            text(
-                c,
-                def.name.clone(),
-                13.0,
-                if ready { GOLD } else { Color::WHITE },
-            );
-            if ready {
-                text(
-                    c,
-                    format!("  -> review with {}", unit_name(content, &def.giver.npc)),
-                    11.0,
-                    GOLD,
-                );
-                continue;
-            }
-            for (o, have) in def.objectives.iter().zip(&q.counts) {
-                let need = o.need();
-                let ok = *have >= need;
-                text(
-                    c,
-                    format!(
-                        "  {} {have}/{need} {}",
-                        if ok { "[x]" } else { "[ ]" },
-                        objective_label(content, o)
-                    ),
-                    11.0,
-                    if ok {
-                        DONE_GREEN
-                    } else {
-                        Color::srgb(0.8, 0.84, 0.9)
-                    },
-                );
+        c.spawn(Node {
+            justify_content: JustifyContent::SpaceBetween,
+            align_items: AlignItems::Center,
+            ..default()
+        })
+        .with_children(|h| {
+            h.spawn((
+                label(format!("~/jira  Objectives ({})", list.len()), 12.0),
+                TextColor(ACCENT),
+            ));
+            h.spawn((
+                ActionButton(Action::Collapse),
+                Button,
+                Node {
+                    padding: UiRect::axes(px(6), px(0)),
+                    ..default()
+                },
+                BackgroundColor(Color::NONE),
+            ))
+            .with_child((
+                label(if collapsed { "[+]" } else { "[-]" }, 13.0),
+                TextColor(DIM),
+            ));
+        });
+        if collapsed {
+            return;
+        }
+        for (id, name, lines) in entries {
+            let ready = lines.last().is_some_and(|(_, l)| *l == Line::Ready);
+            c.spawn((
+                ActionButton(Action::Open(id)),
+                Button,
+                Node {
+                    margin: UiRect::top(px(3)),
+                    ..default()
+                },
+                BackgroundColor(Color::NONE),
+            ))
+            .with_child((
+                label(name, 13.0),
+                TextColor(if ready { GOLD } else { Color::WHITE }),
+            ));
+            for (line, state) in lines {
+                let (mark, color) = match state {
+                    Line::Pending => ("  - ", Color::srgb(0.82, 0.86, 0.92)),
+                    Line::Done => ("  \u{2713} ", DONE_GREY),
+                    Line::Ready => ("  ", GOLD),
+                };
+                text(c, format!("{mark}{line}"), 11.5, color);
             }
         }
-        if log.active.len() > TRACKER_MAX {
-            text(
-                c,
-                format!("  +{} more in ~/jira (J)", log.active.len() - TRACKER_MAX),
-                11.0,
-                DIM,
-            );
+        if more > 0 {
+            text(c, format!("  +{more} more in ~/jira (J)"), 11.0, DIM);
         }
     });
 }
@@ -858,12 +1200,14 @@ fn quest_events(
     mut events: MessageReader<CombatEvent>,
     mut banners: MessageWriter<Banner>,
     mut shown: ResMut<Shown>,
+    mut track: ResMut<QuestTrack>,
     mut toast: Single<(&mut Text, &mut TextColor), With<ProgressToast>>,
 ) {
     let content = sim.content();
     let (toast_text, toast_color) = &mut *toast;
     for CombatEvent(ev) in events.read() {
         match ev {
+            Event::QuestAccepted { quest } => track.untracked.retain(|u| u != quest),
             Event::QuestProgress {
                 quest,
                 objective,
@@ -878,10 +1222,24 @@ fn quest_events(
                     shown.toast_age = 0.0;
                 }
             }
+            Event::QuestReady { quest } => {
+                if let Some(def) = content.quest(quest) {
+                    set_text(
+                        toast_text,
+                        &format!(
+                            "{}: ready to close \u{2014} return to {}",
+                            def.name,
+                            unit_name(content, &def.ender().npc)
+                        ),
+                    );
+                    shown.toast_age = 0.0;
+                }
+            }
             Event::QuestCompleted { quest } => {
                 let Some(def) = content.quest(quest) else {
                     continue;
                 };
+                track.untracked.retain(|u| u != quest);
                 banners.write(Banner {
                     title: format!("Ticket closed: {}", def.name),
                     subtitle: format!(
@@ -956,19 +1314,76 @@ mod tests {
     }
 
     #[test]
-    fn progress_lines_read_like_the_tracker() {
+    fn tracker_lines_read_like_wow() {
         let s = sim();
         let c = s.content();
         let badges = Objective::Loot("Access Badge".into(), 4);
-        assert_eq!(progress_line(c, &badges, 3, 4), "3/4 Access Badges");
+        assert_eq!(progress_line(c, &badges, 3, 4), "Access Badges 3/4");
         let invoices = Objective::Loot("Token Invoice (Itemized)".into(), 4);
         assert_eq!(
             progress_line(c, &invoices, 1, 4),
-            "1/4 Token Invoice (Itemized)"
+            "Token Invoice (Itemized) 1/4"
+        );
+        let proxies = Objective::Kill("meatproxy".into(), 10);
+        assert_eq!(
+            objective_line(c, &proxies, 5, 10),
+            "MeatProxies terminated 5/10"
+        );
+        let talk = Objective::Talk("facilities_guy".into());
+        assert_eq!(objective_line(c, &talk, 0, 1), "Talk to Facilities Guy");
+        assert_eq!(plural("Agile Coach"), "Agile Coaches");
+        assert_eq!(plural("Copilot Drone"), "Copilot Drones");
+        assert_eq!(
+            plural("Gantt Chart (Pure Fiction)"),
+            "Gantt Chart (Pure Fiction)"
         );
         assert_eq!(ticket_id(c, "onboarding"), "SPRINT-101");
         assert!(
             objective_label(c, &Objective::ClearZone("tower/1".into())).contains("Tower floor 1")
         );
+        // Mid-progress: pending and done lines; all done adds the gold turn-in line.
+        let Some(demo) = c.quest("demo_day") else {
+            panic!("no demo_day")
+        };
+        let lines = tracker_lines(c, demo, &[3, 1]);
+        assert_eq!(
+            lines,
+            [
+                ("VC Partners terminated 3/3".to_string(), Line::Done),
+                ("Demo Presenters terminated 1/3".to_string(), Line::Pending),
+            ]
+        );
+        let lines = tracker_lines(c, demo, &[3, 3]);
+        assert_eq!(
+            lines.last(),
+            Some(&(
+                "Ready to close \u{2014} return to Lab Safety Officer".to_string(),
+                Line::Ready
+            ))
+        );
+        // A breadcrumb is closed at its target, not its giver.
+        let Some(crumb) = c.quest("escalation_path") else {
+            panic!("no escalation_path")
+        };
+        assert!(
+            tracker_lines(c, crumb, &[1])
+                .last()
+                .is_some_and(|l| l.0.ends_with("IT Support Lead"))
+        );
+    }
+
+    #[test]
+    fn tracking_follows_accepts_and_untracks() {
+        let mut s = sim();
+        s.spawn_player("fullstack", combat_core::Vec3::new(0.0, 0.0, 0.0), 0.0);
+        s.debug_set_quest("onboarding", QuestStatus::Active);
+        s.debug_set_quest("coffee_run", QuestStatus::Active);
+        let mut track = QuestTrack::default();
+        assert_eq!(tracked(&s, &track).len(), 2);
+        track.untracked.push("coffee_run".into());
+        let ids: Vec<&str> = tracked(&s, &track).iter().map(|q| q.id.as_str()).collect();
+        assert_eq!(ids, ["onboarding"]);
+        // Onboarding wants Facilities: his key is a highlighted objective unit.
+        assert_eq!(objective_units(&s, &track), ["facilities_guy"]);
     }
 }

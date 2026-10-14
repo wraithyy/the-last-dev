@@ -11,6 +11,7 @@ mod export;
 mod kit;
 mod lab;
 mod layout;
+mod office;
 mod props;
 mod shape;
 #[cfg(test)]

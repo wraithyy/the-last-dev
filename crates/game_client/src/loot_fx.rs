@@ -223,6 +223,7 @@ fn hover_cursor(
     ui: Query<&Interaction>,
     units: Query<(Entity, &Transform, &Unit)>,
     sims: Query<&SimUnit>,
+    prop: Res<crate::office::PropHover>,
     mut state: Local<(Option<Vec2>, f32, Option<SystemCursorIcon>)>,
 ) {
     let (win_entity, win) = *window;
@@ -260,7 +261,11 @@ fn hover_cursor(
                     Hover::Nothing
                 })
             })
-            .unwrap_or(Hover::Nothing),
+            .unwrap_or(if prop.0.is_some() {
+                Hover::Friendly
+            } else {
+                Hover::Nothing
+            }),
     };
     let icon = cursor_for(hover);
     if state.2 != Some(icon) {

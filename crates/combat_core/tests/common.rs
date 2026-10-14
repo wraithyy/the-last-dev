@@ -390,6 +390,13 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
         Event::Proc { unit, item } => format!("{} procs {item}", t(*unit)),
         Event::ItemError { reason } => format!("item error: {}", reason.message()),
         Event::ItemCooldown { item, ms } => format!("{item} cools down for {ms} ms"),
+        Event::Interacted {
+            unit,
+            prop,
+            outcome,
+        } => format!("{} uses {prop} ({outcome})", t(*unit)),
+        Event::Achievement { unit, key } => format!("{} earns {key}", t(*unit)),
+        Event::TitleChanged { unit, title } => format!("{} wears title {title:?}", t(*unit)),
     };
     format!("[{tick:05}] {body}")
 }

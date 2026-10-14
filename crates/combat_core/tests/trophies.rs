@@ -19,6 +19,7 @@ fn h_with_loot(items: &[&str]) -> H {
             .map(|item| LootEntry {
                 item: item.clone(),
                 chance_pct: 100,
+                quest: None,
             })
             .collect();
         if let Some(ai) = ceo.ai.as_mut() {

@@ -364,6 +364,8 @@ fn spawn_hud(mut commands: Commands) {
                 ("T", Action::AutoAttack),
                 ("C", Action::Coffee),
                 ("F", Action::Interact),
+                ("Run", Action::Sprint),
+                ("Ride", Action::Scooter),
             ] {
                 p.spawn(button(t, TouchButton::Act(k), 56.0, 56.0));
             }

@@ -890,7 +890,7 @@ impl Sim {
         self.economy().vendor_for(&v.state.key)
     }
 
-    fn bag_full(&self, pi: usize) -> bool {
+    pub(crate) fn bag_full(&self, pi: usize) -> bool {
         self.units[pi].state.bag.len() >= self.economy().bag_size.max(1)
     }
 
@@ -1235,9 +1235,9 @@ impl Sim {
         left
     }
 
-    /// Quest turn-in SP: `quest_sp_pct` of the quest XP.
-    pub(crate) fn quest_sp(&mut self, pi: usize, xp: u32) {
-        let sp = (u64::from(xp) * u64::from(self.economy().quest_sp_pct) / 100) as u32;
+    /// Quest turn-in SP: `quest_sp_pct` of the quest XP plus the quest's own SP.
+    pub(crate) fn quest_sp(&mut self, pi: usize, xp: u32, extra: u32) {
+        let sp = (u64::from(xp) * u64::from(self.economy().quest_sp_pct) / 100) as u32 + extra;
         if sp > 0 {
             self.units[pi].state.sp = self.units[pi].state.sp.saturating_add(sp);
             self.bag_event(pi);

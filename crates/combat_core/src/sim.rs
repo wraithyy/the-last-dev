@@ -191,6 +191,8 @@ pub struct Sim {
     pub(crate) next_telegraph: u32,
     /// Trash packs of the loaded zone (co-op growth on join).
     pub(crate) zone_packs: Vec<crate::zones::PackRt>,
+    /// Props, achievements and rides (`world.rs`).
+    pub(crate) fun: crate::world::WorldRt,
 }
 
 impl Sim {
@@ -217,6 +219,7 @@ impl Sim {
             telegraphs: Vec::new(),
             next_telegraph: 1,
             zone_packs: Vec::new(),
+            fun: crate::world::WorldRt::new(seed),
         }
     }
 
@@ -383,6 +386,8 @@ impl Sim {
             bag: Vec::new(),
             equipped: Vec::new(),
             buyback: Vec::new(),
+            achievements: Vec::new(),
+            title: String::new(),
         };
         self.units.push(Unit {
             state,
@@ -487,7 +492,9 @@ impl Sim {
             | Command::Buy { .. }
             | Command::Sell { .. }
             | Command::Buyback { .. }
-            | Command::UseItem { .. } => {}
+            | Command::UseItem { .. }
+            | Command::Interact { .. }
+            | Command::SetTitle { .. } => {}
         }
         self.pending.push((Some(player), cmd));
     }
@@ -610,6 +617,7 @@ impl Sim {
         self.update_regen();
         self.update_hp_history();
         self.update_combat_flags();
+        self.update_world();
         self.flush_yells();
         self.sync_views();
     }
@@ -665,7 +673,7 @@ impl Sim {
             Command::RespawnPlayer => self.respawn_player(actor),
             Command::Talk { unit } => self.talk(actor, unit),
             Command::AcceptQuest { quest } => self.accept_quest(actor, &quest),
-            Command::TurnInQuest { quest } => self.turn_in_quest(actor, &quest),
+            Command::TurnInQuest { quest, choice } => self.turn_in_quest(actor, &quest, choice),
             Command::AbandonQuest { quest } => self.abandon_quest(actor, &quest),
             Command::Equip { item } => self.equip(actor, &item),
             Command::Unequip { slot } => self.unequip(actor, slot),
@@ -673,6 +681,8 @@ impl Sim {
             Command::Sell { vendor, item } => self.sell(actor, vendor, &item),
             Command::Buyback { vendor, item } => self.buyback(actor, vendor, &item),
             Command::UseItem { item } => self.use_item(actor, &item),
+            Command::Interact { prop } => self.interact(actor, &prop),
+            Command::SetTitle { achievement } => self.set_title(actor, &achievement),
             other => self.apply_named(other),
         }
     }
@@ -713,7 +723,9 @@ impl Sim {
             | Command::Buy { .. }
             | Command::Sell { .. }
             | Command::Buyback { .. }
-            | Command::UseItem { .. } => {}
+            | Command::UseItem { .. }
+            | Command::Interact { .. }
+            | Command::SetTitle { .. } => {}
         }
     }
 
@@ -924,6 +936,7 @@ impl Sim {
         if p.state.alive && t.state.alive && !t.despawned && !t.state.hostile && near {
             let key = t.state.key.clone();
             self.request_yell(ti, YellKind::Talk);
+            self.on_talk(player, &key);
             self.quest_credit(player, |o| matches!(o, Objective::Talk(k) if *k == key));
             self.offer_quests(player, ti);
         }
@@ -983,6 +996,7 @@ impl Sim {
         {
             return Err(CastError::OnCooldown);
         }
+        self.mount_check(ci, spell)?;
         let target = if spell.target == SpellTarget::Ally {
             Some(self.ally_target(ci, spell)?)
         } else if spell.target == SpellTarget::DeadAlly {
@@ -1096,6 +1110,9 @@ impl Sim {
         let Some(spell) = self.content.spell(spell_id).cloned() else {
             return;
         };
+        if self.toggle_mount(ci, &spell) {
+            return;
+        }
         let target = match self.validate(ci, &spell) {
             Ok(t) => t,
             Err(reason) => return self.fail(caster, spell_id, reason),
@@ -1137,6 +1154,7 @@ impl Sim {
     }
 
     pub(crate) fn start_cast(&mut self, ci: usize, spell: &SpellDef, target: Option<EntityId>) {
+        self.dismount_for_cast(ci, spell);
         let haste = self.haste(ci);
         let id = Self::id_of(ci);
         if self.units[ci]
@@ -1439,6 +1457,9 @@ impl Sim {
         for key in depleted {
             self.remove_aura(ti, &key, AuraEnd::Depleted);
         }
+        if amount > 0 {
+            self.dismount(ti);
+        }
         let hp = self.units[ti].state.hp.saturating_sub(dealt);
         self.units[ti].state.hp = hp;
         if self.content.units[self.units[ti].def].ai.is_some() {
@@ -1531,11 +1552,21 @@ impl Sim {
         };
         let mut shares = Vec::with_capacity(owners.len());
         for owner in owners {
-            let mut items: Vec<String> = loot_table
-                .iter()
-                .filter(|e| self.rng.chance_pct(e.chance_pct))
-                .map(|e| e.item.clone())
-                .collect();
+            let mut items: Vec<String> = Vec::new();
+            for e in &loot_table {
+                // Quest-only drops use the loot stream, so taking a quest never shifts combat.
+                let drop = match (&e.quest, owner) {
+                    (None, _) => self.rng.chance_pct(e.chance_pct),
+                    (Some(q), Some(p)) => {
+                        self.wants_quest_drop(p, q, &e.item)
+                            && self.loot_rng.chance_pct(e.chance_pct)
+                    }
+                    (Some(_), None) => false,
+                };
+                if drop {
+                    items.push(e.item.clone());
+                }
+            }
             let role = owner
                 .and_then(|p| self.index(p))
                 .and_then(|p| self.class_at(p))
@@ -1595,7 +1626,13 @@ impl Sim {
                 u.regen_acc = 0;
                 continue;
             }
-            u.regen_acc += d.mana_regen_per_5s_combat + u.item_bonus.mana_regen;
+            let brew: u32 = u
+                .auras
+                .iter()
+                .filter_map(|a| self.content.aura(&a.key))
+                .map(|a| a.mana_regen)
+                .sum();
+            u.regen_acc += d.mana_regen_per_5s_combat + u.item_bonus.mana_regen + brew;
             u.state.mana = (u.state.mana + u.regen_acc / 150).min(u.state.max_mana);
             u.regen_acc %= 150;
         }

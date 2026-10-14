@@ -73,7 +73,9 @@ fn spawn_menu(mut commands: Commands) {
         .with_children(|p| {
             p.spawn((label("~/emotes", 15.0), TextColor(ACCENT)));
             for (i, e) in Emote::ALL.into_iter().enumerate() {
-                p.spawn((
+                // Only the first ten have a number key; the rest are click-only.
+                let key = if i < SLOT_COUNT { "" } else { "  " };
+                let mut row = p.spawn((
                     Button,
                     EmoteButton(e),
                     Node {
@@ -84,15 +86,16 @@ fn spawn_menu(mut commands: Commands) {
                     },
                     BorderColor::all(KEY_RIM),
                     vgrad(KEY_TOP_HI, KEY_TOP),
-                    children![
-                        (
-                            crate::keybinds::KeyLegend(crate::keybinds::Action::Slot(i as u8)),
-                            label("", 13.0),
-                            TextColor(ACCENT),
-                        ),
-                        label(format!(" {}", e.command()), 13.0),
-                    ],
                 ));
+                row.with_children(|r| {
+                    let mut legend = r.spawn((label(key, 13.0), TextColor(ACCENT)));
+                    if i < SLOT_COUNT {
+                        legend.insert(crate::keybinds::KeyLegend(crate::keybinds::Action::Slot(
+                            i as u8,
+                        )));
+                    }
+                    r.spawn(label(format!(" {}", e.command()), 13.0));
+                });
             }
         });
 }
@@ -181,7 +184,10 @@ fn send_emotes(
     (client, net): (Res<NetClient>, Option<Res<NetWorld>>),
     (target, sim_units): (Res<Target>, Query<&SimUnit>),
     player: Single<&SimUnit, With<Player>>,
-    mut events: MessageWriter<CombatEvent>,
+    (mut events, mut played): (
+        MessageWriter<CombatEvent>,
+        MessageWriter<crate::office::EmotePlayed>,
+    ),
     mut last: Local<Option<f32>>,
 ) {
     for EmoteRequest(e) in requests.read() {
@@ -195,6 +201,7 @@ fn send_emotes(
             let target = emote_target(world.players(), player.0, picked);
             send(&client, &ClientMsg::Emote { emote: *e, target });
         } else {
+            played.write(crate::office::EmotePlayed(player.0, *e));
             events.write(CombatEvent(Event::Yell {
                 unit: player.0,
                 text: e.text().into(),

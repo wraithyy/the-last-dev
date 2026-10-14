@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 6;
+pub const PROTOCOL_VERSION: u16 = 8;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -206,10 +206,14 @@ pub enum Emote {
     NoBandwidth,
     Blocked,
     ShipIt,
+    /// Animated emotes: the speaker sits down, dances or facepalms (see the client's poses).
+    Sit,
+    Dance,
+    Facepalm,
 }
 
 impl Emote {
-    pub const ALL: [Emote; 10] = [
+    pub const ALL: [Emote; 13] = [
         Emote::Sync,
         Emote::CircleBack,
         Emote::PerMyLastEmail,
@@ -220,6 +224,9 @@ impl Emote {
         Emote::NoBandwidth,
         Emote::Blocked,
         Emote::ShipIt,
+        Emote::Sit,
+        Emote::Dance,
+        Emote::Facepalm,
     ];
 
     /// The slash command a player types or picks.
@@ -245,6 +252,9 @@ impl Emote {
             Emote::NoBandwidth => "{n}, I don't have the bandwidth for you.",
             Emote::Blocked => "I'm blocked on {n}.",
             Emote::ShipIt => "Ship it, {n}. We'll fix it in prod.",
+            Emote::Sit => "*sits down next to {n}* Is this seat taken by an agent?",
+            Emote::Dance => "*dances with {n}* HR has been notified.",
+            Emote::Facepalm => "*facepalms at {n}*",
         };
         template.replace("{n}", name)
     }
@@ -271,6 +281,9 @@ impl Emote {
             Emote::NoBandwidth => ("/no bandwidth", "I don't have the bandwidth for this."),
             Emote::Blocked => ("/blocked", "I'm blocked."),
             Emote::ShipIt => ("/ship it", "Ship it. We'll fix it in prod."),
+            Emote::Sit => ("/sit", "*sits down* Finally, a meeting with no agenda."),
+            Emote::Dance => ("/dance", "*dances like nobody is tracking engagement*"),
+            Emote::Facepalm => ("/facepalm", "*facepalms* The AI wrote it again."),
         }
     }
 }
@@ -368,6 +381,7 @@ impl QuestSnap {
                 })
                 .collect(),
             completed: self.completed.clone(),
+            kills: Default::default(),
         }
     }
 }
@@ -461,6 +475,8 @@ pub struct PlayerSnap {
     /// Equipped gear by slot as indices into `Content::economy.gear` (`NO_GEAR` = empty), so
     /// late joiners see everyone's outfit.
     pub gear: Vec<u16>,
+    /// Key of the achievement whose title the player wears ("" for none).
+    pub title: String,
 }
 
 impl PlayerSnap {
@@ -504,6 +520,7 @@ impl PlayerSnap {
                         .unwrap_or(Self::NO_GEAR)
                 })
                 .collect(),
+            title: u.title.clone(),
         }
     }
 }
@@ -543,7 +560,7 @@ pub fn is_player_command(cmd: &Command) -> bool {
     match cmd {
         Command::PlayerMoved { .. } => false,
         Command::AcceptQuest { quest }
-        | Command::TurnInQuest { quest }
+        | Command::TurnInQuest { quest, .. }
         | Command::AbandonQuest { quest } => quest.len() <= MAX_QUEST_ID_BYTES,
         Command::Equip { item }
         | Command::UseItem { item }
@@ -559,6 +576,8 @@ pub fn is_player_command(cmd: &Command) -> bool {
         | Command::StopAutoAttack { .. }
         | Command::RespawnPlayer
         | Command::Talk { .. } => true,
+        Command::Interact { prop } => prop.len() <= combat_core::world::WORLD_KEY_MAX,
+        Command::SetTitle { achievement } => achievement.len() <= combat_core::world::WORLD_KEY_MAX,
     }
 }
 
@@ -682,7 +701,9 @@ impl Msg for ServerMsg {
                 units.len() <= MAX_SNAPSHOT_UNITS
                     && players.len() <= MAX_PLAYERS
                     && players.iter().all(|p| {
-                        p.class.len() <= MAX_CLASS_BYTES && p.gear.len() <= combat_core::SLOTS
+                        p.class.len() <= MAX_CLASS_BYTES
+                            && p.gear.len() <= combat_core::SLOTS
+                            && p.title.len() <= combat_core::world::WORLD_KEY_MAX
                     })
                     && units.iter().all(|u| u.auras.len() <= MAX_LIST_LEN)
             }
@@ -761,6 +782,15 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
             names(std::slice::from_ref(item))
         }
         Event::QuestOffered { quests, .. } => list(quests.len()),
+        Event::Interacted { prop: k, .. }
+        | Event::Achievement { key: k, .. }
+        | Event::TitleChanged { title: k, .. } => {
+            if k.len() <= combat_core::world::WORLD_KEY_MAX {
+                Ok(())
+            } else {
+                Err(ProtoError::TooMany)
+            }
+        }
         Event::Yell { text, .. } if text.len() > MAX_TEXT_BYTES => Err(ProtoError::TooMany),
         _ => Ok(()),
     }
@@ -957,6 +987,7 @@ mod tests {
                 },
                 Command::TurnInQuest {
                     quest: "q_intro".into(),
+                    choice: 2,
                 },
                 Command::AbandonQuest {
                     quest: "q_intro".into(),
@@ -979,6 +1010,12 @@ mod tests {
                 },
                 Command::UseItem {
                     item: "Cold Brew".into(),
+                },
+                Command::Interact {
+                    prop: "printer_pmo".into(),
+                },
+                Command::SetTitle {
+                    achievement: "pc_load_letter".into(),
                 },
             ]
             .into_iter()
@@ -1207,6 +1244,7 @@ mod tests {
                     xp: 10,
                     xp_to_next: 400,
                     gear: vec![3, PlayerSnap::NO_GEAR, 0, PlayerSnap::NO_GEAR, 7],
+                    title: "pc_load_letter".into(),
                 }],
             },
             ServerMsg::MoveCorrection {
@@ -1666,6 +1704,7 @@ mod tests {
                 counts: vec![2],
             }],
             completed: vec!["done".into()],
+            kills: Default::default(),
         };
         assert_eq!(QuestSnap::from_log(&log).to_log(), log);
         let msg = cooldowns_msg(7, [SpellId(1), SpellId(2)], |s| CooldownView {

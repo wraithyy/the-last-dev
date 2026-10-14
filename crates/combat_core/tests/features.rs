@@ -269,8 +269,8 @@ fn load_floor_spawns_packs_scaled_by_level_and_reload_despawns() {
     assert!(w.has(|e| matches!(e, Event::FloorLoaded { floor: 1 })));
     assert_eq!(w.sim.floor(), Some(1));
     let others: Vec<_> = w.sim.units().filter(|u| u.id != w.p).cloned().collect();
-    // 10 pack units, the boss, two IT Support (the intern moved to the campus).
-    assert_eq!(others.len(), 10 + 1 + 2);
+    // 10 pack units, the boss, two IT Support (the intern moved to the campus), the hidden QA.
+    assert_eq!(others.len(), 10 + 1 + 2 + 1);
     let mps: Vec<(u8, u32)> = others
         .iter()
         .filter(|u| u.key == "meatproxy")
@@ -300,7 +300,7 @@ fn load_floor_spawns_packs_scaled_by_level_and_reload_despawns() {
         .iter()
         .filter(|(_, e)| matches!(e, Event::Despawned { .. }))
         .count();
-    assert_eq!(despawned, 13);
+    assert_eq!(despawned, others.len());
     assert!(others.iter().all(|u| w.sim.unit(u.id).is_none()));
     assert_eq!(w.u(w.p).level, 3, "the player keeps its level");
 }

@@ -799,12 +799,19 @@ fn update_frames(
                     Color::srgb(0.35, 1.0, 0.4)
                 };
             }
+            // A worn achievement title (players) replaces the unit's own subtitle.
             Field::Title => set_text(
                 &mut text,
                 &sim.content()
-                    .unit_def(&u.key)
-                    .filter(|d| !d.title.is_empty())
-                    .map_or_else(String::new, |d| format!("<{}>", d.title)),
+                    .achievement(&u.title)
+                    .map(|a| a.title.as_str())
+                    .or_else(|| {
+                        sim.content()
+                            .unit_def(&u.key)
+                            .map(|d| d.title.as_str())
+                            .filter(|t| !t.is_empty())
+                    })
+                    .map_or_else(String::new, |t| format!("<{t}>")),
             ),
             Field::Level => set_text(&mut text, &u.level.to_string()),
             Field::Initial => {

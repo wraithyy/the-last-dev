@@ -50,11 +50,23 @@ impl PlayerBody {
     }
 }
 
+/// Run-speed multiplier from the player's speed auras (e-scooter, sprint), kept by
+/// `office::ride` so prediction matches the server's movement budget.
+#[derive(Resource)]
+pub struct MoveSpeed(pub f32);
+
+impl Default for MoveSpeed {
+    fn default() -> Self {
+        MoveSpeed(1.0)
+    }
+}
+
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_player)
+        app.init_resource::<MoveSpeed>()
+            .add_systems(Startup, spawn_player)
             .add_systems(FixedUpdate, simulate)
             .add_systems(
                 RunFixedMainLoop,
@@ -90,6 +102,7 @@ fn simulate(
     time: Res<Time>,
     mut input: ResMut<PlayerInput>,
     colliders: Res<Colliders>,
+    speed: Res<MoveSpeed>,
     mut body: Single<&mut PlayerBody>,
 ) {
     let dt = time.delta_secs();
@@ -103,12 +116,13 @@ fn simulate(
     input.mouse_yaw = 0.0;
 
     let rot = Quat::from_rotation_y(body.yaw);
+    let run = RUN_SPEED * speed.0;
     let max_speed = if input.forward < 0.0 {
-        RUN_SPEED * BACKPEDAL_FACTOR
+        run * BACKPEDAL_FACTOR
     } else {
-        RUN_SPEED
+        run
     };
-    let local = Vec3::new(input.strafe, 0.0, -input.forward) * RUN_SPEED;
+    let local = Vec3::new(input.strafe, 0.0, -input.forward) * run;
     let velocity = rot * local.clamp_length_max(max_speed);
     let knock = body.knock;
     body.pos = slide(body.pos, (velocity + knock) * dt, &colliders.0);

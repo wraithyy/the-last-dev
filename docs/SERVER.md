@@ -169,7 +169,7 @@ Binary WebSocket frames at `/ws`, each one `net_proto` frame (`PROTOCOL_VERSION`
      wall extent (+1 m), at a height the jump arc allows from the flat floor (-0.1..1.5 m; the server owns Y), not with its feet inside a blocker that spans
      the body, when the straight segment from the last accepted position crosses no blocker the body
      cannot step onto or jump over (boxes shrunk by 5 cm, so walls cannot be tunnelled through within
-     the speed budget), and within a distance budget that refills at 1.25 x run speed (8.75 m/s), holds
+     the speed budget), and within a distance budget that refills at 1.25 x run speed (8.75 m/s, times `Sim::move_speed_pct` of a riding or sprinting player), holds
      up to 1 s of movement plus 1 m jitter, and grows by a knockback's strength. While the sim has the
      player stunned only knockback displacement (for 1 s after the knockback) plus 5 cm is accepted.
      The sim has no root effect; stuns are the only movement lock. Respawn, teleport and zone travel

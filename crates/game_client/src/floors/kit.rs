@@ -424,6 +424,8 @@ pub struct Plan {
     pub walls: Vec<Seg>,
     /// Centreline of the intended walk from the spawn to the boss pod (tests and pack placement).
     pub route: Vec<Vec2>,
+    /// Interactive props (`combat_core::world`): key and the world point a click aims at.
+    pub props: Vec<(&'static str, Vec3)>,
     frame: Vec<(Vec3, f32)>,
 }
 
@@ -509,6 +511,15 @@ impl Plan {
 
     pub fn anchor(&mut self, name: &'static str, pos: Vec3, yaw: f32) {
         self.anchors.push(Anchor { name, pos, yaw });
+    }
+
+    /// An interactive prop: `anchor` is `"prop:<key>"`, placed at `stand` (world, where the
+    /// server checks reach) facing `center` (world, what the cursor picks).
+    pub fn interactable(&mut self, anchor: &'static str, center: Vec3, stand: Vec3) {
+        let key = anchor.strip_prefix("prop:").unwrap_or(anchor);
+        let d = center - stand;
+        self.anchor(anchor, stand, (-d.x).atan2(-d.z));
+        self.props.push((key, center));
     }
 
     pub fn prim(&mut self, kind: PrimKind, center: Vec3, size: Vec3, mat: Mat) {

@@ -52,7 +52,7 @@ impl Sim {
     pub fn zone_cleared(&self, zone: &str) -> bool;                       // its boss died this session
     pub fn load_floor(&mut self, floor: u8, anchors, blockers) -> Result<(), ContentError>; // legacy: load_zone("tower/<floor>")
     pub fn floor(&self) -> Option<u8>;                                    // legacy: n of a loaded "tower/<n>"
-    pub fn quests(&self) -> &QuestLog;                                    // QuestLog { active: Vec<ActiveQuest { id, counts }>, completed: Vec<String> }
+    pub fn quests(&self) -> &QuestLog;                                    // QuestLog { active: Vec<ActiveQuest { id, counts }>, completed: Vec<String>, kills }
     pub fn quest_status(&self, quest: &str) -> QuestStatus;               // Locked | Available | Active | Ready | Done
     pub fn set_respawn_point(&mut self, pos: Vec3, yaw: f32);             // where RespawnPlayer puts the player
     pub fn inventory(&self) -> &[(String, u32)];                           // player trophies (name, copies), first pickup first
@@ -90,7 +90,7 @@ pub enum Command {
     RespawnPlayer,
     Talk { unit: EntityId },                     // talk to a friendly NPC within loot_range_m (6 m)
     AcceptQuest { quest: String },               // Available + within talk range of a living giver
-    TurnInQuest { quest: String },               // Ready + within talk range of a living giver
+    TurnInQuest { quest: String, choice: u8 },   // Ready + within talk range of its ender; choice = gear pick
     AbandonQuest { quest: String },              // drops an active quest and its progress
 }
 
@@ -167,6 +167,16 @@ Events: `Bag { unit, sp, bag, equipped, buyback }` (owner only, after every chan
 
 Loot uses its own rng stream (`loot_rng`), so changing drop tables never shifts combat replays. Perks (`Perk`) hook into damage, heals, mana cost, cooldowns, spell resolution and taking damage; item spells are ordinary content spells (ids 900+) resolved by `fire_item_spell` without mana, cooldown or cast bar. Saves: `Sim::export_save` / `import_save` and `SaveData::encode` / `decode` (versioned text, tolerant of unknown names and bad numbers).
 
+## Interactive office (props, rides, achievements)
+
+Content: `Content::world` (`content/game.ron`, section `world`), types and rules in `combat_core::world`.
+
+- `world.spells` are off-bar spells every class knows from level 1 (`ClassDef::knows`): **E-Scooter** (950, 1.5 s cast, aura `e_scooter`: `speed_pct` 60, `mount`) and **Rush to Standup** (951, instant, off the GCD, 30 s cooldown, aura `rush_to_standup`: `speed_pct` 70 for 4 s). `Content::mount_spell` / `sprint_spell` find them.
+- `AuraDef.speed_pct`: run speed bonus; several do not stack, the largest wins (`Content::speed_pct(aura keys)`, `Sim::move_speed_pct(id)`, 100 without). The client scales its run speed with it and the server's movement budget does too. `AuraDef.mount`: ends (`AuraRemoved`, `Consumed`) on any damage taken, on starting any other cast (instant or not), in combat, and when the group loads a zone without `ZoneDef.scooters` (campus and both data center halls have it). Mounting needs `!in_combat` (`CastError::InCombat`) and a scooter zone (`CastError::NoScooters`, "No scooters in the office. (Facilities)"); casting the mount spell while riding gets off instead. `AuraDef.mana_regen` adds in-combat mana per 5 s (Fresh Brew).
+- Props (`world.props`): `(key, name, zone, kind, reach_m = 4, cost_sp, fail_pct, auras: [(aura, ms)], items, cooldown_ms = 1000, respawn_ms)`. The zone layout provides anchor `prop:<key>`, the spot a player uses it from; props whose anchor is missing are absent. `Command::Interact { prop }` (players only): needs the prop in the loaded zone, a living player within `reach_m` of the anchor (`ItemError::TooFar` / `Dead`), the per-player cooldown, `cost_sp` (`NotEnoughSp`) and bag room when it gives items (`BagFull`). Outcome by kind: props with rewards pay `cost_sp`, roll `fail_pct` (outcome 0), else apply one random aura or stow one random item (outcome = 1-based pick, auras first); `Scooter` mounts at once without a cast (same zone and combat checks) and hides that parked scooter for everyone for `respawn_ms`; `FireAlarm` puts every living enemy of the zone on the user's threat table (outcome = how many); everything else is cosmetic and gets a random line number (0..65535). Rolls use the sim's own `world` rng stream, so props never shift combat or loot. `Event::Interacted { unit, prop, outcome }` goes to everyone.
+- Hidden NPCs (`world.secrets`: `(zone, anchor, unit)`): friendly units spawned by `load_zone` at layout anchor `secret:<unit>` when present.
+- Achievements (`world.achievements`: `(key, name, title, text, hint, trigger, sp, trophy)`), once per player, kept in `UnitState.achievements`; triggers: `Streak(kind, n)` (n uses of that kind of prop, each within 10 s of the last), `Fail(kind)`, `Stand(kind, secs)` (within 3 m of its anchor), `Talk(unit)`, `Mount`, `Count(n)`. Unlocking pays `sp`, grants `trophy`, wears the title at once and emits `Achievement { unit, key }` then `TitleChanged { unit, title }` (everyone). `Command::SetTitle { achievement }` wears an unlocked one ("" for none); `UnitState.title` is the worn key. Both persist in `SaveData` (`achievements`, `title`; unknown keys are dropped on import).
+
 ## Co-op group
 
 One `Sim` per room; every player in it is one group (`MAX_PLAYERS` = 5). The single-player API (`player()`, `push`, `quests()`, `quest_status`, `inventory`, `item_totals`, `set_player_*`, `grant_trophy`, `debug_*`) acts on the first player, so single-player behaviour and the golden replays are unchanged.
@@ -183,7 +193,7 @@ One `Sim` per room; every player in it is one group (`MAX_PLAYERS` = 5). The sin
 
 ## Contract with the client: unit keys and zones
 
-- Player `senior_engineer`. Friendly: `intern`, `it_support`, `facilities_guy`, `barista`, `smoking_corner_dev` (quest givers: `intern`, `facilities_guy`, `barista`, `smoking_corner_dev`).
+- Player `senior_engineer`. Friendly: `intern`, `it_support`, `facilities_guy`, `barista`, `smoking_corner_dev` (campus quest givers: `intern`, `facilities_guy`, `barista`, `smoking_corner_dev`); one giver at each other zone's arrival: `helpdesk_lead` (tower/1), `facilities_manager` (tower/2), `office_manager` (tower/3), `pmo_intern` (tower/4), `executive_assistant` (tower/5), `night_shift_sysadmin` (datacenter/1, anchor `npc_2`), `lab_safety_officer` (lab/1, anchor `npc_2`).
 - Trash: `meatproxy`, `vibe_junior`, `copilot_drone`, `scrum_master`, `agile_coach`, `middle_manager`, `sales_rep`, `account_manager`, `linkedin_influencer` (shown as "Network Influencer"), `growth_hacker`, `project_manager`, `product_owner`, `consultant`, `security_analyst`, `ai_ethicist`, `crypto_bro`, `chatbot_minion`, `unreviewed_pr`; campus `delivery_robot`, `scooter_exec`, `unpaid_ambassador`; data center `gpu_cultist`, `cooling_fan`, `token_counter`, `rogue_agent`, `overheated_rack` (add); lab `demo_presenter`, `vc_partner`, `prompt_whisperer`, `agi_hallucination` (add, named "AGI Prototype" like the boss).
 - Mini-bosses (sole unit of `pack_6`): `hr_partner` (tower/2), `marketing_lead` (tower/3), `ciso` (tower/4). Not `boss`, so they can be stunned.
 - Bosses (`boss: true`): `vibe_coder` (tower/1), `analyst` (tower/2), `customer` (tower/3), `vp_synergy` (tower/4), `ceo` (tower/5), `the_scheduler` (datacenter/1), `cooling_failure` (datacenter/2), `agi_prototype` (lab/2).
@@ -228,15 +238,17 @@ Event order on a zone boss kill: `Death`, `AiState Dead`, `XpGained`/`LevelUp`/`
 
 ## Quests
 
-`content.quests[]`: `(id, name, giver: (npc, zone), text, progress_text, done_text, objectives: [Kill(unit_key, n) | Loot(item, n) | Talk(npc_key) | ClearZone(zone)], reward: (xp, trophy: Option<item>), requires: Option<quest id>, level_min)`. Validation: the giver is a friendly spawned in its zone; Kill targets a hostile unit, Talk a friendly one, Loot an `items` entry, ClearZone a zone with a boss; `requires` names a quest listed earlier.
+`content.quests[]`: `(id, name, giver: (npc, zone), text, progress_text, done_text, objectives: [Kill(unit_key, n) | Loot(item, n) | Talk(npc_key) | ClearZone(zone)], reward: (xp, trophy: Option<item>, sp, gear_tier), requires: Option<quest id>, level_min, turn_in: Option<(npc, zone)>, group: bool)`. Validation: the giver (and `turn_in`) is a friendly spawned in its zone; Kill targets a hostile unit, Talk a friendly one, Loot an `items` entry, ClearZone a zone with a boss; `requires` names a quest listed earlier; `gear_tier` is 0-5. `QuestDef::ender()` is who takes the finished quest (`turn_in` or the giver); `is_breadcrumb()` is a Talk-only quest turned in elsewhere ("report to the next floor's giver").
 
-- State is per player (`Sim::quests()` returns the player's log; the map is keyed by player id). Status: `Done` once turned in, `Active`/`Ready` while in the log, `Available` when `requires` is done and the player is at least `level_min`, otherwise `Locked`.
-- `Talk` to a giver counts `Talk(npc)` objectives first, then emits `QuestOffered { npc, quests }` (its Available and Ready quests, content order) when that list is not empty.
-- `AcceptQuest`: Available and within `loot_range_m` of a living giver unit, else ignored silently. Emits `QuestAccepted`. A zone already cleared counts for `ClearZone` and copies already carried count for `Loot` (capped at need); if that completes the quest, `QuestReady` follows.
-- Progress: `Kill` counts the player's own kills only (killer = player, DoTs included); `Loot` counts items the player picks up (after `Looted`); `ClearZone` counts the zone's first clear. Each increment emits `QuestProgress { quest, objective, count, need }` (capped at need); completing the last objective emits `QuestReady` once.
-- `TurnInQuest`: Ready and near a giver. Emits `QuestCompleted`, grants the trophy (silent pickup, like `grant_trophy`) and the XP (`XpGained`/`LevelUp`; no level-difference adjustment, nothing at the cap), then checks unlocks.
-- `AbandonQuest` removes the quest and its counts silently; it becomes Available again.
-- Nothing here uses the rng, so quests never change combat rolls.
+- Placement (tests): every zone's givers stand at its arrival and hand out its own work; an objective happens in the giver's zone (or another hall of the same building: datacenter/*, lab/*), breadcrumbs lead to the next zone's giver. `Content::objective_zones(&objective)` lists where an objective can be worked on. `level_min` fits the zone band (`lo - 1 ..= hi`; breadcrumbs `..= lo` of the target).
+- State is per player (`Sim::quests()` returns the player's log; the map is keyed by player id). Status: `Done` once turned in, `Active`/`Ready` while in the log, `Available` when `requires` is done and the player is at least `level_min`, otherwise `Locked`. `QuestLog.kills` counts the player's kill credit per unit key over the run (saved).
+- `Talk` to an NPC counts `Talk(npc)` objectives first, then emits `QuestOffered { npc, quests }` (Available quests it gives, Ready quests it takes; content order) when that list is not empty.
+- `AcceptQuest`: Available and within talk range of a living giver unit, else ignored silently. Emits `QuestAccepted`. Retro credit: a zone already cleared counts for `ClearZone`, copies carried count for `Loot`, earlier kill credit (`QuestLog.kills`) counts for `Kill` (capped at need); each non-zero start emits `QuestProgress` (so remote logs that start at zero catch up), and `QuestReady` follows if that completes the quest.
+- Progress: `Kill` counts the killer's and nearby group members' kills (DoTs included); `Loot` counts items the player picks up (after `Looted`); `ClearZone` counts the zone's first clear. Each increment emits `QuestProgress { quest, objective, count, need }` (capped at need); completing the last objective emits `QuestReady` once.
+- Quest-only drops: a unit `loot` entry with `quest: Some(id)` rolls (on the loot rng stream) only for a member with that quest active whose objective for the item is not full.
+- `TurnInQuest { quest, choice }`: Ready and near `ender()`. With `gear_tier > 0`, `Content::quest_gear_choices(def, role)` lists 2-3 world pieces of that tier for the player's role (own role or generalist, Rare/Uncommon, Epic for `group` quests; deterministic, so the client shows the same list) and `choice` picks one (clamped); a full bag refuses the turn-in with `ItemError BagFull`. Emits `QuestCompleted`, grants the trophy (silent pickup), the gear (`Bag`), the XP (`XpGained`/`LevelUp`; nothing at the cap) and SP (`quest_sp_pct` of the XP plus `sp`), then checks unlocks.
+- `AbandonQuest` removes the quest and its counts silently; it becomes Available again (kill tallies stay, so it may come back Ready).
+- Quests never touch the combat rng.
 
 ## Levels and spells
 

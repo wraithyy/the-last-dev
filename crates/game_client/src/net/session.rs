@@ -406,6 +406,7 @@ fn apply(
             target,
         } => {
             let text = emote_line(world, emote, target);
+            world.poses.push((player, emote));
             world.push_presentation(Event::Yell { unit: player, text });
         }
         ServerMsg::PlayerJoined(p) => {

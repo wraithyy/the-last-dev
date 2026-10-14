@@ -6,7 +6,8 @@
 //! `WOW_FLOOR=<1..5>` is `WOW_ZONE=tower/<n>`, `WOW_LEVEL=<n>` overrides the start level,
 //! `WOW_PLAYER_AT=x,z,yaw_deg[,cam_deg]` moves the player after the first zone loads (optional
 //! camera yaw offset, 180 = front view), `WOW_UNLOCK_ALL=1` opens every door,
-//! `WOW_QUESTS=id[:active|ready|done],..` forces quest states at start (default `active`).
+//! `WOW_QUESTS=id[:active|ready|done|<n>+<n>..],..` forces quest states at start (default
+//! `active`; numbers set the objective counts of an active quest).
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
@@ -238,8 +239,8 @@ fn env_u8(name: &str) -> Option<u8> {
     std::env::var(name).ok()?.trim().parse().ok()
 }
 
-/// `WOW_QUESTS=id[:active|ready|done],..`
-fn debug_quests() -> Vec<(String, QuestStatus)> {
+/// `WOW_QUESTS=id[:active|ready|done|<n>+<n>..],..`; numbers are objective counts (active).
+fn debug_quests() -> Vec<(String, QuestStatus, Vec<u32>)> {
     let Ok(v) = std::env::var("WOW_QUESTS") else {
         return Vec::new();
     };
@@ -252,7 +253,8 @@ fn debug_quests() -> Vec<(String, QuestStatus)> {
                 "done" => QuestStatus::Done,
                 _ => QuestStatus::Active,
             };
-            (id.to_string(), status)
+            let counts = state.split('+').filter_map(|n| n.parse().ok()).collect();
+            (id.to_string(), status, counts)
         })
         .collect()
 }
@@ -277,9 +279,12 @@ fn start_game(
     if level > 1 {
         sim.0.set_player_level(level);
     }
-    for (id, status) in debug_quests() {
+    for (id, status, counts) in debug_quests() {
         if !sim.0.debug_set_quest(&id, status) {
             warn!("WOW_QUESTS: unknown quest {id:?}");
+        }
+        if !counts.is_empty() {
+            sim.0.debug_quest_counts(&id, &counts);
         }
     }
     flow.unlock_all = std::env::var_os("WOW_UNLOCK_ALL").is_some();

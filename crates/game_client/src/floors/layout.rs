@@ -70,6 +70,9 @@ pub struct FloorLayout {
     /// Intended walking line from the spawn to the boss pod.
     #[cfg_attr(not(test), allow(dead_code))]
     pub route: Vec<Vec2>,
+    /// Interactive props: key and the point a click aims at (anchor `prop:<key>` is where
+    /// the player stands).
+    pub props: Vec<(&'static str, Vec3)>,
 }
 
 /// Zone layouts are floor layouts; the alias is the contract name.
@@ -136,11 +139,14 @@ pub fn assemble(
     plan: Plan,
     theme: Theme,
 ) -> FloorLayout {
+    let mut plan = plan;
+    super::office::place(zone, &mut plan);
     let Plan {
         pieces,
         anchors,
         fp,
         route,
+        props,
         ..
     } = plan;
     FloorLayout {
@@ -157,6 +163,7 @@ pub fn assemble(
         theme,
         footprint: fp,
         route,
+        props,
     }
 }
 

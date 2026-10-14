@@ -6,6 +6,7 @@
 use crate::catalog::{IdlePose, Paint};
 use crate::combat_anim::CombatAnim;
 use crate::config::RUN_SPEED;
+use crate::office::{PoseClip, WorldPose};
 use crate::player::PlayerBody;
 use bevy::animation::AnimationTargetId;
 use bevy::gltf::{Gltf, GltfMaterialName};
@@ -79,6 +80,9 @@ enum Clip {
     CastInspect,
     CastHack,
     CastType,
+    /// Emotes (`office::ride::WorldPose`): the victory pump on a loop, and a slump held.
+    Dance,
+    Facepalm,
 }
 
 struct Spec {
@@ -106,7 +110,7 @@ const fn overlay(clip: &'static str, speed: f32) -> Spec {
 }
 
 /// Indexed by `Clip as usize`.
-const SPECS: [Spec; 20] = [
+const SPECS: [Spec; 22] = [
     spec("Idle", 1.0),
     spec("Walk", 1.0),
     spec("Run", 1.0),
@@ -127,6 +131,8 @@ const SPECS: [Spec; 20] = [
     spec("PickUp", 0.7),
     spec("SwordSlash", 0.45),
     spec("PickUp", 2.2),
+    spec("Victory", 1.2),
+    spec("Defeat", 1.0),
 ];
 const CLIP_COUNT: usize = SPECS.len();
 
@@ -145,6 +151,7 @@ impl Clip {
                 | Clip::Victory
                 | Clip::Roll
                 | Clip::Hop
+                | Clip::Facepalm
         )
     }
 }
@@ -403,6 +410,7 @@ fn attach_players(
 const TELEPORT_SPEED: f32 = 40.0;
 const VEL_SMOOTHING: f32 = 10.0;
 
+#[allow(clippy::type_complexity)] // Bevy query tuple
 fn drive(
     time: Res<Time>,
     mut owners: Query<(
@@ -411,6 +419,7 @@ fn drive(
         &mut AnimState,
         Option<&PlayerBody>,
         &IdlePose,
+        Option<&WorldPose>,
     )>,
     mut players: Query<(&mut AnimationPlayer, &mut AnimationTransitions, &AnimLink)>,
 ) {
@@ -419,7 +428,7 @@ fn drive(
         return;
     }
     for (mut player, mut tr, link) in &mut players {
-        let Ok((tf, ca, mut st, body, pose)) = owners.get_mut(link.owner) else {
+        let Ok((tf, ca, mut st, body, pose, world)) = owners.get_mut(link.owner) else {
             continue;
         };
 
@@ -508,7 +517,7 @@ fn drive(
         } else if let (true, Some(cur)) = (st.one_shot, st.current) {
             cur
         } else {
-            base_clip(&mut st, tf, ca, body, *pose)
+            base_clip(&mut st, tf, ca, body, *pose, world)
         };
 
         if force || st.current != Some(want) {
@@ -561,6 +570,7 @@ fn base_clip(
     ca: &CombatAnim,
     body: Option<&PlayerBody>,
     pose: IdlePose,
+    world: Option<&WorldPose>,
 ) -> Clip {
     if matches!(pose, IdlePose::Sitting | IdlePose::Sleeping) && !ca.casting {
         return Clip::Sit;
@@ -574,7 +584,14 @@ fn base_clip(
     if ca.casting {
         return cast_clip(ca.cast_spell);
     }
-    if !st.moving {
+    match world.and_then(WorldPose::pose) {
+        Some(PoseClip::Sit) => return Clip::Sit,
+        Some(PoseClip::Dance) => return Clip::Dance,
+        Some(PoseClip::Facepalm) => return Clip::Facepalm,
+        None => {}
+    }
+    // On a scooter the deck does the walking.
+    if !st.moving || world.is_some_and(|w| w.mounted) {
         return Clip::Idle;
     }
     let local = tf.rotation.inverse() * st.vel;
@@ -655,13 +672,14 @@ fn apply_paints(
     }
 }
 
-/// Slumps sleeping units forward; every other pose stands upright.
+/// Slumps sleeping units forward; every other pose stands upright. Riders stand on the deck
+/// and lean into turns (`WorldPose::lean`).
 fn pose_lean(
-    poses: Query<&IdlePose>,
+    poses: Query<(&IdlePose, Option<&WorldPose>)>,
     mut roots: Query<(&ChildOf, &mut Transform), With<ModelRoot>>,
 ) {
     for (parent, mut tf) in &mut roots {
-        let Ok(pose) = poses.get(parent.parent()) else {
+        let Ok((pose, world)) = poses.get(parent.parent()) else {
             continue;
         };
         let lean = if *pose == IdlePose::Sleeping {
@@ -669,9 +687,14 @@ fn pose_lean(
         } else {
             0.0
         };
-        let rot = Quat::from_rotation_y(PI) * Quat::from_rotation_x(lean);
+        let (lift, roll) = world.map_or((0.0, 0.0), WorldPose::ride_offset);
+        let rot =
+            Quat::from_rotation_z(roll) * Quat::from_rotation_y(PI) * Quat::from_rotation_x(lean);
         if tf.rotation != rot {
             tf.rotation = rot;
+        }
+        if tf.translation.y != lift {
+            tf.translation.y = lift;
         }
     }
 }

@@ -4,8 +4,8 @@
 mod common;
 
 use combat_core::{
-    AiAbility, AiTarget, Command, Content, EntityId, Event, Objective, QuestStatus, Sim, SpellId,
-    TRASH_RESPAWN_MS, Vec3, ms_to_ticks,
+    AiAbility, AiTarget, Command, Content, EntityId, Event, Objective, QuestStatus, Role, Sim,
+    SpellId, TRASH_RESPAWN_MS, Vec3, ms_to_ticks,
 };
 use common::*;
 
@@ -155,6 +155,7 @@ impl T {
     fn turn_in(&mut self, q: &str) {
         self.quest_cmd(Command::TurnInQuest {
             quest: q.to_string(),
+            choice: 0,
         });
     }
 }
@@ -354,7 +355,8 @@ fn onboarding_accept_progress_ready_turn_in() {
         t.sim.quest_status("badge_access_denied"),
         QuestStatus::Locked
     );
-    assert_eq!(t.sim.quest_status("code_freeze"), QuestStatus::Locked);
+    assert_eq!(t.sim.quest_status("escalation_path"), QuestStatus::Locked);
+    assert_eq!(t.sim.quest_status("mandatory_fun"), QuestStatus::Locked);
 
     // Too far from the intern: ignored.
     t.accept("onboarding");
@@ -406,9 +408,13 @@ fn onboarding_accept_progress_ready_turn_in() {
         t.sim.quest_status("badge_access_denied"),
         QuestStatus::Available
     );
-    assert_eq!(t.sim.quest_status("code_freeze"), QuestStatus::Locked);
+    assert_eq!(
+        t.sim.quest_status("escalation_path"),
+        QuestStatus::Available
+    );
+    assert_eq!(t.sim.quest_status("mandatory_fun"), QuestStatus::Locked);
     t.sim.set_player_level(2);
-    assert_eq!(t.sim.quest_status("code_freeze"), QuestStatus::Available);
+    assert_eq!(t.sim.quest_status("mandatory_fun"), QuestStatus::Available);
 }
 
 #[test]
@@ -429,7 +435,9 @@ fn abandon_drops_progress_and_the_quest_can_be_taken_again() {
     );
     t.talk_to("smoking_corner_dev");
     t.accept("content_moderation");
-    assert_eq!(t.sim.quests().active[0].counts, [0]);
+    // Progress is gone with the quest, but the kill itself is remembered (retro credit).
+    assert_eq!(t.sim.quests().active[0].counts, [1]);
+    assert_eq!(t.sim.quests().kills.get("linkedin_influencer"), Some(&1));
 }
 
 #[test]
@@ -515,11 +523,8 @@ fn clear_zone_objectives_count_a_zone_cleared_before_accepting() {
     let boss = t.id_of("vibe_coder");
     t.kill(boss);
     t.load("campus");
-    t.talk_to("intern");
-    t.accept("onboarding");
-    t.talk_to("facilities_guy");
-    t.talk_to("intern");
-    t.turn_in("onboarding");
+    t.load("tower/1");
+    t.talk_to("helpdesk_lead");
     t.log.clear();
     t.accept("code_freeze");
     assert!(t.has(|e| matches!(e, Event::QuestReady { quest } if quest == "code_freeze")));
@@ -530,8 +535,8 @@ fn clear_zone_objectives_count_a_zone_cleared_before_accepting() {
 #[test]
 fn quest_content_is_validated() {
     let bad = SRC.replace(
-        "objectives: [Kill(\"gpu_cultist\", 6)]",
-        "objectives: [Kill(\"intern\", 6)]",
+        "objectives: [Kill(\"gpu_cultist\", 4)]",
+        "objectives: [Kill(\"intern\", 4)]",
     );
     assert!(Content::from_ron(&bad).is_err(), "kill a friendly");
     let bad = SRC.replace(
@@ -729,4 +734,376 @@ fn debug_kill_counts_as_a_player_kill() {
         |e| matches!(e, Event::Death { unit, killer } if *unit == boss && *killer == Some(t.p))
     ));
     assert!(t.sim.zone_cleared("lab/2"));
+}
+
+// ---- quest placement, levels, retro credit, quest drops, rewards ----
+
+/// "datacenter/2" -> "datacenter": halls of one building share the giver at its entrance.
+fn area(zone: &str) -> &str {
+    zone.split('/').next().unwrap_or(zone)
+}
+
+#[test]
+fn every_quest_is_given_where_its_work_happens() {
+    let c = content();
+    assert!(c.quests.len() >= 40, "{} quests", c.quests.len());
+    for q in &c.quests {
+        if q.is_breadcrumb() {
+            // A breadcrumb points at the next zone's giver, who also takes it.
+            let to = &q.ender().zone;
+            assert_ne!(*to, q.giver.zone, "{}: breadcrumb to its own zone", q.id);
+            for o in &q.objectives {
+                assert_eq!(c.objective_zones(o), [to.as_str()], "{}", q.id);
+            }
+            continue;
+        }
+        assert_eq!(q.ender().zone, q.giver.zone, "{}", q.id);
+        for o in &q.objectives {
+            let zones = c.objective_zones(o);
+            let here = zones
+                .iter()
+                .any(|z| *z == q.giver.zone || area(z) == area(&q.giver.zone) && z != &"campus");
+            assert!(
+                here,
+                "{}: {o:?} happens in {zones:?}, given in {}",
+                q.id, q.giver.zone
+            );
+        }
+    }
+    // Every zone with packs has local work, and each zone's givers stand in it.
+    for z in &c.zones {
+        let n = c
+            .quests
+            .iter()
+            .filter(|q| !q.is_breadcrumb())
+            .filter(|q| {
+                q.objectives
+                    .iter()
+                    .any(|o| c.objective_zones(o).contains(&z.id.as_str()))
+            })
+            .count();
+        assert!(n >= 3, "{}: only {n} quests work there", z.id);
+    }
+}
+
+#[test]
+fn quest_levels_fit_their_zone() {
+    let c = content();
+    for q in &c.quests {
+        let zone = if q.is_breadcrumb() {
+            &q.ender().zone
+        } else {
+            &q.giver.zone
+        };
+        let Some((lo, hi)) = c.zone(zone).map(|z| z.level_range) else {
+            panic!("{}: no zone {zone}", q.id)
+        };
+        // Available on arrival (a level of slack for the walk), never above the zone.
+        let top = if q.is_breadcrumb() { lo } else { hi };
+        assert!(
+            q.level_min + 1 >= lo && q.level_min <= top,
+            "{}: level {} for {zone} ({lo}-{hi})",
+            q.id,
+            q.level_min
+        );
+    }
+}
+
+#[test]
+fn kills_before_accepting_count_and_reach_remote_logs_as_progress() {
+    let mut t = t(5);
+    t.load("tower/1");
+    let proxies: Vec<EntityId> = t
+        .sim
+        .units()
+        .filter(|u| u.key == "meatproxy")
+        .map(|u| u.id)
+        .collect();
+    assert_eq!(proxies.len(), 3);
+    for id in proxies {
+        assert!(t.sim.debug_kill(id));
+    }
+    t.tick();
+    t.talk_to("helpdesk_lead");
+    t.log.clear();
+    t.accept("forwarded_to_ai");
+    assert_eq!(t.sim.quest_status("forwarded_to_ai"), QuestStatus::Ready);
+    let accepted = t
+        .log
+        .iter()
+        .position(|e| matches!(e, Event::QuestAccepted { quest } if quest == "forwarded_to_ai"));
+    let progress = t.log.iter().position(|e| {
+        matches!(e, Event::QuestProgress { quest, count: 3, need: 3, .. } if quest == "forwarded_to_ai")
+    });
+    assert!(accepted.is_some() && accepted < progress, "{:?}", t.log);
+    t.turn_in("forwarded_to_ai");
+    assert_eq!(t.sim.quest_status("forwarded_to_ai"), QuestStatus::Done);
+}
+
+#[test]
+fn quest_items_drop_only_while_the_quest_wants_them() {
+    let mut t = t_with(5, |c| {
+        let p = def_mut(c, "senior_engineer");
+        p.spell_power = 100_000;
+        p.max_hp = 100_000;
+        for l in &mut def_mut(c, "vibe_junior").loot {
+            if l.quest.is_some() {
+                l.chance_pct = 100;
+            }
+        }
+    });
+    t.load("tower/1");
+    let drops = |t: &T| {
+        t.log.iter().any(|e| {
+            matches!(e, Event::LootDropped { items, .. } if items.iter().any(|i| i == "Hardcoded API Key"))
+        })
+    };
+    let juniors: Vec<EntityId> = t
+        .sim
+        .units()
+        .filter(|u| u.key == "vibe_junior")
+        .map(|u| u.id)
+        .collect();
+    assert!(t.sim.debug_kill(juniors[0]));
+    t.tick();
+    assert!(!drops(&t), "no quest, no key");
+    t.talk_to("helpdesk_lead");
+    t.accept("secrets_in_the_repo");
+    t.log.clear();
+    assert!(t.sim.debug_kill(juniors[1]));
+    t.tick();
+    assert!(drops(&t), "on the quest the key drops");
+}
+
+#[test]
+fn gear_rewards_offer_a_role_choice_and_the_pick_lands_in_the_bag() {
+    let c = content();
+    for q in c.quests.iter().filter(|q| q.reward.gear_tier > 0) {
+        for role in [Role::Tank, Role::Healer, Role::Melee, Role::Ranged] {
+            let choices = c.quest_gear_choices(q, Some(role));
+            assert!(
+                (2..=3).contains(&choices.len()),
+                "{} for {role:?}: {choices:?}",
+                q.id
+            );
+            for g in &choices {
+                let gear = c.economy.gear(g);
+                assert!(gear.is_some_and(|g| g.role.is_none() || g.role == Some(role)));
+            }
+        }
+    }
+    let mut t = t(5);
+    t.load("tower/1");
+    let boss = t.id_of("vibe_coder");
+    assert!(t.sim.debug_kill(boss));
+    t.tick();
+    t.talk_to("helpdesk_lead");
+    t.accept("code_freeze");
+    let Some(def) = t.sim.content().quest("code_freeze").cloned() else {
+        panic!("no code_freeze")
+    };
+    let choices = t.sim.content().quest_gear_choices(&def, Some(Role::Ranged));
+    let bag = t.sim.unit(t.p).map_or(0, |u| u.bag.len());
+    t.quest_cmd(Command::TurnInQuest {
+        quest: "code_freeze".into(),
+        choice: 1,
+    });
+    let Some(me) = t.sim.unit(t.p) else { panic!() };
+    assert_eq!(me.bag.len(), bag + 1);
+    assert_eq!(me.bag.last(), choices.get(1));
+}
+
+#[test]
+fn a_gear_reward_waits_for_a_free_bag_slot() {
+    let mut t = t(5);
+    t.load("tower/1");
+    let boss = t.id_of("vibe_coder");
+    assert!(t.sim.debug_kill(boss));
+    t.tick();
+    while t.sim.grant_goods(t.p, "Ibuprofen") {}
+    t.talk_to("helpdesk_lead");
+    t.accept("code_freeze");
+    t.turn_in("code_freeze");
+    assert_eq!(t.sim.quest_status("code_freeze"), QuestStatus::Ready);
+    assert!(t.has(|e| matches!(e, Event::ItemError { .. })));
+}
+
+#[test]
+fn a_breadcrumb_is_turned_in_at_the_next_zones_giver() {
+    let mut t = t(5);
+    t.load("campus");
+    t.talk_to("intern");
+    t.accept("onboarding");
+    t.talk_to("facilities_guy");
+    t.talk_to("intern");
+    t.turn_in("onboarding");
+    t.accept("escalation_path");
+    assert_eq!(t.sim.quest_status("escalation_path"), QuestStatus::Active);
+    // The intern cannot take it back.
+    t.turn_in("escalation_path");
+    assert_eq!(t.sim.quest_status("escalation_path"), QuestStatus::Active);
+    t.load("tower/1");
+    t.log.clear();
+    t.talk_to("helpdesk_lead");
+    assert!(t.has(|e| matches!(
+        e,
+        Event::QuestOffered { quests, .. } if quests.iter().any(|q| q == "escalation_path")
+    )));
+    t.turn_in("escalation_path");
+    assert_eq!(t.sim.quest_status("escalation_path"), QuestStatus::Done);
+}
+
+#[test]
+fn saves_keep_open_quests_and_kill_tallies() {
+    let mut t = t(5);
+    t.load("tower/1");
+    let proxy = t.id_of("meatproxy");
+    assert!(t.sim.debug_kill(proxy));
+    t.tick();
+    t.talk_to("helpdesk_lead");
+    t.accept("autocomplete_pest_control");
+    let Some(save) = t.sim.export_save(t.p) else {
+        panic!("no save")
+    };
+    let Some(back) = combat_core::SaveData::decode(&save.encode()) else {
+        panic!("decode")
+    };
+    assert_eq!(back.kills, [("meatproxy".to_string(), 1)]);
+    let mut fresh = Sim::new(content(), 1);
+    let p = fresh.spawn_player("fullstack", Vec3::new(0.0, 0.0, 0.0), 0.0);
+    assert!(fresh.import_save(p, &back));
+    assert_eq!(fresh.quests().active[0].id, "autocomplete_pest_control");
+    assert_eq!(fresh.quests().kills.get("meatproxy"), Some(&1));
+}
+
+/// The XP budget of one clear per zone in campaign order, quests included (breadcrumbs pay out
+/// where they end): the level you arrive with should match each zone's band.
+#[test]
+fn quest_and_kill_xp_track_the_zone_levels() {
+    const ORDER: [&str; 10] = [
+        "campus",
+        "tower/1",
+        "tower/2",
+        "tower/3",
+        "datacenter/1",
+        "datacenter/2",
+        "tower/4",
+        "tower/5",
+        "lab/1",
+        "lab/2",
+    ];
+    let c = content();
+    let mut sim = Sim::new(c.clone(), 1);
+    sim.spawn_player("fullstack", Vec3::new(0.0, 0.0, 0.0), 0.0);
+    let (mut level, mut xp) = (1u8, 0u32);
+    let gain = |level: &mut u8, xp: &mut u32, amount: u32| {
+        *xp += amount;
+        while c.xp_to_next(*level) > 0 && *xp >= c.xp_to_next(*level) {
+            *xp -= c.xp_to_next(*level);
+            *level += 1;
+        }
+    };
+    let mut report = Vec::new();
+    let mut bad = Vec::new();
+    for zone in ORDER {
+        let arrive = level;
+        if let Err(e) = sim.load_zone(zone, &anchor, Vec::new()) {
+            panic!("{zone}: {e}");
+        }
+        let mobs: Vec<(u8, u32)> = sim
+            .units()
+            .filter(|u| u.hostile)
+            .map(|u| (u.level, u.xp))
+            .collect();
+        let mut kills = 0;
+        for (ml, reward) in mobs {
+            let amount = c.kill_xp(level, ml, reward);
+            kills += amount;
+            gain(&mut level, &mut xp, amount);
+        }
+        let mut quests = 0;
+        for q in &c.quests {
+            let at = if q.is_breadcrumb() {
+                &q.ender().zone
+            } else {
+                &q.giver.zone
+            };
+            if at == zone {
+                quests += q.reward.xp;
+                gain(&mut level, &mut xp, q.reward.xp);
+            }
+        }
+        let (lo, hi) = c.zone(zone).map_or((1, 1), |z| z.level_range);
+        report.push(format!(
+            "{zone} ({lo}-{hi}): {arrive} -> {level} (kills {kills} XP, quests {quests} XP)"
+        ));
+        if arrive + 1 < lo || arrive > hi + 1 {
+            bad.push(zone);
+        }
+    }
+    println!("{}", report.join("\n"));
+    assert!(
+        bad.is_empty(),
+        "off-band arrivals {bad:?}:\n{}",
+        report.join("\n")
+    );
+    assert_eq!(level, c.max_level(), "the campaign ends at the cap");
+}
+
+#[test]
+fn group_members_keep_their_own_logs_and_share_kill_credit() {
+    let mut t = t(5);
+    t.load("tower/1");
+    let p2 = t.sim.spawn_player("devops", Vec3::new(1.0, 0.0, 20.0), 0.0);
+    t.talk_to("helpdesk_lead");
+    t.accept("forwarded_to_ai");
+    // The second member stands next to the first and takes a different ticket.
+    let Some(at) = t.sim.unit(t.p).map(|u| u.pos) else {
+        panic!()
+    };
+    t.sim.push(Command::PlayerMoved {
+        pos: Vec3::new(at.x + 1.0, 0.0, at.z),
+        yaw: 0.0,
+        moving: false,
+        jumping: false,
+    });
+    t.sim.apply_as(
+        p2,
+        Command::PlayerMoved {
+            pos: Vec3::new(at.x + 1.0, 0.0, at.z),
+            yaw: 0.0,
+            moving: false,
+            jumping: false,
+        },
+    );
+    t.sim.apply_as(
+        p2,
+        Command::AcceptQuest {
+            quest: "autocomplete_pest_control".into(),
+        },
+    );
+    t.tick();
+    assert_eq!(
+        t.sim.quests_of(p2).active[0].id,
+        "autocomplete_pest_control"
+    );
+    assert_eq!(t.sim.quests_of(t.p).active[0].id, "forwarded_to_ai");
+    // A drone killed by the first member near the second counts for the second's ticket.
+    let drone = t.id_of("copilot_drone");
+    let Some(dpos) = t.sim.unit(drone).map(|u| u.pos) else {
+        panic!()
+    };
+    t.sim.apply_as(
+        p2,
+        Command::PlayerMoved {
+            pos: Vec3::new(dpos.x + 2.0, 0.0, dpos.z + 2.0),
+            yaw: 0.0,
+            moving: false,
+            jumping: false,
+        },
+    );
+    t.kill(drone);
+    assert_eq!(t.sim.quests_of(p2).active[0].counts, [1]);
+    assert_eq!(t.sim.quests_of(t.p).active[0].counts, [0]);
+    assert_eq!(t.sim.quests_of(p2).kills.get("copilot_drone"), Some(&1));
 }

@@ -86,6 +86,10 @@ pub fn cast_zone(p: &mut Plan, c: &ZoneCast) {
             yaw_towards(spawn, v(heading.x, 0.0, heading.y)),
         );
         p.anchor("graveyard", arrive + facing * 4.0, yaw);
+        // The zone's quest giver waits beside the arrival, so its work is picked up first.
+        let side = Vec3::new(-facing.z, 0.0, facing.x);
+        let giver = spawn + side * 3.0 + facing;
+        p.anchor("npc_2", giver, yaw_towards(giver, spawn));
     }
     for (name, (x, z)) in PACK_NAMES.iter().zip(c.packs) {
         let at = v(*x, 0.0, *z);

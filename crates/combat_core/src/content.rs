@@ -189,6 +189,16 @@ pub struct AuraDef {
     /// Whether `Dispel` effects (and consumables) can remove it; only harmful auras matter.
     #[serde(default)]
     pub dispel: DispelType,
+    /// Movement speed bonus in percent; several do not stack, the largest wins (see `world.rs`).
+    #[serde(default)]
+    pub speed_pct: u32,
+    /// A ride (e-scooter): ends on damage, on any other cast, in combat and in zones without
+    /// `scooters`.
+    #[serde(default)]
+    pub mount: bool,
+    /// Extra in-combat mana per 5 s while it lasts (Fresh Brew).
+    #[serde(default)]
+    pub mana_regen: u32,
 }
 
 /// Dispel category of an aura, shown on the debuff so players know what can clear it.
@@ -479,6 +489,10 @@ impl SpellDef {
 pub struct LootEntry {
     pub item: String,
     pub chance_pct: u32,
+    /// Quest-only drop: rolled (on the loot stream) only for a group member with this quest
+    /// active whose objective for the item is not full yet.
+    #[serde(default)]
+    pub quest: Option<String>,
 }
 
 /// Copies of one trophy beyond this add nothing; the extra copies are still kept and shown.
@@ -840,6 +854,9 @@ pub struct ZoneDef {
     pub friendly: Vec<ZoneSpawn>,
     #[serde(default)]
     pub links: Vec<ZoneLink>,
+    /// Facilities allows e-scooters here (campus, data center halls).
+    #[serde(default)]
+    pub scooters: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -873,6 +890,13 @@ pub struct QuestReward {
     pub xp: u32,
     #[serde(default)]
     pub trophy: Option<String>,
+    /// Story Points on top of the `quest_sp_pct` share of the XP.
+    #[serde(default)]
+    pub sp: u32,
+    /// Gear tier (1-5) of a "choose one" reward; 0 for none. The choices come from
+    /// `Content::quest_gear_choices` for the player's role.
+    #[serde(default)]
+    pub gear_tier: u8,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -893,6 +917,28 @@ pub struct QuestDef {
     pub requires: Option<String>,
     #[serde(default = "one")]
     pub level_min: u8,
+    /// Turned in to this NPC instead of the giver (breadcrumbs: "report to X upstairs").
+    #[serde(default)]
+    pub turn_in: Option<QuestGiver>,
+    /// Elite or boss work the ticket recommends a group for.
+    #[serde(default)]
+    pub group: bool,
+}
+
+impl QuestDef {
+    /// Who takes the finished quest.
+    pub fn ender(&self) -> &QuestGiver {
+        self.turn_in.as_ref().unwrap_or(&self.giver)
+    }
+
+    /// A pure "go talk to X elsewhere" ticket.
+    pub fn is_breadcrumb(&self) -> bool {
+        self.turn_in.is_some()
+            && self
+                .objectives
+                .iter()
+                .all(|o| matches!(o, Objective::Talk(_)))
+    }
 }
 
 pub const MAX_ACTION_BAR: usize = 10;
@@ -952,6 +998,7 @@ impl ClassDef {
         self.action_bar.contains(&spell)
             || self.resurrect == spell
             || content.channel_spell().is_some_and(|c| c.id == spell)
+            || content.world.spells.contains(&spell)
     }
 }
 
@@ -970,6 +1017,9 @@ pub struct Content {
     /// Gear, Story Points, vendors (see `economy.rs`); absent in minimal test content.
     #[serde(default)]
     pub economy: crate::economy::Economy,
+    /// Interactive props, hidden NPCs, achievements and the spells everyone knows (`world.rs`).
+    #[serde(default)]
+    pub world: crate::world::WorldDef,
 }
 
 impl Content {
@@ -1248,6 +1298,7 @@ impl Content {
         self.validate_zones()?;
         self.validate_quests()?;
         self.economy.validate(self)?;
+        self.world.validate(self)?;
         Ok(())
     }
 }
@@ -1389,6 +1440,36 @@ impl Content {
             }
             if q.level_min == 0 || q.level_min > self.max_level() {
                 return bad(format!("quest {} level_min out of range", q.id));
+            }
+            if let Some(t) = &q.turn_in {
+                let takes = self
+                    .zone(&t.zone)
+                    .is_some_and(|z| z.friendly.iter().any(|f| f.unit == t.npc));
+                if !takes {
+                    return bad(format!(
+                        "quest {}: turn-in {} is not a friendly in {}",
+                        q.id, t.npc, t.zone
+                    ));
+                }
+            }
+            if q.reward.gear_tier > 5 {
+                return bad(format!("quest {} gear tier out of range", q.id));
+            }
+        }
+        for u in &self.units {
+            for l in &u.loot {
+                let Some(id) = &l.quest else { continue };
+                let wanted = self.quest(id).is_some_and(|q| {
+                    q.objectives
+                        .iter()
+                        .any(|o| matches!(o, Objective::Loot(it, _) if *it == l.item))
+                });
+                if !wanted {
+                    return bad(format!(
+                        "unit {} drops {} for quest {id}, which does not ask for it",
+                        u.key, l.item
+                    ));
+                }
             }
         }
         Ok(())

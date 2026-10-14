@@ -20,6 +20,10 @@ pub enum Action {
     StrafeLeft,
     StrafeRight,
     Jump,
+    /// Rush to Standup (`world.spells`).
+    Sprint,
+    /// Mount or leave the e-scooter.
+    Scooter,
     TargetNext,
     /// 0 targets yourself, 1..=4 the other group members in join order.
     Party(u8),
@@ -88,6 +92,8 @@ impl Action {
             StrafeLeft,
             StrafeRight,
             Jump,
+            Sprint,
+            Scooter,
             TargetNext,
         ];
         v.extend((0..5).map(Party));
@@ -122,6 +128,8 @@ impl Action {
             StrafeLeft => "strafe_left".into(),
             StrafeRight => "strafe_right".into(),
             Jump => "jump".into(),
+            Sprint => "sprint".into(),
+            Scooter => "scooter".into(),
             TargetNext => "target_next".into(),
             Party(i) => format!("party{i}"),
             Slot(i) => format!("slot{i}"),
@@ -155,6 +163,8 @@ impl Action {
             StrafeLeft => "strafe left".into(),
             StrafeRight => "strafe right".into(),
             Jump => "jump".into(),
+            Sprint => "rush to standup (sprint)".into(),
+            Scooter => "e-scooter (mount)".into(),
             TargetNext => "target next".into(),
             Party(0) => "target self".into(),
             Party(i) => format!("target party {i}"),
@@ -182,9 +192,8 @@ impl Action {
     pub fn group(self) -> Group {
         use Action::*;
         match self {
-            Forward | Backward | TurnLeft | TurnRight | StrafeLeft | StrafeRight | Jump => {
-                Group::Movement
-            }
+            Forward | Backward | TurnLeft | TurnRight | StrafeLeft | StrafeRight | Jump
+            | Sprint | Scooter => Group::Movement,
             TargetNext | Party(_) => Group::Targeting,
             AutoAttack | Coffee | Resurrect | Interact | Gadget(_) => Group::Combat,
             Slot(_) => Group::Bar,
@@ -204,6 +213,8 @@ impl Action {
             StrafeLeft => KeyCode::KeyQ,
             StrafeRight => KeyCode::KeyE,
             Jump => KeyCode::Space,
+            Sprint => KeyCode::KeyX,
+            Scooter => KeyCode::KeyY,
             TargetNext => KeyCode::Tab,
             Party(i) => [
                 KeyCode::F1,

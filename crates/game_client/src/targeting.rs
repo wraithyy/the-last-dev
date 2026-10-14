@@ -237,7 +237,7 @@ fn click_select(
     }
 }
 
-fn ray_sphere(origin: Vec3, dir: Vec3, center: Vec3, radius: f32) -> Option<f32> {
+pub fn ray_sphere(origin: Vec3, dir: Vec3, center: Vec3, radius: f32) -> Option<f32> {
     let oc = center - origin;
     let along = oc.dot(dir);
     let d2 = oc.length_squared() - along * along;

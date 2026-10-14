@@ -355,7 +355,9 @@ impl RoomState {
             .unit(m.eid)
             .map_or((false, false), |u| (u.alive, u.stunned));
         let now = Instant::now();
-        let rate = RUN_SPEED_MPS * SPEED_SLACK;
+        // A ride or a sprint (`AuraDef::speed_pct`) raises the budget with the sim's own number.
+        let speed = self.sim.move_speed_pct(m.eid) as f32 / 100.0;
+        let rate = RUN_SPEED_MPS * SPEED_SLACK * speed;
         let cap = rate * MAX_BURST_S + JITTER_M;
         let dt = now.duration_since(m.last_move).as_secs_f32();
         // A knockback bonus may sit above the cap; refill never pushes it higher.
@@ -810,6 +812,26 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn mounted_players_may_move_faster() {
+        let mut s = room();
+        s.on_join(0, "a", "fullstack");
+        s.tick();
+        let start = s.members[&0].pos;
+        // 13 m in a second: too fast on foot (8.75 m/s budget plus jitter) ...
+        tokio::time::advance(std::time::Duration::from_secs(1)).await;
+        s.on_message(0, mv(Vec3::new(start.x + 13.0, start.y, start.z), 1));
+        assert_eq!(corrections(&s.tick(), 0), [1]);
+        // ... fine on an e-scooter (+60%).
+        let eid = eid_of(&s, 0);
+        assert!(s.sim.debug_apply_aura(eid, "e_scooter", 60_000));
+        s.tick();
+        assert_eq!(s.sim.move_speed_pct(eid), 160);
+        tokio::time::advance(std::time::Duration::from_secs(1)).await;
+        s.on_message(0, mv(Vec3::new(start.x + 13.0, start.y, start.z), 2));
+        assert!(corrections(&s.tick(), 0).is_empty());
     }
 
     #[tokio::test(start_paused = true)]

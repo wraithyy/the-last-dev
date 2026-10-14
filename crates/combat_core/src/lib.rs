@@ -21,6 +21,7 @@ mod telegraph;
 pub mod time;
 pub mod types;
 mod wander;
+pub mod world;
 mod zones;
 
 pub use content::{
@@ -50,4 +51,5 @@ pub use types::{
     AiState, Audience, AuraEnd, AuraView, CastError, CastView, Command, CooldownView, Event,
     ItemError, UnitState,
 };
+pub use world::{AchievementDef, PropDef, PropKind, SecretNpc, Trigger, WorldDef};
 pub use zones::{TRASH_RESPAWN_MS, ZoneLinkView};

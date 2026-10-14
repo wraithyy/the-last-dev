@@ -754,14 +754,17 @@ impl Bot {
             self.sim.push(Command::Talk { unit: npc });
             self.tick();
             for q in quests {
-                let giver = self.sim.content().quest(q).map(|d| d.giver.npc.clone());
-                if giver.as_deref() != Some(f.unit.as_str()) {
+                let Some(def) = self.sim.content().quest(q).cloned() else {
                     continue;
-                }
+                };
                 let quest = q.to_string();
                 match self.sim.quest_status(q) {
-                    QuestStatus::Ready => self.sim.push(Command::TurnInQuest { quest }),
-                    QuestStatus::Available => self.sim.push(Command::AcceptQuest { quest }),
+                    QuestStatus::Ready if def.ender().npc == f.unit => {
+                        self.sim.push(Command::TurnInQuest { quest, choice: 0 })
+                    }
+                    QuestStatus::Available if def.giver.npc == f.unit => {
+                        self.sim.push(Command::AcceptQuest { quest })
+                    }
                     _ => continue,
                 }
                 self.tick();
@@ -1198,10 +1201,13 @@ type ZoneLine = (String, u32, u64, bool);
 
 /// The whole campaign for one class and seed, carrying the character (gear, bag, SP) from zone
 /// to zone through a save, as the client does across sessions.
-fn campaign(class: &'static str, seed: u64) -> (Vec<ZoneLine>, combat_core::UnitState) {
+/// Also returns how many quests the bot closed on the way.
+fn campaign(class: &'static str, seed: u64) -> (Vec<ZoneLine>, combat_core::UnitState, usize) {
     let mut save: Option<combat_core::SaveData> = None;
     let mut lines = Vec::new();
     let mut last = None;
+    let quests: Vec<String> = content().quests.iter().map(|q| q.id.clone()).collect();
+    let quests: Vec<&str> = quests.iter().map(String::as_str).collect();
     for zone in CAMPAIGN {
         let max = content().zone(zone).map_or(1, |z| z.level_range.1);
         let mut bot = Bot::new_as(class, zone, max, seed);
@@ -1211,7 +1217,12 @@ fn campaign(class: &'static str, seed: u64) -> (Vec<ZoneLine>, combat_core::Unit
             bot.sim.set_player_level(max);
             bot.visit_vendor(zone);
         }
+        // Quests on the way: hand in breadcrumbs and pick up the zone's work on arrival,
+        // close what is done after the clear (twice, for chains that open on turn-in).
+        bot.visit_givers(zone, &quests);
         bot.run_geared(zone);
+        bot.visit_givers(zone, &quests);
+        bot.visit_givers(zone, &quests);
         let secs = bot.report.after.last().map_or(0, |a| a.2);
         lines.push((
             zone.to_string(),
@@ -1228,7 +1239,8 @@ fn campaign(class: &'static str, seed: u64) -> (Vec<ZoneLine>, combat_core::Unit
     let Some(me) = last else {
         panic!("empty campaign")
     };
-    (lines, me)
+    let done = save.map_or(0, |s| s.quests_done.len());
+    (lines, me, done)
 }
 
 /// Every class clears the campaign on three seeds while equipping what drops.
@@ -1238,8 +1250,14 @@ fn every_class_clears_the_campaign_equipping_drops() {
     for class in ["fullstack", "frontend", "backend", "devops"] {
         let mut lowest: Vec<(String, u32)> = Vec::new();
         for seed in [7, 42, 1234] {
-            let (lines, me) = campaign(class, seed);
-            println!("{class} seed {seed}: {lines:?}");
+            let (lines, me, done) = campaign(class, seed);
+            println!("{class} seed {seed}: {lines:?}, {done} quests closed");
+            // One pass, no farming or backtracking: most quests still close on the way.
+            let total = content().quests.len();
+            assert!(
+                done * 5 >= total * 3,
+                "{class} seed {seed}: only {done}/{total} quests closed on the way"
+            );
             for (zone, min, _, died) in &lines {
                 if *died {
                     failures.push(format!("{class} seed {seed}: died in {zone}"));

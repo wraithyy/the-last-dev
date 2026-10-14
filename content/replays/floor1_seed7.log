@@ -326,9 +326,9 @@
 [01794] Fullstack Engineer hits The Vibe Coder with melee for 11 (absorbed 0)
 [01795] Fullstack Engineer begins Code Review (2000 ms)
 [01831] The Vibe Coder casts Generate Pull Requests
-[01831] The Vibe Coder summons Unreviewed PR #15
-[01831] Unreviewed PR ai Chase
 [01831] The Vibe Coder summons Unreviewed PR #16
+[01831] Unreviewed PR ai Chase
+[01831] The Vibe Coder summons Unreviewed PR #17
 [01831] Unreviewed PR ai Chase
 [01831] The Vibe Coder ai Attack
 [01831] The Vibe Coder swings at Fullstack Engineer
@@ -425,8 +425,8 @@
 [02327] Fullstack Engineer hits The Vibe Coder with Refactor for 162 (absorbed 0) COMBO
 [02327] Fullstack Engineer auto attack off
 [02327] The Vibe Coder dies (killer Fullstack Engineer)
-[02327] #15 despawns
 [02327] #16 despawns
+[02327] #17 despawns
 [02327] The Vibe Coder ai Dead
 [02327] Fullstack Engineer gains 250 xp
 [02327] The Vibe Coder drops ["Prompt Fragment", "Mechanical Keyboard with No Keycaps", "Rubber Duck With a Pager"] and 36 SP

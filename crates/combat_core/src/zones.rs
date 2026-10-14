@@ -216,6 +216,7 @@ impl Sim {
         if let Some((pos, yaw)) = graveyard {
             self.set_respawn_point(pos, yaw);
         }
+        self.load_world(id, anchors);
         self.events.push(Event::ZoneLoaded {
             zone: id.to_string(),
         });
@@ -367,7 +368,7 @@ impl Sim {
         // Classic: every group member near the kill gets the credit, not just the killer.
         for p in self.kill_sharers(killer, ti) {
             let p = Self::id_of(p);
-            self.quest_credit(p, |o| matches!(o, Objective::Kill(k, _) if *k == key));
+            self.record_kill(p, &key);
         }
         self.check_unlocks();
     }

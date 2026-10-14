@@ -681,6 +681,7 @@ fn quest_turn_in_pays_story_points() {
         p,
         Command::TurnInQuest {
             quest: q.id.clone(),
+            choice: 0,
         },
     );
     sim.tick();

@@ -135,6 +135,19 @@ struct RezRing;
 #[derive(Component)]
 struct RezGlow;
 
+/// The movement keycaps stacked above attack and coffee: sprint (false) and the e-scooter (true).
+#[derive(Component)]
+struct ExtraRing(bool);
+#[derive(Component)]
+struct ExtraButton(bool);
+#[derive(Component)]
+struct ExtraIcon(bool);
+#[derive(Component)]
+struct ExtraGlow(bool);
+/// Cooldown remainder (sprint), mount cast progress, or full while riding.
+#[derive(Component)]
+struct ExtraGauge(bool);
+
 pub struct ActionBarPlugin;
 
 impl Plugin for ActionBarPlugin {
@@ -146,6 +159,8 @@ impl Plugin for ActionBarPlugin {
                 click_attack,
                 click_coffee,
                 click_rez,
+                click_extras,
+                update_extras,
                 update_slots,
                 update_attack,
                 update_coffee,
@@ -461,6 +476,24 @@ const REZ_ACCENT: Accent = Accent {
 };
 const REZ_EDGE: Color = Color::srgb(0.2, 0.42, 0.45);
 
+const SPRINT_ACCENT: Accent = Accent {
+    action: Action::Sprint,
+    legend: "X",
+    plate: (Color::srgb(0.05, 0.1, 0.06), Color::srgb(0.02, 0.04, 0.03)),
+    face: (Color::srgb(0.35, 0.7, 0.4), Color::srgb(0.14, 0.34, 0.18)),
+    edge: EXTRA_EDGE,
+    gauge: (Color::srgb(0.6, 1.0, 0.6), Color::srgb(0.2, 0.6, 0.3)),
+};
+const SCOOTER_ACCENT: Accent = Accent {
+    action: Action::Scooter,
+    legend: "Y",
+    plate: (Color::srgb(0.12, 0.07, 0.03), Color::srgb(0.05, 0.03, 0.02)),
+    face: (Color::srgb(0.95, 0.55, 0.2), Color::srgb(0.5, 0.25, 0.08)),
+    edge: EXTRA_EDGE,
+    gauge: (Color::srgb(1.0, 0.75, 0.35), Color::srgb(0.7, 0.4, 0.1)),
+};
+const EXTRA_EDGE: Color = Color::srgb(0.4, 0.4, 0.3);
+
 const COFFEE_ACCENT: Accent = Accent {
     action: Action::Coffee,
     legend: "C",
@@ -474,9 +507,26 @@ const COFFEE_ACCENT: Accent = Accent {
 fn spawn_accents(commands: &mut Commands) {
     // Right of the bar like an Enter key; the left side belongs to the combat log.
     let left = bar_width() / 2.0 + ATTACK_GAP;
+    let above = BAR_BOTTOM + bar_height() + 6.0;
+    for (k, look, mount) in [(0.0, &SPRINT_ACCENT, false), (1.0, &SCOOTER_ACCENT, true)] {
+        accent_key(
+            commands,
+            left + k * (ATTACK_PLATE + COFFEE_GAP),
+            above,
+            look,
+            (
+                ExtraRing(mount),
+                ExtraButton(mount),
+                ExtraIcon(mount),
+                ExtraGlow(mount),
+                ExtraGauge(mount),
+            ),
+        );
+    }
     accent_key(
         commands,
         left,
+        BAR_BOTTOM,
         &ATTACK_ACCENT,
         (
             AttackRing,
@@ -489,6 +539,7 @@ fn spawn_accents(commands: &mut Commands) {
     accent_key(
         commands,
         left + ATTACK_PLATE + COFFEE_GAP,
+        BAR_BOTTOM,
         &COFFEE_ACCENT,
         (
             CoffeeRing,
@@ -501,6 +552,7 @@ fn spawn_accents(commands: &mut Commands) {
     let rez = accent_key(
         commands,
         left + 2.0 * (ATTACK_PLATE + COFFEE_GAP),
+        BAR_BOTTOM,
         &REZ_ACCENT,
         (RezRing, RezButton, RezIcon, RezGlow, RezGauge),
     );
@@ -511,6 +563,7 @@ fn spawn_accents(commands: &mut Commands) {
 fn accent_key<R: Bundle, B: Bundle, I: Bundle, G: Bundle, F: Bundle>(
     commands: &mut Commands,
     left: f32,
+    bottom: f32,
     look: &Accent,
     markers: (R, B, I, G, F),
 ) -> Entity {
@@ -518,7 +571,7 @@ fn accent_key<R: Bundle, B: Bundle, I: Bundle, G: Bundle, F: Bundle>(
     commands
         .spawn(Node {
             position_type: PositionType::Absolute,
-            bottom: px(BAR_BOTTOM),
+            bottom: px(bottom),
             left: percent(50),
             margin: UiRect::left(px(left)),
             width: px(ATTACK_PLATE),
@@ -797,6 +850,129 @@ fn update_coffee(
         }
         None => percent(0),
     };
+}
+
+fn click_extras(
+    paused: Res<Paused>,
+    flow: Res<GameFlow>,
+    sim: SimView,
+    mut pending: ResMut<PendingCommands>,
+    player: Single<&SimUnit, With<Player>>,
+    buttons: Query<(&Interaction, &ExtraButton), Changed<Interaction>>,
+) {
+    if paused.0 || !can_act(&*sim, &flow, player.0) {
+        return;
+    }
+    for (i, b) in &buttons {
+        if *i == Interaction::Pressed {
+            crate::office::cast_world_spell(&*sim, &mut pending, player.0, b.0);
+        }
+    }
+}
+
+/// Lit while the ride or sprint is on; greyed while it cannot be used (indoors, in combat,
+/// cooling down). The gauge shows the mount cast, the ride, or the sprint cooldown.
+#[allow(clippy::type_complexity)] // Bevy query filter tuples
+fn update_extras(
+    time: Res<Time>,
+    sim: SimView,
+    assets: Res<AssetServer>,
+    mut icons: ResMut<IconCache>,
+    player: Single<&SimUnit, With<Player>>,
+    mut buttons: Query<
+        (&ExtraButton, &Interaction, &mut BorderColor, &mut Node),
+        Without<ExtraGauge>,
+    >,
+    mut rings: Query<(&ExtraRing, &mut BorderColor), Without<ExtraButton>>,
+    mut icons_q: Query<(&ExtraIcon, &mut ImageNode)>,
+    mut glows: Query<(&ExtraGlow, &mut BackgroundColor)>,
+    mut gauges: Query<(&ExtraGauge, &mut Node), Without<ExtraButton>>,
+) {
+    let content = sim.content();
+    let me = sim.unit(player.0);
+    let k = 0.5 + 0.5 * (time.elapsed_secs() * 7.0).sin();
+    let state = |mount: bool| {
+        let spell = if mount {
+            content.mount_spell()
+        } else {
+            content.sprint_spell()
+        }?;
+        let aura = match &spell.effect {
+            Effect::Aura { aura, .. } => aura.as_str(),
+            _ => "",
+        };
+        let on = me.is_some_and(|u| u.auras.iter().any(|a| a.key == aura));
+        let casting = me.and_then(|u| u.cast).filter(|c| c.spell == spell.id);
+        Some((spell, on, casting, sim.cooldown(player.0, spell.id)))
+    };
+    for (b, interaction, mut border, mut node) in &mut buttons {
+        let Some((_, on, ..)) = state(b.0) else {
+            continue;
+        };
+        let look = if b.0 { &SCOOTER_ACCENT } else { &SPRINT_ACCENT };
+        *border = BorderColor::all(if on {
+            look.edge.mix(&Color::WHITE, 0.8 * k)
+        } else {
+            look.edge
+        });
+        let (top, bottom) = key_travel(1.0, ATTACK_LIP, *interaction == Interaction::Pressed);
+        if node.top != top {
+            node.top = top;
+            node.bottom = bottom;
+        }
+    }
+    for (r, mut border) in &mut rings {
+        let Some((_, on, ..)) = state(r.0) else {
+            continue;
+        };
+        let look = if r.0 { &SCOOTER_ACCENT } else { &SPRINT_ACCENT };
+        *border = BorderColor::all(if on {
+            PANEL_EDGE.mix(&look.gauge.0, k)
+        } else {
+            PANEL_EDGE
+        });
+    }
+    for (i, mut img) in &mut icons_q {
+        let Some((spell, on, casting, cd)) = state(i.0) else {
+            continue;
+        };
+        let handle = icons.get(&assets, &spell.icon);
+        if img.image != handle {
+            img.image = handle;
+        }
+        // The mount key also gets you off, so a rider's key stays lit.
+        img.color = if on || casting.is_some() || cd.usable.is_ok() {
+            Color::WHITE
+        } else {
+            ICON_STUNNED
+        };
+    }
+    for (g, mut bg) in &mut glows {
+        let Some(interaction) = buttons
+            .iter()
+            .find(|(b, ..)| b.0 == g.0)
+            .map(|(_, i, ..)| *i)
+        else {
+            continue;
+        };
+        bg.0 = match interaction {
+            Interaction::Pressed => PRESS,
+            Interaction::Hovered => HOVER,
+            Interaction::None => Color::NONE,
+        };
+    }
+    for (g, mut node) in &mut gauges {
+        let Some((_, on, casting, cd)) = state(g.0) else {
+            continue;
+        };
+        let frac = match casting {
+            Some(c) => c.elapsed_ms as f32 / c.total_ms.max(1) as f32,
+            None if g.0 && on => 1.0,
+            None if cd.cd_total_ms > 0 => cd.cd_remaining_ms as f32 / cd.cd_total_ms as f32,
+            None => 0.0,
+        };
+        node.width = percent(100.0 * frac.clamp(0.0, 1.0));
+    }
 }
 
 fn click_rez(

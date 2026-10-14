@@ -280,6 +280,11 @@ fn key_code(name: &str) -> Option<KeyCode> {
             } else {
                 let c = name.strip_prefix("Key")?.chars().next()?;
                 match c {
+                    'A' => KeyCode::KeyA,
+                    'B' => KeyCode::KeyB,
+                    'D' => KeyCode::KeyD,
+                    'X' => KeyCode::KeyX,
+                    'Y' => KeyCode::KeyY,
                     'C' => KeyCode::KeyC,
                     'F' => KeyCode::KeyF,
                     'G' => KeyCode::KeyG,

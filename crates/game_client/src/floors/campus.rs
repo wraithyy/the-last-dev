@@ -753,17 +753,13 @@ fn ambient_props(p: &mut Plan) {
     p.boxed(v(26.0, 1.5, -15.15), v(0.2, 3.0, 0.2), Mat::Metal, false);
     p.sign(v(-26.0, 3.0, -10.0), 0.0, 4.0, Sign::Compute);
     p.boxed(v(-26.0, 1.5, -10.15), v(0.2, 3.0, 0.2), Mat::Metal, false);
-    // Scooters littering the walkways.
+    // Scooters littering the walkways; four more are borrowable (`office::CAMPUS_SCOOTERS`).
     for (i, (x, z)) in [
         (-4.0, -12.0),
-        (3.5, -17.0),
         (-17.0, -7.0),
         (-28.0, -14.0),
-        (18.0, -2.0),
         (30.0, -7.5),
         (-14.0, 13.0),
-        (-20.0, 17.5),
-        (4.0, 8.0),
         (35.0, -5.0),
     ]
     .into_iter()

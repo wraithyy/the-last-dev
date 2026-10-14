@@ -35,6 +35,8 @@ pub enum CastError {
     FullMana,
     InCombat,
     TargetNotDead,
+    /// Mounting in a zone without `ZoneDef::scooters`.
+    NoScooters,
 }
 
 impl CastError {
@@ -61,6 +63,7 @@ impl CastError {
             CastError::FullMana => "You are already at full mana.",
             CastError::InCombat => "Can't do that while in combat.",
             CastError::TargetNotDead => "Your target is not dead. Yet.",
+            CastError::NoScooters => "No scooters in the office. (Facilities)",
         }
     }
 }
@@ -136,9 +139,11 @@ pub enum Command {
     AcceptQuest {
         quest: String,
     },
-    /// Hand in a ready quest at its giver (talk range): XP and trophy are granted.
+    /// Hand in a ready quest at its giver, or its `turn_in` NPC (talk range): XP, SP, trophy
+    /// and, for a gear reward, `Content::quest_gear_choices` entry `choice` are granted.
     TurnInQuest {
         quest: String,
+        choice: u8,
     },
     /// Drop an active quest and its progress; it can be accepted again.
     AbandonQuest {
@@ -169,6 +174,14 @@ pub enum Command {
     /// Drink a consumable from the bag or trigger an equipped piece's on-use perk.
     UseItem {
         item: String,
+    },
+    /// Use an interactive prop (`WorldDef::props` key) within its reach in the loaded zone.
+    Interact {
+        prop: String,
+    },
+    /// Wear the title of an unlocked achievement under the name; "" takes it off.
+    SetTitle {
+        achievement: String,
     },
 }
 
@@ -437,6 +450,23 @@ pub enum Event {
         item: String,
         ms: u32,
     },
+    /// Someone used a prop. `outcome` per kind (see `world.rs`): 0 a failed roll, k the k-th
+    /// reward of the prop, or a random line number for purely cosmetic props.
+    Interacted {
+        unit: EntityId,
+        prop: String,
+        outcome: u32,
+    },
+    /// A player unlocked an achievement (everyone sees it, as in WoW).
+    Achievement {
+        unit: EntityId,
+        key: String,
+    },
+    /// The achievement whose title the player now wears ("" for none).
+    TitleChanged {
+        unit: EntityId,
+        title: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -507,6 +537,10 @@ pub struct UnitState {
     pub equipped: Vec<String>,
     /// Items sold this session, oldest first.
     pub buyback: Vec<String>,
+    /// Player: unlocked achievement keys, oldest first.
+    pub achievements: Vec<String>,
+    /// Player: key of the achievement whose title is worn, "" for none.
+    pub title: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

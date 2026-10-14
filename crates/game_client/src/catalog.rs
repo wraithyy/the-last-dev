@@ -534,6 +534,102 @@ static TABLE: &[(&str, UnitVisual)] = &[
             ],
         ),
     ),
+    // ---- quest givers at each zone's arrival
+    (
+        "helpdesk_lead",
+        v(
+            CASUAL_F,
+            1.7,
+            "IT Support Lead",
+            "<Ticket Queue: 4,812>",
+            &[
+                paint("Shirt", 0.6, 0.58, 0.52),
+                paint("Hair", 0.12, 0.1, 0.1),
+                paint("Pants", 0.25, 0.25, 0.28),
+            ],
+        ),
+    ),
+    (
+        "facilities_manager",
+        v(
+            WORKER,
+            1.82,
+            "Facilities Manager",
+            "<Rooms Booked by an Agent>",
+            &[
+                paint("Vest", 0.2, 0.45, 0.85),
+                paint("Hat", 0.95, 0.95, 0.95),
+                paint("Shirt", 0.3, 0.3, 0.35),
+            ],
+        ),
+    ),
+    (
+        "office_manager",
+        v(
+            SUIT_F,
+            1.7,
+            "Office Manager",
+            "<Ordered 400 Beanbags by Accident>",
+            &[
+                paint("Shirt", 0.85, 0.3, 0.45),
+                paint("Pants", 0.15, 0.15, 0.2),
+            ],
+        ),
+    ),
+    (
+        "pmo_intern",
+        v(
+            CASUAL2,
+            1.7,
+            "PMO Intern",
+            "<Owns 31 Gantt Charts>",
+            &[
+                paint("Shirt", 0.95, 0.75, 0.2),
+                paint("Pants", 0.2, 0.25, 0.4),
+            ],
+        ),
+    ),
+    (
+        "executive_assistant",
+        v(
+            SUIT_F,
+            1.74,
+            "Executive Assistant",
+            "<Actually Runs the Company>",
+            &[
+                paint("Shirt", 0.1, 0.1, 0.12),
+                paint("Pants", 0.1, 0.1, 0.12),
+            ],
+        ),
+    ),
+    (
+        "night_shift_sysadmin",
+        v(
+            CASUAL_F,
+            1.68,
+            "Night-Shift Sysadmin",
+            "<Has Not Seen the Sun Since the IPO>",
+            &[
+                paint("Shirt", 0.15, 0.15, 0.2),
+                paint("Hair", 0.55, 0.1, 0.5),
+                paint("Pants", 0.1, 0.1, 0.12),
+            ],
+        ),
+    ),
+    (
+        "lab_safety_officer",
+        v(
+            WORKER,
+            1.76,
+            "Lab Safety Officer",
+            "<Not Allowed in the Lab>",
+            &[
+                paint("Vest", 0.9, 0.95, 0.1),
+                paint("Hat", 0.95, 0.95, 0.95),
+                paint("Shirt", 0.85, 0.85, 0.85),
+            ],
+        ),
+    ),
     (
         "barista",
         v(
@@ -825,6 +921,68 @@ static TABLE: &[(&str, UnitVisual)] = &[
             &[paint("Shirt", 0.85, 0.3, 0.95)],
         ),
     ),
+    // ---- Hidden NPCs (combat_core world secrets) ----
+    (
+        "last_human_qa",
+        v(
+            CASUAL_M,
+            1.75,
+            "Last Human QA",
+            "<Manually Tested Everything>",
+            &[
+                paint("Shirt", 0.85, 0.75, 0.2),
+                paint("Pants", 0.2, 0.22, 0.3),
+            ],
+        ),
+    ),
+    (
+        "docs_intern",
+        v(
+            CASUAL_F,
+            1.6,
+            "Intern Who Read The Docs",
+            "<RTFM Certified>",
+            &[
+                paint("Shirt", 0.3, 0.5, 0.9),
+                paint("Hair", 0.15, 0.1, 0.08),
+            ],
+        ),
+    ),
+    (
+        "deprecated_ghost",
+        v(
+            SUIT_M,
+            1.85,
+            "Ghost of a Deprecated API",
+            "<v1, Sunset in 2019>",
+            &[
+                glow("Shirt", 0.55, 0.75, 1.0),
+                glow("Skin", 0.6, 0.8, 1.0),
+                glow("Pants", 0.4, 0.55, 0.9),
+                glow("Hair", 0.7, 0.85, 1.0),
+            ],
+        ),
+    ),
+    (
+        "cable_sysadmin",
+        v(
+            WORKER,
+            1.8,
+            "Sysadmin Who Knows Where the Cables Go",
+            "<Bus Factor: 1>",
+            &[paint("Shirt", 0.25, 0.25, 0.28)],
+        ),
+    ),
+    (
+        "cobol_contractor",
+        v(
+            SUIT_M_BALD,
+            1.72,
+            "Retired COBOL Contractor",
+            "<Billing Since 1987>",
+            &[paint("Shirt", 0.55, 0.45, 0.3)],
+        ),
+    ),
 ];
 
 /// Primitive rig kind (see `rigs.rs`) of a unit key, `None` for character-model units.
@@ -1063,6 +1221,13 @@ mod tests {
         "procurement_officer",
         "hardware_broker",
         "barista",
+        "helpdesk_lead",
+        "facilities_manager",
+        "office_manager",
+        "pmo_intern",
+        "executive_assistant",
+        "night_shift_sysadmin",
+        "lab_safety_officer",
         "smoking_corner_dev",
         "delivery_robot",
         "scooter_exec",

@@ -22,6 +22,7 @@ const WALL_RGBA: [u8; 4] = [120, 150, 190, 255];
 const BLOCK_RGBA: [u8; 4] = [70, 84, 108, 255];
 const OPEN: Color = Color::srgb(0.4, 1.0, 0.5);
 const LOCKED: Color = Color::srgb(1.0, 0.42, 0.36);
+const QUEST: Color = Color::srgb(1.0, 0.9, 0.2);
 
 #[derive(Component)]
 struct MapRoot;
@@ -291,7 +292,7 @@ fn update_map(
     paused: Res<Paused>,
     sim: SimView,
     flow: Res<GameFlow>,
-    mut windows: ResMut<QuestWindows>,
+    (mut windows, track): (ResMut<QuestWindows>, Res<super::quests::QuestTrack>),
     mut view: ResMut<MapView>,
     mut images: ResMut<Assets<Image>>,
     mut root: Single<&mut Node, (With<MapRoot>, Without<PlayerDot>)>,
@@ -336,19 +337,44 @@ fn update_map(
     dot.left = px(p.x - 4.5);
     dot.top = px(p.y - 4.5);
 
-    // Givers, boss and doors: rebuilt only when something on them changes.
+    // Givers, boss, quest targets and doors: rebuilt only when something on them changes.
+    let wanted = super::quests::objective_units(&*sim, &track);
     let marks: Vec<(Vec2, &str, Color)> = sim
         .units()
         .filter(|u| u.alive)
         .filter_map(|u| {
             let at = view.to_canvas(Vec3::new(u.pos.x, 0.0, u.pos.z));
             if u.boss {
-                Some((at, "B", LOCKED))
+                let c = if wanted.contains(&u.key) {
+                    QUEST
+                } else {
+                    LOCKED
+                };
+                Some((at, "B", c))
             } else if !u.hostile {
                 giver_mark(&*sim, &u.key, &flow.zone).map(|(g, c)| (at, g, c))
+            } else if wanted.contains(&u.key) {
+                Some((at, "*", QUEST))
             } else {
                 None
             }
+        })
+        .collect();
+    // Zones where a tracked quest still has work, for the tree.
+    let quest_zones: Vec<String> = super::quests::tracked(&*sim, &track)
+        .into_iter()
+        .filter_map(|q| content.quest(&q.id).map(|d| (q, d)))
+        .flat_map(|(q, d)| {
+            d.objectives
+                .iter()
+                .enumerate()
+                .filter(|(k, o)| q.counts.get(*k).copied().unwrap_or(0) < o.need())
+                .map(|(_, o)| content.objective_zones(o))
+                // "Anywhere" work (MeatProxies are on every floor) would tag the whole tree.
+                .filter(|z| z.len() <= 2)
+                .flatten()
+                .map(String::from)
+                .collect::<Vec<_>>()
         })
         .collect();
     let doors: Vec<(Vec2, String, bool)> = sim
@@ -361,7 +387,7 @@ fn update_map(
         })
         .collect();
     let sig = format!(
-        "{:?}|{:?}|{:?}",
+        "{:?}|{:?}|{:?}|{quest_zones:?}",
         marks.iter().map(|m| (m.0.round(), m.1)).collect::<Vec<_>>(),
         doors.iter().map(|d| (&d.1, d.2)).collect::<Vec<_>>(),
         zone_tree(&*sim)
@@ -427,6 +453,13 @@ fn update_map(
                 TextColor(color),
                 indent(0.0),
             ));
+            if quest_zones.contains(&z) {
+                g.spawn((
+                    label("! tracked objectives", 10.0),
+                    TextColor(QUEST),
+                    indent(12.0),
+                ));
+            }
             if let (Err(reason), false) = (state, here) {
                 let reason = reason.trim_start_matches("Requires: ");
                 g.spawn((

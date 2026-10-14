@@ -45,6 +45,9 @@ struct QuestMark(String);
 pub struct PlateName(pub EntityId);
 #[derive(Component)]
 pub struct PlateLootTag(pub EntityId);
+/// Subtitle of a friendly plate: the unit's title, or a player's worn achievement title.
+#[derive(Component)]
+struct PlateTitle(EntityId);
 
 pub struct NameplatePlugin;
 
@@ -56,6 +59,7 @@ impl Plugin for NameplatePlugin {
                 spawn_plates,
                 place_plates.in_set(PlatePlacement),
                 update_marks,
+                update_titles,
             )
                 .chain()
                 .in_set(SimReady),
@@ -181,13 +185,39 @@ fn spawn_plates(
                     },
                     BackgroundColor(Color::srgb(0.85, 0.15, 0.12)),
                 ));
-            } else if !title.is_empty() {
+            } else {
                 p.spawn((
-                    label(format!("<{title}>"), 10.0),
+                    PlateTitle(u.id),
+                    label(plate_title(&title), 10.0),
                     TextColor(Color::srgb(0.75, 0.85, 0.78)),
                 ));
             }
         });
+    }
+}
+
+fn plate_title(title: &str) -> String {
+    if title.is_empty() {
+        String::new()
+    } else {
+        format!("<{title}>")
+    }
+}
+
+/// Titles change when a player unlocks or picks an achievement.
+fn update_titles(sim: SimView, mut titles: Query<(&PlateTitle, &mut Text)>) {
+    for (PlateTitle(id), mut text) in &mut titles {
+        let Some(u) = sim.unit(*id) else { continue };
+        let content = sim.content();
+        let title = content
+            .achievement(&u.title)
+            .map(|a| a.title.as_str())
+            .or_else(|| content.unit_def(&u.key).map(|d| d.title.as_str()))
+            .unwrap_or("");
+        let want = plate_title(title);
+        if text.0 != want {
+            text.0 = want;
+        }
     }
 }
 
