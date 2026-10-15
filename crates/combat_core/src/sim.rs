@@ -1696,9 +1696,10 @@ impl Sim {
         for owner in owners {
             let mut items: Vec<String> = Vec::new();
             for e in &loot_table {
-                // Quest-only drops use the loot stream, so taking a quest never shifts combat.
+                // Trophies roll on the loot stream like the rest of the loot, so loot table
+                // changes (or taking a quest) never shift combat.
                 let drop = match (&e.quest, owner) {
-                    (None, _) => self.rng.chance_pct(e.chance_pct),
+                    (None, _) => self.loot_rng.chance_pct(e.chance_pct),
                     // A sprint is quest-free: its floors' quest drops stay in the campaign.
                     (Some(_), _) if sprint => false,
                     (Some(q), Some(p)) => {
@@ -1716,6 +1717,10 @@ impl Sim {
                 .and_then(|p| self.class_at(p))
                 .map(|c| c.role);
             let (goods, sp) = self.roll_economy_loot(ti, role);
+            let bonus = owner
+                .and_then(|p| self.index(p))
+                .map_or(0, |p| self.perk_kudos_pct(p));
+            let sp = sp * (100 + bonus) / 100;
             items.extend(goods);
             items.extend(self.pet_drops(ti, owner));
             shares.push(LootShare { owner, items, sp });

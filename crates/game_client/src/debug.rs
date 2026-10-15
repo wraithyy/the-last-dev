@@ -190,6 +190,53 @@ impl Plugin for DebugPlugin {
                 .in_set(SimReady),
             );
         }
+        // `WOW_KILL_NEAREST=<secs>`: kill the nearest hostile then; `WOW_LOOT_ADD=<item>|..`
+        // also puts those goods on its corpse (loot window shots of specific junk).
+        if let Some(at) = env::var("WOW_KILL_NEAREST")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+        {
+            app.add_systems(
+                Update,
+                (move |time: Res<Time>,
+                       mut sim: ResMut<CombatSim>,
+                       mut body: Single<&mut PlayerBody>,
+                       mut corpse: Local<Option<combat_core::EntityId>>,
+                       mut done: Local<bool>| {
+                    if *done || time.elapsed_secs() < at {
+                        return;
+                    }
+                    if let Some(c) = *corpse {
+                        // Loot shares exist once the kill has ticked.
+                        let items = env::var("WOW_LOOT_ADD").unwrap_or_default();
+                        for item in items.split('|').filter(|s| !s.is_empty()) {
+                            if !sim.0.debug_add_loot(c, item) {
+                                return;
+                            }
+                        }
+                        *done = true;
+                        return;
+                    }
+                    let Some(me) = sim.0.player().and_then(|p| sim.0.unit(p)).map(|u| u.pos) else {
+                        return;
+                    };
+                    let nearest = sim
+                        .0
+                        .units()
+                        .filter(|u| u.hostile && u.alive && !u.boss)
+                        .min_by(|a, b| distance(a.pos, me).total_cmp(&distance(b.pos, me)))
+                        .map(|u| (u.id, u.pos));
+                    if let Some((id, at)) = nearest
+                        && sim.0.debug_kill(id)
+                    {
+                        *corpse = Some(id);
+                        // Step up to the corpse so `WOW_LOOT` is in reach.
+                        body.teleport(Vec3::new(at.x + 1.2, at.y, at.z + 1.2));
+                    }
+                })
+                .in_set(SimReady),
+            );
+        }
         if let Some((pct, at)) = env::var("WOW_BOSS_PCT").ok().and_then(|v| {
             let (p, t) = v.split_once('@')?;
             Some((p.parse::<u32>().ok()?, t.parse::<f32>().ok()?))

@@ -189,6 +189,6 @@ combat_core side (client presentation is tracked separately):
 - [x] Player levels 1-10, XP table, level-difference XP with gray mobs, stat growth, spell unlocks, 10-slot bar (`known_spells`). Deviation: Reject PR unlocks at level 2 and Guardrails at 3.
 - [x] Headless playthrough test: every floor cleared at its max level on three seeds; golden replay of a floor-1 clear from level 1.
 - [x] Trophies: all 46 loot items are permanent bonus items (`items` table: HP, mana, spell power, crit, haste, mana regen; 3-copy stack cap). Looting fills `UnitState.inventory` and applies the bonus at once; the client shows them in the loot window, the combat log and the B window (`~/trophies`).
-- [x] Economy: 89 gear pieces in five visible slots, 4 sets, 8 Legendaries, 14 junk items, 5 consumables, 2 vendors, Kudos, perks and on-use gadgets, per-class offline saves (`economy.rs`, `save.rs`, client `economy/`).
+- [x] Economy: 283 gear pieces in five visible slots (43 visual styles), 14 sets, 21 Legendaries, 22 on-use gadgets, 79 junk items, 125 trophies, 24 consumables, 2 vendors, Kudos, perks and on-use gadgets, per-class offline saves (`economy.rs`, `save.rs`, client `economy/`).
 - [ ] Channels, mini-boss optionality, per-room elevator logic (client).
 

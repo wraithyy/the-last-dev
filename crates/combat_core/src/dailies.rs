@@ -67,6 +67,9 @@ pub struct TaskDef {
     /// Claiming it grants the achievements with `Trigger::Event(<key>)` (a cosmetic title).
     #[serde(default)]
     pub title: bool,
+    /// A consumable or junk item handed out with the reward (lost on a full bag).
+    #[serde(default)]
+    pub item: Option<String>,
 }
 
 /// A goal resolved for one player; travels in `BoardView`.
@@ -210,13 +213,14 @@ impl Content {
 
     /// The Sprint Goal's "choose one": best-tier world gear for `level` and `role`.
     pub fn sprint_goal_gear(&self, level: u8, role: Option<Role>) -> Vec<String> {
-        self.gear_choices(level.div_ceil(2).max(1), true, role)
+        self.gear_choices(level.div_ceil(2).max(1), true, role, u64::from(level))
     }
 
     /// "Choose one" gear of `tier` for a role: world gear, own role or generalist, best rarity
     /// first (Epic only with `epic`), one piece per slot while that still leaves two to choose
-    /// from, at most three. Deterministic, so client and sim agree without sending the list.
-    pub fn gear_choices(&self, tier: u8, epic: bool, role: Option<Role>) -> Vec<String> {
+    /// from, at most three. `seed` rotates each rarity's candidates so different quests offer
+    /// different pieces. Deterministic, so client and sim agree without sending the list.
+    pub fn gear_choices(&self, tier: u8, epic: bool, role: Option<Role>, seed: u64) -> Vec<String> {
         const RARITIES: [Rarity; 3] = [Rarity::Epic, Rarity::Rare, Rarity::Uncommon];
         if tier == 0 {
             return Vec::new();
@@ -225,12 +229,22 @@ impl Content {
         let pool: Vec<&crate::economy::GearDef> = rarities
             .iter()
             .flat_map(|r| {
-                self.economy.gear.iter().filter(move |g| {
-                    g.source == GearSource::World
-                        && g.tier() == tier
-                        && g.rarity == *r
-                        && (role.is_none() || g.role.is_none() || g.role == role)
-                })
+                let mut group: Vec<&crate::economy::GearDef> = self
+                    .economy
+                    .gear
+                    .iter()
+                    .filter(|g| {
+                        g.source == GearSource::World
+                            && g.tier() == tier
+                            && g.rarity == *r
+                            && (role.is_none() || g.role.is_none() || g.role == role)
+                    })
+                    .collect();
+                if !group.is_empty() {
+                    let k = (seed % group.len() as u64) as usize;
+                    group.rotate_left(k);
+                }
+                group
             })
             .collect();
         let mut out: Vec<&crate::economy::GearDef> = Vec::new();
@@ -269,6 +283,11 @@ pub(crate) fn validate_tasks(c: &Content) -> Result<(), ContentError> {
                     "task {} duplicate, too long or without goals",
                     t.key
                 ));
+            }
+            if let Some(item) = &t.item
+                && c.economy.goods(item).is_none()
+            {
+                return bad(format!("task {} rewards unknown goods {item}", t.key));
             }
             for g in &t.goals {
                 let ok = match g {
@@ -640,6 +659,17 @@ impl Sim {
             },
         );
         self.grant_xp(pi, task.xp);
+        let item = self
+            .content
+            .task_def(&task.key, task.weekly)
+            .and_then(|d| d.item.clone());
+        if let Some(item) = item {
+            if self.stow(pi, vec![item]).is_empty() {
+                self.bag_event(pi);
+            } else {
+                self.item_error(player, ItemError::BagFull);
+            }
+        }
         if task.sp > 0 {
             let s = &mut self.units[pi].state;
             s.sp = s.sp.saturating_add(task.sp);

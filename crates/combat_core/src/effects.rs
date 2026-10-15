@@ -175,7 +175,7 @@ impl Sim {
                 }
                 let crit_pct = self.content.units[self.units[ci].def].crit_pct;
                 let mut amount = self.power(ci, *base, *coefficient_pct);
-                amount = self.perk_amount(ci, spell.id, amount, false);
+                amount = self.perk_amount(ci, ti, spell.id, amount, false);
                 let mut combo = false;
                 let stacks = consume_aura.as_ref().and_then(|c| {
                     self.units[ti]
@@ -246,7 +246,7 @@ impl Sim {
                 Some(ti),
             ) => {
                 let amount = self.power(ci, *base, *coefficient_pct);
-                let amount = self.perk_amount(ci, spell.id, amount, true) as u32;
+                let amount = self.perk_amount(ci, ti, spell.id, amount, true) as u32;
                 self.heal(caster, ti, Some(spell.id), amount);
             }
             (Effect::Aura { aura, duration_ms }, Some(ti)) => {

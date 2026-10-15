@@ -553,6 +553,10 @@ fn check_perk(class: &str, row: usize, k: u8, t: &TalentDef, perk: &Perk) -> Res
             }
         }
         Perk::OnUse { .. } => return fail("talents have no on-use perks"),
+        Perk::Execute { .. }
+        | Perk::Triage { .. }
+        | Perk::Desperate { .. }
+        | Perk::KudosFind { .. } => return fail("gear-only perk on a talent"),
     }
     Ok(())
 }

@@ -1647,7 +1647,7 @@ impl Sim {
                     .gear
                     .iter()
                     .filter(|g| {
-                        g.source == GearSource::World
+                        matches!(g.source, GearSource::World | GearSource::Sprint)
                             && g.tier() == tier
                             && g.rarity == *r
                             && (g.role.is_none() || g.role == role)

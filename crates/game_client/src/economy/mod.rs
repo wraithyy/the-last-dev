@@ -10,7 +10,8 @@
 //! - `WOW_HOVER_ITEM=<item>`: pin that item's tooltip (screenshots of comparisons);
 //!   `WOW_HOVER_BUY=1` shows it as on a vendor shelf (price, level requirement).
 //! - `WOW_DISCARD_POPUP=<item>@<secs>` opens the delete popup; `WOW_JUNK_SWEEP=<secs>` sweeps the junk.
-//! - `WOW_LINEUP_GEAR=1`: lineup skins (`WOW_LINEUP=4`) wear a sample outfit per class.
+//! - `WOW_LINEUP_GEAR=1`: lineup skins (`WOW_LINEUP=4`) wear a sample outfit per class;
+//!   `WOW_LINEUP_GEAR=<item>|..;<item>|..` dresses each skin in class order instead.
 //! - `WOW_NO_SAVE=1`: neither load nor write the offline save.
 //! - `WOW_LOOT=<secs>`: loot the nearest corpse within reach at that time (loot window shots).
 
@@ -102,10 +103,9 @@ impl Plugin for EconomyPlugin {
             .init_resource::<Inspect>()
             .add_systems(PreUpdate, close_on_escape.after(InputSystems))
             .add_systems(Startup, spawn_tooltip)
-            .add_systems(PostStartup, debug_start.in_set(SimReady))
             .add_systems(
                 Update,
-                (update_tooltip, debug_loot, debug_gain).in_set(SimReady),
+                (debug_start, update_tooltip, debug_loot, debug_gain).in_set(SimReady),
             )
             .add_systems(Update, pin_ui_camera)
             .add_plugins((
@@ -151,8 +151,13 @@ fn env_list(name: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-fn debug_start(mut sim: ResMut<CombatSim>, mut ui: ResMut<EconomyUi>) {
+/// Once, as soon as the local player exists (the sim may come up after startup).
+fn debug_start(mut sim: ResMut<CombatSim>, mut ui: ResMut<EconomyUi>, mut done: Local<bool>) {
+    if *done {
+        return;
+    }
     let Some(p) = sim.0.player() else { return };
+    *done = true;
     for item in env_list("WOW_GEAR") {
         if !sim.0.debug_equip(p, &item) {
             warn!("WOW_GEAR: unknown gear {item:?}");

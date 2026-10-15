@@ -356,7 +356,11 @@ impl Content {
     /// "Choose one" gear for a quest and role (`gear_choices` of its tier; Epic only for group
     /// quests).
     pub fn quest_gear_choices(&self, def: &QuestDef, role: Option<Role>) -> Vec<String> {
-        self.gear_choices(def.reward.gear_tier, def.group, role)
+        // FNV-1a of the quest id: a stable per-quest rotation of the candidates.
+        let seed = def.id.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+            (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+        });
+        self.gear_choices(def.reward.gear_tier, def.group, role, seed)
     }
 
     /// Zones where an objective can be worked on: the zones spawning the unit (pack or boss),

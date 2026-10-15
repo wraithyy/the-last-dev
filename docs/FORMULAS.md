@@ -239,9 +239,13 @@ power    : amount = (base + sp * coef / 100) * dmg_pct / 100 * (1000 + power_ten
 armour   : hit    = hit * (1000 - min(armor_tenths, 250)) / 1000, before the aura modifiers
 perks    : SpellDamage / SpellHeal +pct on that spell; Cooldown and ManaCost -pct (cooldowns at most -80%);
            Echo repeats a landed hit at pct (chance roll on the combat rng, only when worn)
+           Execute / Triage +pct damage / healing on targets at or below below_pct HP;
+           Desperate +pct damage and healing while the wearer is at or below below_pct HP;
+           KudosFind +pct of the wearer's own kill Kudos share
+perk caps (percent, tests/items.rs): Rare 25, Epic 30, Legendary 50; gadgets cool down >= 45 s
 ```
 
-Kudos (`sp` in code and saves) per kill and member: `(level * sp_per_level + U[0, level]) * mult` (elite 4, boss 12; summons 0). Gear drop chance: trash 12%, elite 60%, boss 100%; rarity weights Common/Uncommon/Rare/Epic trash 50/35/13/2, elite 10/45/37/8, boss 0/25/55/20; the piece is from the mob's tier (`ceil(level / 2)`), from the looter's role 70% of the time. Bosses with named Legendaries add one 25% of the time; non-bosses drop junk 30%. Quest turn-ins pay `reward.xp * 15%` Kudos plus `reward.sp` (authored XP, before `xp_reward_pct`). Prices and level requirements: see Kudos below.
+Kudos (`sp` in code and saves) per kill and member: `(level * sp_per_level + U[0, level]) * mult` (elite 4, boss 12; summons 0). Gear drop chance: trash 12%, elite 60%, boss 100%; rarity weights Common/Uncommon/Rare/Epic trash 50/35/13/2, elite 10/45/37/8, boss 0/25/55/20; the piece is from the mob's tier (`ceil(level / 2)`), from the looter's role 70% of the time. Bosses with named pieces (`source: Boss(key)`) add one 25% of the time (`legendary_pct`); elites and night-shift mobs with named pieces drop one at `named_pct` 8% (scaled like their gear chance); non-bosses drop junk 30%, picked from junk of the mob's tier or tier-free junk. `source: Sprint` pieces come only from the end-of-sprint chest. Quest "choose one" pools rotate per quest (FNV-1a of the quest id) so quests of a tier offer different pieces, one per slot. Quest turn-ins pay `reward.xp * 15%` Kudos plus `reward.sp` (authored XP, before `xp_reward_pct`). Prices and level requirements: see Kudos below.
 
 Measured (combat_core tests, level-capped bots, 3 seeds): a full set of tier-appropriate Rare gear cuts boss kill time to 72-80% of fresh and raises the boss-fight minimum HP by 13-32 points; Code Review damage over 10 s goes up by about 60% at tier 5.
 
@@ -262,16 +266,16 @@ Expected income of one solo pass (`kudos_never_buy_the_whole_stock_and_upgrades_
 
 | zone | band top | kills | quests | sales | dailies | zone total | cumulative | stock at band top | share | tier Rare | zones per Rare |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| campus | 2 | 30 | 162 | 32 | 22 | 246 | 246 | 2360 | 10% | 400 | 1.6 |
-| tower/1 | 2 | 56 | 141 | 68 | 22 | 287 | 533 | 2360 | 22% | 400 | 1.4 |
-| tower/2 | 4 | 148 | 224 | 165 | 66 | 603 | 1136 | 5720 | 19% | 700 | 1.2 |
-| tower/3 | 6 | 238 | 195 | 234 | 111 | 778 | 1914 | 11320 | 16% | 1000 | 1.3 |
-| datacenter/1 | 7 | 223 | 453 | 225 | 133 | 1034 | 2948 | 18600 | 15% | 1300 | 1.3 |
-| datacenter/2 | 8 | 284 | 0 | 253 | 156 | 693 | 3641 | 22500 | 16% | 1300 | 1.9 |
-| tower/4 | 8 | 302 | 487 | 295 | 156 | 1240 | 4881 | 22500 | 21% | 1300 | 1.0 |
-| tower/5 | 10 | 346 | 607 | 296 | 200 | 1449 | 6330 | 27300 | 23% | 1600 | 1.1 |
-| lab/1 | 10 | 165 | 675 | 88 | 222 | 1150 | 7480 | 27300 | 27% | 1600 | 1.4 |
-| lab/2 | 10 | 285 | 0 | 256 | 222 | 763 | 8243 | 27300 | 30% | 1600 | 2.1 |
+| campus | 2 | 30 | 162 | 32 | 22 | 246 | 246 | 4570 | 5% | 400 | 1.6 |
+| tower/1 | 2 | 56 | 141 | 68 | 22 | 287 | 533 | 4570 | 11% | 400 | 1.4 |
+| tower/2 | 4 | 148 | 224 | 165 | 66 | 603 | 1136 | 11430 | 9% | 700 | 1.2 |
+| tower/3 | 6 | 238 | 195 | 234 | 111 | 778 | 1914 | 25030 | 7% | 1000 | 1.3 |
+| datacenter/1 | 7 | 223 | 453 | 225 | 133 | 1034 | 2948 | 41410 | 7% | 1300 | 1.3 |
+| datacenter/2 | 8 | 284 | 0 | 253 | 156 | 693 | 3641 | 49210 | 7% | 1300 | 1.9 |
+| tower/4 | 8 | 302 | 487 | 295 | 156 | 1240 | 4881 | 49210 | 9% | 1300 | 1.0 |
+| tower/5 | 10 | 346 | 607 | 296 | 200 | 1449 | 6330 | 70010 | 9% | 1600 | 1.1 |
+| lab/1 | 10 | 165 | 675 | 88 | 222 | 1150 | 7480 | 70010 | 10% | 1600 | 1.4 |
+| lab/2 | 10 | 285 | 0 | 256 | 222 | 763 | 8243 | 70010 | 11% | 1600 | 2.1 |
 
 Sprint chests add `40 * level` per delivered run (80 at +2, 400 at +10); the world boss pays boss Kudos (`12 * (level * 1 + level / 2)`, 180 at level 10). Gates: the share stays under 35% after every zone, the tier Rare is 0.8-2.5 zones of that zone's income, and a tier-4 Epic costs at least three tier-4 Rares (`epics_are_steep_and_vendors_gate_by_level`).
 

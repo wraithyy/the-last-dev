@@ -182,6 +182,14 @@ pub enum Perk {
     HpCost { pct: u32 },
     /// All damage taken changes by `pct` percent.
     DamageTaken { pct: i32 },
+    /// Damage against targets at or below `below_pct` HP is `pct` higher.
+    Execute { below_pct: u32, pct: u32 },
+    /// Healing on targets at or below `below_pct` HP is `pct` higher.
+    Triage { below_pct: u32, pct: u32 },
+    /// While you are at or below `below_pct` HP, your damage and healing are `pct` higher.
+    Desperate { below_pct: u32, pct: u32 },
+    /// Kudos from your kills are `pct` higher (your own share only).
+    KudosFind { pct: u32 },
 }
 
 impl Perk {
@@ -205,7 +213,12 @@ impl Perk {
             Perk::OnKill { reset, cast } => reset.iter().chain(cast.iter()).copied().collect(),
             Perk::Reset { on, reset, .. } => on.iter().copied().chain([*reset]).collect(),
             Perk::Replace { spell, with } => vec![*spell, *with],
-            Perk::HpCost { .. } | Perk::DamageTaken { .. } => Vec::new(),
+            Perk::HpCost { .. }
+            | Perk::DamageTaken { .. }
+            | Perk::Execute { .. }
+            | Perk::Triage { .. }
+            | Perk::Desperate { .. }
+            | Perk::KudosFind { .. } => Vec::new(),
         }
     }
 }
@@ -217,8 +230,11 @@ pub enum GearSource {
     World,
     /// Only vendors sell it.
     Vendor,
-    /// A boss (unit key) drops it now and then on top of its guaranteed piece.
+    /// This unit (key) drops it now and then: a boss at `legendary_pct` on top of its
+    /// guaranteed piece, any other unit (elites, the night shift) at `named_pct`.
     Boss(String),
+    /// Only the end-of-sprint chest hands it out (top tier like the rest of the chest).
+    Sprint,
 }
 
 /// How the piece looks on the character: a tint and a model variant per slot.
@@ -343,6 +359,9 @@ pub struct JunkDef {
     pub icon: String,
     pub description: String,
     pub price: u32,
+    /// Drops only from mobs of this gear tier; 0 drops anywhere.
+    #[serde(default)]
+    pub tier: u8,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -441,6 +460,8 @@ pub struct Economy {
     pub boss_rarity: [u32; 4],
     /// A boss with a `Boss` item drops it with this chance, on top of its guaranteed piece.
     pub legendary_pct: u32,
+    /// A non-boss unit with a `Boss` item (elites, night shift) drops it with this chance.
+    pub named_pct: u32,
     /// Chance a gear drop is picked from the looter's own role (else any role).
     pub own_role_pct: u32,
     /// Quest turn-in SP in percent of the quest XP.
@@ -645,8 +666,11 @@ impl Economy {
             }
         }
         for j in &self.junk {
-            if j.description.chars().count() > ITEM_DESC_MAX + 30 {
-                return bad(format!("junk {} description too long", j.name));
+            if j.description.chars().count() > ITEM_DESC_MAX + 30 || j.tier > 5 {
+                return bad(format!(
+                    "junk {} description too long or tier above 5",
+                    j.name
+                ));
             }
         }
         for c in &self.consumables {
@@ -801,12 +825,27 @@ impl Sim {
         named.is_none_or(|s| self.perk_hits(ci, s, cast))
     }
 
-    /// Spell damage or healing after the caster's gear perks (and a splash's reduced share).
-    pub(crate) fn perk_amount(&self, ci: usize, spell: SpellId, amount: u64, heal: bool) -> u64 {
+    /// Spell damage or healing on unit `ti` after the caster's gear perks (and a splash's
+    /// reduced share).
+    pub(crate) fn perk_amount(
+        &self,
+        ci: usize,
+        ti: usize,
+        spell: SpellId,
+        amount: u64,
+        heal: bool,
+    ) -> u64 {
+        let low = |i: usize, below: u32| {
+            let u = &self.units[i].state;
+            u64::from(u.hp) * 100 <= u64::from(u.max_hp) * u64::from(below)
+        };
         let pct: u64 = self
             .perks(ci)
             .iter()
             .map(|p| match &p.perk {
+                Perk::Execute { below_pct, pct } if !heal && low(ti, *below_pct) => u64::from(*pct),
+                Perk::Triage { below_pct, pct } if heal && low(ti, *below_pct) => u64::from(*pct),
+                Perk::Desperate { below_pct, pct } if low(ci, *below_pct) => u64::from(*pct),
                 Perk::SpellDamage { spell: s, pct }
                     if !heal && self.perk_hits_opt(ci, *s, spell) =>
                 {
@@ -849,6 +888,17 @@ impl Sim {
             && self.perks(ci).iter().any(|p| {
                 matches!(&p.perk, Perk::CastWhileMoving { spell: s } if self.perk_hits_opt(ci, *s, spell.id))
             })
+    }
+
+    /// Kudos bonus in percent from the looter's `KudosFind` perks.
+    pub(crate) fn perk_kudos_pct(&self, i: usize) -> u32 {
+        self.perks(i)
+            .iter()
+            .map(|p| match p.perk {
+                Perk::KudosFind { pct } => pct,
+                _ => 0,
+            })
+            .sum()
     }
 
     /// Damage-taken change in percent from the bearer's `DamageTaken` perks.
@@ -1587,24 +1637,34 @@ impl Sim {
             }
             items.extend(picked);
         }
-        if boss {
-            let named: Vec<&GearDef> = eco
-                .gear
-                .iter()
-                .filter(|g| matches!(&g.source, GearSource::Boss(k) if *k == d.key))
-                .collect();
-            if !named.is_empty() && rng.chance_pct(eco.legendary_pct) {
-                let own: Vec<&&GearDef> = named.iter().filter(|g| g.role == role).collect();
-                let k = if own.is_empty() {
-                    named[rng.below(named.len() as u32) as usize]
-                } else {
-                    own[rng.below(own.len() as u32) as usize]
-                };
-                items.push(k.name.clone());
-            }
-        } else if !eco.junk.is_empty() && rng.chance_pct(eco.junk_pct * scale / 100) {
-            let k = rng.below(eco.junk.len() as u32) as usize;
-            items.push(eco.junk[k].name.clone());
+        let named: Vec<&GearDef> = eco
+            .gear
+            .iter()
+            .filter(|g| matches!(&g.source, GearSource::Boss(k) if *k == d.key))
+            .collect();
+        let named_pct = if boss {
+            eco.legendary_pct
+        } else {
+            eco.named_pct * scale / 100
+        };
+        if !named.is_empty() && rng.chance_pct(named_pct) {
+            let own: Vec<&&GearDef> = named.iter().filter(|g| g.role == role).collect();
+            let k = if own.is_empty() {
+                named[rng.below(named.len() as u32) as usize]
+            } else {
+                own[rng.below(own.len() as u32) as usize]
+            };
+            items.push(k.name.clone());
+        }
+        // Junk of the mob's tier, or tier-free junk.
+        let junk: Vec<&JunkDef> = eco
+            .junk
+            .iter()
+            .filter(|j| j.tier == 0 || j.tier == tier)
+            .collect();
+        if !boss && !junk.is_empty() && rng.chance_pct(eco.junk_pct * scale / 100) {
+            let k = rng.below(junk.len() as u32) as usize;
+            items.push(junk[k].name.clone());
         }
         (items, sp)
     }

@@ -869,3 +869,55 @@ fn kill_loot_is_trimmed_and_the_chest_still_pays() {
     assert_eq!(chest.sp, 200);
     assert!(chest.items.len() >= 2);
 }
+
+/// Sprint-only gear comes from the end-of-sprint chest: with the top tier's world pieces taken
+/// off the drop tables, every chest piece is a Sprint (or named boss) piece.
+#[test]
+fn the_chest_hands_out_sprint_only_gear() {
+    let mut c = no_affixes();
+    let top = c
+        .economy
+        .gear
+        .iter()
+        .map(combat_core::GearDef::tier)
+        .max()
+        .unwrap_or(1);
+    for g in &mut c.economy.gear {
+        match g.source {
+            combat_core::GearSource::World if g.tier() == top => {
+                g.source = combat_core::GearSource::Vendor;
+            }
+            // Level-1 chests pay Uncommon at most.
+            combat_core::GearSource::Sprint => g.rarity = combat_core::Rarity::Uncommon,
+            _ => {}
+        }
+    }
+    let sprint: Vec<String> = c
+        .economy
+        .gear
+        .iter()
+        .filter(|g| g.source == combat_core::GearSource::Sprint)
+        .map(|g| g.name.clone())
+        .collect();
+    assert!(sprint.len() >= 4);
+    let mut s = S::new(c, 10);
+    s.start_in("tower", 1);
+    assert!(s.sim.debug_end_sprint(true));
+    s.tick();
+    let chest = s.log.iter().find_map(|e| match e {
+        Event::SprintEnded { summary, .. } => Some(summary.clone()),
+        _ => None,
+    });
+    let Some(chest) = chest else { panic!("no end") };
+    let items = &chest.rewards[0].items;
+    assert!(items.iter().any(|i| sprint.contains(i)), "{items:?}");
+    for i in items {
+        let named = s
+            .sim
+            .content()
+            .economy
+            .gear(i)
+            .is_some_and(|g| matches!(g.source, combat_core::GearSource::Boss(_)));
+        assert!(sprint.contains(i) || named, "{i} in the chest");
+    }
+}

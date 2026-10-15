@@ -55,6 +55,19 @@ impl Plugin for ShopPlugin {
     }
 }
 
+/// Shelves longer than this are laid out in two columns.
+const LONG_SHELF: usize = 14;
+
+fn stock_node(cols: u16) -> Node {
+    Node {
+        display: Display::Grid,
+        grid_template_columns: RepeatedGridTrack::flex(cols, 1.0),
+        row_gap: px(1),
+        column_gap: px(6),
+        ..default()
+    }
+}
+
 fn spawn_window(mut commands: Commands) {
     commands
         .spawn((ShopWindow, window_node(None, Some(16.0), 400.0)))
@@ -69,14 +82,7 @@ fn spawn_window(mut commands: Commands) {
             });
             c.spawn((ShopStatus, label("", 12.0), TextColor(SP_GOLD)));
             c.spawn((label("for sale (click to buy)", 12.0), TextColor(DIM)));
-            c.spawn((
-                StockList,
-                Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: px(1),
-                    ..default()
-                },
-            ));
+            c.spawn((StockList, stock_node(1)));
             c.spawn(Node {
                 justify_content: JustifyContent::SpaceBetween,
                 align_items: AlignItems::Center,
@@ -245,9 +251,13 @@ fn rebuild(
     *shown = key;
     let equipped = goods::slots_of(&me.equipped);
     let role = content.class_of_unit(&me.key).map(|c| c.role);
+    // A long shelf goes to two columns so the window stays on screen (there is no scrolling).
+    let cols: u16 = if stock.len() > LONG_SHELF { 2 } else { 1 };
+    window.width = px(if cols == 2 { 620.0 } else { 400.0 });
     for (e, stock_list, sell, buyback) in &lists {
         if stock_list.is_some() {
             commands.entity(e).despawn_related::<Children>();
+            commands.entity(e).insert(stock_node(cols));
             for name in &stock {
                 let price = content.economy.goods(name).map_or(0, |g| g.price());
                 let affordable = me.sp >= price;

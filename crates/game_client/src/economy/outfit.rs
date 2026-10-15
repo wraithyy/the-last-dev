@@ -165,21 +165,32 @@ fn lineup_outfits(
         (Added<crate::gear::Accessories>, Without<SimUnit>),
     >,
 ) {
-    if std::env::var_os("WOW_LINEUP_GEAR").is_none() {
+    let Ok(spec) = std::env::var("WOW_LINEUP_GEAR") else {
         return;
-    }
+    };
+    // "1" wears the samples; anything else is outfits per skin: `a|b|c;d|e;..`.
+    let custom: Vec<Vec<&str>> = if spec == "1" {
+        Vec::new()
+    } else {
+        spec.split(';').map(|o| o.split('|').collect()).collect()
+    };
     for (e, kit) in &skins {
         let k = sim
             .content()
             .classes
             .iter()
             .position(|c| c.key == kit.0)
-            .unwrap_or(0)
-            .min(LINEUP_GEAR.len() - 1);
+            .unwrap_or(0);
+        let names: &[&str] = match custom.get(k) {
+            Some(o) => o,
+            None if custom.is_empty() => LINEUP_GEAR[k.min(LINEUP_GEAR.len() - 1)],
+            None => &[],
+        };
         let mut outfit = vec![String::new(); combat_core::SLOTS];
-        for name in LINEUP_GEAR[k] {
-            if let Some(g) = sim.content().economy.gear(name) {
-                outfit[g.slot.index()] = (*name).to_string();
+        for name in names {
+            match sim.content().economy.gear(name) {
+                Some(g) => outfit[g.slot.index()] = (*name).to_string(),
+                None => warn!("WOW_LINEUP_GEAR: unknown gear {name:?}"),
             }
         }
         commands.entity(e).insert(DisplayOutfit(outfit));
@@ -461,6 +472,157 @@ fn build_piece(
                     ));
                 }
             }
+            7 => {
+                // Ring light on a stalk behind the head: always on, always filming.
+                out.push((
+                    torus.clone(),
+                    dark.clone(),
+                    at(0.0, 0.64, 0.0, Vec3::new(0.6, 0.35, 0.6)),
+                    None,
+                ));
+                out.push((
+                    cyl,
+                    main,
+                    at(0.0, 0.95, -0.55, Vec3::new(0.05, 0.75, 0.05)),
+                    None,
+                ));
+                let light = a.mat(materials, (1.0, 0.95, 0.85), 2);
+                out.push((
+                    torus,
+                    light,
+                    Transform::from_xyz(0.0, 1.38, -0.55)
+                        .with_rotation(Quat::from_rotation_x(FRAC_PI_2))
+                        .with_scale(Vec3::new(0.48, 1.4, 0.48)),
+                    None,
+                ));
+            }
+            8 => {
+                // Hard hat: dome, wide brim, ridge and a headlamp.
+                out.push((
+                    sphere.clone(),
+                    main.clone(),
+                    at(0.0, 0.72, 0.0, Vec3::new(1.24, 0.78, 1.24)),
+                    None,
+                ));
+                out.push((
+                    cyl,
+                    main.clone(),
+                    at(0.0, 0.62, 0.04, Vec3::new(1.42, 0.04, 1.5)),
+                    None,
+                ));
+                out.push((
+                    cube,
+                    main,
+                    at(0.0, 1.06, 0.0, Vec3::new(0.14, 0.1, 0.9)),
+                    None,
+                ));
+                let lamp = a.mat(materials, (1.0, 0.95, 0.6), 2);
+                out.push((sphere, lamp, at(0.0, 0.78, 0.6, Vec3::splat(0.16)), None));
+            }
+            9 => {
+                // Party hat, slightly askew, pompom on top.
+                let tilt = Quat::from_rotation_z(0.2);
+                out.push((
+                    cone,
+                    main,
+                    Transform::from_xyz(-0.08, 1.24, 0.0)
+                        .with_rotation(tilt)
+                        .with_scale(Vec3::new(0.62, 0.8, 0.62)),
+                    None,
+                ));
+                out.push((
+                    sphere.clone(),
+                    white,
+                    at(-0.16, 1.64, 0.0, Vec3::splat(0.17)),
+                    None,
+                ));
+                for (k, col) in [(1.0, 0.85, 0.2), (0.3, 0.9, 1.0), (1.0, 0.4, 0.7)]
+                    .into_iter()
+                    .enumerate()
+                {
+                    let y = 1.0 + k as f32 * 0.14;
+                    let r = 0.27 - k as f32 * 0.07;
+                    out.push((
+                        sphere.clone(),
+                        a.mat(materials, col, glow),
+                        at(-0.03 - k as f32 * 0.03, y, r, Vec3::splat(0.07)),
+                        None,
+                    ));
+                }
+            }
+            10 => {
+                // Top hat: crown, band, brim.
+                out.push((
+                    cyl.clone(),
+                    main.clone(),
+                    at(0.0, 1.3, 0.0, Vec3::new(0.62, 0.62, 0.62)),
+                    None,
+                ));
+                out.push((
+                    cyl.clone(),
+                    main,
+                    at(0.0, 0.99, 0.0, Vec3::new(1.0, 0.04, 1.0)),
+                    None,
+                ));
+                let band = if glow > 0 { gold } else { dark };
+                out.push((
+                    cyl,
+                    band,
+                    at(0.0, 1.07, 0.0, Vec3::new(0.63, 0.1, 0.63)),
+                    None,
+                ));
+            }
+            11 => {
+                // Headband with two antennas: receiving agentic signals.
+                out.push((
+                    torus,
+                    main.clone(),
+                    at(0.0, 0.64, 0.0, Vec3::new(0.6, 0.45, 0.6)),
+                    None,
+                ));
+                let tip = a.mat(materials, c, 2);
+                for side in [-1.0f32, 1.0] {
+                    out.push((
+                        cyl.clone(),
+                        dark.clone(),
+                        Transform::from_xyz(side * 0.36, 1.12, 0.0)
+                            .with_rotation(Quat::from_rotation_z(-side * 0.35))
+                            .with_scale(Vec3::new(0.04, 0.55, 0.04)),
+                        None,
+                    ));
+                    out.push((
+                        sphere.clone(),
+                        tip.clone(),
+                        at(side * 0.46, 1.4, 0.0, Vec3::splat(0.15)),
+                        None,
+                    ));
+                }
+            }
+            12 => {
+                // Tinfoil hat with crinkles.
+                let foil = a.mat(materials, (0.82, 0.84, 0.88), glow);
+                out.push((
+                    cone,
+                    foil.clone(),
+                    at(0.0, 1.12, 0.0, Vec3::new(1.12, 0.8, 1.12)),
+                    None,
+                ));
+                for k in 0..5 {
+                    let ang = k as f32 * 1.3;
+                    out.push((
+                        cube.clone(),
+                        foil.clone(),
+                        Transform::from_xyz(
+                            ang.sin() * 0.4,
+                            0.86 + (k % 2) as f32 * 0.12,
+                            ang.cos() * 0.4,
+                        )
+                        .with_rotation(Quat::from_euler(EulerRot::XYZ, ang, ang * 0.7, 0.4))
+                        .with_scale(Vec3::splat(0.14)),
+                        None,
+                    ));
+                }
+            }
             6 => {
                 // Shades.
                 for side in [-1.0f32, 1.0] {
@@ -515,7 +677,8 @@ fn build_piece(
         },
         Slot::Hoodie => {
             // The tint does most of the work; logo and trims make tiers readable.
-            if g.visual.style >= 1 {
+            let s = g.visual.style;
+            if (1..=3).contains(&s) {
                 out.push((
                     cube.clone(),
                     white.clone(),
@@ -523,7 +686,7 @@ fn build_piece(
                     None,
                 ));
             }
-            if g.visual.style >= 2 {
+            if (2..=3).contains(&s) {
                 let trim = a.mat(
                     materials,
                     (c.0 * 0.5 + 0.5, c.1 * 0.5 + 0.5, c.2 * 0.5 + 0.5),
@@ -538,13 +701,98 @@ fn build_piece(
                     ));
                 }
             }
-            if g.visual.style >= 3 {
-                out.push((
+            match s {
+                3 => out.push((
                     torus,
                     gold,
                     at(0.0, -0.18, 0.0, Vec3::new(0.36, 0.5, 0.3)),
                     None,
-                ));
+                )),
+                4 => {
+                    // Cape: collar over the shoulders, panel flaring out behind (under the
+                    // keyboard strap), gold hem on Epic and up.
+                    out.push((
+                        cube.clone(),
+                        main.clone(),
+                        at(0.0, 0.36, -0.2, Vec3::new(0.72, 0.08, 0.2)),
+                        None,
+                    ));
+                    let flare = Quat::from_rotation_x(0.22);
+                    out.push((
+                        cube.clone(),
+                        main,
+                        Transform::from_xyz(0.0, -0.12, -0.38)
+                            .with_rotation(flare)
+                            .with_scale(Vec3::new(0.64, 1.05, 0.03)),
+                        None,
+                    ));
+                    if glow > 0 {
+                        out.push((
+                            cube,
+                            gold,
+                            Transform::from_xyz(0.0, -0.6, -0.49)
+                                .with_rotation(flare)
+                                .with_scale(Vec3::new(0.65, 0.05, 0.035)),
+                            None,
+                        ));
+                    }
+                }
+                5 => {
+                    // Blazer over the hoodie: dark front panels, the hoodie shows in the middle.
+                    let blazer = a.mat(materials, (0.14, 0.16, 0.24), glow);
+                    for side in [-1.0f32, 1.0] {
+                        out.push((
+                            cube.clone(),
+                            blazer.clone(),
+                            Transform::from_xyz(side * 0.17, 0.02, 0.3)
+                                .with_rotation(Quat::from_rotation_z(side * 0.12))
+                                .with_scale(Vec3::new(0.2, 0.58, 0.03)),
+                            None,
+                        ));
+                    }
+                    out.push((sphere, gold, at(0.06, -0.12, 0.32, Vec3::splat(0.04)), None));
+                }
+                6 => {
+                    // Hi-vis vest: reflective bands front and back.
+                    let reflect = a.mat(materials, (0.9, 0.92, 0.95), 1);
+                    for z in [0.31f32, -0.31] {
+                        for y in [0.02f32, -0.16] {
+                            out.push((
+                                cube.clone(),
+                                reflect.clone(),
+                                at(0.0, y, z, Vec3::new(0.6, 0.05, 0.02)),
+                                None,
+                            ));
+                        }
+                    }
+                    for side in [-1.0f32, 1.0] {
+                        out.push((
+                            cube.clone(),
+                            reflect.clone(),
+                            at(side * 0.13, 0.22, 0.31, Vec3::new(0.05, 0.3, 0.02)),
+                            None,
+                        ));
+                    }
+                }
+                7 => {
+                    // Sponsor logos everywhere, like a race car that never shipped.
+                    let patches = [
+                        ((1.0, 0.3, 0.3), Vec3::new(-0.14, 0.18, 0.31)),
+                        ((0.3, 0.6, 1.0), Vec3::new(0.14, 0.2, 0.31)),
+                        ((1.0, 0.85, 0.2), Vec3::new(0.0, -0.02, 0.31)),
+                        ((0.3, 0.9, 0.45), Vec3::new(-0.15, -0.16, 0.31)),
+                        ((0.95, 0.95, 0.98), Vec3::new(0.15, -0.14, 0.31)),
+                    ];
+                    for (col, p) in patches {
+                        out.push((
+                            cube.clone(),
+                            a.mat(materials, col, glow),
+                            at(p.x, p.y, p.z, Vec3::new(0.11, 0.08, 0.02)),
+                            None,
+                        ));
+                    }
+                }
+                _ => {}
             }
         }
         Slot::Keyboard => {
@@ -554,8 +802,59 @@ fn build_piece(
                 2 => (0.95, true),
                 _ => (1.05, false),
             };
-            let rot = Quat::from_rotation_y(PI) * Quat::from_rotation_z(0.5);
+            let style = g.visual.style;
+            let tilt = if style == 6 { 0.9 } else { 0.5 };
+            let rot = Quat::from_rotation_y(PI) * Quat::from_rotation_z(tilt);
             let base = Transform::from_xyz(0.0, 0.12, -0.36).with_rotation(rot);
+            if style == 6 {
+                // Keytar: short body with white keys and a long neck past the shoulder.
+                out.push((
+                    cube.clone(),
+                    main.clone(),
+                    base * Transform::from_xyz(-0.1, 0.0, 0.0)
+                        .with_scale(Vec3::new(0.7, 0.3, 0.07)),
+                    None,
+                ));
+                out.push((
+                    cube.clone(),
+                    main,
+                    base * Transform::from_xyz(0.5, 0.04, 0.0)
+                        .with_scale(Vec3::new(0.55, 0.09, 0.06)),
+                    None,
+                ));
+                out.push((
+                    cube.clone(),
+                    white,
+                    base * Transform::from_xyz(-0.1, -0.03, 0.045)
+                        .with_scale(Vec3::new(0.62, 0.11, 0.03)),
+                    None,
+                ));
+                for k in 0..5 {
+                    out.push((
+                        cube.clone(),
+                        dark.clone(),
+                        base * Transform::from_xyz(-0.36 + k as f32 * 0.12, 0.0, 0.06)
+                            .with_scale(Vec3::new(0.04, 0.06, 0.02)),
+                        None,
+                    ));
+                }
+                let knob = a.mat(materials, (1.0, 0.3, 0.6), 2);
+                out.push((
+                    sphere,
+                    knob,
+                    base * Transform::from_xyz(0.78, 0.04, 0.03).with_scale(Vec3::splat(0.07)),
+                    None,
+                ));
+                out.push((
+                    cube,
+                    dark,
+                    Transform::from_xyz(0.0, 0.2, 0.0)
+                        .with_rotation(Quat::from_rotation_z(0.5))
+                        .with_scale(Vec3::new(0.05, 0.9, 0.72)),
+                    None,
+                ));
+                return out;
+            }
             let halves: Vec<(f32, f32)> = if split {
                 vec![(-0.26, 0.45), (0.26, 0.45)]
             } else {
@@ -582,6 +881,49 @@ fn build_piece(
                     base * Transform::from_xyz(dx, 0.0, 0.0).with_scale(Vec3::new(hw, 0.34, 0.06)),
                     None,
                 ));
+                if style == 4 {
+                    // Mechanical: individual tall keycaps and an RGB underglow strip.
+                    for row in 0..3 {
+                        for col in 0..7 {
+                            out.push((
+                                cube.clone(),
+                                keys[0].clone(),
+                                base * Transform::from_xyz(
+                                    dx - hw * 0.39 + col as f32 * hw * 0.13,
+                                    0.1 - row as f32 * 0.1,
+                                    0.055,
+                                )
+                                .with_scale(Vec3::new(
+                                    hw * 0.1,
+                                    0.075,
+                                    0.06,
+                                )),
+                                None,
+                            ));
+                        }
+                    }
+                    for (k, col) in [(1.0, 0.2, 0.4), (0.2, 1.0, 0.5), (0.3, 0.5, 1.0)]
+                        .into_iter()
+                        .enumerate()
+                    {
+                        out.push((
+                            cube.clone(),
+                            a.mat(materials, col, 2),
+                            base * Transform::from_xyz(
+                                dx - hw / 3.0 + k as f32 * hw / 3.0,
+                                -0.18,
+                                0.0,
+                            )
+                            .with_scale(Vec3::new(
+                                hw / 3.0,
+                                0.025,
+                                0.065,
+                            )),
+                            None,
+                        ));
+                    }
+                    continue;
+                }
                 for (row, mat) in keys.iter().enumerate() {
                     out.push((
                         cube.clone(),
@@ -590,6 +932,26 @@ fn build_piece(
                             .with_scale(Vec3::new(hw * 0.88, 0.06, 0.03)),
                         None,
                     ));
+                }
+                if style == 5 {
+                    // Stickers over the keys: every conference since 2015.
+                    let stickers = [
+                        ((1.0, 0.3, 0.3), -0.35, 0.08, 0.3),
+                        ((0.3, 0.8, 1.0), -0.1, -0.05, -0.4),
+                        ((1.0, 0.85, 0.2), 0.18, 0.06, 0.2),
+                        ((0.4, 0.95, 0.45), 0.38, -0.08, -0.2),
+                        ((0.85, 0.4, 1.0), 0.02, 0.11, 0.6),
+                    ];
+                    for (col, x, y, r) in stickers {
+                        out.push((
+                            cube.clone(),
+                            a.mat(materials, col, glow),
+                            base * Transform::from_xyz(dx + x * hw, y, 0.065)
+                                .with_rotation(Quat::from_rotation_z(r))
+                                .with_scale(Vec3::new(0.12, 0.1, 0.01)),
+                            None,
+                        ));
+                    }
                 }
             }
             // The strap over the shoulder.
@@ -672,7 +1034,117 @@ fn build_piece(
                         None,
                     ));
                 }
+                4 => {
+                    // Energy can: slim, silver lid, white stripe.
+                    out.push((
+                        cyl.clone(),
+                        main.clone(),
+                        Transform::from_translation(grip + Vec3::Y * 0.06)
+                            .with_scale(Vec3::new(0.26, 0.56, 0.26)),
+                        None,
+                    ));
+                    let silver = a.mat(materials, (0.8, 0.82, 0.86), 0);
+                    out.push((
+                        cyl.clone(),
+                        silver,
+                        Transform::from_translation(grip + Vec3::Y * 0.35)
+                            .with_scale(Vec3::new(0.22, 0.03, 0.22)),
+                        None,
+                    ));
+                    out.push((
+                        cyl,
+                        white,
+                        Transform::from_translation(grip + Vec3::Y * 0.1)
+                            .with_scale(Vec3::new(0.265, 0.08, 0.265)),
+                        None,
+                    ));
+                }
+                5 => {
+                    // Smoothie / boba cup: dome lid and a fat straw.
+                    out.push((
+                        cyl.clone(),
+                        main.clone(),
+                        Transform::from_translation(grip + Vec3::Y * 0.04)
+                            .with_scale(Vec3::new(0.34, 0.5, 0.34)),
+                        None,
+                    ));
+                    out.push((
+                        sphere,
+                        white.clone(),
+                        Transform::from_translation(grip + Vec3::Y * 0.29)
+                            .with_scale(Vec3::new(0.34, 0.2, 0.34)),
+                        None,
+                    ));
+                    let straw = a.mat(materials, (1.0, 0.35, 0.55), glow);
+                    out.push((
+                        cyl,
+                        straw,
+                        Transform::from_translation(grip + Vec3::new(0.04, 0.5, 0.0))
+                            .with_rotation(Quat::from_rotation_z(-0.2))
+                            .with_scale(Vec3::new(0.06, 0.4, 0.06)),
+                        None,
+                    ));
+                }
+                6 => {
+                    // Moka pot: two stacked frustums, black handle and knob.
+                    out.push((
+                        cone.clone(),
+                        main.clone(),
+                        Transform::from_translation(grip - Vec3::Y * 0.05)
+                            .with_scale(Vec3::new(0.42, 0.3, 0.42)),
+                        None,
+                    ));
+                    out.push((
+                        cone,
+                        main,
+                        Transform::from_translation(grip + Vec3::Y * 0.2)
+                            .with_rotation(Quat::from_rotation_x(PI))
+                            .with_scale(Vec3::new(0.38, 0.28, 0.38)),
+                        None,
+                    ));
+                    out.push((
+                        cube,
+                        dark.clone(),
+                        Transform::from_translation(grip + Vec3::new(0.0, 0.18, -0.24))
+                            .with_scale(Vec3::new(0.06, 0.2, 0.1)),
+                        None,
+                    ));
+                    out.push((
+                        sphere,
+                        dark,
+                        Transform::from_translation(grip + Vec3::Y * 0.36)
+                            .with_scale(Vec3::splat(0.08)),
+                        None,
+                    ));
+                }
                 _ => {
+                    if g.visual.style == 7 {
+                        // Mandatory fun: confetti hovering over the coffee.
+                        let confetti = [
+                            (1.0, 0.3, 0.4),
+                            (0.3, 0.8, 1.0),
+                            (1.0, 0.85, 0.2),
+                            (0.45, 1.0, 0.45),
+                            (0.85, 0.4, 1.0),
+                        ];
+                        for (k, col) in confetti.into_iter().enumerate() {
+                            let ang = k as f32 * 1.26;
+                            out.push((
+                                cube.clone(),
+                                a.mat(materials, col, 1),
+                                Transform::from_translation(
+                                    grip + Vec3::new(
+                                        ang.sin() * 0.16,
+                                        0.32 + (k % 3) as f32 * 0.07,
+                                        ang.cos() * 0.16,
+                                    ),
+                                )
+                                .with_rotation(Quat::from_rotation_z(ang))
+                                .with_scale(Vec3::new(0.06, 0.06, 0.015)),
+                                None,
+                            ));
+                        }
+                    }
                     out.push((
                         cyl.clone(),
                         main.clone(),
@@ -703,6 +1175,37 @@ fn build_piece(
                 part.2.scale *= k;
             }
         }
+        Slot::Lanyard if g.visual.style == 4 => {
+            // Bandolier: a strap from shoulder to hip loaded with pagers, LEDs lit.
+            let strap = Quat::from_rotation_z(0.75);
+            out.push((
+                cube.clone(),
+                main,
+                Transform::from_xyz(0.0, 0.08, 0.31)
+                    .with_rotation(strap)
+                    .with_scale(Vec3::new(0.08, 0.85, 0.03)),
+                None,
+            ));
+            let led = a.mat(materials, (0.3, 1.0, 0.4), 2);
+            for k in 0..4 {
+                let t = -0.27 + k as f32 * 0.18;
+                let p = strap * Vec3::new(0.0, t, 0.0) + Vec3::new(0.0, 0.08, 0.34);
+                out.push((
+                    cube.clone(),
+                    dark.clone(),
+                    Transform::from_translation(p)
+                        .with_rotation(strap)
+                        .with_scale(Vec3::new(0.11, 0.08, 0.05)),
+                    None,
+                ));
+                out.push((
+                    sphere.clone(),
+                    led.clone(),
+                    at(p.x, p.y, p.z + 0.03, Vec3::splat(0.025)),
+                    None,
+                ));
+            }
+        }
         Slot::Lanyard => {
             let cord = a.mat(materials, c, 0);
             for side in [-1.0f32, 1.0] {
@@ -714,6 +1217,74 @@ fn build_piece(
                         .with_scale(Vec3::new(0.03, 0.4, 0.02)),
                     None,
                 ));
+            }
+            match g.visual.style {
+                5 => {
+                    // Medallion: a big round dial instead of a card.
+                    let face = Transform::from_xyz(0.0, 0.0, 0.33)
+                        .with_rotation(Quat::from_rotation_x(FRAC_PI_2));
+                    out.push((
+                        cyl.clone(),
+                        main,
+                        face.with_scale(Vec3::new(0.26, 0.04, 0.26)),
+                        None,
+                    ));
+                    out.push((
+                        cyl.clone(),
+                        white,
+                        face.with_translation(Vec3::new(0.0, 0.0, 0.353))
+                            .with_scale(Vec3::new(0.2, 0.01, 0.2)),
+                        None,
+                    ));
+                    out.push((
+                        cyl,
+                        gold,
+                        at(0.0, 0.15, 0.33, Vec3::new(0.05, 0.05, 0.05)),
+                        None,
+                    ));
+                    return out;
+                }
+                6 => {
+                    // Clicker / AI pin: a small device with a glowing red button.
+                    out.push((
+                        cube,
+                        dark,
+                        at(0.0, 0.02, 0.33, Vec3::new(0.09, 0.17, 0.04)),
+                        None,
+                    ));
+                    let red = a.mat(materials, (1.0, 0.15, 0.1), 2);
+                    out.push((sphere, red, at(0.0, 0.06, 0.355, Vec3::splat(0.05)), None));
+                    return out;
+                }
+                3 => {
+                    // Too many badges: a cascade of team cards under the main one.
+                    let teams = [
+                        (0.95, 0.35, 0.3),
+                        (0.3, 0.6, 1.0),
+                        (0.35, 0.85, 0.45),
+                        (1.0, 0.8, 0.2),
+                    ];
+                    for (k, col) in teams.into_iter().enumerate() {
+                        let y = -0.13 - k as f32 * 0.11;
+                        let side = if k % 2 == 0 { -1.0 } else { 1.0 };
+                        let t = Transform::from_xyz(side * 0.04, y, 0.315 - k as f32 * 0.004)
+                            .with_rotation(Quat::from_rotation_z(side * 0.18));
+                        out.push((
+                            cube.clone(),
+                            white.clone(),
+                            t.with_scale(Vec3::new(0.18, 0.13, 0.02)),
+                            None,
+                        ));
+                        out.push((
+                            cube.clone(),
+                            a.mat(materials, col, glow),
+                            t.with_translation(t.translation + Vec3::new(0.0, 0.035, 0.012))
+                                .with_scale(Vec3::new(0.18, 0.04, 0.01)),
+                            None,
+                        ));
+                    }
+                }
+                _ => {}
             }
             let card = if g.visual.style == 2 {
                 gold.clone()
