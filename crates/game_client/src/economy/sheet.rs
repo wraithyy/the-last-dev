@@ -489,13 +489,15 @@ fn follow_preview(
 // ---- gadget bar: equipped on-use items on U / O / P ----
 
 fn spawn_gadgets(mut commands: Commands) {
+    let (left, bottom) = crate::hud::actionbar::gadget_anchor();
     commands
         .spawn((
             GadgetBar,
             Node {
                 position_type: PositionType::Absolute,
-                right: px(16),
-                bottom: px(190),
+                left: percent(50),
+                margin: UiRect::left(px(left)),
+                bottom: px(bottom),
                 padding: UiRect::all(px(4)),
                 column_gap: px(4),
                 border: UiRect::all(px(1)),
@@ -599,6 +601,7 @@ fn gadgets(
         Without<GadgetCooldown>,
     >,
     mut shades: Query<(&GadgetCooldown, &mut Node), Without<GadgetButton>>,
+    touch: Res<crate::touch::TouchMode>,
 ) {
     let list = gadgets_of(&*sim);
     bar.display = if list.is_empty() {
@@ -606,6 +609,21 @@ fn gadgets(
     } else {
         Display::Flex
     };
+    // Touch puts its own big buttons beside the action bar; the gadgets move under the
+    // player frame there.
+    let (left, margin, bottom, top) = if touch.active {
+        (px(16), Val::Px(0.0), Val::Auto, px(118))
+    } else {
+        let (l, b) = crate::hud::actionbar::gadget_anchor();
+        (percent(50), Val::Px(l), px(b), Val::Auto)
+    };
+    let margin = UiRect::left(margin);
+    if bar.left != left || bar.bottom != bottom || bar.top != top || bar.margin != margin {
+        bar.left = left;
+        bar.bottom = bottom;
+        bar.top = top;
+        bar.margin = margin;
+    }
     let Some(me) = sim.player() else { return };
     for (b, interaction, mut node, mut image, mut border) in &mut buttons {
         let Some(item) = list.get(b.0) else {

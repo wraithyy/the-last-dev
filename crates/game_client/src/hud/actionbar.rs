@@ -530,6 +530,15 @@ const COFFEE_ACCENT: Accent = Accent {
 };
 
 /// Wider accent keycaps kept apart from the spell row, like an Esc key: auto attack, then coffee.
+/// (left offset from screen centre, bottom) for the gadget bar: stacked on top of the
+/// sprint/scooter keys, clear of the meter and combat log column on the right edge.
+pub fn gadget_anchor() -> (f32, f32) {
+    (
+        bar_width() / 2.0 + ATTACK_GAP,
+        BAR_BOTTOM + 2.0 * bar_height() + 6.0 + 8.0,
+    )
+}
+
 fn spawn_accents(commands: &mut Commands) {
     // Right of the bar like an Enter key; the left side belongs to the combat log.
     let left = bar_width() / 2.0 + ATTACK_GAP;

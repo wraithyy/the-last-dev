@@ -3,7 +3,7 @@
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
-mod actionbar;
+pub(crate) mod actionbar;
 mod banners;
 mod career;
 mod feed;
