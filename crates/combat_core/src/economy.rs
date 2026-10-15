@@ -3,7 +3,8 @@
 //! `UnitState` (`sp`, `bag`, `equipped`, `buyback`). See docs/FORMULAS.md, Gear.
 
 use crate::content::{
-    ContentError, ITEM_DESC_MAX, ItemBonus, ItemTotals, Role, SpellId, SpellTarget, ticks,
+    ContentError, ITEM_DESC_MAX, ItemBonus, ItemTotals, Objective, Role, SpellId, SpellTarget,
+    ticks,
 };
 use crate::geom::in_range;
 use crate::sim::Sim;
@@ -1283,7 +1284,31 @@ impl Sim {
         let Some(k) = self.units[pi].state.bag.iter().position(|n| n == item) else {
             return self.item_error(pid, ItemError::NotInBag);
         };
-        let price = self.economy().sell_price(item).unwrap_or(0);
+        self.sell_slot(pi, k);
+        self.bag_event(pi);
+    }
+
+    /// Every junk item in the bag goes through the same path as a single sale.
+    pub(crate) fn sell_junk(&mut self, pid: EntityId, vendor: EntityId) {
+        let Some(pi) = self.index(pid) else { return };
+        if self.near_vendor(pi, vendor).is_none() {
+            return self.item_error(pid, ItemError::TooFar);
+        }
+        let junk = self.junk_slots(pi);
+        for &k in junk.iter().rev() {
+            self.sell_slot(pi, k);
+        }
+        if !junk.is_empty() {
+            self.bag_event(pi);
+        }
+    }
+
+    /// Callers have checked that `k` is in range; the caller sends the bag event.
+    fn sell_slot(&mut self, pi: usize, k: usize) {
+        let price = self
+            .economy()
+            .sell_price(&self.units[pi].state.bag[k])
+            .unwrap_or(0);
         let cap = self.economy().buyback_size.max(1);
         let s = &mut self.units[pi].state;
         let name = s.bag.remove(k);
@@ -1292,7 +1317,60 @@ impl Sim {
         if s.buyback.len() > cap {
             s.buyback.remove(0);
         }
+    }
+
+    /// Bag indexes of junk, ascending.
+    fn junk_slots(&self, pi: usize) -> Vec<usize> {
+        let eco = self.economy();
+        let bag = &self.units[pi].state.bag;
+        (0..bag.len())
+            .filter(|&k| matches!(eco.goods(&bag[k]), Some(Goods::Junk(_))))
+            .collect()
+    }
+
+    /// Trophies and the loot objective of an active quest are never thrown away. Equipped
+    /// pieces are not in the bag at all, so they cannot be reached by slot.
+    fn discard_protected(&self, pid: EntityId, item: &str) -> bool {
+        if self.content.item(item).is_some() {
+            return true;
+        }
+        self.quests_of(pid).active.iter().any(|q| {
+            self.content.quest(&q.id).is_some_and(|def| {
+                def.objectives
+                    .iter()
+                    .any(|o| matches!(o, Objective::Loot(it, _) if it == item))
+            })
+        })
+    }
+
+    /// Destroys the bag item at `slot`. A slot past the end is ignored.
+    pub(crate) fn discard(&mut self, pid: EntityId, slot: u16) {
+        let Some(pi) = self.index(pid) else { return };
+        let k = usize::from(slot);
+        let Some(name) = self.units[pi].state.bag.get(k) else {
+            return;
+        };
+        if self.discard_protected(pid, name) {
+            return self.item_error(pid, ItemError::Protected);
+        }
+        self.units[pi].state.bag.remove(k);
         self.bag_event(pi);
+    }
+
+    /// Destroys every junk item in the bag except one an active quest still wants.
+    pub(crate) fn discard_junk(&mut self, pid: EntityId) {
+        let Some(pi) = self.index(pid) else { return };
+        let junk: Vec<usize> = self
+            .junk_slots(pi)
+            .into_iter()
+            .filter(|&k| !self.discard_protected(pid, &self.units[pi].state.bag[k]))
+            .collect();
+        for &k in junk.iter().rev() {
+            self.units[pi].state.bag.remove(k);
+        }
+        if !junk.is_empty() {
+            self.bag_event(pi);
+        }
     }
 
     pub(crate) fn buyback(&mut self, pid: EntityId, vendor: EntityId, item: &str) {

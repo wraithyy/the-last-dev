@@ -152,7 +152,7 @@ fn spawn_window(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
                     col.spawn((PerkText, label("", 11.0), TextColor(goods::PERK_GOLD)));
                 });
             });
-            c.spawn((label("bag (click: equip / use)", 12.0), TextColor(DIM)));
+            super::discard::bag_header(c, "bag (click: equip / use, shift+right-click: delete)");
             c.spawn((
                 BagGrid,
                 Node {
@@ -367,23 +367,64 @@ fn rebuild(
     }
 }
 
+/// A bag tile pressed with the mouse: acts on release unless it was dragged out of the window.
+struct Held {
+    item: String,
+    action: Option<TileAction>,
+}
+
 fn tiles(
     ui: Res<EconomyUi>,
     sim: SimView,
     touch: Res<crate::touch::TouchMode>,
     touches: Res<bevy::input::touch::Touches>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    keys: Res<ButtonInput<KeyCode>>,
+    window: Single<&Window, With<bevy::window::PrimaryWindow>>,
+    sheet: Single<(&ComputedNode, &UiGlobalTransform), With<SheetWindow>>,
     mut hover: ResMut<HoverItem>,
     mut inspect: ResMut<super::Inspect>,
     mut pending: ResMut<PendingCommands>,
+    mut discard: ResMut<super::discard::DiscardUi>,
+    mut held: Local<Option<Held>>,
     tiles: Query<(&Interaction, &TileItem, Option<&TileAction>), Changed<Interaction>>,
-    hovered: Query<(&Interaction, &TileItem)>,
+    hovered: Query<(&Interaction, &TileItem, Option<&TileAction>)>,
 ) {
     if !ui.sheet || sim.player().is_none() {
+        *held = None;
         return;
     }
-    for (i, item) in &hovered {
+    let worn = |a: Option<&TileAction>| matches!(a, Some(TileAction::Unequip(_)));
+    for (i, item, _) in &hovered {
         if *i != Interaction::None {
             hover.set(&item.0, false);
+        }
+    }
+    // Equipped pieces never reach the discard path; the sim refuses protected bag items too.
+    let shift = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
+    if shift && mouse.just_pressed(MouseButton::Right) {
+        let target = hovered
+            .iter()
+            .find(|(i, _, a)| **i != Interaction::None && !worn(*a));
+        if let Some((_, item, _)) = target {
+            super::discard::request(&mut discard, &mut pending, &*sim, &item.0);
+        }
+    }
+    if mouse.just_released(MouseButton::Left)
+        && let Some(h) = held.take()
+    {
+        let (node, at) = *sheet;
+        let inside = window
+            .physical_cursor_position()
+            .is_none_or(|c| node.contains_point(*at, c));
+        if !inside {
+            super::discard::request(&mut discard, &mut pending, &*sim, &h.item);
+        } else if hovered
+            .iter()
+            .any(|(i, t, _)| *i != Interaction::None && t.0 == h.item)
+            && inspect.gate(touch.active, &h.item, false, super::tap_position(&touches))
+        {
+            act(h.action.as_ref(), &mut pending);
         }
     }
     for (i, item, action) in &tiles {
@@ -391,18 +432,30 @@ fn tiles(
             continue;
         }
         // While the shop is open, bag clicks sell instead (the shop window handles those).
-        if ui.shop.is_some() && !matches!(action, Some(TileAction::Unequip(_))) {
+        if ui.shop.is_some() && !worn(action) {
+            continue;
+        }
+        // Mouse presses on bag tiles wait for the release so a drag out can delete instead.
+        if !touch.active && !worn(action) {
+            *held = Some(Held {
+                item: item.0.clone(),
+                action: action.cloned(),
+            });
             continue;
         }
         if !inspect.gate(touch.active, &item.0, false, super::tap_position(&touches)) {
             continue;
         }
-        match action {
-            Some(TileAction::Unequip(slot)) => pending.0.push(Command::Unequip { slot: *slot }),
-            Some(TileAction::Equip(item)) => pending.0.push(Command::Equip { item: item.clone() }),
-            Some(TileAction::Use(item)) => pending.0.push(Command::UseItem { item: item.clone() }),
-            None => {}
-        }
+        act(action, &mut pending);
+    }
+}
+
+fn act(action: Option<&TileAction>, pending: &mut PendingCommands) {
+    match action {
+        Some(TileAction::Unequip(slot)) => pending.0.push(Command::Unequip { slot: *slot }),
+        Some(TileAction::Equip(item)) => pending.0.push(Command::Equip { item: item.clone() }),
+        Some(TileAction::Use(item)) => pending.0.push(Command::UseItem { item: item.clone() }),
+        None => {}
     }
 }
 

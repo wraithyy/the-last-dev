@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 13;
+pub const PROTOCOL_VERSION: u16 = 14;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -632,6 +632,9 @@ pub fn is_player_command(cmd: &Command) -> bool {
         | Command::Sell { item, .. }
         | Command::Buyback { item, .. } => item.len() <= MAX_ITEM_NAME_BYTES,
         Command::Unequip { slot } => usize::from(*slot) < combat_core::SLOTS,
+        // The bag is cut to `MAX_LIST_LEN` on the wire too, so a larger index cannot be real.
+        Command::Discard { slot } => usize::from(*slot) < MAX_LIST_LEN,
+        Command::DiscardJunk | Command::SellJunk { .. } => true,
         Command::SetTarget { .. }
         | Command::Cast { .. }
         | Command::StopCasting { .. }
@@ -1217,6 +1220,9 @@ mod tests {
                     vendor: 12,
                     item: "Expired Free Pizza Coupon".into(),
                 },
+                Command::SellJunk { vendor: 12 },
+                Command::Discard { slot: 3 },
+                Command::DiscardJunk,
                 Command::Buyback {
                     vendor: 12,
                     item: "Expired Free Pizza Coupon".into(),
@@ -1825,6 +1831,10 @@ mod tests {
             slot: combat_core::SLOTS as u8,
         });
         assert_eq!(roundtrip(&bad_slot), Err(ProtoError::IllegalCommand));
+        let bad_discard = ClientMsg::Cmd(Command::Discard {
+            slot: MAX_LIST_LEN as u16,
+        });
+        assert_eq!(roundtrip(&bad_discard), Err(ProtoError::IllegalCommand));
         for (row, choice) in [
             (combat_core::TALENT_ROWS as u8, 1),
             (0, combat_core::TALENT_CHOICES + 1),

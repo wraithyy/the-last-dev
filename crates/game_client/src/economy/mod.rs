@@ -9,6 +9,7 @@
 //! - `WOW_SHEET=1`: open the character sheet; `WOW_SHOP=1`: open the nearest vendor two seconds in.
 //! - `WOW_HOVER_ITEM=<item>`: pin that item's tooltip (screenshots of comparisons);
 //!   `WOW_HOVER_BUY=1` shows it as on a vendor shelf (price, level requirement).
+//! - `WOW_DISCARD_POPUP=<item>@<secs>` opens the delete popup; `WOW_JUNK_SWEEP=<secs>` sweeps the junk.
 //! - `WOW_LINEUP_GEAR=1`: lineup skins (`WOW_LINEUP=4`) wear a sample outfit per class.
 //! - `WOW_NO_SAVE=1`: neither load nor write the offline save.
 //! - `WOW_LOOT=<secs>`: loot the nearest corpse within reach at that time (loot window shots).
@@ -16,6 +17,7 @@
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
+mod discard;
 pub mod goods;
 mod outfit;
 pub mod save;
@@ -108,6 +110,7 @@ impl Plugin for EconomyPlugin {
             .add_systems(Update, pin_ui_camera)
             .add_plugins((
                 wallet::WalletPlugin,
+                discard::DiscardPlugin,
                 sheet::SheetPlugin,
                 shop::ShopPlugin,
                 outfit::OutfitPlugin,
@@ -116,10 +119,18 @@ impl Plugin for EconomyPlugin {
     }
 }
 
-/// Esc closes the shop, then the sheet, and is swallowed so it neither pauses nor clears the
+/// Esc closes the delete popup, then the shop, then the sheet, and is swallowed so it neither pauses nor clears the
 /// target in the same press.
-fn close_on_escape(mut keys: ResMut<ButtonInput<KeyCode>>, mut ui: ResMut<EconomyUi>) {
+fn close_on_escape(
+    mut keys: ResMut<ButtonInput<KeyCode>>,
+    mut ui: ResMut<EconomyUi>,
+    mut discard: ResMut<discard::DiscardUi>,
+) {
     if !keys.just_pressed(KeyCode::Escape) {
+        return;
+    }
+    if discard.confirm.take().is_some() {
+        keys.clear_just_pressed(KeyCode::Escape);
         return;
     }
     if ui.shop.take().is_some() || std::mem::take(&mut ui.sheet) {

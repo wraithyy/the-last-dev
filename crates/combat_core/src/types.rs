@@ -166,6 +166,16 @@ pub enum Command {
         vendor: EntityId,
         item: String,
     },
+    /// Sell every junk item in the bag to a vendor in range.
+    SellJunk {
+        vendor: EntityId,
+    },
+    /// Destroy the bag item at this index. Trophies and active quest items are refused.
+    Discard {
+        slot: u16,
+    },
+    /// Destroy every junk item in the bag.
+    DiscardJunk,
     /// Buy back something sold this session at its sell price.
     Buyback {
         vendor: EntityId,
@@ -240,6 +250,8 @@ pub enum ItemError {
     NotEligible,
     /// The vendor wants a higher level for that piece (`GearDef::required_level`).
     LevelTooLow,
+    /// A trophy or an active quest item cannot be deleted.
+    Protected,
 }
 
 impl ItemError {
@@ -259,6 +271,7 @@ impl ItemError {
             ItemError::LevelTooLow => {
                 "Procurement says that is above your pay grade. Come back after a promotion."
             }
+            ItemError::Protected => "That one is load-bearing. Compliance would notice.",
         }
     }
 }

@@ -523,6 +523,9 @@ impl Sim {
             | Command::Unequip { .. }
             | Command::Buy { .. }
             | Command::Sell { .. }
+            | Command::SellJunk { .. }
+            | Command::Discard { .. }
+            | Command::DiscardJunk
             | Command::Buyback { .. }
             | Command::UseItem { .. }
             | Command::Interact { .. }
@@ -727,6 +730,9 @@ impl Sim {
             Command::Unequip { slot } => self.unequip(actor, slot),
             Command::Buy { vendor, item } => self.buy(actor, vendor, &item),
             Command::Sell { vendor, item } => self.sell(actor, vendor, &item),
+            Command::SellJunk { vendor } => self.sell_junk(actor, vendor),
+            Command::Discard { slot } => self.discard(actor, slot),
+            Command::DiscardJunk => self.discard_junk(actor),
             Command::Buyback { vendor, item } => self.buyback(actor, vendor, &item),
             Command::UseItem { item } => self.use_item(actor, &item),
             Command::Interact { prop } => self.interact(actor, &prop),
@@ -779,6 +785,9 @@ impl Sim {
             | Command::Unequip { .. }
             | Command::Buy { .. }
             | Command::Sell { .. }
+            | Command::SellJunk { .. }
+            | Command::Discard { .. }
+            | Command::DiscardJunk
             | Command::Buyback { .. }
             | Command::UseItem { .. }
             | Command::Interact { .. }

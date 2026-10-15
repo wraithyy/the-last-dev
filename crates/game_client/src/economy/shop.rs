@@ -32,6 +32,8 @@ struct StockList;
 struct SellGrid;
 #[derive(Component)]
 struct BuybackRow;
+#[derive(Component)]
+struct SellJunk;
 
 #[derive(Component, Clone)]
 enum ShopAction {
@@ -75,7 +77,26 @@ fn spawn_window(mut commands: Commands) {
                     ..default()
                 },
             ));
-            c.spawn((label("your bag (click to sell)", 12.0), TextColor(DIM)));
+            c.spawn(Node {
+                justify_content: JustifyContent::SpaceBetween,
+                align_items: AlignItems::Center,
+                ..default()
+            })
+            .with_children(|h| {
+                h.spawn((label("your bag (click to sell)", 12.0), TextColor(DIM)));
+                h.spawn((
+                    SellJunk,
+                    Button,
+                    Node {
+                        padding: UiRect::axes(px(6), px(2)),
+                        border: UiRect::all(px(1)),
+                        border_radius: BorderRadius::all(px(3)),
+                        ..default()
+                    },
+                    BorderColor::all(PANEL_EDGE),
+                    children![(label("sell all junk", 12.0), TextColor(SP_GOLD))],
+                ));
+            });
             c.spawn((
                 SellGrid,
                 Node {
@@ -337,6 +358,8 @@ fn clicks(
     mut hover: ResMut<HoverItem>,
     mut inspect: ResMut<Inspect>,
     mut pending: ResMut<PendingCommands>,
+    mut watch: ResMut<super::discard::SweepWatch>,
+    sell_junk: Query<&Interaction, (With<SellJunk>, Changed<Interaction>)>,
     pressed: Query<(&Interaction, &ShopAction), Changed<Interaction>>,
     hovered: Query<(&Interaction, &ShopAction)>,
 ) {
@@ -346,6 +369,17 @@ fn clicks(
             let (ShopAction::Buy(n) | ShopAction::Sell(n) | ShopAction::Buyback(n)) = a;
             hover.set(n, matches!(a, ShopAction::Buy(_)));
         }
+    }
+    if sell_junk.iter().any(|i| *i == Interaction::Pressed)
+        && let Some(me) = sim.player().and_then(|p| sim.unit(p))
+        && me.bag.iter().any(|n| super::discard::is_junk(&*sim, n))
+    {
+        let sweep = super::discard::Sweep::Sell {
+            bag_len: me.bag.len(),
+            sp: me.sp,
+        };
+        watch.0 = Some((sweep, 3.0));
+        pending.0.push(Command::SellJunk { vendor });
     }
     for (i, a) in &pressed {
         if *i != Interaction::Pressed {

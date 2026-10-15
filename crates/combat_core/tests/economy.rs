@@ -795,3 +795,118 @@ fn every_item_text_is_written() {
         );
     }
 }
+
+fn bag_of(sim: &Sim, p: u64) -> Vec<String> {
+    me(sim, p).bag
+}
+
+#[test]
+fn discard_destroys_one_item_and_the_save_keeps_it_gone() {
+    let (mut sim, p) = sim_with("fullstack", |_| {});
+    for n in [
+        "Expired Free Pizza Coupon",
+        "Ibuprofen",
+        "Expired Free Pizza Coupon",
+    ] {
+        assert!(sim.grant_goods(p, n));
+    }
+    sim.apply_as(p, Command::Discard { slot: 1 });
+    tick(&mut sim, 1);
+    assert_eq!(bag_of(&sim, p), ["Expired Free Pizza Coupon"; 2]);
+    let Some(save) = sim.export_save(p) else {
+        panic!("no save")
+    };
+    let Some(back) = SaveData::decode(&save.encode()) else {
+        panic!("save does not decode")
+    };
+    assert_eq!(back.bag, ["Expired Free Pizza Coupon"; 2]);
+}
+
+#[test]
+fn junk_sweep_only_removes_greys_and_equipped_gear_stays() {
+    let (mut sim, p) = sim_with("fullstack", |_| {});
+    let junk: Vec<String> = sim
+        .content()
+        .economy
+        .junk
+        .iter()
+        .take(2)
+        .map(|j| j.name.clone())
+        .collect();
+    assert_eq!(junk.len(), 2);
+    assert!(sim.grant_goods(p, &junk[0]));
+    assert!(sim.grant_goods(p, "Ibuprofen"));
+    assert!(sim.grant_goods(p, &junk[1]));
+    let Some(gear) = sim.content().economy.gear.first().map(|g| g.name.clone()) else {
+        panic!("no gear")
+    };
+    assert!(sim.debug_equip(p, &gear));
+    let worn = me(&sim, p).equipped;
+    sim.apply_as(p, Command::DiscardJunk);
+    tick(&mut sim, 1);
+    assert_eq!(bag_of(&sim, p), ["Ibuprofen"]);
+    assert_eq!(me(&sim, p).equipped, worn);
+}
+
+#[test]
+fn out_of_range_discard_is_a_no_op() {
+    let (mut sim, p) = sim_with("fullstack", |_| {});
+    assert!(sim.grant_goods(p, "Ibuprofen"));
+    tick(&mut sim, 1);
+    for slot in [1, 24, u16::MAX] {
+        sim.apply_as(p, Command::Discard { slot });
+        let ev = tick(&mut sim, 1);
+        assert!(
+            ev.iter()
+                .all(|e| !matches!(e, Event::Bag { .. } | Event::ItemError { .. }))
+        );
+    }
+    assert_eq!(bag_of(&sim, p), ["Ibuprofen"]);
+}
+
+#[test]
+fn sell_all_junk_pays_the_sum_and_leaves_the_rest() {
+    let (mut sim, p) = sim_with("fullstack", |_| {});
+    let v = near_vendor(&mut sim, p, "procurement_officer");
+    let junk: Vec<String> = sim
+        .content()
+        .economy
+        .junk
+        .iter()
+        .take(3)
+        .map(|j| j.name.clone())
+        .collect();
+    let expect: u32 = junk
+        .iter()
+        .map(|n| sim.content().economy.sell_price(n).unwrap_or(0))
+        .sum();
+    assert!(expect > 0);
+    for n in &junk {
+        assert!(sim.grant_goods(p, n));
+    }
+    assert!(sim.grant_goods(p, "Ibuprofen"));
+    sim.apply_as(p, Command::SellJunk { vendor: v });
+    tick(&mut sim, 1);
+    let s = me(&sim, p);
+    assert_eq!(
+        (s.sp, s.bag.clone(), s.buyback.len()),
+        (expect, vec!["Ibuprofen".to_string()], 3)
+    );
+    // Out of range the vendor pays nothing.
+    assert!(sim.grant_goods(p, &junk[0]));
+    sim.apply_as(
+        p,
+        Command::PlayerMoved {
+            pos: Vec3::new(40.0, 0.0, 0.0),
+            yaw: 0.0,
+            moving: false,
+            jumping: false,
+        },
+    );
+    sim.apply_as(p, Command::SellJunk { vendor: v });
+    let ev = tick(&mut sim, 1);
+    assert!(ev.contains(&Event::ItemError {
+        reason: ItemError::TooFar
+    }));
+    assert_eq!(me(&sim, p).sp, expect);
+}

@@ -790,6 +790,33 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn discard_only_touches_the_senders_bag_and_bad_slots_do_nothing() {
+        let mut s = room();
+        s.on_join(0, "a", "fullstack");
+        s.on_join(1, "b", "fullstack");
+        s.tick();
+        let (a, b) = (eid_of(&s, 0), eid_of(&s, 1));
+        let junk = "Expired Free Pizza Coupon";
+        assert!(s.sim.grant_goods(a, junk) && s.sim.grant_goods(b, junk));
+        let bag = |s: &RoomState, e| s.sim.unit(e).map(|u| u.bag.len());
+        // Out of range for the wire (rejected by decode) and for the bag (ignored by the sim).
+        let wire = |slot| {
+            let msg = encode(&ClientMsg::Cmd(Command::Discard { slot })).unwrap();
+            decode::<ClientMsg>(&msg)
+        };
+        assert!(wire(net_proto::MAX_LIST_LEN as u16).is_err());
+        s.on_message(0, ClientMsg::Cmd(Command::Discard { slot: 9 }));
+        s.tick();
+        assert_eq!((bag(&s, a), bag(&s, b)), (Some(1), Some(1)));
+        let Ok(ClientMsg::Cmd(cmd)) = wire(0) else {
+            panic!("slot 0 is a legal discard")
+        };
+        s.on_message(0, ClientMsg::Cmd(cmd));
+        s.tick();
+        assert_eq!((bag(&s, a), bag(&s, b)), (Some(0), Some(1)));
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn join_welcomes_and_announces() {
         let mut s = room();
         assert!(s.on_join(0, "Dana", "fullstack"));

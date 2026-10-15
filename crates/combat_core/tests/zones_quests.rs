@@ -1254,3 +1254,37 @@ fn a_boss_corpse_stays_until_the_zone_is_left() {
     t.load("campus");
     assert!(t.sim.unit(boss).is_none());
 }
+
+#[test]
+fn an_item_an_active_quest_wants_cannot_be_discarded() {
+    const JUNK: &str = "Expired Free Pizza Coupon";
+    let mut picked = None;
+    let mut t = t_with(10, |c| {
+        picked = c
+            .quests
+            .iter_mut()
+            .find(|q| q.giver.zone == "campus" && q.requires.is_none() && q.level_min <= 10)
+            .map(|q| {
+                q.objectives = vec![Objective::Loot(JUNK.into(), 1)];
+                (q.id.clone(), q.giver.npc.clone())
+            });
+    });
+    let Some((quest, giver)) = picked else {
+        panic!("no campus quest")
+    };
+    t.load("campus");
+    t.talk_to(&giver);
+    t.accept(&quest);
+    assert_eq!(t.sim.quests_of(t.p).active.len(), 1);
+    assert!(t.sim.grant_goods(t.p, JUNK));
+    t.quest_cmd(Command::Discard { slot: 0 });
+    t.quest_cmd(Command::DiscardJunk);
+    let bag = t.sim.unit(t.p).map(|u| u.bag.clone());
+    assert_eq!(bag, Some(vec![JUNK.to_string()]), "protected while active");
+    assert!(t.has(|e| matches!(
+        e,
+        Event::ItemError {
+            reason: combat_core::ItemError::Protected
+        }
+    )));
+}
