@@ -720,7 +720,7 @@ fn saves_roundtrip_and_tolerate_bad_data() {
     // Garbage, other versions and unknown names never break a load.
     assert!(SaveData::decode("").is_none());
     assert!(SaveData::decode("hello\nworld").is_none());
-    assert!(SaveData::decode(&text.replace("version=2", "version=99")).is_none());
+    assert!(SaveData::decode(&text.replace("version=3", "version=99")).is_none());
     let mangled = text
         .replace("level=10", "level=banana")
         .replace("Ibuprofen", "Ibuprofen|Nonexistent Thing")
@@ -735,6 +735,40 @@ fn saves_roundtrip_and_tolerate_bad_data() {
     assert_eq!((c.level, c.sp), (1, 0));
     assert!(c.bag.iter().all(|n| n != "Nonexistent Thing"));
     assert_eq!(c.equipped.len(), SLOTS);
+}
+
+/// Saves before version 3 predate the levelling curve: the level stays, and the XP into it keeps
+/// its share of the level (old table 400, 600, ... 2000).
+#[test]
+fn old_saves_keep_level_and_rescale_xp() {
+    let (mut sim, p) = sim_with("frontend", |_| {});
+    sim.set_level_of(p, 5);
+    tick(&mut sim, 1);
+    let Some(save) = sim.export_save(p) else {
+        panic!("no save")
+    };
+    let need = sim.content().xp_to_next(5);
+    // Halfway through level 5 under the old table (1200 to level 6).
+    let v2 = save
+        .encode()
+        .replace("version=3", "version=2")
+        .replace("xp=0", "xp=600");
+    let Some(old) = SaveData::decode(&v2) else {
+        panic!("v2 decodes")
+    };
+    let mut fresh = Sim::new(content(), 9);
+    let q = fresh.spawn_player("frontend", Vec3::new(0.0, 0.0, 0.0), 0.0);
+    assert!(fresh.import_save(q, &old));
+    let b = me(&fresh, q);
+    assert_eq!((b.level, b.xp, b.xp_to_next), (5, need / 2, need));
+    // A current save keeps its raw XP.
+    let Some(new) = SaveData::decode(&save.encode().replace("xp=0", "xp=600")) else {
+        panic!("v3 decodes")
+    };
+    let mut again = Sim::new(content(), 9);
+    let r = again.spawn_player("frontend", Vec3::new(0.0, 0.0, 0.0), 0.0);
+    assert!(again.import_save(r, &new));
+    assert_eq!(me(&again, r).xp, 600);
 }
 
 #[test]

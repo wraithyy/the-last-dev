@@ -1182,7 +1182,7 @@ pub fn zone_npc_at(zone: &str, anchor: &str) -> Option<(&'static str, IdlePose)>
         ("campus", "npc_1") => Some(("intern", IdlePose::Standing)),
         ("campus", "npc_2") => Some(("facilities_guy", IdlePose::Standing)),
         ("campus", "npc_3") => Some(("barista", IdlePose::Standing)),
-        ("campus", "npc_4") => Some(("smoking_corner_dev", IdlePose::Standing)),
+        ("campus", "npc_4") => Some(("smoking_corner_dev", IdlePose::Sitting)),
         ("campus", "npc_5") => Some(("unpaid_ambassador", IdlePose::Chatting)),
         ("campus", "npc_6") => Some(("scooter_exec", IdlePose::Standing)),
         ("datacenter/1", "npc_1") => Some(("it_support", IdlePose::Standing)),

@@ -49,6 +49,12 @@ impl Sim {
         let hp_level_pct = self.class_at(i).map_or(100, |c| c.level_hp_pct);
         let hp_aura_pct = self.max_hp_aura_pct(i);
         let (sprint_hp, sprint_dmg) = self.sprint_mob_pct(i);
+        // Sprint mobs sit at the run's level, not in the levelling curve.
+        let reward_pct = if self.live_run().is_some() {
+            100
+        } else {
+            self.content.xp_reward_pct(level)
+        };
         let d = &self.content.units[self.units[i].def];
         let u = &mut self.units[i];
         u.state.level = level;
@@ -101,7 +107,8 @@ impl Sim {
                 / 100;
             if d.hostile {
                 let xp = scale_pct(s.xp_pct_per_level, level, d.level);
-                u.state.xp = (u64::from(d.xp_reward) * u64::from(xp) / 100) as u32;
+                u.state.xp = (u64::from(d.xp_reward) * u64::from(xp) / 100 * u64::from(reward_pct)
+                    / 100) as u32;
             }
         }
         u.state.hp = u.state.max_hp;

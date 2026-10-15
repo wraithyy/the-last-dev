@@ -1,5 +1,6 @@
 //! Lootable-corpse feedback: rising golden sparkles, a gold nameplate with a
-//! LOOT tag, and the hover cursor (crosshair / grab / pointer).
+//! LOOT tag, and the hover cursor (crosshair / grab / pointer). Also the corpse decay: a
+//! corpse sinks into the floor once its timer (see `combat_core::CORPSE_EMPTY_MS`) runs out.
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::too_many_arguments)]
 
@@ -8,11 +9,11 @@ use crate::combat::{CombatEvent, SimRead, SimReady, SimUnit, SimView};
 use crate::input::{MouseState, Paused};
 use crate::nameplates::{PlateLootTag, PlateName};
 use crate::player::{Player, PlayerBody};
-use crate::targeting::pick_unit;
+use crate::targeting::{Target, pick_unit};
 use crate::units::Unit;
 use bevy::prelude::*;
 use bevy::window::{PrimaryWindow, SystemCursorIcon};
-use combat_core::{EntityId, Event};
+use combat_core::{CORPSE_EMPTY_MS, CORPSE_LOOT_MS, EntityId, Event, TICK_HZ, ms_to_ticks};
 use std::collections::HashSet;
 
 pub const GOLD: Color = Color::srgb(1.0, 0.82, 0.25);
@@ -22,6 +23,35 @@ const SPARKLE_EVERY: f32 = 0.14;
 const SPARKLE_LIFE: f32 = 1.3;
 /// Re-pick at least this often even with a still cursor: units walk under it.
 const PICK_EVERY: f32 = 0.15;
+/// A decaying corpse sinks this deep over the last `SINK_SECS` of its timer. Sinking under the
+/// opaque floor instead of an alpha fade keeps the shared character materials untouched (and
+/// WebGL2 has no order-independent transparency to fade skinned meshes cleanly anyway).
+const SINK_M: f32 = 0.8;
+const SINK_SECS: f32 = 3.0;
+
+/// This player's view of a corpse's timer, mirroring the sim's `refresh_corpse`: 3 minutes
+/// from the death while it holds loot for us, 30 s once it holds none. Online a teammate's roll
+/// keeps the corpse in the server's sim; it still goes here. Offline the sim despawns it on the
+/// same tick.
+#[derive(Component)]
+struct CorpseClock {
+    died: u64,
+    empty_since: Option<u64>,
+}
+
+impl CorpseClock {
+    fn end(&self) -> u64 {
+        let last = self.died + ms_to_ticks(CORPSE_LOOT_MS);
+        self.empty_since
+            .map_or(last, |t| (t + ms_to_ticks(CORPSE_EMPTY_MS)).min(last))
+    }
+}
+
+/// How far under the floor a corpse is with `left` seconds on its timer (eased in).
+fn sink_depth(left: f32) -> f32 {
+    let k = (1.0 - left / SINK_SECS).clamp(0.0, 1.0);
+    SINK_M * k * k
+}
 
 /// Corpses whose drop was empty: nothing to show, though the sim still calls them lootable.
 #[derive(Resource, Default)]
@@ -51,6 +81,7 @@ impl Plugin for LootFxPlugin {
                 Update,
                 (
                     track_empty,
+                    decay_corpses,
                     spawn_sparkles,
                     update_sparkles,
                     mark_plates,
@@ -94,6 +125,65 @@ fn track_empty(
     empty
         .0
         .retain(|id| sim.unit(*id).is_some_and(|u| u.lootable));
+}
+
+type CorpseParts = (
+    Entity,
+    &'static SimUnit,
+    &'static mut Transform,
+    &'static mut Visibility,
+    Option<&'static mut CorpseClock>,
+    Has<Unit>,
+);
+
+/// Runs after the render interpolation wrote this frame's pose, so the sink offset never
+/// accumulates. A sunk corpse loses its `Unit` mirror: no picking, no target frame (the target
+/// drops), no plate; a unit that comes back to life gets it again.
+fn decay_corpses(
+    mut commands: Commands,
+    sim: SimView,
+    empty: Res<EmptyCorpses>,
+    mut target: ResMut<Target>,
+    mut corpses: Query<CorpseParts, Without<Player>>,
+) {
+    let now = sim.now().0;
+    for (e, su, mut tf, mut vis, clock, mirrored) in &mut corpses {
+        let Some(u) = sim.unit(su.0) else { continue };
+        // Bosses are set pieces, respawning units come back in place, players get resurrected.
+        let keeps = u.boss || u.respawn_in_ms.is_some() || sim.players().contains(&u.id);
+        if u.alive || keeps {
+            if clock.is_some() {
+                commands.entity(e).remove::<CorpseClock>();
+                *vis = Visibility::Inherited;
+                if !mirrored {
+                    commands.entity(e).insert(Unit {
+                        hostile: u.hostile,
+                        alive: u.alive,
+                    });
+                }
+            }
+            continue;
+        }
+        let Some(mut clock) = clock else {
+            commands.entity(e).insert(CorpseClock {
+                died: now,
+                empty_since: None,
+            });
+            continue;
+        };
+        if clock.empty_since.is_none() && !has_loot(&*sim, &empty, su.0) {
+            clock.empty_since = Some(now);
+        }
+        let left = clock.end().saturating_sub(now) as f32 / TICK_HZ as f32;
+        tf.translation.y -= sink_depth(left);
+        if left <= 0.0 && mirrored {
+            *vis = Visibility::Hidden;
+            commands.entity(e).remove::<Unit>();
+            if target.0 == Some(e) {
+                target.0 = None;
+            }
+        }
+    }
 }
 
 fn has_loot(sim: &dyn SimRead, empty: &EmptyCorpses, id: EntityId) -> bool {
@@ -289,5 +379,29 @@ mod tests {
         assert_eq!(cursor_for(Hover::Hostile), Crosshair);
         assert_eq!(cursor_for(Hover::Corpse { in_reach: true }), Grab);
         assert_eq!(cursor_for(Hover::Corpse { in_reach: false }), NotAllowed);
+    }
+
+    #[test]
+    fn corpse_clock_matches_the_sim_rule_and_sinks_only_at_the_end() {
+        let t = |ms| ms_to_ticks(ms);
+        let held = CorpseClock {
+            died: 100,
+            empty_since: None,
+        };
+        assert_eq!(held.end(), 100 + t(CORPSE_LOOT_MS));
+        let looted = CorpseClock {
+            died: 100,
+            empty_since: Some(400),
+        };
+        assert_eq!(looted.end(), 400 + t(CORPSE_EMPTY_MS));
+        // Emptied just before the long timer: the long timer still wins.
+        let late = CorpseClock {
+            died: 100,
+            empty_since: Some(100 + t(CORPSE_LOOT_MS) - 30),
+        };
+        assert_eq!(late.end(), 100 + t(CORPSE_LOOT_MS));
+        assert_eq!(sink_depth(SINK_SECS + 1.0), 0.0);
+        assert!(sink_depth(SINK_SECS / 2.0) > 0.0 && sink_depth(SINK_SECS / 2.0) < SINK_M);
+        assert_eq!(sink_depth(0.0), SINK_M);
     }
 }

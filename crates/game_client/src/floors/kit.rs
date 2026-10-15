@@ -7,7 +7,8 @@
 
 use super::shape::{Footprint, Seg, WALL_T as COLLIDER_T, colliders};
 use crate::collision::aabb;
-use crate::config::WALL_HEIGHT;
+use crate::config::{PLAYER_HEIGHT, WALL_HEIGHT};
+use crate::seat::{self, SeatSpot};
 use bevy::prelude::*;
 use combat_core::Aabb;
 use std::f32::consts::{FRAC_PI_2, PI};
@@ -32,6 +33,42 @@ impl Model {
     const fn new(file: &'static str, lo: [f32; 2], size: [f32; 3]) -> Self {
         Self { file, lo, size }
     }
+}
+
+/// How a model seats people, in native model units around its footprint centre (measured from
+/// the glTF vertices: the cushion's top face and middle).
+#[derive(Clone, Copy)]
+struct ModelSeat {
+    top: f32,
+    /// Cushion middle, forward of the footprint centre (the model front is +Z).
+    z: f32,
+    /// Sideways slot centres; empty when the piece is only scaled to match.
+    slots: &'static [f32],
+    half_depth: f32,
+    /// Shrinks the piece so its cushion sits at `seat::SEAT_TOP`: Kenney furniture at
+    /// `FURNITURE_SCALE` is built for adults, but the chibi sit clip keeps its feet on the
+    /// floor with the pelvis only ~0.2 m up.
+    scale: f32,
+}
+
+fn model_seat(file: &str) -> Option<ModelSeat> {
+    let (top, z, slots, half_depth): (f32, f32, &'static [f32], f32) = match file {
+        "chairDesk" => (0.36, -0.02, &[0.0], 0.13),
+        "chairModernCushion" => (0.27, 0.0, &[0.0], 0.09),
+        "loungeSofa" => (0.23, 0.045, &[-0.21, 0.21], 0.16),
+        "loungeChair" => (0.23, 0.045, &[0.0], 0.16),
+        "loungeDesignSofa" => (0.23, 0.065, &[-0.2, 0.2], 0.14),
+        "loungeChairRelax" => (0.23, -0.02, &[0.0], 0.16),
+        "loungeSofaLong" => (0.23, 0.0, &[], 0.16),
+        _ => return None,
+    };
+    Some(ModelSeat {
+        top,
+        z,
+        slots,
+        half_depth,
+        scale: seat::SEAT_TOP / (top * FURNITURE_SCALE),
+    })
 }
 
 pub static BOOKCASE_CLOSED_WIDE: Model =
@@ -428,6 +465,8 @@ pub struct Plan {
     pub route: Vec<Vec2>,
     /// Interactive props (`combat_core::world`): key and the world point a click aims at.
     pub props: Vec<(&'static str, Vec3)>,
+    /// Every place to sit, registered by the props that offer one.
+    pub seats: Vec<SeatSpot>,
     frame: Vec<(Vec3, f32)>,
 }
 
@@ -476,6 +515,21 @@ impl Plan {
         scale: f32,
     ) {
         let (pos, yaw) = (self.to_world(pos), yaw + self.yaw_sum());
+        let seat = model_seat(model.file);
+        let scale = scale * seat.map_or(1.0, |m| m.scale);
+        if let Some(m) = seat {
+            // The model front is +Z, so a sitter faces the same way the model does.
+            let s = FURNITURE_SCALE * scale;
+            for x in m.slots {
+                let at = pos + Quat::from_rotation_y(yaw) * Vec3::new(x * s, 0.0, m.z * s);
+                self.seats.push(SeatSpot {
+                    pos: Vec3::new(at.x, m.top * s, at.z),
+                    yaw: seat::wrap_yaw(yaw + PI),
+                    half_depth: m.half_depth * s,
+                    taken: false,
+                });
+            }
+        }
         self.pieces.push(Piece::Prop {
             model,
             pos,
@@ -513,6 +567,46 @@ impl Plan {
 
     pub fn anchor(&mut self, name: &'static str, pos: Vec3, yaw: f32) {
         self.anchors.push(Anchor { name, pos, yaw });
+    }
+
+    /// A seat built from boxes (benches, beanbags), in the current frame: `centre` is the middle
+    /// of the surface and `yaw` the way the sitter faces.
+    pub fn seat(&mut self, centre: Vec3, yaw: f32, half_depth: f32) {
+        self.seats.push(SeatSpot {
+            pos: self.to_world(centre),
+            yaw: seat::wrap_yaw(yaw + self.yaw_sum() + PI),
+            half_depth,
+            taken: false,
+        });
+    }
+
+    pub fn anchor_pos(&self, name: &str) -> Option<Vec3> {
+        self.anchors.iter().find(|a| a.name == name).map(|a| a.pos)
+    }
+
+    /// Seats an NPC: the seat nearest to `near` (world) becomes theirs for good and anchor
+    /// `name` is moved to where a standard-height unit's feet go so its hips land on it.
+    pub fn occupy(&mut self, name: &'static str, near: Vec3) {
+        let Some(i) = self
+            .seats
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| !s.taken)
+            .min_by(|a, b| {
+                let d = |s: &SeatSpot| Vec2::new(s.pos.x - near.x, s.pos.z - near.z).length();
+                d(a.1).total_cmp(&d(b.1))
+            })
+            .map(|(i, _)| i)
+        else {
+            return;
+        };
+        self.seats[i].taken = true;
+        let (pos, yaw) = (
+            self.seats[i].origin(seat::model_scale(PLAYER_HEIGHT)),
+            self.seats[i].yaw,
+        );
+        self.anchors.retain(|a| a.name != name);
+        self.anchor(name, pos, yaw);
     }
 
     /// An interactive prop: `anchor` is `"prop:<key>"`, placed at `stand` (world, where the

@@ -36,6 +36,8 @@ pub struct AppState {
     pub ip_conns: Arc<ConnTracker>,
     pub join_fails: RateLimiter,
     pub room_creates: RateLimiter,
+    /// `ListRooms` and `JoinPublic` per IP.
+    pub room_lists: RateLimiter,
     pub statics: Option<static_files::StaticFiles>,
 }
 
@@ -110,6 +112,11 @@ pub async fn run(
             Duration::from_secs(60),
             Duration::ZERO,
         ),
+        room_lists: RateLimiter::new(
+            cfg.per_ip_lists_per_min,
+            Duration::from_secs(60),
+            Duration::ZERO,
+        ),
         statics,
         registry: registry.clone(),
         cfg,
@@ -130,6 +137,7 @@ pub async fn run(
                 let (rooms, players) = st.registry.counts();
                 st.join_fails.prune();
                 st.room_creates.prune();
+                st.room_lists.prune();
                 tracing::info!(rooms, players, "gauge");
             }
         })

@@ -12,11 +12,11 @@ use std::time::Duration;
 
 use axum::body::Bytes;
 use combat_core::MAX_PLAYERS;
-use net_proto::ClientMsg;
+use net_proto::{ClientMsg, MAX_ROOM_LIST, RoomInfo, default_title, sanitize_title};
 use tokio::sync::{mpsc, watch};
 use tokio::time::{Instant, MissedTickBehavior, interval};
 
-use crate::room_state::{Audience, PlayerId, RoomState, cannot_join_frame};
+use crate::room_state::{Audience, PlayerId, RoomState, RoomSummary, cannot_join_frame};
 use crate::world::World;
 
 /// Produces a candidate room code (`random_room_code`; tests may inject their own).
@@ -29,6 +29,8 @@ const TICK_SAMPLES: usize = 4096;
 
 pub const TICK_HZ: u64 = 30;
 const CMD_QUEUE: usize = 1024;
+/// Ticks between refreshes of a room's `RoomSummary` in the registry (1 s).
+const SUMMARY_EVERY_TICKS: u64 = TICK_HZ;
 
 /// Short, per-process-keyed hash of a room code for logs. Codes are join credentials, so they
 /// must not appear in logs; the key stops anyone brute-forcing a code back out of a log line.
@@ -83,6 +85,10 @@ struct Entry {
     players: usize,
     next_player: PlayerId,
     tx: mpsc::Sender<RoomCmd>,
+    created: Instant,
+    /// `RoomInfo::id`: random and unrelated to the code; redrawn whenever the room turns public.
+    id: u64,
+    info: RoomSummary,
 }
 
 struct Inner {
@@ -161,8 +167,20 @@ impl RoomRegistry {
         self.0.world.content.class(class).is_some()
     }
 
-    /// Creates a fresh room and joins it as its first player.
+    /// Creates a fresh private room and joins it as its first player.
     pub fn create_and_join(&self, name: &str, class: &str) -> Result<Joined, JoinError> {
+        self.create(name, class, false, "")
+    }
+
+    /// Creates a room (listed when `public`) titled with the sanitised `raw_title` or a
+    /// generated default, and joins it as its first player.
+    pub fn create(
+        &self,
+        name: &str,
+        class: &str,
+        public: bool,
+        raw_title: &str,
+    ) -> Result<Joined, JoinError> {
         let inner = &self.0;
         let mut rooms = inner.lock();
         if rooms.len() >= inner.max_rooms {
@@ -174,18 +192,27 @@ impl RoomRegistry {
             .find(|c| !rooms.contains_key(c))
             .ok_or(JoinError::Unavailable)?;
         let (tx, rx) = mpsc::channel(CMD_QUEUE);
+        let id = random_id();
+        let title = sanitize_title(raw_title).unwrap_or_else(|| default_title(id));
         rooms.insert(
             code.clone(),
             Entry {
                 players: 0,
                 next_player: 0,
                 tx,
+                created: Instant::now(),
+                id,
+                info: RoomSummary {
+                    public,
+                    title: title.clone(),
+                    ..RoomSummary::default()
+                },
             },
         );
         let joined = join_locked(inner, &mut rooms, &code, name, class);
         match joined {
             Ok(j) => {
-                tokio::spawn(run_room(code.clone(), inner.clone(), rx));
+                tokio::spawn(run_room(code.clone(), inner.clone(), rx, (public, title)));
                 tracing::info!(room = %code_tag(&code), rooms = rooms.len(), "room created");
                 Ok(j)
             }
@@ -199,6 +226,48 @@ impl RoomRegistry {
     pub fn join(&self, code: &str, name: &str, class: &str) -> Result<Joined, JoinError> {
         let mut rooms = self.0.lock();
         join_locked(&self.0, &mut rooms, code, name, class)
+    }
+
+    /// Joins a room by its public id; a private room (or one gone private) is `NoSuchRoom`.
+    pub fn join_public(&self, id: u64, name: &str, class: &str) -> Result<Joined, JoinError> {
+        let mut rooms = self.0.lock();
+        let code = rooms
+            .iter()
+            .find(|(_, e)| e.info.public && e.id == id)
+            .map(|(c, _)| c.clone())
+            .ok_or(JoinError::NoSuchRoom)?;
+        join_locked(&self.0, &mut rooms, &code, name, class)
+    }
+
+    /// Public rooms with someone in them: the most populated first, then the newest. Carries
+    /// no code; full rooms are included (the client greys them out).
+    pub fn list(&self) -> Vec<RoomInfo> {
+        let rooms = self.0.lock();
+        let mut v: Vec<&Entry> = rooms
+            .values()
+            .filter(|e| e.info.public && e.players > 0 && !e.info.host.is_empty())
+            .collect();
+        v.sort_by(|a, b| {
+            b.players
+                .cmp(&a.players)
+                .then_with(|| b.created.cmp(&a.created))
+        });
+        let small = |n: usize| u8::try_from(n).unwrap_or(u8::MAX);
+        v.into_iter()
+            .take(MAX_ROOM_LIST)
+            .map(|e| RoomInfo {
+                id: e.id,
+                title: e.info.title.clone(),
+                host: e.info.host.clone(),
+                players: small(e.players),
+                max: small(self.0.max_players),
+                zone: e.info.zone.clone(),
+                avg_level: e.info.avg_level,
+                roles: e.info.roles.clone(),
+                in_sprint: e.info.in_sprint,
+                age_s: u32::try_from(e.created.elapsed().as_secs()).unwrap_or(u32::MAX),
+            })
+            .collect()
     }
 
     pub async fn leave(&self, joined: &Joined) {
@@ -270,10 +339,40 @@ fn join_locked(
     })
 }
 
-async fn run_room(code: String, inner: Arc<Inner>, mut rx: mpsc::Receiver<RoomCmd>) {
+/// Copies the room's list entry into the registry. Turning public draws a fresh id, so an id
+/// seen while the room was listed before stops working once it went private.
+fn publish(inner: &Inner, code: &str, info: RoomSummary) {
+    let mut rooms = inner.lock();
+    if let Some(e) = rooms.get_mut(code) {
+        if info.public && !e.info.public {
+            e.id = random_id();
+        }
+        e.info = info;
+    }
+}
+
+/// `RoomInfo::id`. Not a credential for private rooms (it only works while the room is
+/// public), so std's randomly keyed hasher is an acceptable fallback if the OS rng fails.
+fn random_id() -> u64 {
+    let mut b = [0u8; 8];
+    if getrandom::fill(&mut b).is_ok() {
+        return u64::from_le_bytes(b);
+    }
+    RandomState::new().build_hasher().finish()
+}
+
+async fn run_room(
+    code: String,
+    inner: Arc<Inner>,
+    mut rx: mpsc::Receiver<RoomCmd>,
+    (public, title): (bool, String),
+) {
     let tag = code_tag(&code);
     let mut state = RoomState::new(code.clone(), inner.world.clone());
     state.dev_start_level.clone_from(&inner.dev_start_level);
+    state.public = public;
+    state.title = title;
+    let mut ticks = 0u64;
     let mut joins = 0u32;
     let mut players: HashMap<PlayerId, mpsc::Sender<Bytes>> = HashMap::new();
     let mut empty_since = Some(Instant::now());
@@ -302,6 +401,7 @@ async fn run_room(code: String, inner: Arc<Inner>, mut rx: mpsc::Receiver<RoomCm
                     players.insert(player, out);
                     joins += 1;
                     empty_since = None;
+                    publish(&inner, &code, state.summary());
                 }
                 Some(RoomCmd::Leave(player)) => {
                     if players.remove(&player).is_some() {
@@ -311,8 +411,15 @@ async fn run_room(code: String, inner: Arc<Inner>, mut rx: mpsc::Receiver<RoomCm
                     if players.is_empty() {
                         empty_since = Some(Instant::now());
                     }
+                    publish(&inner, &code, state.summary());
                 }
-                Some(RoomCmd::Msg(player, bytes)) => state.on_message(player, bytes),
+                Some(RoomCmd::Msg(player, msg)) => {
+                    let visibility = matches!(msg, ClientMsg::SetPublic { .. });
+                    state.on_message(player, msg);
+                    if visibility {
+                        publish(&inner, &code, state.summary());
+                    }
+                }
             },
             _ = ticker.tick() => {
                 let started = std::time::Instant::now();
@@ -321,6 +428,10 @@ async fn run_room(code: String, inner: Arc<Inner>, mut rx: mpsc::Receiver<RoomCm
                     inner.record_tick(u32::try_from(started.elapsed().as_micros()).unwrap_or(u32::MAX));
                 }
                 dispatch(&tag, &mut players, &mut state, out);
+                ticks += 1;
+                if !players.is_empty() && ticks.is_multiple_of(SUMMARY_EVERY_TICKS) {
+                    publish(&inner, &code, state.summary());
+                }
                 // A room nobody ever joined is most likely creation spam; reap it quickly.
                 let ttl = if joins > 1 { inner.empty_ttl } else { inner.unjoined_ttl };
                 if empty_since.is_some_and(|t| t.elapsed() >= ttl) && remove_if_empty(&inner, &code) {
@@ -578,7 +689,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn dropped_slow_client_triggers_on_leave() {
         let cfg = Config {
-            outbound_queue: 5,
+            // Room for the join burst (welcome, snapshot, settings, joined) plus a tick.
+            outbound_queue: 7,
             ..cfg(5, 5)
         };
         let reg = reg(&cfg);
@@ -597,6 +709,148 @@ mod tests {
         }
         assert!(seen, "on_leave was not called for the dropped client");
         drop(b);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn only_public_rooms_are_listed_and_joinable_by_id() {
+        let reg = reg(&cfg(5, 2));
+        let private = reg.create_and_join("Pat", "fullstack").unwrap();
+        let mut a = reg
+            .create("Ann", "backend", true, "Mob\u{202e} Programming")
+            .unwrap();
+        settle().await;
+        let list = reg.list();
+        assert_eq!(list.len(), 1);
+        let r = &list[0];
+        assert_eq!(
+            (r.title.as_str(), r.host.as_str(), r.players, r.max),
+            ("Mob Programming", "Ann", 1, 2)
+        );
+        assert_eq!(
+            (r.zone.as_str(), r.roles.clone(), r.in_sprint),
+            ("campus", vec!["backend".to_string()], false)
+        );
+        assert!(r.avg_level >= 1);
+        // The list carries no code, and the id does not open the private room.
+        let wire = net_proto::encode(&ServerMsg::RoomList {
+            rooms: list.clone(),
+        })
+        .unwrap();
+        for code in [&a.code, &private.code] {
+            assert!(!wire.windows(code.len()).any(|w| w == code.as_bytes()));
+        }
+        let b = reg.join_public(r.id, "Bo", "devops").unwrap();
+        assert_eq!(b.code, a.code);
+        settle().await;
+        let full = &reg.list()[0];
+        assert_eq!((full.players, full.max), (2, 2), "full rooms stay listed");
+        assert_eq!(
+            full.roles,
+            vec!["backend".to_string(), "devops".to_string()]
+        );
+        assert_eq!(
+            reg.join_public(full.id, "Cy", "devops").err(),
+            Some(JoinError::RoomFull)
+        );
+        assert_eq!(
+            reg.join_public(full.id ^ 1, "Cy", "devops").err(),
+            Some(JoinError::NoSuchRoom)
+        );
+        assert!(drain(&mut a).iter().any(|m| matches!(
+            m,
+            ServerMsg::RoomSettings { public: true, title, .. } if title == "Mob Programming"
+        )));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn untitled_rooms_get_a_generated_title() {
+        let reg = reg(&cfg(5, 5));
+        let _a = reg.create("Ann", "backend", true, "  !! ").unwrap();
+        settle().await;
+        let t = reg.list()[0].title.clone();
+        assert!(
+            net_proto::TITLE_TEMPLATES.iter().any(|p| t.starts_with(p)),
+            "{t}"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn only_the_leader_toggles_visibility() {
+        let reg = reg(&cfg(5, 5));
+        let mut a = reg.create_and_join("Ann", "backend").unwrap();
+        let mut b = reg.join(&a.code, "Bo", "devops").unwrap();
+        settle().await;
+        drain(&mut a);
+        drain(&mut b);
+        assert!(reg.list().is_empty());
+        b.send(ClientMsg::SetPublic { public: true });
+        settle().await;
+        assert!(reg.list().is_empty(), "a non-leader cannot list the room");
+        assert!(drain(&mut b).iter().any(|m| matches!(
+            m,
+            ServerMsg::Error {
+                kind: net_proto::ErrorKind::NotLeader,
+                ..
+            }
+        )));
+        a.send(ClientMsg::SetPublic { public: true });
+        settle().await;
+        let first = reg.list()[0].id;
+        assert!(
+            drain(&mut b)
+                .iter()
+                .any(|m| matches!(m, ServerMsg::RoomSettings { public: true, .. }))
+        );
+        a.send(ClientMsg::SetPublic { public: false });
+        settle().await;
+        assert!(reg.list().is_empty());
+        assert_eq!(
+            reg.join_public(first, "Cy", "devops").err(),
+            Some(JoinError::NoSuchRoom),
+            "an id from before stops working once private"
+        );
+        a.send(ClientMsg::SetPublic { public: true });
+        settle().await;
+        assert_ne!(reg.list()[0].id, first, "listing again draws a new id");
+        // The leader leaving hands the toggle to the next player.
+        reg.leave(&a).await;
+        settle().await;
+        assert!(drain(&mut b).iter().any(|m| matches!(
+            m,
+            ServerMsg::RoomSettings { leader, .. } if *leader != 0
+        )));
+        b.send(ClientMsg::SetPublic { public: false });
+        settle().await;
+        assert!(reg.list().is_empty());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn empty_and_expired_rooms_leave_the_list() {
+        let reg = reg(&cfg(5, 5));
+        let a = reg.create("Ann", "backend", true, "").unwrap();
+        settle().await;
+        assert_eq!(reg.list().len(), 1);
+        reg.leave(&a).await;
+        settle().await;
+        assert!(reg.list().is_empty(), "empty rooms are not listed");
+        tokio::time::sleep(Duration::from_secs(61)).await;
+        assert_eq!(reg.counts().0, 0);
+        assert!(reg.list().is_empty());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn list_is_capped_and_most_populated_first() {
+        let reg = reg(&cfg(MAX_ROOM_LIST + 5, 5));
+        let mut held = Vec::new();
+        for _ in 0..MAX_ROOM_LIST + 3 {
+            held.push(reg.create("Ann", "backend", true, "").unwrap());
+        }
+        let busy = held[0].code.clone();
+        held.push(reg.join(&busy, "Bo", "devops").unwrap());
+        settle().await;
+        let list = reg.list();
+        assert_eq!(list.len(), MAX_ROOM_LIST);
+        assert_eq!(list[0].players, 2);
     }
 
     #[tokio::test(start_paused = true)]

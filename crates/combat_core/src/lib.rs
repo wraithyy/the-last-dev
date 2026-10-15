@@ -38,7 +38,7 @@ pub use economy::{
     ActivePerk, ConsumableDef, Economy, GearDef, GearSource, GearStats, GearVisual, Goods, JunkDef,
     Perk, PerkView, Rarity, SLOTS, SetDef, Slot, VendorDef,
 };
-pub use floors::pack_offsets;
+pub use floors::{CORPSE_EMPTY_MS, CORPSE_LOOT_MS, pack_offsets};
 pub use geom::{Aabb, Vec3, distance, forward, in_range, is_facing, line_of_sight};
 pub use progression::GROUP_SHARE_RANGE_M;
 pub use quests::{ActiveQuest, GIVER_REACH_SLACK_M, QuestLog, QuestStatus};

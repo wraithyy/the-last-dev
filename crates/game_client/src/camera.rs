@@ -76,6 +76,13 @@ impl Plugin for CameraPlugin {
         app.init_resource::<CameraShake>()
             .add_systems(Startup, spawn_camera)
             .add_systems(Update, (follow_player, orbit_input, place_camera).chain());
+        if let Some(look) = std::env::var("WOW_CAM_LOOK")
+            .ok()
+            .and_then(|v| parse_look(&v))
+        {
+            app.insert_resource(FixedLook(look))
+                .add_systems(Update, fixed_look.after(place_camera));
+        }
         if let Some(v) = std::env::var("WOW_TOPDOWN")
             .ok()
             .and_then(|v| v.parse::<f32>().ok())
@@ -84,6 +91,23 @@ impl Plugin for CameraPlugin {
                 .add_systems(Update, topdown.after(place_camera));
         }
     }
+}
+
+/// `WOW_CAM_LOOK=ex,ey,ez,tx,ty,tz`: the camera sits at `e` and looks at `t` (world metres), for
+/// close-ups of poses from any side without the player in the way (QA only).
+#[derive(Resource)]
+struct FixedLook((Vec3, Vec3));
+
+fn parse_look(v: &str) -> Option<(Vec3, Vec3)> {
+    let n: Vec<f32> = v.split(',').filter_map(|p| p.trim().parse().ok()).collect();
+    match n[..] {
+        [ex, ey, ez, tx, ty, tz] => Some((Vec3::new(ex, ey, ez), Vec3::new(tx, ty, tz))),
+        _ => None,
+    }
+}
+
+fn fixed_look(look: Res<FixedLook>, mut cam: Single<&mut Transform, With<OrbitCamera>>) {
+    **cam = Transform::from_translation(look.0.0).looking_at(look.0.1, Vec3::Y);
 }
 
 fn topdown(

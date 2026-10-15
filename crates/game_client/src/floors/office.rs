@@ -26,6 +26,15 @@ fn secret(p: &mut Plan, anchor: &'static str, x: f32, z: f32, look: (f32, f32)) 
     );
 }
 
+/// A hidden NPC that sits or sleeps: the chair is built under them, turned towards `look`.
+fn secret_seated(p: &mut Plan, anchor: &'static str, x: f32, z: f32, look: (f32, f32)) {
+    let at = v(x, 0.0, z);
+    // The model front is the sitter's facing, which is half a turn off a unit yaw.
+    let face = super::layout::yaw_towards(at, v(look.0, 0.0, look.1));
+    p.prop(&CHAIR_DESK, at, face - PI, false);
+    p.occupy(anchor, at);
+}
+
 /// Parked e-scooters anyone can borrow; the office module draws them (they vanish when
 /// borrowed), so the campus builder leaves these four spots empty.
 pub const CAMPUS_SCOOTERS: [(&str, f32, f32); 4] = [
@@ -43,7 +52,7 @@ pub fn place(zone: &str, p: &mut Plan) {
         "tower/4" => pmo(p),
         "datacenter/1" => {
             spot(p, "prop:vending_hall_a", (-43.0, 1.0, -9.8), (-43.0, -8.2));
-            secret(p, "secret:cable_sysadmin", -16.0, 37.0, (-8.0, 31.0));
+            secret_seated(p, "secret:cable_sysadmin", -16.0, 37.0, (-8.0, 31.0));
         }
         // The dark corner of the lobby, flickering.
         "datacenter/2" => secret(p, "secret:deprecated_ghost", -41.8, 7.6, (-48.0, 0.0)),
@@ -62,13 +71,14 @@ fn campus(p: &mut Plan) {
     spot(p, "prop:days_sign_campus", (-7.0, 3.1, -8.85), (-7.0, -6.5));
     spot(p, "prop:ai_car", (-39.0, 0.9, 36.0), (-39.0, 38.8));
     spot(p, "prop:bike_rack", (14.75, 0.5, -14.0), (14.75, -12.4));
-    // Just in front of the sad bench, so the seated pose lands on the slats.
+    // The bench's two slots: the corner's dev holds the east one, /sit takes the other.
     spot(p, "prop:smoking_bench", (46.0, 0.5, 25.8), (46.0, 24.4));
+    p.occupy("npc_4", v(46.45, 0.5, 25.8));
     for (anchor, x, z) in CAMPUS_SCOOTERS {
         spot(p, anchor, (x, 0.5, z), (x + 1.3, z));
     }
     // Behind the reception kiosk, back to the plaza, reading.
-    secret(p, "secret:docs_intern", 10.0, -5.8, (10.0, -10.0));
+    secret_seated(p, "secret:docs_intern", 10.0, -5.8, (10.0, -10.0));
     // Sprint mode: the planning board beside the walk from the car park, and a terminal at
     // the tower entrance.
     let (x, z) = (-14.0, 17.0);
@@ -122,7 +132,7 @@ fn open_space(p: &mut Plan) {
     );
     spot(p, "prop:elevator_music", (x, 1.3, z), (x + 1.3, z));
     // The last human tester, in the quiet corridor nobody walks.
-    secret(p, "secret:last_human_qa", -12.0, -23.0, (-6.0, -23.0));
+    secret_seated(p, "secret:last_human_qa", -12.0, -23.0, (-6.0, -23.0));
 }
 
 fn meeting_rooms(p: &mut Plan) {
@@ -155,13 +165,73 @@ fn pmo(p: &mut Plan) {
     }
     p.sign(v(x, 2.0, z - 0.06), PI, 2.6, Sign::DaysAi);
     spot(p, "prop:days_sign_pmo", (x, 2.0, z), (x, 20.6));
-    secret(p, "secret:cobol_contractor", -19.5, 16.5, (-14.0, 16.5));
+    secret_seated(p, "secret:cobol_contractor", -19.5, 16.5, (-14.0, 16.5));
 }
 
 #[cfg(test)]
 mod tests {
     use crate::floors::build_zone;
     use crate::floors::testgrid::Grid;
+
+    /// A seated NPC's anchor is exactly where its seat puts a standard unit's feet, and every
+    /// other NPC or hidden NPC stands clear of solid geometry (no one inside a counter).
+    #[test]
+    fn npc_anchors_sit_on_seats_or_stand_clear() {
+        let scale = crate::seat::model_scale(crate::config::PLAYER_HEIGHT);
+        let mut problems = Vec::new();
+        for zone in super::super::zones::ZONE_IDS {
+            let Some(l) = build_zone(zone) else { continue };
+            for (name, pos, _) in &l.anchors {
+                if !(name.starts_with("npc_") || name.starts_with("secret:")) {
+                    continue;
+                }
+                let seated = l
+                    .seats
+                    .iter()
+                    .any(|s| s.taken && s.origin(scale).distance(*pos) < 0.01);
+                let inside = l.blockers.iter().any(|b| {
+                    pos.x > b.min.x - 0.25
+                        && pos.x < b.max.x + 0.25
+                        && pos.z > b.min.z - 0.25
+                        && pos.z < b.max.z + 0.25
+                        && b.max.y > 0.3
+                        && b.min.y < 1.5
+                });
+                if !seated && inside {
+                    problems.push(format!("{zone}: {name} at {pos} is inside geometry"));
+                }
+            }
+            for s in l.seats.iter().filter(|s| s.taken) {
+                let anchored = l
+                    .anchors
+                    .iter()
+                    .any(|(_, p, _)| s.origin(scale).distance(*p) < 0.01);
+                if !anchored {
+                    problems.push(format!("{zone}: taken seat at {} has no sitter", s.pos));
+                }
+            }
+        }
+        assert!(problems.is_empty(), "{}", problems.join("\n"));
+    }
+
+    /// Every sittable prop is built so its seat surface is the chibi seat height.
+    #[test]
+    fn seats_are_at_the_chibi_seat_height() {
+        let mut n = 0;
+        for zone in super::super::zones::ZONE_IDS {
+            let Some(l) = build_zone(zone) else { continue };
+            for s in &l.seats {
+                n += 1;
+                assert!(
+                    (s.pos.y - crate::seat::SEAT_TOP).abs() < 0.03,
+                    "{zone}: seat at {} is {} m high",
+                    s.pos,
+                    s.pos.y
+                );
+            }
+        }
+        assert!(n > 20, "only {n} seats registered");
+    }
 
     /// Every prop of the content sits in its zone's layout, at a stand spot a player can reach,
     /// and every hidden NPC has its anchor.

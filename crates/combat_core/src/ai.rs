@@ -552,6 +552,7 @@ impl Sim {
         u.state.phase = 1;
         u.loot.clear();
         u.respawn_at = None;
+        u.corpse_until = None;
         u.melee_next = 0;
         u.cooldowns.clear();
         u.lockout_until = [0; 2];

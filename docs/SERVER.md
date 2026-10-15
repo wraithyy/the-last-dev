@@ -140,6 +140,31 @@ the OS RNG; the 8-symbol Crockford suffix carries 40 bits). Unknown, full and ma
 the same `Error { kind: CannotJoin }` and close `1008 cannot join`, and all count as failed joins.
 Codes appear in logs only as a keyed hash prefix; display names and payloads are never logged.
 
+### Public rooms ("Open standups")
+
+Rooms are private by default: reachable only with the code, never listed. A room created with
+`CreateRoom { public: true }` (or switched by its leader) appears in `RoomList`:
+
+- A `RoomInfo` carries no code and no address: a random 64-bit `id` (OS RNG, independent of the
+  code, so the code cannot be derived from it), the title, the leader's display name, players/max,
+  zone id, average level, the members' class keys, the sprint flag and the room's age. Nothing
+  else about players (IPs, ids, positions) is listed.
+- `JoinPublic { id }` only works while the room is public; switching it public again draws a new
+  id, so an id seen earlier stops working once the room went private. A failed public join gets
+  the same `CannotJoin` and close as any join, but does not count towards the failed-join lockout
+  (ids come from the list, so it is no code oracle); it shares the list's per-IP budget instead.
+- Titles are the only player text: `net_proto::sanitize_title` keeps ASCII letters, digits, `-`,
+  `_` and single spaces, at most 24 characters, which drops control, bidi and other Unicode
+  characters and markup; under 3 characters left, the room gets a generated name such as
+  "Daily Standup 42". Raw titles over 64 bytes fail to decode. The client also rejects a list whose
+  titles or host names contain anything else. Profanity filtering is out of scope.
+- The list holds at most 50 rooms (`MAX_ROOM_LIST`), most populated first, then newest. Full rooms
+  are listed (the client greys them out); empty rooms are not, and expired rooms are gone with
+  their registry entry. Entries refresh once per second and on join, leave and visibility changes.
+- Only the leader (the group's first player, as for sprints) may send `SetPublic`; anyone else
+  gets `Error { NotLeader }`. When the leader leaves, the next player inherits the switch and
+  everyone gets a fresh `RoomSettings`.
+
 HTTP request heads must arrive within 10 s (slowloris), `Hello` within 2 s of the WebSocket upgrade
 and the room request within 2 s after it (`Config::handshake_timeout`), so a client that stays silent
 after connecting is dropped. Static files: path segments starting with `.` return 404, symlinks leaving the web dir return
@@ -153,15 +178,21 @@ Binary WebSocket frames at `/ws`, each one `net_proto` frame (`PROTOCOL_VERSION`
 1. Client: `Hello { version, name }` (name sanitised by `net_proto::sanitize_name`, else `Intern-<n>`).
    Wrong version: `Error { BadVersion }`, close 1008. Anything else or nothing in time:
    `Error { HelloRequired }`, close 1008.
-2. Client: exactly one `CreateRoom` or `JoinRoom { code }` (code parsed leniently by `decode`).
+2. Client: any number of `ListRooms` (answered with `RoomList { rooms }`, see "Public rooms"),
+   then exactly one `CreateRoom { public, title }`, `JoinRoom { code }` (code parsed leniently by
+   `decode`) or `JoinPublic { id }`. Before the first `ListRooms` the room request must come within
+   the handshake timeout; once browsing, every `ListRooms` or `Ping` (answered with `Pong`) extends
+   the deadline by the idle timeout (30 s), up to `Config::browse_timeout` (5 min) after `Hello`,
+   then close 1001. A list request over its budget gets `Error { RateLimited }` and a strike; the
+   connection stays open.
    - Create: `RoomCreated { code }`, then the join below. Over the creation limit: `Error { RateLimited }`;
      server at `--max-rooms`: `Error { ServerFull }`; both close 1008.
    - Any join failure: `Error { CannotJoin }`, close 1008.
 3. Joined: `Welcome { you, room, zone, seed, players, quests, cleared, unlocked }`, then a full
    `Snapshot` in the same tick. `quests` is the joiner's own log (fresh for a new player: logs are
    per player), `cleared` and `unlocked` are the group's zone state, so doors and the map render
-   correctly; the snapshot carries every unit with its auras and their remaining time. Others get
-   `PlayerJoined`. The player spawns at the zone's `player_spawn` (pack formation for later joiners).
+   correctly; the snapshot carries every unit with its auras and their remaining time, then
+   `RoomSettings { public, title, leader }`. Others get `PlayerJoined`. The player spawns at the zone's `player_spawn` (pack formation for later joiners).
 4. In the room:
    - `Cmd(cmd)`: only `net_proto::is_player_command` commands decode; applied with `Sim::apply_as`,
      which rebinds the actor to the sender, so nobody can act as another player.
@@ -177,6 +208,8 @@ Binary WebSocket frames at `/ws`, each one `net_proto` frame (`PROTOCOL_VERSION`
    - `Emote { emote, target }`: `Emoted { player, emote, target }` to everyone; `target` is kept only
      when it names another member of the room, otherwise it becomes `None` (no error). `Ping { t }`: `Pong { t }` straight from the connection.
      `LeaveRoom`: close 1000, then `remove_player` and `PlayerLeft` to the others (also on disconnect).
+   - `SetPublic { public }`: leader only (else `Error { NotLeader }`); everyone gets `RoomSettings`.
+     `ListRooms`, `JoinPublic`, `CreateRoom` and `JoinRoom` inside a room are invalid messages.
 5. Every tick: `Sim::tick_routed`, one `Events { tick, events }` frame per player with the events meant
    for them (skipped when empty); a `Snapshot` (`UnitSnap` with auras + `PlayerSnap`) every second, on
    join and after zone travel. Between snapshots, every third tick (10 Hz), `Positions { tick, units }`
@@ -212,6 +245,10 @@ The sim pauses while a room is empty. Zone geometry comes from the client's Bevy
 | Invalid messages (undecodable, handshake messages inside a room) | `Config::invalid_message_limit` (5), via `ws::Strikes::bump` | close 1008 |
 | `Cmd` / `Move` per connection | 20/s (burst 20) / 30/s (burst 45) | dropped + strike |
 | `Emote` per connection | 1/s (burst 3) | dropped |
+| `SetPublic` per connection | shares the `Emote` budget | dropped + strike |
+| `ListRooms` per connection / per IP (`ListRooms` + `JoinPublic`) | 1 per 2 s / `Config::per_ip_lists_per_min` (30) | `Error { RateLimited }` + strike / `Error { RateLimited }` (a `JoinPublic` over it closes 1008) |
+| Browsing without a room | `Config::browse_timeout` (5 min) | close 1001 |
+| `RoomList` length / title | 50 rooms / 24 chars | capped by the server, rejected by `decode` |
 | Pending commands per room queue | 1024 | sender closed with 1008 |
 | Rooms / players per room | `--max-rooms` / `--max-players-per-room` (capped at the sim's 5) | `Error`, close 1008 |
 | Outbound queue per player | 64 messages | client dropped (1013) |

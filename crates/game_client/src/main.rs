@@ -26,6 +26,7 @@ mod office;
 mod player;
 mod presentation;
 mod rigs;
+mod seat;
 mod spell_fx;
 mod sprint;
 mod targeting;

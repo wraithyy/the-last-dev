@@ -6,14 +6,18 @@
 use crate::catalog::{IdlePose, Paint};
 use crate::combat_anim::CombatAnim;
 use crate::config::RUN_SPEED;
-use crate::office::{PoseClip, WorldPose};
+use crate::office::{PoseClip, Props, WorldPose};
 use crate::player::PlayerBody;
+use crate::seat;
 use bevy::animation::AnimationTargetId;
 use bevy::gltf::{Gltf, GltfMaterialName};
 use bevy::prelude::*;
 use std::collections::HashMap;
-use std::f32::consts::PI;
+use std::f32::consts::{PI, TAU};
 use std::time::Duration;
+
+/// Exponential rate (1/s) of the slide onto and off a seat.
+const SEAT_BLEND_RATE: f32 = 12.0;
 
 /// A character GLB, identified by its asset path (see `catalog::unit_visual`).
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -47,7 +51,7 @@ struct PaintCache(HashMap<(AssetId<StandardMaterial>, usize, usize), Handle<Stan
 /// Put on a unit root; the model is spawned as a child once its glTF is loaded.
 /// Requires `CombatAnim` so every animated entity can be driven by the combat bridge.
 #[derive(Component)]
-#[require(AnimState, CombatAnim, IdlePose)]
+#[require(AnimState, CombatAnim, IdlePose, SeatBlend)]
 pub struct Character {
     pub kind: ModelKind,
     pub scale: f32,
@@ -672,29 +676,75 @@ fn apply_paints(
     }
 }
 
-/// Slumps sleeping units forward; every other pose stands upright. Riders stand on the deck
-/// and lean into turns (`WorldPose::lean`).
+/// Seat shift of one character, eased so a /sit slides onto the seat and standing up slides
+/// back. NPCs on a seat are snapped: their pose never changes.
+#[derive(Component, Default)]
+pub struct SeatBlend {
+    /// 0 standing where the entity is, 1 drawn on the seat.
+    w: f32,
+    /// The shift at full weight: model-root offset (entity frame, lift in `y`) and extra yaw.
+    shift: (Vec3, f32),
+}
+
+/// Slumps sleeping units forward about the hips; every other pose stands upright. Seated
+/// characters are drawn on the nearest seat (`seat::SeatSpot`), riders stand on the deck and
+/// lean into turns (`WorldPose::lean`).
+#[allow(clippy::type_complexity)] // Bevy query tuple
 fn pose_lean(
-    poses: Query<(&IdlePose, Option<&WorldPose>)>,
+    time: Res<Time>,
+    props: Res<Props>,
+    mut poses: Query<
+        (
+            &IdlePose,
+            Option<&WorldPose>,
+            &Transform,
+            &Character,
+            &mut SeatBlend,
+        ),
+        Without<ModelRoot>,
+    >,
     mut roots: Query<(&ChildOf, &mut Transform), With<ModelRoot>>,
 ) {
+    let k = 1.0 - (-SEAT_BLEND_RATE * time.delta_secs()).exp();
     for (parent, mut tf) in &mut roots {
-        let Ok((pose, world)) = poses.get(parent.parent()) else {
+        let Ok((pose, world, at, c, mut blend)) = poses.get_mut(parent.parent()) else {
             continue;
         };
+        let npc_seated = matches!(pose, IdlePose::Sitting | IdlePose::Sleeping);
+        let seated = npc_seated || world.is_some_and(|w| w.pose() == Some(PoseClip::Sit));
+        let seat = seated
+            .then(|| seat::seat_under(&props.seats, at.translation))
+            .flatten();
+        let entity_yaw = at.rotation.to_euler(EulerRot::YXZ).0;
+        if let Some(spot) = seat {
+            let (off, yaw) = spot.root_shift(c.scale, at.translation, entity_yaw);
+            blend.shift = (off, (yaw + PI).rem_euclid(TAU) - PI);
+        }
+        let goal = if seat.is_some() { 1.0 } else { 0.0 };
+        blend.w = if npc_seated {
+            goal
+        } else {
+            blend.w + (goal - blend.w) * k
+        };
+        let (off, yaw) = (blend.shift.0 * blend.w, blend.shift.1 * blend.w);
+
         let lean = if *pose == IdlePose::Sleeping {
             0.5
         } else {
             0.0
         };
         let (lift, roll) = world.map_or((0.0, 0.0), WorldPose::ride_offset);
-        let rot =
-            Quat::from_rotation_z(roll) * Quat::from_rotation_y(PI) * Quat::from_rotation_x(lean);
+        let upright = Quat::from_rotation_z(roll) * Quat::from_rotation_y(yaw + PI);
+        let slump = Quat::from_rotation_x(lean);
+        let rot = upright * slump;
+        // The slump tips about the hips (on the seat), not about the feet.
+        let hip = seat::sit_hip(c.scale);
+        let at_root = Vec3::new(off.x, off.y + lift, off.z) + upright * (hip - slump * hip);
         if tf.rotation != rot {
             tf.rotation = rot;
         }
-        if tf.translation.y != lift {
-            tf.translation.y = lift;
+        if tf.translation != at_root {
+            tf.translation = at_root;
         }
     }
 }

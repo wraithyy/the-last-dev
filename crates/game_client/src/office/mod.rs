@@ -61,6 +61,8 @@ pub struct PropSpot {
 pub struct Props {
     zone: String,
     pub list: Vec<PropSpot>,
+    /// Every place to sit in the loaded zone.
+    pub seats: Vec<crate::seat::SeatSpot>,
     days_reset: f32,
     /// The local player's prop uses this session (varies repeated lines).
     uses: u32,
@@ -170,8 +172,10 @@ fn track_zone(
     }
     let Some(layout) = build_zone(&flow.zone) else {
         props.list.clear();
+        props.seats.clear();
         return;
     };
+    props.seats.clone_from(&layout.seats);
     let content = sim.content();
     props.list = layout
         .props
@@ -381,9 +385,10 @@ fn prop_events(
                 }
                 let spot = props.list.iter().find(|p| p.key == prop.as_str());
                 match (def.kind, spot) {
-                    // Back to the seat, facing away from it: the seated pose lands on the slats.
+                    // `/sit` snaps to the nearest free slot of the bench (`ride::apply_emotes`);
+                    // the stand spot is within reach of it.
                     (PropKind::Bench, Some(s)) if Some(*unit) == me => {
-                        body.teleport_facing(s.stand, s.stand_yaw + std::f32::consts::PI);
+                        body.teleport(s.stand);
                         emotes.write(EmoteRequest(Emote::Sit));
                     }
                     (PropKind::Table, _) if Some(*unit) == me => {

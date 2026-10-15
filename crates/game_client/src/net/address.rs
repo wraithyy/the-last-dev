@@ -122,6 +122,8 @@ pub enum Field {
     Address,
     Name,
     Room,
+    /// Optional title of a room the player creates (`net_proto::sanitize_title` rules).
+    Title,
 }
 
 impl Field {
@@ -131,6 +133,7 @@ impl Field {
             Field::Name => 16,
             // Longest code: QUARTERLY-PARADIGM-XXXXXXXX (27); a little slack for typos.
             Field::Room => 32,
+            Field::Title => net_proto::MAX_TITLE_CHARS,
         }
     }
 
@@ -138,7 +141,9 @@ impl Field {
     pub fn filter(self, c: char) -> Option<char> {
         match self {
             Field::Address => (c.is_ascii_alphanumeric() || ":.-_/[]".contains(c)).then_some(c),
-            Field::Name => (c.is_ascii_alphanumeric() || matches!(c, ' ' | '_' | '-')).then_some(c),
+            Field::Name | Field::Title => {
+                (c.is_ascii_alphanumeric() || matches!(c, ' ' | '_' | '-')).then_some(c)
+            }
             // Codes read aloud get typed with spaces; they separate words like dashes.
             Field::Room => match c {
                 ' ' | '-' => Some('-'),

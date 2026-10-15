@@ -73,6 +73,8 @@ pub struct FloorLayout {
     /// Interactive props: key and the point a click aims at (anchor `prop:<key>` is where
     /// the player stands).
     pub props: Vec<(&'static str, Vec3)>,
+    /// Every place to sit (see `crate::seat`).
+    pub seats: Vec<crate::seat::SeatSpot>,
 }
 
 /// Zone layouts are floor layouts; the alias is the contract name.
@@ -147,6 +149,7 @@ pub fn assemble(
         fp,
         route,
         props,
+        seats,
         ..
     } = plan;
     FloorLayout {
@@ -164,6 +167,7 @@ pub fn assemble(
         footprint: fp,
         route,
         props,
+        seats,
     }
 }
 
@@ -259,7 +263,7 @@ mod tests {
                     "floor {id}: {name} at {pos} is outside the outline"
                 );
                 assert!(
-                    g.free(*pos),
+                    g.free_anchor(&l, *pos),
                     "floor {id}: anchor {name} at {pos} is inside a blocker"
                 );
             }
@@ -309,7 +313,10 @@ mod tests {
                 "floor {id}: route not progressive {route:?}"
             );
             for (name, pos, _) in &l.anchors {
-                assert!(g.at(*pos).is_finite(), "floor {id}: {name} unreachable");
+                assert!(
+                    g.at_anchor(&l, *pos).is_finite(),
+                    "floor {id}: {name} unreachable"
+                );
             }
             let trig = elevator_exit_trigger(&l);
             let centre = Vec3::new(
@@ -408,7 +415,7 @@ mod tests {
             out.push(format!("floor {id}: route not progressive {order:?}"));
         }
         for (name, pos, _) in &l.anchors {
-            if !g.at(*pos).is_finite() {
+            if !g.at_anchor(l, *pos).is_finite() {
                 out.push(format!("floor {id}: {name} unreachable"));
             }
         }

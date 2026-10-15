@@ -1,9 +1,10 @@
-//! "Co-op (beta)" entry in the Esc menu and the `~/coop` panel: address, display name, room code.
+//! "Co-op (beta)" entry in the Esc menu and the `~/coop` panel: address, display name, room code,
+//! the public room browser ("Open standups") and the host's public/private switch.
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
 use super::address::{self, Field};
-use super::session::LeaveRequest;
+use super::session::{self, LeaveRequest, Phase, Session, request_frame};
 use super::store::{self, Saved};
 use super::transport::{NetClient, NetState, WAKING};
 use super::world::NetWorld;
@@ -15,6 +16,8 @@ use crate::input::{Paused, TextFocus};
 use bevy::input::ButtonState;
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::prelude::*;
+use combat_core::{Content, EntityId, Role};
+use net_proto::{ClientMsg, RoomInfo};
 
 const DEFAULT_NAME: &str = "Anonymous Dev";
 const PLACEHOLDER: Color = Color::srgb(0.38, 0.42, 0.5);
@@ -27,11 +30,19 @@ const FIELD_CHARS_BESIDE_BUTTON: usize = 17;
 const GLYPH_W: f32 = 9.6;
 /// Box border + horizontal padding: where the first glyph starts inside a field box.
 const TEXT_INSET: f32 = 10.0;
+/// Rows the room browser shows; the rest are counted in the footer.
+const MAX_ROWS: usize = 8;
+/// The server answers one list per 2 s per connection.
+const REFRESH_SECS: f64 = 2.0;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Intent {
     Create,
     Join,
+    /// Fetch the public room list; the connection stays open for the next request.
+    Browse,
+    /// Join a listed public room by its `RoomInfo::id`.
+    JoinPublic(u64),
 }
 
 /// Lobby form state. Wave 2 reads `intent`, `name` and `room` once `NetClient` reports Connected.
@@ -42,6 +53,20 @@ pub struct Lobby {
     pub address: String,
     pub name: String,
     pub room: String,
+    /// Optional title for a room this player creates.
+    pub title: String,
+    /// Create the room public (listed) instead of code-only.
+    pub public: bool,
+    /// The room's (public, title, leader) from the last `RoomSettings`.
+    pub settings: Option<(bool, String, EntityId)>,
+    /// Public rooms from the last `RoomList`, sorted for display.
+    rooms: Vec<RoomInfo>,
+    /// Bumped on every new list, so the table is rebuilt only then.
+    rooms_rev: u32,
+    /// The room browser is shown.
+    browsing: bool,
+    /// `session::clock()` of the last list request.
+    listed_at: Option<f64>,
     /// What the player asked for with the last connect attempt.
     pub intent: Option<Intent>,
     /// Local validation message; connection problems come from `NetState`.
@@ -63,6 +88,7 @@ impl Lobby {
             Field::Address => &self.address,
             Field::Name => &self.name,
             Field::Room => &self.room,
+            Field::Title => &self.title,
         }
     }
 
@@ -71,7 +97,18 @@ impl Lobby {
             Field::Address => &mut self.address,
             Field::Name => &mut self.name,
             Field::Room => &mut self.room,
+            Field::Title => &mut self.title,
         }
+    }
+
+    pub fn set_rooms(&mut self, mut rooms: Vec<RoomInfo>) {
+        sort_rooms(&mut rooms);
+        self.rooms = rooms;
+        self.rooms_rev = self.rooms_rev.wrapping_add(1);
+    }
+
+    pub fn open_browser(&mut self) {
+        self.browsing = true;
     }
 
     /// Empties a field and focuses it with the caret at the start.
@@ -137,6 +174,85 @@ fn initial_address(this_server: Option<String>, saved: String, default: Option<&
     }
 }
 
+/// Joinable rooms first, then the fuller ones (a group forming), then the newest.
+fn sort_rooms(rooms: &mut [RoomInfo]) {
+    rooms.sort_by(|a, b| {
+        let open = |r: &RoomInfo| r.players < r.max;
+        open(b)
+            .cmp(&open(a))
+            .then(b.players.cmp(&a.players))
+            .then(a.age_s.cmp(&b.age_s))
+    });
+}
+
+fn role_tag(role: Role) -> &'static str {
+    match role {
+        Role::Tank => "TNK",
+        Role::Healer => "HEAL",
+        Role::Melee => "MEL",
+        Role::Ranged => "RNG",
+    }
+}
+
+/// "<1m", "12m", "3h".
+fn ago(secs: u32) -> String {
+    match secs {
+        0..60 => "<1m".into(),
+        60..3600 => format!("{}m", secs / 60),
+        _ => format!("{}h", secs / 3600),
+    }
+}
+
+/// Table cells of one room: title, host and age, players, zone, level, role tags and sprint.
+fn row_cells(r: &RoomInfo, content: &Content) -> [String; 6] {
+    let zone = content
+        .zones
+        .iter()
+        .find(|z| z.id == r.zone)
+        .map_or(r.zone.as_str(), |z| z.name.as_str());
+    let mut tags: Vec<&str> = r
+        .roles
+        .iter()
+        .filter_map(|k| content.class(k).map(|c| role_tag(c.role)))
+        .collect();
+    if r.in_sprint {
+        tags.push("SPRINT");
+    }
+    let players = if r.players >= r.max {
+        "FULL".to_string()
+    } else {
+        format!("{}/{}", r.players, r.max)
+    };
+    [
+        r.title.clone(),
+        format!("{} {}", r.host, ago(r.age_s)),
+        players,
+        zone.to_string(),
+        format!("Lv {}", r.avg_level),
+        tags.join(" "),
+    ]
+}
+
+/// Text nodes do not clip their own glyphs, so long cells are cut to the column width
+/// (JetBrains Mono at 13 px is about 7.8 px per glyph).
+fn fit_cell(cell: &str, width_px: f32) -> String {
+    let max = (width_px / 7.8).floor() as usize;
+    if cell.chars().count() <= max {
+        return cell.to_string();
+    }
+    let mut out: String = cell.chars().take(max.saturating_sub(1)).collect();
+    out.push('~');
+    out
+}
+
+fn list_footer(shown: usize, total: usize) -> String {
+    match total {
+        0 => "No open standups. Create a room and make it public.".into(),
+        n if n > shown => format!("{shown} of {n} public rooms. Refresh for others."),
+        n => format!("{n} public room(s). Click one to join."),
+    }
+}
+
 /// Text and colour for the status line.
 fn status_line(state: &NetState, notice: Option<&str>, in_room: bool) -> (String, Color) {
     match state {
@@ -162,7 +278,8 @@ fn next_field(f: Field) -> Field {
     match f {
         Field::Address => Field::Name,
         Field::Name => Field::Room,
-        Field::Room => Field::Address,
+        Field::Room => Field::Title,
+        Field::Title => Field::Address,
     }
 }
 
@@ -301,6 +418,38 @@ enum Btn {
     ThisServer,
     Leave,
     Copy,
+    Browse,
+    Refresh,
+    /// Public/Private choice for a room to create.
+    Public,
+    /// Host only, in a room: list it or hide it.
+    RoomVis,
+}
+
+/// Texts the browser system rewrites.
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+enum BrowseText {
+    PublicChoice,
+    RoomVis,
+    Visibility,
+    Footer,
+}
+
+/// Nodes the browser system shows or hides.
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+enum BrowsePart {
+    Table,
+    HostOnly,
+}
+
+#[derive(Component)]
+struct RoomRows;
+
+/// A clickable row of the room browser.
+#[derive(Component)]
+struct RoomRow {
+    id: u64,
+    open: bool,
 }
 
 pub struct LobbyPlugin;
@@ -322,6 +471,7 @@ impl Plugin for LobbyPlugin {
                     lobby_logic,
                     lobby_fields,
                     lobby_room,
+                    lobby_browse,
                     lobby_visuals,
                 )
                     .chain(),
@@ -330,6 +480,11 @@ impl Plugin for LobbyPlugin {
 }
 
 fn button(text: &str) -> impl Bundle {
+    (button_node(), children![label(text, 16.0)])
+}
+
+/// A button whose label the caller spawns (texts that change).
+fn button_node() -> impl Bundle {
     (
         Button,
         Node {
@@ -340,7 +495,6 @@ fn button(text: &str) -> impl Bundle {
         },
         BorderColor::all(KEY_RIM),
         vgrad(KEY_TOP_HI, KEY_TOP),
-        children![label(text, 16.0)],
     )
 }
 
@@ -403,13 +557,17 @@ fn spawn_ui(mut commands: Commands) {
                     (Field::Address, "Server address"),
                     (Field::Name, "Display name"),
                     (Field::Room, "Room code"),
+                    (Field::Title, "New room title"),
                 ] {
-                    p.spawn(Node {
+                    let mut row = p.spawn(Node {
                         align_items: AlignItems::Center,
                         column_gap: px(10),
                         ..default()
-                    })
-                    .with_children(|r| {
+                    });
+                    if field == Field::Title {
+                        row.insert(ShowWhenOnline(false));
+                    }
+                    row.with_children(|r| {
                         r.spawn((
                             label(name, 16.0),
                             TextColor(DIM),
@@ -471,6 +629,11 @@ fn spawn_ui(mut commands: Commands) {
                         if field == Field::Address && this_server {
                             r.spawn((Btn::ThisServer, ThisServerBtn, button("This server")));
                         }
+                        if field == Field::Title {
+                            r.spawn((Btn::Public, button_node())).with_children(|b| {
+                                b.spawn((BrowseText::PublicChoice, label("Private", 16.0)));
+                            });
+                        }
                     });
                 }
                 p.spawn((
@@ -493,6 +656,41 @@ fn spawn_ui(mut commands: Commands) {
                     label("", 14.0),
                     TextColor(DIM),
                 ));
+                p.spawn((
+                    BrowseText::Visibility,
+                    ShowWhenOnline(true),
+                    label("", 14.0),
+                    TextColor(DIM),
+                ));
+                p.spawn((
+                    BrowsePart::Table,
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        row_gap: px(4),
+                        display: Display::None,
+                        ..default()
+                    },
+                ))
+                .with_children(|t| {
+                    t.spawn(Node {
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::SpaceBetween,
+                        ..default()
+                    })
+                    .with_children(|h| {
+                        h.spawn((label("Open standups", 18.0), TextColor(ACCENT)));
+                        h.spawn((Btn::Refresh, button("Refresh")));
+                    });
+                    t.spawn((
+                        RoomRows,
+                        Node {
+                            flex_direction: FlexDirection::Column,
+                            row_gap: px(3),
+                            ..default()
+                        },
+                    ));
+                    t.spawn((BrowseText::Footer, label("", 13.0), TextColor(DIM)));
+                });
                 p.spawn(Node {
                     column_gap: px(10),
                     justify_content: JustifyContent::FlexEnd,
@@ -501,6 +699,11 @@ fn spawn_ui(mut commands: Commands) {
                 .with_children(|r| {
                     r.spawn((Btn::Create, ShowWhenOnline(false), button("Create room")));
                     r.spawn((Btn::Join, ShowWhenOnline(false), button("Join room")));
+                    r.spawn((Btn::Browse, ShowWhenOnline(false), button("Browse rooms")));
+                    r.spawn((Btn::RoomVis, BrowsePart::HostOnly, button_node()))
+                        .with_children(|b| {
+                            b.spawn((BrowseText::RoomVis, label("", 16.0)));
+                        });
                     if cfg!(target_arch = "wasm32") {
                         r.spawn((Btn::Copy, ShowWhenOnline(true), button("Copy code")));
                     }
@@ -569,7 +772,7 @@ fn lobby_clicks(
 }
 
 fn max_chars(f: Field, this_server_btn: bool) -> usize {
-    if f == Field::Address && this_server_btn {
+    if f == Field::Title || (f == Field::Address && this_server_btn) {
         FIELD_CHARS_BESIDE_BUTTON
     } else {
         FIELD_CHARS
@@ -589,6 +792,7 @@ fn lobby_logic(
     mut shown_focus: Local<Option<Field>>,
     mut kb_seen: Local<String>,
     world: Option<Res<NetWorld>>,
+    session: Res<Session>,
 ) {
     // Esc unpauses (see targeting.rs), which also closes the lobby.
     if !paused.0 {
@@ -648,31 +852,30 @@ fn lobby_logic(
             lobby.address = url;
         }
         if pressed(Btn::Back) {
+            // A browsing connection has no room to keep; one in a room stays.
             if matches!(
                 net.state(),
                 NetState::Connecting { .. } | NetState::Waking { .. }
-            ) {
+            ) || (*net.state() == NetState::Connected && world.is_none())
+            {
                 net.disconnect();
             }
             lobby.open = false;
             lobby.focus = None;
+            lobby.browsing = false;
+        }
+        if pressed(Btn::Browse) {
+            lobby.browsing = !lobby.browsing;
+            if lobby.browsing {
+                request(&mut lobby, &mut net, session.phase, Intent::Browse);
+            }
+        }
+        if pressed(Btn::Refresh) {
+            request(&mut lobby, &mut net, session.phase, Intent::Browse);
         }
         for (btn, intent) in [(Btn::Create, Intent::Create), (Btn::Join, Intent::Join)] {
-            if !pressed(btn) || net.state().busy() {
-                continue;
-            }
-            let https = store::page().is_some_and(|p| p.https());
-            match lobby.validate(intent, https) {
-                Ok(url) => {
-                    lobby.notice = None;
-                    lobby.intent = Some(intent);
-                    store::save(&Saved {
-                        address: lobby.address.clone(),
-                        name: lobby.name.clone(),
-                    });
-                    net.connect(&url);
-                }
-                Err(msg) => lobby.notice = Some(msg),
+            if pressed(btn) {
+                request(&mut lobby, &mut net, session.phase, intent);
             }
         }
     }
@@ -680,9 +883,186 @@ fn lobby_logic(
     sync_soft_keyboard(&mut lobby, &mut shown_focus, &mut kb_seen);
     text_focus.0 = lobby.open && lobby.focus.is_some();
 
-    let (line, tint) = status_line(net.state(), lobby.notice.as_deref(), world.is_some());
+    let browse_open = world.is_none()
+        && *net.state() == NetState::Connected
+        && lobby.intent == Some(Intent::Browse);
+    let (line, tint) = if browse_open && lobby.notice.is_none() {
+        ("Browsing public rooms.".to_string(), HP_GREEN)
+    } else {
+        status_line(net.state(), lobby.notice.as_deref(), world.is_some())
+    };
     set_text(&mut status.0, &line);
     status.1.0 = tint;
+}
+
+/// Starts `intent`: on an open browsing connection the request goes out at once, otherwise a
+/// new connection is dialled and the session sends it after `Hello`.
+fn request(lobby: &mut Lobby, net: &mut NetClient, phase: Phase, intent: Intent) {
+    let browse_open = phase == Phase::Handshake
+        && *net.state() == NetState::Connected
+        && lobby.intent == Some(Intent::Browse);
+    if net.state().busy() && !browse_open {
+        return;
+    }
+    if intent == Intent::Browse {
+        let now = session::clock();
+        if lobby.listed_at.is_some_and(|t| now - t < REFRESH_SECS) {
+            return;
+        }
+        lobby.listed_at = Some(now);
+        lobby.browsing = true;
+    }
+    let https = store::page().is_some_and(|p| p.https());
+    match lobby.validate(intent, https) {
+        Ok(url) => {
+            lobby.notice = None;
+            lobby.intent = Some(intent);
+            store::save(&Saved {
+                address: lobby.address.clone(),
+                name: lobby.name.clone(),
+            });
+            if browse_open {
+                let msg = request_frame(intent, &lobby.room, (lobby.public, &lobby.title));
+                session::send(net, &msg);
+            } else {
+                net.connect(&url);
+            }
+        }
+        Err(msg) => lobby.notice = Some(msg),
+    }
+}
+
+/// The room browser table, row clicks, the Public/Private choice and the host's switch.
+fn lobby_browse(
+    mut commands: Commands,
+    mut lobby: ResMut<Lobby>,
+    mut net: ResMut<NetClient>,
+    session: Res<Session>,
+    world: Option<Res<NetWorld>>,
+    sim: Res<crate::combat::CombatSim>,
+    buttons: Query<(&Interaction, &Btn), Changed<Interaction>>,
+    rows: Query<(&Interaction, &RoomRow), Changed<Interaction>>,
+    list: Single<Entity, With<RoomRows>>,
+    mut parts: Query<(&BrowsePart, &mut Node)>,
+    mut texts: Query<(&BrowseText, &mut Text)>,
+    mut built: Local<Option<u32>>,
+    time: Res<Time>,
+) {
+    if !lobby.open {
+        return;
+    }
+    // QA: `WOW_BROWSE_JOIN=<s>` joins the first open listed room that many seconds in.
+    if world.is_none()
+        && !matches!(lobby.intent, Some(Intent::JoinPublic(_)))
+        && let Some(at) = std::env::var("WOW_BROWSE_JOIN")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+        && time.elapsed_secs() >= at
+        && let Some(id) = lobby.rooms.iter().find(|r| r.players < r.max).map(|r| r.id)
+    {
+        request(&mut lobby, &mut net, session.phase, Intent::JoinPublic(id));
+    }
+    let you_lead = match (&world, &lobby.settings) {
+        (Some(w), Some((_, _, leader))) => w.you == *leader,
+        _ => false,
+    };
+    for (i, b) in &buttons {
+        if *i != Interaction::Pressed {
+            continue;
+        }
+        match b {
+            Btn::Public => lobby.public = !lobby.public,
+            Btn::RoomVis if you_lead => {
+                if let Some((public, ..)) = lobby.settings {
+                    session::send(&net, &ClientMsg::SetPublic { public: !public });
+                }
+            }
+            _ => {}
+        }
+    }
+    for (i, row) in &rows {
+        if *i == Interaction::Pressed && row.open && world.is_none() {
+            request(
+                &mut lobby,
+                &mut net,
+                session.phase,
+                Intent::JoinPublic(row.id),
+            );
+        }
+    }
+    for (part, mut node) in &mut parts {
+        let on = match part {
+            BrowsePart::Table => lobby.browsing && world.is_none(),
+            BrowsePart::HostOnly => you_lead,
+        };
+        let want = if on { Display::Flex } else { Display::None };
+        if node.display != want {
+            node.display = want;
+        }
+    }
+    let public_now = lobby.settings.as_ref().is_some_and(|s| s.0);
+    for (which, mut text) in &mut texts {
+        let line = match which {
+            BrowseText::PublicChoice => if lobby.public { "Public" } else { "Private" }.to_string(),
+            BrowseText::RoomVis => if public_now {
+                "Make private"
+            } else {
+                "Make public"
+            }
+            .to_string(),
+            BrowseText::Visibility => match &lobby.settings {
+                Some((true, title, _)) => format!("Public: listed as \"{title}\"."),
+                _ => "Private: only people with the code can join.".to_string(),
+            },
+            BrowseText::Footer => list_footer(lobby.rooms.len().min(MAX_ROWS), lobby.rooms.len()),
+        };
+        set_text(&mut text, &line);
+    }
+    if *built == Some(lobby.rooms_rev) {
+        return;
+    }
+    *built = Some(lobby.rooms_rev);
+    let content = sim.0.content();
+    commands.entity(*list).despawn_related::<Children>();
+    commands.entity(*list).with_children(|l| {
+        for r in lobby.rooms.iter().take(MAX_ROWS) {
+            let open = r.players < r.max;
+            let tint = if open { Color::WHITE } else { DIM };
+            let cells = row_cells(r, content);
+            l.spawn((
+                Button,
+                RoomRow { id: r.id, open },
+                Node {
+                    column_gap: px(8),
+                    padding: UiRect::axes(px(6), px(5)),
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(px(4)),
+                    align_items: AlignItems::Center,
+                    ..default()
+                },
+                BorderColor::all(PANEL_EDGE),
+                BackgroundColor(if open {
+                    Color::srgb(0.07, 0.08, 0.11)
+                } else {
+                    Color::srgb(0.04, 0.04, 0.05)
+                }),
+            ))
+            .with_children(|row| {
+                for (cell, w) in cells.iter().zip([130.0, 90.0, 36.0, 92.0, 38.0, 80.0]) {
+                    row.spawn((
+                        label(fit_cell(cell, w), 13.0),
+                        TextColor(tint),
+                        TextLayout::no_wrap(),
+                        Node {
+                            width: px(w),
+                            overflow: Overflow::clip(),
+                            ..default()
+                        },
+                    ));
+                }
+            });
+        }
+    });
 }
 
 /// Field text, caret bar and clear buttons.
@@ -830,6 +1210,7 @@ fn placeholder(f: Field) -> &'static str {
         Field::Address => "192.168.1.20:7777",
         Field::Name => DEFAULT_NAME,
         Field::Room => "MERGE-CONFLICT-7K3M9QZA",
+        Field::Title => "optional",
     }
 }
 
@@ -1130,6 +1511,84 @@ mod tests {
     #[test]
     fn tab_cycles_fields() {
         assert_eq!(next_field(Field::Address), Field::Name);
-        assert_eq!(next_field(Field::Room), Field::Address);
+        assert_eq!(next_field(Field::Room), Field::Title);
+        assert_eq!(next_field(Field::Title), Field::Address);
+    }
+
+    fn room(id: u64, players: u8, age_s: u32) -> RoomInfo {
+        RoomInfo {
+            id,
+            title: "Retro 7".into(),
+            host: "Ann".into(),
+            players,
+            max: 5,
+            zone: "tower/2".into(),
+            avg_level: 4,
+            roles: vec!["backend".into(), "devops".into()],
+            in_sprint: false,
+            age_s,
+        }
+    }
+
+    #[test]
+    fn rooms_sort_joinable_then_fuller_then_newer() {
+        let mut v = vec![
+            room(1, 5, 10),
+            room(2, 1, 50),
+            room(3, 3, 900),
+            room(4, 1, 5),
+        ];
+        sort_rooms(&mut v);
+        let ids: Vec<u64> = v.iter().map(|r| r.id).collect();
+        assert_eq!(ids, vec![3, 4, 2, 1]);
+    }
+
+    #[test]
+    fn long_cells_are_cut_to_their_column() {
+        assert_eq!(fit_cell("Anonymous Dev 1m", 90.0), "Anonymous ~");
+        assert_eq!(fit_cell("Lv 3", 38.0), "Lv 3");
+    }
+
+    #[test]
+    fn row_cells_name_zone_roles_and_full_rooms() {
+        let sim = crate::combat::new_sim().unwrap();
+        let content = sim.content();
+        let cells = row_cells(&room(1, 2, 125), content);
+        assert_eq!(cells[0], "Retro 7");
+        assert_eq!(cells[1], "Ann 2m");
+        assert_eq!(cells[2], "2/5");
+        assert_eq!(cells[3], "Meeting Rooms");
+        assert_eq!(cells[4], "Lv 4");
+        assert_eq!(cells[5], "TNK HEAL");
+        let full = RoomInfo {
+            in_sprint: true,
+            zone: "nowhere".into(),
+            roles: vec!["no_such_class".into()],
+            ..room(2, 5, 7_300)
+        };
+        let cells = row_cells(&full, content);
+        assert_eq!((cells[1].as_str(), cells[2].as_str()), ("Ann 2h", "FULL"));
+        assert_eq!(
+            (cells[3].as_str(), cells[5].as_str()),
+            ("nowhere", "SPRINT")
+        );
+        assert_eq!(ago(0), "<1m");
+    }
+
+    #[test]
+    fn footer_counts_hidden_rows() {
+        assert!(list_footer(0, 0).starts_with("No open standups"));
+        assert_eq!(
+            list_footer(8, 20),
+            "8 of 20 public rooms. Refresh for others."
+        );
+        assert!(list_footer(3, 3).starts_with("3 public"));
+    }
+
+    #[test]
+    fn browse_and_public_join_need_no_code() {
+        let l = lobby("10.0.0.2", "");
+        assert!(l.validate(Intent::Browse, false).is_ok());
+        assert!(l.validate(Intent::JoinPublic(9), false).is_ok());
     }
 }

@@ -599,7 +599,7 @@ fn decor1(p: &mut Plan) {
             0.0,
             false,
         );
-        p.prop(&CHAIR_DESK, v(-0.4, 0.0, 0.1), PI + 0.5, false);
+        p.prop(&CHAIR_DESK, v(-0.4, 0.0, 0.1), PI, false);
         p.prop(
             &KEYBOARD,
             v(0.9, DESK.size[1] * FURNITURE_SCALE, -0.75),
@@ -610,9 +610,11 @@ fn decor1(p: &mut Plan) {
     });
     it_clutter(p, -44.0, 5.5);
     mini_fridge(p, -34.5, 11.0, Face::NegZ);
-    let sleeper = v(-38.6, 0.0, 7.6);
-    p.anchor("npc_2", sleeper, PI);
-    let talker = v(-36.4, 0.0, 6.0);
+    // The chair (frame origin (-39, 9) turned half a turn) is at (-38.6, 8.9), facing the desk.
+    p.occupy("npc_2", v(-38.6, 0.0, 8.9));
+    let sleeper = p.anchor_pos("npc_2").unwrap_or_default();
+    // Chatting at the sleeper's elbow, a conversation apart from the desk edge.
+    let talker = sleeper + v(1.3, 0.0, -0.5);
     p.anchor("npc_3", talker, yaw_towards(talker, sleeper));
     vending(p, -31.0, 11.4, Face::NegZ);
     water_cooler(p, -29.0, 10.5);

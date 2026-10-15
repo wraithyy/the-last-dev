@@ -94,6 +94,25 @@ pub struct RoomState {
     sent_pos: HashMap<EntityId, ([i32; 3], u8)>,
     /// QA: joiners' start levels in join order (`Config::dev_start_level`).
     pub dev_start_level: Vec<u8>,
+    /// Listed in `RoomList`; only the leader changes it (`ClientMsg::SetPublic`).
+    pub public: bool,
+    /// Already sanitised (`net_proto::sanitize_title` or `default_title`).
+    pub title: String,
+    /// Leader named by the last `RoomSettings`, so a leader change is announced once.
+    leader_sent: EntityId,
+}
+
+/// What the public room list shows about a room; refreshed by the room task.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RoomSummary {
+    pub public: bool,
+    pub title: String,
+    /// Leader's sanitised display name; empty until someone joined.
+    pub host: String,
+    pub zone: String,
+    pub avg_level: u8,
+    pub roles: Vec<String>,
+    pub in_sprint: bool,
 }
 
 fn frame(msg: &ServerMsg) -> Option<Bytes> {
@@ -155,6 +174,48 @@ impl RoomState {
             pending: Vec::new(),
             sent_pos: HashMap::new(),
             dev_start_level: Vec::new(),
+            public: false,
+            title: String::new(),
+            leader_sent: 0,
+        }
+    }
+
+    fn leader(&self) -> EntityId {
+        self.sim.players().first().copied().unwrap_or_default()
+    }
+
+    fn settings(&mut self) -> ServerMsg {
+        self.leader_sent = self.leader();
+        ServerMsg::RoomSettings {
+            public: self.public,
+            title: self.title.clone(),
+            leader: self.leader_sent,
+        }
+    }
+
+    pub fn summary(&self) -> RoomSummary {
+        let leader = self.leader();
+        let levels: Vec<u32> = self
+            .members
+            .values()
+            .filter_map(|m| self.sim.unit(m.eid))
+            .map(|u| u32::from(u.level))
+            .collect();
+        let avg = levels.iter().sum::<u32>() / u32::try_from(levels.len().max(1)).unwrap_or(1);
+        let roles: BTreeSet<&String> = self.members.values().map(|m| &m.class).collect();
+        RoomSummary {
+            public: self.public,
+            title: self.title.clone(),
+            host: self
+                .members
+                .values()
+                .find(|m| m.eid == leader)
+                .map(|m| m.name.clone())
+                .unwrap_or_default(),
+            zone: self.sim.zone().unwrap_or(START_ZONE).to_string(),
+            avg_level: u8::try_from(avg).unwrap_or(u8::MAX),
+            roles: roles.into_iter().cloned().collect(),
+            in_sprint: self.sim.sprint_active(),
         }
     }
 
@@ -257,6 +318,8 @@ impl RoomState {
         if let Some(s) = self.snapshot() {
             self.pending.push((Audience::Only(player), s));
         }
+        let settings = self.settings();
+        self.push(Audience::Only(player), &settings);
         true
     }
 
@@ -297,6 +360,10 @@ impl RoomState {
         };
         self.sim.remove_player(m.eid);
         self.broadcast(None, &ServerMsg::PlayerLeft { id: m.eid });
+        if self.leader() != self.leader_sent && !self.members.is_empty() {
+            let settings = self.settings();
+            self.broadcast(None, &settings);
+        }
     }
 
     /// `msg` is decoded and validated by `net_proto` and rate limited by the connection.
@@ -328,9 +395,22 @@ impl RoomState {
                 );
             }
             ClientMsg::Ping { t } => self.push(Audience::Only(player), &ServerMsg::Pong { t }),
+            ClientMsg::SetPublic { public } => {
+                if eid != self.leader() {
+                    let kind = ErrorKind::NotLeader;
+                    let text = kind.message().into();
+                    self.push(Audience::Only(player), &ServerMsg::Error { kind, text });
+                } else if public != self.public {
+                    self.public = public;
+                    let settings = self.settings();
+                    self.broadcast(None, &settings);
+                }
+            }
             // The connection handles the handshake and leaving; these never reach a room.
             ClientMsg::Hello { .. }
-            | ClientMsg::CreateRoom
+            | ClientMsg::CreateRoom { .. }
+            | ClientMsg::ListRooms
+            | ClientMsg::JoinPublic { .. }
             | ClientMsg::JoinRoom { .. }
             | ClientMsg::LeaveRoom => {}
         }

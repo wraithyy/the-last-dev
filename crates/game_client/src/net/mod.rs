@@ -9,7 +9,8 @@
 //! - `party`: party frames; `emotes`: the emote menu.
 //!
 //! Debug: `WOW_COOP=1` starts paused with the `~/coop` panel open (for screenshots);
-//! `WOW_ONLINE=<ws url>` connects and creates a room at startup, `WOW_JOIN=<code>` joins one.
+//! `WOW_ONLINE=<ws url>` connects and creates a room at startup, `WOW_JOIN=<code>` joins one,
+//! `WOW_PUBLIC=<title>` makes the created room public, `WOW_BROWSE=1` opens the room browser.
 
 pub mod address;
 mod emotes;

@@ -1,8 +1,9 @@
 //! Protocol session on top of the transport: handshake, keep-alive, server messages into
 //! `NetWorld`, and the switches between offline and online play.
 //!
-//! Handshake: connect to `/ws`, send `Hello`, then `CreateRoom` or `JoinRoom`. The server
-//! answers `RoomCreated` (create only) and `Welcome`, or `Error` and closes.
+//! Handshake: connect to `/ws`, send `Hello`, then `CreateRoom`, `JoinRoom`, `JoinPublic` or
+//! `ListRooms`. The server answers `RoomCreated` (create only) and `Welcome`, or `Error` and
+//! closes; `ListRooms` gets a `RoomList` and the connection stays open for the next request.
 //!
 //! Going online freezes the offline sim (it is not stepped and not shown); dropping out of
 //! the room relinks the player to it and reloads its zone, so solo progress survives a
@@ -24,8 +25,8 @@ use bevy::platform::time::Instant;
 use bevy::prelude::*;
 use combat_core::{Command, EntityId, Event};
 use net_proto::{
-    ClientMsg, Emote, ErrorKind, MAX_RAW_NAME_BYTES, PROTOCOL_VERSION, ServerMsg, decode, encode,
-    is_player_command, parse_room_code,
+    ClientMsg, Emote, ErrorKind, MAX_RAW_NAME_BYTES, MAX_TITLE_CHARS, PROTOCOL_VERSION, ServerMsg,
+    decode, encode, is_player_command, parse_room_code,
 };
 use std::sync::OnceLock;
 
@@ -102,19 +103,36 @@ pub fn advance(phase: Phase, step: &Step) -> (Phase, Outcome) {
     }
 }
 
+/// What a room request (or a list request) looks like on the wire. `create` is the
+/// visibility and raw title of a room to create; the server sanitises the title.
+pub fn request_frame(intent: Intent, room: &str, (public, title): (bool, &str)) -> ClientMsg {
+    match intent {
+        Intent::Create => ClientMsg::CreateRoom {
+            public,
+            title: title.trim().chars().take(MAX_TITLE_CHARS).collect(),
+        },
+        Intent::Join => ClientMsg::JoinRoom {
+            code: room.to_string(),
+        },
+        Intent::Browse => ClientMsg::ListRooms,
+        Intent::JoinPublic(id) => ClientMsg::JoinPublic { id },
+    }
+}
+
 /// `Hello` plus the room request. The name is cut to what `decode` accepts; the server
 /// sanitises the rest and checks the class.
-pub fn hello_frames(intent: Intent, name: &str, room: &str, class: &str) -> Vec<ClientMsg> {
+pub fn hello_frames(
+    intent: Intent,
+    name: &str,
+    room: &str,
+    class: &str,
+    create: (bool, &str),
+) -> Vec<ClientMsg> {
     let mut name = name.trim().to_string();
     while name.len() > MAX_RAW_NAME_BYTES {
         name.pop();
     }
-    let request = match intent {
-        Intent::Create => ClientMsg::CreateRoom,
-        Intent::Join => ClientMsg::JoinRoom {
-            code: room.to_string(),
-        },
-    };
+    let request = request_frame(intent, room, create);
     vec![
         ClientMsg::Hello {
             version: PROTOCOL_VERSION,
@@ -307,6 +325,18 @@ pub fn run_session(
                         continue;
                     }
                     ServerMsg::Error { kind, .. } => Step::Error(kind),
+                    ServerMsg::RoomList { rooms } => {
+                        lobby.set_rooms(rooms);
+                        continue;
+                    }
+                    ServerMsg::RoomSettings {
+                        public,
+                        title,
+                        leader,
+                    } => {
+                        lobby.settings = Some((public, title, leader));
+                        continue;
+                    }
                     ServerMsg::RoomCreated { code } => {
                         // The code ends up in the clipboard; only a well-formed one may.
                         if let Some(code) = checked_code(&code) {
@@ -334,6 +364,7 @@ pub fn run_session(
                     lobby.display_name(),
                     &room,
                     &switch.class.0,
+                    (lobby.public, &lobby.title),
                 ) {
                     send(&client, &msg);
                 }
@@ -424,7 +455,11 @@ fn apply(
             world.remove_player(id);
         }
         ServerMsg::Pong { t } => world.record_pong(t, clock()),
-        ServerMsg::Welcome { .. } | ServerMsg::RoomCreated { .. } | ServerMsg::Error { .. } => {}
+        ServerMsg::Welcome { .. }
+        | ServerMsg::RoomCreated { .. }
+        | ServerMsg::Error { .. }
+        | ServerMsg::RoomList { .. }
+        | ServerMsg::RoomSettings { .. } => {}
     }
 }
 
@@ -438,11 +473,18 @@ pub fn emote_line(world: &NetWorld, emote: Emote, target: Option<EntityId>) -> S
 
 /// `WOW_ONLINE=<ws url>` connects at startup and creates a room; with `WOW_JOIN=<code>` it
 /// joins that room instead (default address `ws://127.0.0.1:7777/ws`). `WOW_NAME` sets the
-/// display name (the server sanitises it like any other).
+/// display name (the server sanitises it like any other). `WOW_PUBLIC=<title>` makes the
+/// created room public; `WOW_BROWSE=1` fetches the public room list instead (with `WOW_COOP=1`
+/// to show it; `WOW_BROWSE_JOIN=<s>` then joins the first open room).
 pub fn auto_connect(mut lobby: ResMut<Lobby>, mut client: ResMut<NetClient>) {
     let online = std::env::var("WOW_ONLINE").ok();
     let join = std::env::var("WOW_JOIN").ok();
-    if online.is_none() && join.is_none() {
+    let browse = std::env::var_os("WOW_BROWSE").is_some();
+    if let Ok(title) = std::env::var("WOW_PUBLIC") {
+        lobby.public = true;
+        lobby.title = super::address::Field::Title.sanitize(&title);
+    }
+    if online.is_none() && join.is_none() && !browse {
         return;
     }
     let address = online.unwrap_or_else(|| "ws://127.0.0.1:7777/ws".into());
@@ -461,6 +503,10 @@ pub fn auto_connect(mut lobby: ResMut<Lobby>, mut client: ResMut<NetClient>) {
         Some(code) => {
             lobby.room = super::address::Field::Room.sanitize(&code);
             Intent::Join
+        }
+        None if browse => {
+            lobby.open_browser();
+            Intent::Browse
         }
         None => Intent::Create,
     });
@@ -512,7 +558,7 @@ mod tests {
 
     #[test]
     fn hello_frames_follow_the_intent_and_cap_the_name() {
-        let create = hello_frames(Intent::Create, "  Dana ", "", "devops");
+        let create = hello_frames(Intent::Create, "  Dana ", "", "devops", (false, ""));
         assert_eq!(
             create,
             vec![
@@ -521,7 +567,10 @@ mod tests {
                     name: "Dana".into(),
                     class: "devops".into(),
                 },
-                ClientMsg::CreateRoom
+                ClientMsg::CreateRoom {
+                    public: false,
+                    title: String::new()
+                }
             ]
         );
         let join = hello_frames(
@@ -529,6 +578,7 @@ mod tests {
             &"x".repeat(100),
             "SCOPE-CREEP-7K3M9QZA",
             "fullstack",
+            (true, "ignored"),
         );
         let ClientMsg::Hello { name, .. } = &join[0] else {
             panic!("no hello")
@@ -540,8 +590,13 @@ mod tests {
                 code: "SCOPE-CREEP-7K3M9QZA".into()
             }
         );
+        let public = request_frame(Intent::Create, "", (true, &"t".repeat(100)));
+        let browse = request_frame(Intent::Browse, "", (false, ""));
+        let by_id = request_frame(Intent::JoinPublic(7), "", (false, ""));
+        assert_eq!(browse, ClientMsg::ListRooms);
+        assert_eq!(by_id, ClientMsg::JoinPublic { id: 7 });
         // Every frame survives the server's decode.
-        for m in join.iter().chain(&create) {
+        for m in join.iter().chain(&create).chain([&public, &browse, &by_id]) {
             let Ok(bytes) = encode(m) else {
                 panic!("encode")
             };

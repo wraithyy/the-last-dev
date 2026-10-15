@@ -728,7 +728,7 @@ fn saves_carry_talents_and_old_saves_migrate() {
     assert_eq!(save.talents, [1, 2, 3, 1, 2]);
     assert_eq!(save.title, "do_oncall");
     let text = save.encode();
-    assert!(text.contains("version=2\n") && text.contains("talents=1,2,3,1,2\n"));
+    assert!(text.contains("version=3\n") && text.contains("talents=1,2,3,1,2\n"));
     let back = SaveData::decode(&text).expect("decodes");
     assert_eq!(back, save);
     // Restoring at a lower level drops the rows the level does not allow (and the title).
@@ -741,7 +741,7 @@ fn saves_carry_talents_and_old_saves_migrate() {
     assert_eq!((u.talents, u.title.as_str()), ([1, 2, 0, 0, 0], ""));
     // Version 1 (before talents) still loads, with no picks.
     let v1 = text
-        .replace("version=2", "version=1")
+        .replace("version=3", "version=1")
         .lines()
         .filter(|l| !l.starts_with("talents="))
         .collect::<Vec<_>>()
@@ -752,7 +752,7 @@ fn saves_carry_talents_and_old_saves_migrate() {
     let p3 = sim3.spawn_player("devops", Vec3::new(0.0, 0.0, 0.0), 0.0);
     assert!(sim3.import_save(p3, &old));
     assert_eq!(sim3.unit(p3).map(|u| u.talents), Some([0; TALENT_ROWS]));
-    assert!(SaveData::decode(&text.replace("version=2", "version=3")).is_none());
+    assert!(SaveData::decode(&text.replace("version=3", "version=4")).is_none());
     // A save of another class keeps nothing it cannot use.
     let mut sim4 = Sim::new(content(), 1);
     let p4 = sim4.spawn_player("fullstack", Vec3::new(0.0, 0.0, 0.0), 0.0);

@@ -197,9 +197,12 @@ mod tests {
                     l.footprint.contains(Vec2::new(p.x, p.z)),
                     "{id}: {name} at {p} is outside the outline"
                 );
-                assert!(g.free(*p), "{id}: anchor {name} at {p} is inside a blocker");
                 assert!(
-                    g.at(*p).is_finite(),
+                    g.free_anchor(&l, *p),
+                    "{id}: anchor {name} at {p} is inside a blocker"
+                );
+                assert!(
+                    g.at_anchor(&l, *p).is_finite(),
                     "{id}: {name} unreachable from the spawn"
                 );
             }

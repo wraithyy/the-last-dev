@@ -977,20 +977,22 @@ fn saves_keep_open_quests_and_kill_tallies() {
 }
 
 /// The XP budget of one clear per zone in campaign order, quests included (breadcrumbs pay out
-/// where they end): the level you arrive with should match each zone's band.
+/// where they end): the level you arrive with should match each zone's band, and the level you
+/// leave with the curve's design (docs/FORMULAS.md, Levels and XP): one level per zone early,
+/// later levels spanning more content, the cap inside the Innovation Lab.
 #[test]
 fn quest_and_kill_xp_track_the_zone_levels() {
-    const ORDER: [&str; 10] = [
-        "campus",
-        "tower/1",
-        "tower/2",
-        "tower/3",
-        "datacenter/1",
-        "datacenter/2",
-        "tower/4",
-        "tower/5",
-        "lab/1",
-        "lab/2",
+    const ORDER: [(&str, u8, u8); 10] = [
+        ("campus", 3, 3),
+        ("tower/1", 3, 4),
+        ("tower/2", 4, 5),
+        ("tower/3", 5, 6),
+        ("datacenter/1", 6, 7),
+        ("datacenter/2", 7, 8),
+        ("tower/4", 8, 9),
+        ("tower/5", 9, 10),
+        ("lab/1", 10, 10),
+        ("lab/2", 10, 10),
     ];
     let c = content();
     let mut sim = Sim::new(c.clone(), 1);
@@ -1005,7 +1007,7 @@ fn quest_and_kill_xp_track_the_zone_levels() {
     };
     let mut report = Vec::new();
     let mut bad = Vec::new();
-    for zone in ORDER {
+    for (zone, leave_lo, leave_hi) in ORDER {
         let arrive = level;
         if let Err(e) = sim.load_zone(zone, &anchor, Vec::new()) {
             panic!("{zone}: {e}");
@@ -1029,15 +1031,19 @@ fn quest_and_kill_xp_track_the_zone_levels() {
                 &q.giver.zone
             };
             if at == zone {
-                quests += q.reward.xp;
-                gain(&mut level, &mut xp, q.reward.xp);
+                // Taken after the zone's kills at the latest; the curve must allow it by then.
+                if q.level_min > level {
+                    bad.push(zone);
+                }
+                quests += c.quest_xp(q);
+                gain(&mut level, &mut xp, c.quest_xp(q));
             }
         }
         let (lo, hi) = c.zone(zone).map_or((1, 1), |z| z.level_range);
         report.push(format!(
             "{zone} ({lo}-{hi}): {arrive} -> {level} (kills {kills} XP, quests {quests} XP)"
         ));
-        if arrive + 1 < lo || arrive > hi + 1 {
+        if arrive + 1 < lo || arrive > hi + 1 || !(leave_lo..=leave_hi).contains(&level) {
             bad.push(zone);
         }
     }
@@ -1106,4 +1112,141 @@ fn group_members_keep_their_own_logs_and_share_kill_credit() {
     assert_eq!(t.sim.quests_of(p2).active[0].counts, [1]);
     assert_eq!(t.sim.quests_of(t.p).active[0].counts, [0]);
     assert_eq!(t.sim.quests_of(p2).kills.get("copilot_drone"), Some(&1));
+}
+
+// ---- corpse lifetime ----
+
+fn despawned(t: &T, id: EntityId) -> bool {
+    t.has(|e| matches!(e, Event::Despawned { unit } if *unit == id))
+}
+
+impl T {
+    /// Kills a living `key` and returns its id with the death tick.
+    fn kill_key(&mut self, key: &str) -> (EntityId, u64) {
+        let id = self.id_of(key);
+        self.kill(id);
+        (id, self.sim.now().0)
+    }
+
+    fn loot(&mut self, looter: EntityId, corpse: EntityId) {
+        self.sim.apply_as(looter, Command::Loot { looter, corpse });
+        self.tick();
+        assert!(
+            self.has(|e| matches!(e, Event::Looted { looter: l, corpse: c, .. } if *l == looter && *c == corpse)),
+            "{looter} could not loot {corpse}"
+        );
+    }
+
+    /// Runs until tick `at` (absolute).
+    fn run_to(&mut self, at: u64) {
+        while self.sim.now().0 < at {
+            self.tick();
+        }
+    }
+}
+
+#[test]
+fn a_looted_corpse_despawns_30_s_after_the_loot_and_its_kill_still_counts() {
+    let mut t = t(5);
+    t.load("tower/1");
+    let (mp, _) = t.kill_key("meatproxy");
+    let Some(at) = t.sim.unit(mp).map(|u| u.pos) else {
+        panic!("no corpse")
+    };
+    t.move_to(Vec3::new(at.x, 0.0, at.z + 1.0), 0.0);
+    t.sim.push(Command::SetTarget {
+        unit: t.p,
+        target: Some(mp),
+    });
+    t.loot(t.p, mp);
+    let emptied = t.sim.now().0;
+    t.run_to(emptied + ms_to_ticks(combat_core::CORPSE_EMPTY_MS) - 1);
+    assert!(t.sim.unit(mp).is_some_and(|u| !u.lootable && !u.alive));
+    t.tick();
+    assert!(t.sim.unit(mp).is_none() && despawned(&t, mp));
+    assert!(
+        t.sim.units().all(|u| u.target != Some(mp)),
+        "targets drop it"
+    );
+    assert_eq!(t.sim.quests().kills.get("meatproxy"), Some(&1));
+}
+
+#[test]
+fn an_unlooted_corpse_keeps_its_loot_for_three_minutes_then_goes() {
+    let mut t = t(5);
+    t.load("tower/1");
+    let (mp, died) = t.kill_key("meatproxy");
+    let last = died + ms_to_ticks(combat_core::CORPSE_LOOT_MS);
+    t.run_to(died + ms_to_ticks(combat_core::CORPSE_EMPTY_MS) + 30);
+    assert!(
+        t.sim.unit(mp).is_some_and(|u| u.lootable),
+        "still holds loot"
+    );
+    t.run_to(last - 1);
+    assert!(t.sim.unit(mp).is_some_and(|u| u.lootable));
+    t.tick();
+    assert!(
+        t.sim.unit(mp).is_none() && despawned(&t, mp),
+        "loot is lost"
+    );
+}
+
+/// Per-player rolls: the corpse stays while any member still has one, and the short timer
+/// starts when the last roll is taken (or its owner leaves).
+#[test]
+fn a_corpse_stays_while_any_group_member_still_has_loot_on_it() {
+    let mut t = t_with(5, |c| {
+        for k in ["senior_engineer", "devops_eng", "backend_dev"] {
+            let u = def_mut(c, k);
+            u.spell_power = 100_000;
+            u.max_hp = 100_000;
+        }
+    });
+    t.load("tower/1");
+    let p2 = t.sim.spawn_player("devops", Vec3::new(0.0, 0.0, 20.0), 0.0);
+    let p3 = t
+        .sim
+        .spawn_player("backend", Vec3::new(0.0, 0.0, 20.0), 0.0);
+    let (mp, died) = t.kill_key("meatproxy");
+    let Some(at) = t.sim.unit(mp).map(|u| u.pos) else {
+        panic!("no corpse")
+    };
+    let pos = Vec3::new(at.x, 0.0, at.z + 1.0);
+    for p in [p2, p3] {
+        let (yaw, moving, jumping) = (0.0, false, false);
+        t.sim.apply_as(
+            p,
+            Command::PlayerMoved {
+                pos,
+                yaw,
+                moving,
+                jumping,
+            },
+        );
+    }
+    t.move_to(pos, 0.0);
+    t.loot(t.p, mp);
+    t.run_to(died + ms_to_ticks(combat_core::CORPSE_EMPTY_MS) + 30);
+    assert!(t.sim.unit(mp).is_some(), "p2 and p3 still have rolls on it");
+    t.loot(p2, mp);
+    // The last roll leaves with its owner: from here the corpse is empty for everyone.
+    assert!(t.sim.remove_player(p3));
+    let emptied = t.sim.now().0;
+    t.run_to(emptied + ms_to_ticks(combat_core::CORPSE_EMPTY_MS) - 1);
+    assert!(t.sim.unit(mp).is_some_and(|u| !u.lootable));
+    t.tick();
+    assert!(t.sim.unit(mp).is_none());
+}
+
+/// Boss corpses are set pieces: they stay until the zone unloads, loot or not.
+#[test]
+fn a_boss_corpse_stays_until_the_zone_is_left() {
+    let mut t = t(10);
+    t.load("tower/1");
+    let boss = t.id_of("vibe_coder");
+    assert!(t.sim.debug_kill(boss));
+    t.run(ms_to_ticks(combat_core::CORPSE_LOOT_MS) + 30);
+    assert!(t.sim.unit(boss).is_some_and(|u| !u.alive));
+    t.load("campus");
+    assert!(t.sim.unit(boss).is_none());
 }

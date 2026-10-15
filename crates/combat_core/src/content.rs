@@ -803,6 +803,10 @@ pub struct LevelDef {
     pub hp_bonus: u32,
     pub mana_bonus: u32,
     pub spell_power_bonus: u32,
+    /// Kill XP of mobs at this level and quest XP of zones starting at it, in percent of the
+    /// authored reward: later content pays more so the steeper table still fits the zones.
+    #[serde(default = "hundred")]
+    pub xp_reward_pct: u32,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1106,6 +1110,19 @@ impl Content {
 
     pub fn max_level(&self) -> u8 {
         self.levels.len() as u8
+    }
+
+    /// `xp_reward_pct` of `level`; beyond the table the last row's.
+    pub fn xp_reward_pct(&self, level: u8) -> u32 {
+        let i = usize::from(level.max(1) - 1).min(self.levels.len().saturating_sub(1));
+        self.levels.get(i).map_or(100, |l| l.xp_reward_pct)
+    }
+
+    /// XP a quest pays on turn-in: its authored XP at the level of the zone it is turned in
+    /// (breadcrumbs pay at their destination). Story Points stay on the authored XP.
+    pub fn quest_xp(&self, q: &QuestDef) -> u32 {
+        let level = self.zone(&q.ender().zone).map_or(1, |z| z.level_range.0);
+        (u64::from(q.reward.xp) * u64::from(self.xp_reward_pct(level)) / 100) as u32
     }
 
     /// XP needed to leave `level`; 0 at the level cap (or beyond the table).
@@ -1505,7 +1522,7 @@ mod tests {
         let cr = c.spell(SpellId(1)).unwrap();
         assert_eq!((cr.cast_ms, cr.mana, cr.range_m as u32), (2000, 35, 30));
         assert_eq!(c.action_bar().len(), 10);
-        assert_eq!(c.config.xp_per_level, 400);
+        assert_eq!(c.config.xp_per_level, 450);
         assert_eq!(c.max_level(), 10);
         let icons: Vec<&str> = c
             .action_bar()

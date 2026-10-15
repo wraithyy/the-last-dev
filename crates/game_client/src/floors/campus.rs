@@ -30,7 +30,7 @@ const PACKS: [(f32, f32); 8] = [
 const NPCS: [(f32, f32); 6] = [
     (-19.0, 19.0),
     (36.5, -2.0),
-    (-34.0, 6.2),
+    (-34.0, 6.85),
     (46.0, 22.5),
     (8.0, 10.0),
     (-9.0, 15.0),
@@ -496,10 +496,11 @@ fn pavilion(p: &mut Plan) {
         Mat::LedGreen,
         false,
     );
-    p.boxed(v(cx, 1.0, cz - 3.4), v(9.0, 2.0, 0.5), Mat::Rack, false);
+    // Far enough back that the barista has an aisle between the shelf and the counter.
+    p.boxed(v(cx, 1.0, cz - 4.0), v(9.0, 2.0, 0.5), Mat::Rack, false);
     for k in 0..6 {
         p.boxed(
-            v(cx - 3.5 + k as f32 * 1.4, 1.6, cz - 3.1),
+            v(cx - 3.5 + k as f32 * 1.4, 1.6, cz - 3.7),
             v(0.35, 0.5, 0.2),
             Mat::Paper,
             false,

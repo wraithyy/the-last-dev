@@ -3,12 +3,14 @@
 //! player's speed auras feed `MoveSpeed`, so prediction matches the server's movement budget.
 
 use crate::combat::{PendingCommands, SimRead, SimUnit, SimView, can_act};
+use crate::config::{PLAYER_MODEL_SCALE, PLAYER_RADIUS};
 use crate::game::GameFlow;
 use crate::input::Paused;
 use crate::keybinds::{Action, Keybinds};
 use crate::net::NetWorld;
-use crate::player::{MoveSpeed, Player};
+use crate::player::{MoveSpeed, Player, PlayerBody};
 use crate::rigs::PrimRig;
+use crate::seat;
 use bevy::prelude::*;
 use combat_core::{Command, EntityId};
 use net_proto::Emote;
@@ -19,6 +21,7 @@ const FACEPALM_SECS: f32 = 2.6;
 const DANCE_SECS: f32 = 20.0;
 /// Moving this far (XZ) ends a sit or a dance.
 const POSE_BREAK_M: f32 = 0.25;
+const POSE_SETTLE_SECS: f32 = 0.3;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PoseClip {
@@ -88,7 +91,13 @@ pub fn apply_emotes(
     time: Res<Time>,
     mut played: MessageReader<EmotePlayed>,
     net: Option<ResMut<NetWorld>>,
-    mut poses: Query<(&SimUnit, &Transform, &mut WorldPose)>,
+    props: Res<super::Props>,
+    mut poses: Query<(
+        &SimUnit,
+        &Transform,
+        &mut WorldPose,
+        Option<&mut PlayerBody>,
+    )>,
 ) {
     let mut list: Vec<(EntityId, Emote)> = played.read().map(|m| (m.0, m.1)).collect();
     if let Some(mut net) = net
@@ -99,9 +108,21 @@ pub fn apply_emotes(
     let now = time.elapsed_secs();
     for (id, emote) in list {
         let Some(pose) = pose_of(emote) else { continue };
-        if let Some((_, tf, mut w)) = poses.iter_mut().find(|(s, ..)| s.0 == id) {
-            w.start(pose, now, tf.translation);
+        let Some((_, tf, mut w, body)) = poses.iter_mut().find(|(s, ..)| s.0 == id) else {
+            continue;
+        };
+        let mut at = tf.translation;
+        // /sit puts the player on the nearest free seat, ahead of it and clear of the solid
+        // cushion so standing up needs no shove; the model is drawn onto the seat itself
+        // (`anim::pose_lean`). Remote players arrive already standing there.
+        if pose == PoseClip::Sit
+            && let Some(mut body) = body
+            && let Some(spot) = seat::nearest(&props.seats, body.pos, seat::SNAP_M, true)
+        {
+            at = spot.body_pos(PLAYER_MODEL_SCALE, PLAYER_RADIUS);
+            body.teleport_facing(at, spot.yaw);
         }
+        w.start(pose, now, at);
     }
 }
 
@@ -133,7 +154,9 @@ pub fn update_poses(
                 PoseClip::Sit => false,
             };
             let dead = sim.unit(su.0).is_some_and(|u| !u.alive);
-            if over || dead || moved > POSE_BREAK_M || mounted {
+            // The seat snap moves the body after the emote starts; give the transform a moment to follow.
+            let settled = now - t0 > POSE_SETTLE_SECS;
+            if over || dead || (settled && moved > POSE_BREAK_M) || mounted {
                 w.emote = None;
             }
         }

@@ -241,7 +241,9 @@ fn kill_levels_up_heals_to_full_and_teaches_spells() {
         ]
     );
     let p = w.u(w.p);
-    assert_eq!((p.level, p.xp, p.xp_to_next), (2, 100, 600));
+    let c = w.sim.content();
+    let left = (2, 500 - c.xp_to_next(1), c.xp_to_next(2));
+    assert_eq!((p.level, p.xp, p.xp_to_next), left);
     assert_eq!((p.hp, p.max_hp, p.max_mana), (335, 335, 290));
 }
 

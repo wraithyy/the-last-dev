@@ -82,9 +82,12 @@ fn fake_server_round_trip_keeps_networld_in_step() {
     // Handshake as the session runs it.
     let (phase, out) = advance(Phase::Idle, &Step::Opened);
     assert_eq!(out, Outcome::SendHello);
-    let hello = hello_frames(Intent::Create, "Dana", "", "fullstack");
+    let hello = hello_frames(Intent::Create, "Dana", "", "fullstack", (false, ""));
     assert!(matches!(wire(&hello[0]), ClientMsg::Hello { .. }));
-    assert_eq!(wire(&hello[1]), ClientMsg::CreateRoom);
+    assert!(matches!(
+        wire(&hello[1]),
+        ClientMsg::CreateRoom { public: false, .. }
+    ));
 
     let Ok(mut sim) = new_sim() else {
         panic!("content")

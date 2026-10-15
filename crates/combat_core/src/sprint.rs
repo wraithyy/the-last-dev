@@ -506,7 +506,7 @@ impl Sim {
         &self.content.sprint
     }
 
-    fn live_run(&self) -> Option<&Run> {
+    pub(crate) fn live_run(&self) -> Option<&Run> {
         self.sprint.run.as_ref().filter(|r| !r.ended)
     }
 

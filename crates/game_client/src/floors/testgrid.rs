@@ -91,6 +91,35 @@ impl Grid {
     pub fn free(&self, p: Vec3) -> bool {
         !self.blocked[self.cell(p)]
     }
+
+    /// The seat a sitter's feet position `p` belongs to: its cells are the chair's own.
+    fn seat_of(l: &FloorLayout, p: Vec3) -> Option<&crate::seat::SeatSpot> {
+        let scale = crate::seat::model_scale(crate::config::PLAYER_HEIGHT);
+        l.seats
+            .iter()
+            .find(|s| s.taken && s.origin(scale).distance(p) < 0.01)
+    }
+
+    /// `free` for anchors: a seated NPC stands inside its chair's cells by design.
+    pub fn free_anchor(&self, l: &FloorLayout, p: Vec3) -> bool {
+        Self::seat_of(l, p).is_some() || self.free(p)
+    }
+
+    /// `at` for anchors: a sitter counts as reachable when a free cell within talking range
+    /// (1.5 m) of the seat is.
+    pub fn at_anchor(&self, l: &FloorLayout, p: Vec3) -> f32 {
+        let Some(s) = Self::seat_of(l, p) else {
+            return self.at(p);
+        };
+        (0..8)
+            .map(|k| {
+                let a = k as f32 * std::f32::consts::FRAC_PI_4;
+                Vec3::new(s.pos.x + 1.5 * a.cos(), 0.0, s.pos.z + 1.5 * a.sin())
+            })
+            .filter(|q| self.free(*q))
+            .map(|q| self.at(q))
+            .fold(f32::INFINITY, f32::min)
+    }
 }
 
 pub fn seg_dist(p: Vec2, a: Vec2, b: Vec2) -> f32 {

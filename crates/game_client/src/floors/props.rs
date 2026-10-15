@@ -1,6 +1,7 @@
 //! Reusable dressing and satirical gags. All pure: they only append pieces.
 
 use super::kit::*;
+use crate::seat;
 use bevy::prelude::*;
 use std::f32::consts::{FRAC_PI_2, PI};
 
@@ -174,9 +175,12 @@ pub fn foosball(p: &mut Plan, x: f32, z: f32) {
     }
 }
 
+/// A beanbag facing the middle of the zone; its top is the seat.
 pub fn beanbag(p: &mut Plan, x: f32, z: f32, mat: Mat) {
-    p.boxed(v(x, 0.28, z), v(1.1, 0.56, 1.0), mat, true);
-    p.boxed(v(x, 0.6, z - 0.05), v(0.8, 0.14, 0.7), mat, false);
+    p.boxed(v(x, 0.2, z), v(1.1, 0.4, 1.0), mat, true);
+    p.boxed(v(x, 0.43, z - 0.05), v(0.8, 0.1, 0.7), mat, false);
+    let face = super::layout::yaw_towards(v(x, 0.0, z), Vec3::ZERO);
+    p.seat(v(x, seat::SEAT_TOP, z), face - PI, 0.5);
 }
 
 /// Dusty bookshelf row with a "Documentation" sign and cobwebs. Open towards +Z.
@@ -364,10 +368,14 @@ pub fn exec_desk(p: &mut Plan, x: f32, z: f32, face: Face) {
 /// Park bench (slatted seat and back), facing +Z at yaw 0. Solid: it is knee-high.
 pub fn bench(p: &mut Plan, x: f32, z: f32, yaw: f32) {
     p.framed(v(x, 0.0, z), yaw, |p| {
-        p.boxed(v(0.0, 0.45, 0.0), v(1.8, 0.08, 0.5), Mat::Wood, true);
-        p.boxed(v(0.0, 0.8, -0.22), v(1.8, 0.45, 0.06), Mat::Wood, false);
+        p.boxed(v(0.0, 0.43, 0.0), v(1.8, 0.08, 0.5), Mat::Wood, true);
+        p.boxed(v(0.0, 0.76, -0.22), v(1.8, 0.45, 0.06), Mat::Wood, false);
         for sx in [-0.8, 0.8] {
-            p.boxed(v(sx, 0.22, 0.0), v(0.08, 0.44, 0.4), Mat::Metal, false);
+            p.boxed(v(sx, 0.2, 0.0), v(0.08, 0.4, 0.4), Mat::Metal, false);
+        }
+        // Two slots; the sitter's back just meets the backrest.
+        for sx in [-0.45, 0.45] {
+            p.seat(v(sx, seat::SEAT_TOP, 0.0), 0.0, 0.25);
         }
     });
 }

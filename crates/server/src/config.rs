@@ -47,6 +47,10 @@ pub struct Config {
     pub per_ip_rooms_per_min: u32,
     pub per_ip_failed_joins: u32,
     pub failed_join_lockout: Duration,
+    /// `ListRooms` and `JoinPublic` requests per IP per minute.
+    pub per_ip_lists_per_min: u32,
+    /// A connection browsing the public room list (no room yet) is closed after this long.
+    pub browse_timeout: Duration,
     /// Loopback/private-range clients skip per-IP limits (LAN play); global caps still apply.
     pub lan_exempt: bool,
     /// Dev/QA only: joining players start at these levels, in join order, the last one
@@ -81,6 +85,8 @@ impl Default for Config {
             per_ip_rooms_per_min: 6,
             per_ip_failed_joins: 10,
             failed_join_lockout: Duration::from_secs(30),
+            per_ip_lists_per_min: 30,
+            browse_timeout: Duration::from_secs(300),
             lan_exempt: true,
             dev_start_level: Vec::new(),
         }

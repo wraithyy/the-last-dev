@@ -169,7 +169,7 @@ fn scenario_log_contains_every_spec_beat() {
         "casts Reject PR",
         "interrupted by Fullstack Engineer (lockout 4000 ms)",
         "CEO dies",
-        "gains 120 xp",
+        "gains 144 xp",
         "loots CEO",
         "CEO respawns",
     ] {

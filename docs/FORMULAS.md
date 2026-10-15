@@ -120,7 +120,43 @@ Copies beyond the cap are kept and listed but add nothing (hard cap, no further 
 
 ## Levels and XP
 
-Player stats at level `L` = `senior_engineer` stats + cumulative `levels[L-1]` bonus (HP +35, mana +40, spell power +10 per level; level 10: 615 HP, 610 mana, 110 SP). XP to leave level `L` is `levels[L-1].xp_to_next` (400, 600, ... 2000; 0 at the cap).
+Player stats at level `L` = `senior_engineer` stats + cumulative `levels[L-1]` bonus (HP +35, mana +40, spell power +10 per level; level 10: 615 HP, 610 mana, 110 SP). XP to leave level `L` is `levels[L-1].xp_to_next` (0 at the cap).
+
+The curve is geometric: each level needs about 1.55-1.67x the previous one (2x for the first step), so early levels come fast and later ones slow down. XP sources grow with level too, through `levels[L-1].xp_reward_pct`: kill XP of a mob at level `L` and quest XP turned in at a zone whose range starts at `L` are multiplied by it. The authored `xp_reward` and quest `reward.xp` stay the level-1 values; quest Story Points stay on the authored XP.
+
+| Level | XP to next (old) | XP to next | Ratio | XP reward % |
+|---|---|---|---|---|
+| 1 | 400 | 450 | - | 100 |
+| 2 | 600 | 900 | 2.00 | 120 |
+| 3 | 800 | 1500 | 1.67 | 120 |
+| 4 | 1000 | 2400 | 1.60 | 130 |
+| 5 | 1200 | 3800 | 1.58 | 145 |
+| 6 | 1400 | 6000 | 1.58 | 165 |
+| 7 | 1600 | 9300 | 1.55 | 235 |
+| 8 | 1800 | 14400 | 1.55 | 335 |
+| 9 | 2000 | 22200 | 1.54 | 335 |
+| 10 | 0 | 0 | - | 375 |
+
+Why: the world is played once (trash only respawns after `TRASH_RESPAWN_MS` away), so the table is fitted to the XP one full clear per zone pays (every kill, every quest, `quest_and_kill_xp_track_the_zone_levels`). Old table: the cap came at the end of the PMO, with the Penthouse and the Lab at 10. New table, level after each zone: campus 3, Open Space 4, Meeting Rooms 5, Sales 6, Data Center halls 6 and 7, PMO 8, Penthouse 9, Innovation Lab 10 (reached in the Showroom). Talents (2, 4, 6, 8, 10) land in the campus, at the end of Open Space, Sales, in the PMO and in the Lab. Quest `level_min` follows the curve (at most the level a full clear arrives with); no rested or catch-up XP, the +5% per level above you already rewards pulling up.
+
+Measured (`time_at_level`, Fullstack bot, seed 7, one pass from level 1 with its real level, sim seconds of fights and rests plus the walking it skips at 7 m/s; it misses about a third of the quests, mostly item and chain quests):
+
+| Level | Seconds at level (old) | Seconds at level |
+|---|---|---|
+| 1 | 345 | 345 |
+| 2 | 68 | 70 |
+| 3 | 244 | 286 |
+| 4 | 116 | 345 |
+| 5 | 190 | 359 |
+| 6 | 348 | 426 |
+| 7 | 231 | 431 |
+| 8 | 255 | 299 |
+| 9 | 372 | 398 |
+| 10 | from the PMO on | reached at the end of the Rack Room |
+
+The bot turns quests in only after clearing a zone, so level 1 spans most of its campus pass (a player handing in Onboarding first levels sooner). Content time per zone is roughly flat (200-450 bot seconds), so with one pass the curve can spread later levels over more zones but not make a level take 30 minutes; that needs more content or re-clears.
+
+Saves before version 3 keep their level; the XP into it keeps its share (`xp * new_need / old_need`).
 
 Monster scaling when spawned at level `M` with authored level `A` (`config.mob_scaling`):
 
@@ -128,7 +164,7 @@ Monster scaling when spawned at level `M` with authored level `A` (`config.mob_s
 pct(per) = max(10, 100 + per * (M - A))
 max_hp   = max_hp * pct(hp_pct_per_level = 12) / 100
 dmg_pct  = pct(damage_pct_per_level = 10)            // multiplies melee, spells, heals, DoTs it deals
-reward   = xp_reward * pct(xp_pct_per_level = 10) / 100
+reward   = xp_reward * pct(xp_pct_per_level = 10) / 100 * levels[M-1].xp_reward_pct / 100   // 100 inside a sprint
 ```
 
 Kill XP for a player of level `P` (`config.xp_rules`, classic style but compressed for a 10-level game):
@@ -181,7 +217,9 @@ Pack growth (`config.group_pack_growth_players`, content 2, default 0 = off): ev
 
 Linked packs (`config.pack_link_m`, content 7 m, default 0 = off): when a trash unit gets its first threat, idle trash of other packs (not bosses or summons) within that distance of it joins on the same source, and pulls its own pack. Leash: beyond `leash_m` from its spawn a unit evades home and heals to full; every player on its threat table stays in combat for `config.combat_lock_ms` (content 5,000) after the reset, so no out-of-combat regen or resurrect right after kiting a pull away.
 
-Quest rewards add `reward.xp` flat on turn-in: no level-difference adjustment, nothing at the cap, same carry-over and level-up rules as kills.
+Quest rewards add `reward.xp * levels[Z-1].xp_reward_pct / 100` on turn-in, `Z` the first level of the zone the quest is turned in (breadcrumbs pay at their destination): no level-difference adjustment, nothing at the cap, same carry-over and level-up rules as kills.
+
+Corpses (`refresh_corpse`, `CORPSE_EMPTY_MS` 30,000, `CORPSE_LOOT_MS` 180,000): a dead unit despawns 30 s after its death or after the last roll on it is taken (or its owner leaves), and 3 minutes after its death while any group member still has a roll on it (that loot is lost). The empty timer never runs past the 3 minutes and is never pushed back. Bosses keep their corpse until the zone unloads (set pieces, often with yells and banners tied to them); hand-spawned units that respawn in place are left to their respawn timer. Kill credit, XP and loot are decided at the death, so a despawn changes none of them. Each client applies the same rule to its own roll only: online a corpse a teammate still has to loot sinks into the floor for you after 30 s while the server keeps it; offline the sim despawns it on the same tick the sink ends.
 
 Zone spawns: packs in the first half of the zone's list spawn at `level_range.0`, the rest at `level_range.1`; bosses and friendlies keep their authored level; summons use the summoner's level. Trash of a zone left for at least `TRASH_RESPAWN_MS` (300,000 ms of sim time) respawns on re-entry and gives XP again.
 
@@ -203,7 +241,7 @@ perks    : SpellDamage / SpellHeal +pct on that spell; Cooldown and ManaCost -pc
            Echo repeats a landed hit at pct (chance roll on the combat rng, only when worn)
 ```
 
-Story Points per kill and member: `(level * sp_per_level + U[0, level]) * mult` (elite 4, boss 12; summons 0). Gear drop chance: trash 12%, elite 60%, boss 100%; rarity weights Common/Uncommon/Rare/Epic trash 50/35/13/2, elite 10/45/37/8, boss 0/25/55/20; the piece is from the mob's tier (`ceil(level / 2)`), from the looter's role 70% of the time. Bosses with named Legendaries add one 25% of the time; non-bosses drop junk 30%. Quest turn-ins pay `xp * 15%` SP. Prices: `base(rarity) * (2 + ilvl) / 4` with base 8/20/50/120/300 unless authored; sell price 25% (junk 100%).
+Story Points per kill and member: `(level * sp_per_level + U[0, level]) * mult` (elite 4, boss 12; summons 0). Gear drop chance: trash 12%, elite 60%, boss 100%; rarity weights Common/Uncommon/Rare/Epic trash 50/35/13/2, elite 10/45/37/8, boss 0/25/55/20; the piece is from the mob's tier (`ceil(level / 2)`), from the looter's role 70% of the time. Bosses with named Legendaries add one 25% of the time; non-bosses drop junk 30%. Quest turn-ins pay `reward.xp * 15%` SP (authored XP, before `xp_reward_pct`). Prices: `base(rarity) * (2 + ilvl) / 4` with base 8/20/50/120/300 unless authored; sell price 25% (junk 100%).
 
 Measured (combat_core tests, level-capped bots, 3 seeds): a full set of tier-appropriate Rare gear cuts boss kill time to 72-80% of fresh and raises the boss-fight minimum HP by 13-32 points; Code Review damage over 10 s goes up by about 60% at tier 5.
 

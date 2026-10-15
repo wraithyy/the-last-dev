@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 10;
+pub const PROTOCOL_VERSION: u16 = 11;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -34,6 +34,14 @@ pub const MAX_LIST_LEN: usize = 64;
 pub const MAX_ITEM_NAME_BYTES: usize = 64;
 /// Error, yell and other free-form server strings (yells are content lines, not user text).
 pub const MAX_TEXT_BYTES: usize = 512;
+/// Public rooms in one `RoomList`; the server sends the most populated, then newest.
+pub const MAX_ROOM_LIST: usize = 50;
+/// A sanitised room title (`sanitize_title`) is at most this many ASCII characters.
+pub const MAX_TITLE_CHARS: usize = 24;
+/// Raw titles longer than this are rejected before sanitising.
+pub const MAX_RAW_TITLE_BYTES: usize = 64;
+/// Sanitised display names (`sanitize_name`) are at most this long.
+pub const MAX_NAME_CHARS: usize = 16;
 
 const HEADER: usize = 2;
 
@@ -48,7 +56,23 @@ pub enum ClientMsg {
         name: String,
         class: String,
     },
-    CreateRoom,
+    /// `public` rooms appear in `RoomList`; private ones are reachable only by code. `title`
+    /// is raw and goes through `sanitize_title`; empty or unusable gets a generated one.
+    CreateRoom {
+        public: bool,
+        title: String,
+    },
+    /// Before a room request only: answered with `RoomList` (rate limited per connection
+    /// and per IP). The connection stays open for `JoinPublic`, `CreateRoom` or `JoinRoom`.
+    ListRooms,
+    /// Joins a listed public room by its `RoomInfo::id`, which is not the room code.
+    JoinPublic {
+        id: u64,
+    },
+    /// In a room, leader only: list the room publicly or hide it again.
+    SetPublic {
+        public: bool,
+    },
     /// `code` is normalised by `decode` (`parse_room_code`); a bad code fails the decode,
     /// which the server must answer with `ErrorKind::CannotJoin` like any other join failure.
     JoinRoom {
@@ -147,6 +171,37 @@ pub enum ServerMsg {
     Pong {
         t: u64,
     },
+    RoomList {
+        rooms: Vec<RoomInfo>,
+    },
+    /// On join and whenever visibility or the leader changes. `leader` (the first player)
+    /// may toggle `public` and start sprints.
+    RoomSettings {
+        public: bool,
+        title: String,
+        leader: EntityId,
+    },
+}
+
+/// One public room in `RoomList`. No code, no address: `id` is a separate random token that
+/// only works while the room is public (making it public again draws a new one).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoomInfo {
+    pub id: u64,
+    /// `sanitize_title` output.
+    pub title: String,
+    /// Display name of the leader, `sanitize_name` output.
+    pub host: String,
+    pub players: u8,
+    pub max: u8,
+    /// Zone id (`Content::zones`), e.g. `tower/3`.
+    pub zone: String,
+    pub avg_level: u8,
+    /// Distinct class keys of the members, sorted.
+    pub roles: Vec<String>,
+    pub in_sprint: bool,
+    /// Seconds since the room was created.
+    pub age_s: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -172,6 +227,8 @@ pub enum ErrorKind {
     HelloRequired,
     /// `Hello` named a class the server's content does not have.
     UnknownClass,
+    /// A leader-only action (room visibility) from another member.
+    NotLeader,
 }
 
 impl ErrorKind {
@@ -186,6 +243,7 @@ impl ErrorKind {
             ErrorKind::RateLimited => "Slow down.",
             ErrorKind::HelloRequired => "Handshake missing.",
             ErrorKind::UnknownClass => "Unknown role. Pick another one.",
+            ErrorKind::NotLeader => "Only the host can change that.",
         }
     }
 }
@@ -645,6 +703,9 @@ impl Msg for ClientMsg {
             ClientMsg::Hello { class, .. } if class.len() > MAX_CLASS_BYTES => {
                 Err(ProtoError::BadName)
             }
+            ClientMsg::CreateRoom { title, .. } if title.len() > MAX_RAW_TITLE_BYTES => {
+                Err(ProtoError::TooMany)
+            }
             ClientMsg::JoinRoom { code } => Ok(ClientMsg::JoinRoom {
                 code: parse_room_code(&code)?,
             }),
@@ -719,6 +780,18 @@ impl Msg for ServerMsg {
             ServerMsg::MoveCorrection { pos, .. } => {
                 return finite(&[pos.x, pos.y, pos.z]).map(|_| self);
             }
+            ServerMsg::RoomList { rooms } => {
+                rooms.len() <= MAX_ROOM_LIST
+                    && rooms.iter().all(|r| {
+                        title_ok(&r.title)
+                            && r.host.len() <= MAX_NAME_CHARS
+                            && clean(&r.host)
+                            && r.zone.len() <= MAX_QUEST_ID_BYTES
+                            && r.roles.len() <= MAX_PLAYERS
+                            && r.roles.iter().all(|c| c.len() <= MAX_CLASS_BYTES)
+                    })
+            }
+            ServerMsg::RoomSettings { title, .. } => title_ok(title),
             ServerMsg::PlayerLeft { .. } | ServerMsg::Emoted { .. } | ServerMsg::Pong { .. } => {
                 true
             }
@@ -875,7 +948,7 @@ pub fn decode<M: Msg>(bytes: &[u8]) -> Result<M, ProtoError> {
 /// becomes `Intern-<n>` (the server passes a per-room counter).
 pub fn sanitize_name(raw: &str, n: u32) -> String {
     let name = raw.trim();
-    let ok = (2..=16).contains(&name.len())
+    let ok = (2..=MAX_NAME_CHARS).contains(&name.len())
         && name
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b' ' | b'-' | b'_'));
@@ -884,6 +957,55 @@ pub fn sanitize_name(raw: &str, n: u32) -> String {
     } else {
         format!("Intern-{n}")
     }
+}
+
+// ---- room titles ----
+
+/// Only what `sanitize_title` and `sanitize_name` emit: ASCII letters, digits, space, `-`, `_`.
+fn clean(s: &str) -> bool {
+    s.bytes()
+        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b' ' | b'-' | b'_'))
+}
+
+fn title_ok(t: &str) -> bool {
+    t.len() <= MAX_TITLE_CHARS && clean(t)
+}
+
+/// Meetings a generated title is named after; `default_title` adds a number.
+pub const TITLE_TEMPLATES: [&str; 8] = [
+    "Daily Standup",
+    "Sprint Planning",
+    "Retro",
+    "Backlog Grooming",
+    "All Hands",
+    "Quick Sync",
+    "Incident Bridge",
+    "Arch Review",
+];
+
+/// "Daily Standup 42", picked by `n` (the server passes the room's random id).
+pub fn default_title(n: u64) -> String {
+    let t = TITLE_TEMPLATES[(n % TITLE_TEMPLATES.len() as u64) as usize];
+    format!("{t} {}", (n >> 8) % 100 + 1)
+}
+
+/// Keeps ASCII letters, digits, `-`, `_` and single spaces, at most `MAX_TITLE_CHARS`.
+/// Everything else (control, bidi, other Unicode, markup) is dropped. `None` when fewer than
+/// three characters survive: the caller uses `default_title`.
+pub fn sanitize_title(raw: &str) -> Option<String> {
+    let mut out = String::new();
+    for c in raw.chars() {
+        if out.len() >= MAX_TITLE_CHARS {
+            break;
+        }
+        if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+            out.push(c);
+        } else if c == ' ' && !out.is_empty() && !out.ends_with(' ') {
+            out.push(' ');
+        }
+    }
+    let out = out.trim_end().to_string();
+    (out.len() >= 3).then_some(out)
 }
 
 // ---- room codes ----
@@ -981,7 +1103,17 @@ mod tests {
                 name: "Dana".into(),
                 class: "backend".into(),
             },
-            ClientMsg::CreateRoom,
+            ClientMsg::CreateRoom {
+                public: true,
+                title: "Mob Programming".into(),
+            },
+            ClientMsg::CreateRoom {
+                public: false,
+                title: String::new(),
+            },
+            ClientMsg::ListRooms,
+            ClientMsg::JoinPublic { id: u64::MAX },
+            ClientMsg::SetPublic { public: true },
             ClientMsg::JoinRoom {
                 code: "SCOPE-CREEP-7K3M9QZA".into(),
             },
@@ -1320,7 +1452,107 @@ mod tests {
                 tick: 9,
                 events: sprint_events(),
             },
+            ServerMsg::RoomList {
+                rooms: vec![room_info(), room_info()],
+            },
+            ServerMsg::RoomList { rooms: Vec::new() },
+            ServerMsg::RoomSettings {
+                public: true,
+                title: "Daily Standup 42".into(),
+                leader: 1,
+            },
         ]
+    }
+
+    fn room_info() -> RoomInfo {
+        RoomInfo {
+            id: 0xdead_beef,
+            title: "Daily Standup 42".into(),
+            host: "Dana".into(),
+            players: 2,
+            max: 5,
+            zone: "tower/3".into(),
+            avg_level: 7,
+            roles: vec!["backend".into(), "devops".into()],
+            in_sprint: true,
+            age_s: 90,
+        }
+    }
+
+    #[test]
+    fn room_lists_and_titles_are_capped() {
+        let list = |rooms: Vec<RoomInfo>| roundtrip(&ServerMsg::RoomList { rooms });
+        assert!(list(vec![room_info(); MAX_ROOM_LIST]).is_ok());
+        assert_eq!(
+            list(vec![room_info(); MAX_ROOM_LIST + 1]),
+            Err(ProtoError::TooMany)
+        );
+        let bad = [
+            RoomInfo {
+                title: "x".repeat(MAX_TITLE_CHARS + 1),
+                ..room_info()
+            },
+            RoomInfo {
+                title: "evil\u{202e}gnp".into(),
+                ..room_info()
+            },
+            RoomInfo {
+                host: "<b>".into(),
+                ..room_info()
+            },
+            RoomInfo {
+                host: "h".repeat(MAX_NAME_CHARS + 1),
+                ..room_info()
+            },
+            RoomInfo {
+                roles: vec!["devops".into(); MAX_PLAYERS + 1],
+                ..room_info()
+            },
+            RoomInfo {
+                zone: "z".repeat(MAX_QUEST_ID_BYTES + 1),
+                ..room_info()
+            },
+        ];
+        for r in bad {
+            assert_eq!(list(vec![r]), Err(ProtoError::TooMany));
+        }
+        let settings = ServerMsg::RoomSettings {
+            public: false,
+            title: "a\nb".into(),
+            leader: 1,
+        };
+        assert_eq!(roundtrip(&settings), Err(ProtoError::TooMany));
+        let long = ClientMsg::CreateRoom {
+            public: true,
+            title: "t".repeat(MAX_RAW_TITLE_BYTES + 1),
+        };
+        assert_eq!(roundtrip(&long), Err(ProtoError::TooMany));
+    }
+
+    #[test]
+    fn titles_are_sanitised_or_generated() {
+        assert_eq!(
+            sanitize_title("  Mob   Programming! ").as_deref(),
+            Some("Mob Programming")
+        );
+        assert_eq!(
+            sanitize_title("abc\u{202e}def\u{0007}<script>").as_deref(),
+            Some("abcdefscript")
+        );
+        assert_eq!(sanitize_title("Zo\u{eb} ok").as_deref(), Some("Zo ok"));
+        assert_eq!(
+            sanitize_title(&"w".repeat(100)).map(|t| t.len()),
+            Some(MAX_TITLE_CHARS)
+        );
+        assert_eq!(sanitize_title("a        b").as_deref(), Some("a b"));
+        for none in ["", "  ", "ab", "!!!", "\u{202e}\u{202e}\u{202e}"] {
+            assert_eq!(sanitize_title(none), None, "{none:?}");
+        }
+        for n in [0, 1, 7, 255, 1 << 20, u64::MAX] {
+            let t = default_title(n);
+            assert!(title_ok(&t) && t.len() >= 3, "{t}");
+            assert_eq!(sanitize_title(&t).as_deref(), Some(t.as_str()));
+        }
     }
 
     fn sprint_events() -> Vec<Event> {

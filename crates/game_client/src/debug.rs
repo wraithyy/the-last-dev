@@ -18,6 +18,8 @@
 //!
 //! Floor, level and start-position hooks live in `game.rs`, the autofight bot in `combat.rs`.
 //! - `WOW_TALK=1`: talk to the nearest friendly NPC (within reach) two seconds in.
+//! - `WOW_EMOTE=</cmd>@<secs>`: send that emote command (e.g. `/sit@3`) at that time.
+//! - `WOW_CAM_LOOK=ex,ey,ez,tx,ty,tz`: fixed camera at `e` looking at `t` (see `camera.rs`).
 //! - `WOW_CAM_DIST=<m>`: start with the camera zoomed to that distance; `WOW_CAM_PITCH=<deg>` tilts it.
 //! - `WOW_GIVE_ITEMS=1`: grant a sample set of trophies at start (stacks included).
 //! - `WOW_TROPHIES=1`: open the `~/trophies` window at start.
@@ -206,6 +208,26 @@ impl Plugin for DebugPlugin {
                         .map(|u| (u.id, u.max_hp));
                     if let Some((id, max)) = boss {
                         sim.0.debug_set_hp(id, max * pct / 100);
+                    }
+                })
+                .in_set(SimReady),
+            );
+        }
+        if let Some((emote, at)) = env::var("WOW_EMOTE").ok().and_then(|v| {
+            let (cmd, at) = v.split_once('@')?;
+            Some((
+                net_proto::Emote::from_command(cmd)?,
+                at.parse::<f32>().ok()?,
+            ))
+        }) {
+            app.add_systems(
+                Update,
+                (move |time: Res<Time>,
+                       mut out: MessageWriter<crate::net::EmoteRequest>,
+                       mut done: Local<bool>| {
+                    if !*done && time.elapsed_secs() >= at {
+                        *done = true;
+                        out.write(crate::net::EmoteRequest(emote));
                     }
                 })
                 .in_set(SimReady),

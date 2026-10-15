@@ -7,10 +7,13 @@ use crate::sim::Sim;
 use crate::targeting::EntityId;
 
 /// Bumped when a field changes meaning. Version 1 (before talents) still loads, with no picks;
-/// anything else loads as no save at all.
-pub const SAVE_VERSION: u32 = 2;
+/// versions 1-2 (before the levelling curve) carry `xp` against the old table and are rescaled
+/// on import; anything else loads as no save at all.
+pub const SAVE_VERSION: u32 = 3;
 const OLDEST_VERSION: u32 = 1;
 const HEADER: &str = "the-last-dev save";
+/// `xp_to_next` of levels 1-9 before save version 3.
+const V2_XP_TO_NEXT: [u32; 9] = [400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000];
 /// Copies of one trophy kept in a save; far above anything a run produces.
 const TROPHY_COPIES_MAX: u32 = 99;
 
@@ -39,6 +42,8 @@ pub struct SaveData {
     /// Sprint mode: recommended next level per building, and the delivered-run leaderboard.
     pub sprint_keys: Vec<(String, u8)>,
     pub sprint_records: Vec<crate::sprint::SprintRecord>,
+    /// Decoded from a save before version 3: `xp` is progress against `V2_XP_TO_NEXT`.
+    pub xp_v2: bool,
 }
 
 fn list(v: &str) -> Vec<String> {
@@ -214,9 +219,9 @@ impl SaveData {
                 _ => {}
             }
         }
-        version
-            .is_some_and(|v| (OLDEST_VERSION..=SAVE_VERSION).contains(&v))
-            .then_some(s)
+        let v = version.filter(|v| (OLDEST_VERSION..=SAVE_VERSION).contains(v))?;
+        s.xp_v2 = v < 3;
+        Some(s)
     }
 }
 
@@ -242,6 +247,7 @@ impl Sim {
             bosses: world.bosses_killed.iter().cloned().collect(),
             sprint_keys: self.sprint_keys_of(player),
             sprint_records: self.sprint_records(player).to_vec(),
+            xp_v2: false,
             achievements: s.achievements.clone(),
             title: s.title.clone(),
             talents: s.talents,
@@ -373,7 +379,13 @@ impl Sim {
         u.title = title;
         self.set_level_of(player, level);
         let need = self.content.xp_to_next(level);
-        self.units[i].state.xp = if need == 0 { 0 } else { save.xp.min(need - 1) };
+        // Keep the share of the level already done, not the raw number, across a table change.
+        let old_need = V2_XP_TO_NEXT.get(usize::from(level) - 1).copied();
+        let xp = match old_need.filter(|_| save.xp_v2) {
+            Some(old) => (u64::from(save.xp) * u64::from(need) / u64::from(old)) as u32,
+            None => save.xp,
+        };
+        self.units[i].state.xp = if need == 0 { 0 } else { xp.min(need - 1) };
         self.refresh_item_bonus(i);
         let u = &mut self.units[i].state;
         u.hp = u.max_hp;

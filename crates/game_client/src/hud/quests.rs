@@ -506,7 +506,7 @@ fn reward(
     let sp = (u64::from(def.reward.xp) * u64::from(content.economy.quest_sp_pct) / 100) as u32
         + def.reward.sp;
     let xp = if def.reward.xp > 0 {
-        format!("+{} XP   +{sp} SP", def.reward.xp)
+        format!("+{} XP   +{sp} SP", content.quest_xp(def))
     } else {
         "Exposure".into()
     };
@@ -1244,7 +1244,7 @@ fn quest_events(
                     title: format!("Ticket closed: {}", def.name),
                     subtitle: format!(
                         "+{} XP. Moved to Done. The AI will present it at the all-hands.",
-                        def.reward.xp
+                        content.quest_xp(def)
                     ),
                     color: DONE_GREEN,
                 });

@@ -83,6 +83,10 @@ struct Report {
     level: u8,
     /// (hp %, mana %, seconds) after each pull.
     after: Vec<(u32, u32, u64)>,
+    /// (sim tick, new level) per level-up.
+    level_ups: Vec<(u64, u8)>,
+    /// Walking the bot skips by teleporting between packs and NPCs, at `RUN_MPS`, in ms.
+    travel_ms: u64,
 }
 
 struct Bot {
@@ -104,6 +108,7 @@ struct Bot {
     low_hp_pct: u32,
     /// Stop drinking when something attacks (sprint adds); off for the golden runs.
     rest_alert: bool,
+    last_pos: Vec3,
 }
 
 fn yaw_to(from: Vec3, to: Vec3) -> f32 {
@@ -142,6 +147,7 @@ impl Bot {
             seed,
             low_hp_pct: 100,
             rest_alert: false,
+            last_pos: start,
         }
     }
 
@@ -174,8 +180,16 @@ impl Bot {
             let pct = me.hp * 100 / me.max_hp.max(1);
             self.report.boss_min_hp_pct = self.report.boss_min_hp_pct.min(pct);
         }
+        let hop = combat_core::distance(self.last_pos, self.pos);
+        if hop > 1.0 {
+            self.report.travel_ms += (hop / RUN_MPS * 1000.0) as u64;
+        }
+        self.last_pos = self.pos;
         for e in &events {
             match e {
+                Event::LevelUp { unit, level } if *unit == self.player => {
+                    self.report.level_ups.push((now, *level));
+                }
                 Event::Knockback {
                     unit,
                     dir,
@@ -1573,4 +1587,83 @@ fn every_talent_build_clears_the_campaign() {
     }
     println!("{}", table.join("\n"));
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Zones in world order (the zone-level band order of `zones_quests.rs`).
+const WORLD_ORDER: [&str; 10] = [
+    "campus",
+    "tower/1",
+    "tower/2",
+    "tower/3",
+    "datacenter/1",
+    "datacenter/2",
+    "tower/4",
+    "tower/5",
+    "lab/1",
+    "lab/2",
+];
+
+/// (zone, level on leaving it, seconds spent in it).
+type ZoneEnd = (String, u8, u64);
+
+/// One pass through the world from level 1 with the character's real level (no
+/// `set_player_level`), looting and questing like `campaign`. Returns the seconds spent at each
+/// level (sim time of fights and rests plus the walking the bot teleports over), the level after
+/// each zone with the zone's seconds, and the zones the bot died in.
+fn natural_campaign(class: &'static str, seed: u64) -> (Vec<u64>, Vec<ZoneEnd>, Vec<String>) {
+    let quests: Vec<String> = content().quests.iter().map(|q| q.id.clone()).collect();
+    let quests: Vec<&str> = quests.iter().map(String::as_str).collect();
+    let mut save: Option<combat_core::SaveData> = None;
+    let (mut clock_ms, mut level, mut since_ms) = (0u64, 1u8, 0u64);
+    let mut at_level = vec![0u64; usize::from(content().max_level())];
+    let (mut ends, mut deaths) = (Vec::new(), Vec::new());
+    for zone in WORLD_ORDER {
+        let mut bot = Bot::new_as(class, zone, 1, seed);
+        bot.looting = true;
+        if let Some(s) = &save {
+            assert!(bot.sim.import_save(bot.player, s));
+            bot.visit_vendor(zone);
+        }
+        bot.visit_givers(zone, &quests);
+        bot.run_geared(zone);
+        bot.visit_givers(zone, &quests);
+        bot.visit_givers(zone, &quests);
+        let ms = |tick: u64, travel: u64| combat_core::ticks_to_ms(tick) + travel;
+        // Travel is spread evenly over the zone so level-ups inside it split it fairly.
+        let (end_tick, travel) = (bot.sim.now().0, bot.report.travel_ms);
+        for &(tick, l) in &bot.report.level_ups {
+            let t = clock_ms + ms(tick, travel * tick / end_tick.max(1));
+            at_level[usize::from(level) - 1] += t - since_ms;
+            (since_ms, level) = (t, l);
+        }
+        clock_ms += ms(end_tick, travel);
+        if bot.report.died {
+            deaths.push(zone.to_string());
+        }
+        ends.push((
+            zone.to_string(),
+            bot.me().level,
+            ms(end_tick, travel) / 1000,
+        ));
+        save = bot.sim.export_save(bot.player);
+    }
+    at_level[usize::from(level) - 1] += clock_ms - since_ms;
+    (at_level.iter().map(|ms| ms / 1000).collect(), ends, deaths)
+}
+
+/// Time-at-level report for the levelling curve (docs/FORMULAS.md, Levels and XP):
+/// `cargo test -p combat_core --test playthrough time_at_level -- --nocapture`.
+#[test]
+fn time_at_level() {
+    let (secs, ends, deaths) = natural_campaign("fullstack", 7);
+    println!("level | seconds at level");
+    for (k, s) in secs.iter().enumerate() {
+        println!("{:5} | {s}", k + 1);
+    }
+    println!("level after each zone: {ends:?}, died in {deaths:?}");
+    assert!(deaths.is_empty(), "died in {deaths:?}");
+    // The cap belongs to the Innovation Lab, even for a pass that misses quests.
+    let lab = ends.iter().position(|e| e.0.starts_with("lab/"));
+    let capped = ends.iter().position(|e| e.1 == content().max_level());
+    assert!(capped.is_some() && capped >= lab, "{ends:?}");
 }

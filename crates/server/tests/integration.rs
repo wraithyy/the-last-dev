@@ -175,7 +175,12 @@ async fn drain_now(ws: &mut Ws) -> Vec<ServerMsg> {
 async fn create_with(addr: SocketAddr, headers: &[(&'static str, &str)]) -> (Ws, String, EntityId) {
     let mut ws = connect_with(addr, "", headers).await.unwrap();
     ws.send(hello_msg("Dana")).await.unwrap();
-    ws.send(enc(&ClientMsg::CreateRoom)).await.unwrap();
+    ws.send(enc(&ClientMsg::CreateRoom {
+        public: false,
+        title: String::new(),
+    }))
+    .await
+    .unwrap();
     let ServerMsg::RoomCreated { code } = next_msg(&mut ws).await else {
         panic!("expected RoomCreated")
     };
@@ -660,7 +665,12 @@ async fn garbage_frames_strike_out() {
     // A second CreateRoom inside a room is invalid too.
     let (mut b, _, _) = create(s.addr).await;
     for _ in 0..5 {
-        b.send(enc(&ClientMsg::CreateRoom)).await.unwrap();
+        b.send(enc(&ClientMsg::CreateRoom {
+            public: false,
+            title: String::new(),
+        }))
+        .await
+        .unwrap();
     }
     assert_eq!(expect_closed(&mut b).await, Some(CloseCode::Policy));
     s.shutdown().await;
@@ -787,7 +797,12 @@ async fn hello_is_required_in_time() {
         )
     );
     let mut rude = connect(s.addr, "").await;
-    rude.send(enc(&ClientMsg::CreateRoom)).await.unwrap();
+    rude.send(enc(&ClientMsg::CreateRoom {
+        public: false,
+        title: String::new(),
+    }))
+    .await
+    .unwrap();
     assert_eq!(join_refusal(&mut rude).await.0, ErrorKind::HelloRequired);
     let mut old = connect(s.addr, "").await;
     old.send(enc(&ClientMsg::Hello {
@@ -896,7 +911,13 @@ async fn room_creation_rate_limit() {
     let _keep = [create(s.addr).await, create(s.addr).await];
     let mut third = connect(s.addr, "").await;
     third.send(hello_msg("x")).await.unwrap();
-    third.send(enc(&ClientMsg::CreateRoom)).await.unwrap();
+    third
+        .send(enc(&ClientMsg::CreateRoom {
+            public: false,
+            title: String::new(),
+        }))
+        .await
+        .unwrap();
     assert_eq!(join_refusal(&mut third).await.0, ErrorKind::RateLimited);
     s.shutdown().await;
 }
@@ -921,7 +942,12 @@ async fn five_clients_behind_one_ip_share_a_room() {
 async fn trusted_proxy_forwarded_for_is_used_for_limits() {
     let refused = |mut ws: Ws| async move {
         ws.send(hello_msg("x")).await.unwrap();
-        ws.send(enc(&ClientMsg::CreateRoom)).await.unwrap();
+        ws.send(enc(&ClientMsg::CreateRoom {
+            public: false,
+            title: String::new(),
+        }))
+        .await
+        .unwrap();
         join_refusal(&mut ws).await.0
     };
     let s = start(Config {
@@ -1271,4 +1297,196 @@ async fn talent_picks_are_validated_and_shared() {
     })
     .await;
     s.shutdown().await;
+}
+
+async fn list_rooms(ws: &mut Ws) -> Vec<net_proto::RoomInfo> {
+    ws.send(enc(&ClientMsg::ListRooms)).await.unwrap();
+    match next_msg(ws).await {
+        ServerMsg::RoomList { rooms } => rooms,
+        other => panic!("expected RoomList, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn browse_public_rooms_and_join_by_id() {
+    let s = start(cfg()).await;
+    let (_private, private_code, _) = create(s.addr).await;
+    let mut host = connect(s.addr, "").await;
+    host.send(hello_msg("Ann")).await.unwrap();
+    host.send(enc(&ClientMsg::CreateRoom {
+        public: true,
+        title: "Retro\u{202e} of Retros".into(),
+    }))
+    .await
+    .unwrap();
+    let ServerMsg::RoomCreated { code } = next_msg(&mut host).await else {
+        panic!("expected RoomCreated")
+    };
+    wait_for(&mut host, |m| matches!(m, ServerMsg::RoomSettings { .. })).await;
+
+    let mut guest = connect(s.addr, "").await;
+    guest.send(hello_msg("Bo")).await.unwrap();
+    let rooms = list_rooms(&mut guest).await;
+    assert_eq!(rooms.len(), 1, "private rooms are never listed");
+    assert_eq!(
+        (rooms[0].title.as_str(), rooms[0].host.as_str()),
+        ("Retro of Retros", "Ann")
+    );
+    assert!(!format!("{rooms:?}").contains(&code) && !format!("{rooms:?}").contains(&private_code));
+    // A refresh inside 2 s is refused, but the connection stays open for the join.
+    guest.send(enc(&ClientMsg::ListRooms)).await.unwrap();
+    assert!(matches!(
+        next_msg(&mut guest).await,
+        ServerMsg::Error {
+            kind: ErrorKind::RateLimited,
+            ..
+        }
+    ));
+    guest
+        .send(enc(&ClientMsg::JoinPublic { id: rooms[0].id }))
+        .await
+        .unwrap();
+    let ServerMsg::Welcome { room, players, .. } = next_msg(&mut guest).await else {
+        panic!("expected Welcome")
+    };
+    assert_eq!((room, players.len()), (code, 2));
+    // Lobby messages inside a room are invalid.
+    for _ in 0..5 {
+        guest.send(enc(&ClientMsg::ListRooms)).await.unwrap();
+    }
+    assert_eq!(expect_closed(&mut guest).await, Some(CloseCode::Policy));
+    s.shutdown().await;
+}
+
+#[tokio::test]
+async fn unknown_public_id_cannot_join_and_list_needs_hello() {
+    let s = start(cfg()).await;
+    let mut ws = connect(s.addr, "").await;
+    ws.send(enc(&ClientMsg::ListRooms)).await.unwrap();
+    assert!(matches!(
+        next_msg(&mut ws).await,
+        ServerMsg::Error {
+            kind: ErrorKind::HelloRequired,
+            ..
+        }
+    ));
+    let mut ws = connect(s.addr, "").await;
+    ws.send(hello_msg("Bo")).await.unwrap();
+    ws.send(enc(&ClientMsg::JoinPublic { id: 42 }))
+        .await
+        .unwrap();
+    assert_eq!(join_refusal(&mut ws).await.0, ErrorKind::CannotJoin);
+    s.shutdown().await;
+}
+
+#[tokio::test]
+async fn room_list_is_rate_limited_per_ip() {
+    let s = start(Config {
+        per_ip_lists_per_min: 2,
+        ..strict()
+    })
+    .await;
+    for _ in 0..2 {
+        let mut ws = connect(s.addr, "").await;
+        ws.send(hello_msg("Bo")).await.unwrap();
+        assert!(list_rooms(&mut ws).await.is_empty());
+    }
+    let mut ws = connect(s.addr, "").await;
+    ws.send(hello_msg("Bo")).await.unwrap();
+    ws.send(enc(&ClientMsg::ListRooms)).await.unwrap();
+    assert!(matches!(
+        next_msg(&mut ws).await,
+        ServerMsg::Error {
+            kind: ErrorKind::RateLimited,
+            ..
+        }
+    ));
+    s.shutdown().await;
+}
+
+#[tokio::test]
+async fn browsing_outlives_the_handshake_timeout_but_not_the_browse_cap() {
+    let s = start(Config {
+        idle_timeout: Duration::from_secs(1),
+        browse_timeout: Duration::from_millis(2500),
+        ..cfg()
+    })
+    .await;
+    let mut ws = connect(s.addr, "").await;
+    ws.send(hello_msg("Bo")).await.unwrap();
+    assert!(list_rooms(&mut ws).await.is_empty());
+    for t in 0..3 {
+        tokio::time::sleep(Duration::from_millis(700)).await;
+        ws.send(enc(&ClientMsg::Ping { t })).await.unwrap();
+        assert_eq!(next_msg(&mut ws).await, ServerMsg::Pong { t });
+    }
+    assert_eq!(expect_closed(&mut ws).await, Some(CloseCode::Away));
+    s.shutdown().await;
+}
+
+/// Bot that creates (or joins) a room on `addr` and stays in it, reading and pinging.
+async fn demo_bot(addr: String, name: &str, class: &str, request: ClientMsg) -> Option<String> {
+    let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{addr}/ws"))
+        .await
+        .ok()?;
+    ws.send(enc(&ClientMsg::Hello {
+        version: PROTOCOL_VERSION,
+        name: name.into(),
+        class: class.into(),
+    }))
+    .await
+    .ok()?;
+    ws.send(enc(&request)).await.ok()?;
+    let ServerMsg::Welcome { room, .. } =
+        wait_for(&mut ws, |m| matches!(m, ServerMsg::Welcome { .. })).await
+    else {
+        return None;
+    };
+    tokio::spawn(async move {
+        let mut t = 0;
+        loop {
+            t += 1;
+            if ws.send(enc(&ClientMsg::Ping { t })).await.is_err() {
+                return;
+            }
+            let until = tokio::time::Instant::now() + Duration::from_secs(5);
+            while let Ok(Some(Ok(_))) = tokio::time::timeout_at(until, ws.next()).await {}
+        }
+    });
+    Some(room)
+}
+
+/// QA: fills a running server (`TLD_DEMO_ADDR`, started with `--max-players-per-room 2`) with
+/// bot rooms for room browser screenshots: one public, one public and full, one private.
+/// `TLD_DEMO_ADDR=127.0.0.1:7777 cargo test -p server --test integration -- --ignored demo_rooms`
+#[tokio::test]
+#[ignore = "QA helper, needs a running server"]
+async fn demo_rooms() {
+    let addr = std::env::var("TLD_DEMO_ADDR").unwrap();
+    let public = |title: &str| ClientMsg::CreateRoom {
+        public: true,
+        title: title.into(),
+    };
+    demo_bot(addr.clone(), "Priya", "devops", public("Incident Bridge"))
+        .await
+        .unwrap();
+    let full = demo_bot(addr.clone(), "Marek", "backend", public(""))
+        .await
+        .unwrap();
+    demo_bot(
+        addr.clone(),
+        "Lena",
+        "frontend",
+        ClientMsg::JoinRoom { code: full },
+    )
+    .await
+    .unwrap();
+    let private = ClientMsg::CreateRoom {
+        public: false,
+        title: "Secret Layoffs".into(),
+    };
+    demo_bot(addr, "Hidden", "fullstack", private)
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_secs(90)).await;
 }

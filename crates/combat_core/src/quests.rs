@@ -213,7 +213,7 @@ impl Sim {
             self.stow(pi, vec![g]);
             self.bag_event(pi);
         }
-        self.grant_xp(pi, def.reward.xp);
+        self.grant_xp(pi, self.content.quest_xp(&def));
         self.quest_sp(pi, def.reward.xp, def.reward.sp);
         self.check_unlocks();
     }

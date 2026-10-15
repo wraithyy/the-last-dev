@@ -260,61 +260,9 @@ async fn connection(
         }
     };
 
-    let joined = match recv(&mut socket, Instant::now() + hs, &mut bucket).await {
-        Recv::Msg(ClientMsg::CreateRoom) => {
-            if limited && !st.room_creates.check_and_hit(ip) {
-                tracing::warn!(%ip, "room creation rate limit hit");
-                return reject(
-                    &mut socket,
-                    ErrorKind::RateLimited,
-                    1008,
-                    "too many rooms created",
-                )
-                .await;
-            }
-            match st.registry.create_and_join(&name, &class) {
-                Ok(j) => {
-                    if !send_msg(
-                        &mut socket,
-                        &ServerMsg::RoomCreated {
-                            code: j.code.clone(),
-                        },
-                    )
-                    .await
-                    {
-                        st.registry.leave(&j).await;
-                        return;
-                    }
-                    Ok(j)
-                }
-                Err(e) => Err(e),
-            }
-        }
-        // `decode` already normalised the code; a malformed one fails as BadRoomCode.
-        Recv::Msg(ClientMsg::JoinRoom { code }) => {
-            join(&st, ip, limited, Some(&code), (&name, &class))
-        }
-        Recv::Bad(ProtoError::BadRoomCode) => join(&st, ip, limited, None, (&name, &class)),
-        Recv::Timeout => {
-            return reject(
-                &mut socket,
-                ErrorKind::HelloRequired,
-                1008,
-                "handshake timeout",
-            )
-            .await;
-        }
-        Recv::End(Some((code, reason))) => return close(&mut socket, code, reason).await,
-        Recv::End(None) => return,
-        Recv::Msg(_) | Recv::Bad(_) => {
-            return reject(
-                &mut socket,
-                ErrorKind::BadMessage,
-                1008,
-                "expected create or join",
-            )
-            .await;
-        }
+    let joined = match lobby(&mut socket, &st, ip, limited, &mut bucket, (&name, &class)).await {
+        Some(j) => j,
+        None => return,
     };
     let mut joined = match joined {
         Ok(j) => j,
@@ -334,6 +282,124 @@ async fn connection(
     if let Some((code, reason)) = result {
         tracing::info!(room = %code_tag(&joined.code), player = joined.player, reason, "closing connection");
         close(&mut socket, code, reason).await;
+    }
+}
+
+/// After `Hello`: any number of `ListRooms` (browsing), then one room request. None means the
+/// connection was already answered and closed (or the peer is gone).
+async fn lobby(
+    socket: &mut WebSocket,
+    st: &AppState,
+    ip: IpAddr,
+    limited: bool,
+    bucket: &mut TokenBucket,
+    (name, class): (&str, &str),
+) -> Option<Result<Joined, JoinError>> {
+    let mut until = Instant::now() + st.cfg.handshake_timeout;
+    let browse_end = Instant::now() + st.cfg.browse_timeout;
+    let mut browsing = false;
+    // One list per 2 s per connection: refreshing faster shows nothing new.
+    let mut lists = TokenBucket::new(0.5, 1.0);
+    let mut strikes = Strikes::new(st.cfg.invalid_message_limit);
+    loop {
+        match recv(socket, until, bucket).await {
+            Recv::Msg(ClientMsg::ListRooms) => {
+                browsing = true;
+                // The player is reading the list; their next request may take a while.
+                until = (Instant::now() + st.cfg.idle_timeout).min(browse_end);
+                let msg = if lists.try_take() && (!limited || st.room_lists.check_and_hit(ip)) {
+                    ServerMsg::RoomList {
+                        rooms: st.registry.list(),
+                    }
+                } else {
+                    if strikes.bump() {
+                        reject(socket, ErrorKind::RateLimited, 1008, "listing too fast").await;
+                        return None;
+                    }
+                    ServerMsg::Error {
+                        kind: ErrorKind::RateLimited,
+                        text: ErrorKind::RateLimited.message().into(),
+                    }
+                };
+                if !send_msg(socket, &msg).await {
+                    return None;
+                }
+            }
+            Recv::Msg(ClientMsg::Ping { t }) if browsing => {
+                until = (Instant::now() + st.cfg.idle_timeout).min(browse_end);
+                if !send_msg(socket, &ServerMsg::Pong { t }).await {
+                    return None;
+                }
+            }
+            Recv::Msg(ClientMsg::CreateRoom { public, title }) => {
+                if limited && !st.room_creates.check_and_hit(ip) {
+                    tracing::warn!(%ip, "room creation rate limit hit");
+                    reject(
+                        socket,
+                        ErrorKind::RateLimited,
+                        1008,
+                        "too many rooms created",
+                    )
+                    .await;
+                    return None;
+                }
+                let j = match st.registry.create(name, class, public, &title) {
+                    Ok(j) => j,
+                    Err(e) => return Some(Err(e)),
+                };
+                let created = ServerMsg::RoomCreated {
+                    code: j.code.clone(),
+                };
+                if !send_msg(socket, &created).await {
+                    st.registry.leave(&j).await;
+                    return None;
+                }
+                return Some(Ok(j));
+            }
+            // `decode` already normalised the code; a malformed one fails as BadRoomCode.
+            Recv::Msg(ClientMsg::JoinRoom { code }) => {
+                return Some(join(st, ip, limited, Some(&code), (name, class)));
+            }
+            Recv::Bad(ProtoError::BadRoomCode) => {
+                return Some(join(st, ip, limited, None, (name, class)));
+            }
+            // Ids come from the list, so this is no code oracle and stays off the failed-join
+            // lockout; it shares the list's per-IP budget instead.
+            Recv::Msg(ClientMsg::JoinPublic { id }) => {
+                if limited && !st.room_lists.check_and_hit(ip) {
+                    reject(socket, ErrorKind::RateLimited, 1008, "listing too fast").await;
+                    return None;
+                }
+                let r = st.registry.join_public(id, name, class);
+                if let Err(e) = &r {
+                    tracing::info!(%ip, error = ?e, "public join failed");
+                }
+                return Some(r);
+            }
+            Recv::Timeout if browsing => {
+                close(socket, 1001, "browse timeout").await;
+                return None;
+            }
+            Recv::Timeout => {
+                reject(socket, ErrorKind::HelloRequired, 1008, "handshake timeout").await;
+                return None;
+            }
+            Recv::End(Some((code, reason))) => {
+                close(socket, code, reason).await;
+                return None;
+            }
+            Recv::End(None) => return None,
+            Recv::Msg(_) | Recv::Bad(_) => {
+                reject(
+                    socket,
+                    ErrorKind::BadMessage,
+                    1008,
+                    "expected create or join",
+                )
+                .await;
+                return None;
+            }
+        }
     }
 }
 
@@ -435,7 +501,14 @@ async fn pump(
                         // Emote spam is merely dropped: an impatient player is not an attacker.
                         Ok(m @ ClientMsg::Emote { .. }) if limits.emote.try_take() => Some(m),
                         Ok(ClientMsg::Emote { .. }) => continue,
-                        Ok(ClientMsg::Hello { .. } | ClientMsg::CreateRoom | ClientMsg::JoinRoom { .. })
+                        Ok(m @ ClientMsg::SetPublic { .. }) => limits.emote.try_take().then_some(m),
+                        Ok(
+                            ClientMsg::Hello { .. }
+                            | ClientMsg::CreateRoom { .. }
+                            | ClientMsg::ListRooms
+                            | ClientMsg::JoinPublic { .. }
+                            | ClientMsg::JoinRoom { .. },
+                        )
                         | Err(_) => None,
                     };
                     let Some(m) = forward else {

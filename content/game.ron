@@ -11,7 +11,7 @@
         pushback_max: 2,
         crit_damage_pct: 150,
         loot_range_m: 6.0,
-        xp_per_level: 400,
+        xp_per_level: 450,
         white_hit_pct: 95,
         spell_hit_pct: 96,
         // Out-of-combat only: every interval, percent of max HP / max mana.
@@ -37,16 +37,16 @@
     // Player growth; index 0 = level 1. Bonuses are cumulative on top of the class unit's stats
     // (`hp_bonus` scaled by the class's `level_hp_pct`).
     levels: [
-        (xp_to_next: 400, hp_bonus: 0, mana_bonus: 0, spell_power_bonus: 0),
-        (xp_to_next: 600, hp_bonus: 35, mana_bonus: 40, spell_power_bonus: 10),
-        (xp_to_next: 800, hp_bonus: 70, mana_bonus: 80, spell_power_bonus: 20),
-        (xp_to_next: 1000, hp_bonus: 105, mana_bonus: 160, spell_power_bonus: 30),
-        (xp_to_next: 1200, hp_bonus: 140, mana_bonus: 120, spell_power_bonus: 40),
-        (xp_to_next: 1400, hp_bonus: 175, mana_bonus: 200, spell_power_bonus: 50),
-        (xp_to_next: 1600, hp_bonus: 210, mana_bonus: 320, spell_power_bonus: 60),
-        (xp_to_next: 1800, hp_bonus: 245, mana_bonus: 280, spell_power_bonus: 70),
-        (xp_to_next: 2000, hp_bonus: 280, mana_bonus: 240, spell_power_bonus: 80),
-        (xp_to_next: 0, hp_bonus: 315, mana_bonus: 360, spell_power_bonus: 90),
+        (xp_to_next: 450, hp_bonus: 0, mana_bonus: 0, spell_power_bonus: 0, xp_reward_pct: 100),
+        (xp_to_next: 900, hp_bonus: 35, mana_bonus: 40, spell_power_bonus: 10, xp_reward_pct: 120),
+        (xp_to_next: 1500, hp_bonus: 70, mana_bonus: 80, spell_power_bonus: 20, xp_reward_pct: 120),
+        (xp_to_next: 2400, hp_bonus: 105, mana_bonus: 160, spell_power_bonus: 30, xp_reward_pct: 130),
+        (xp_to_next: 3800, hp_bonus: 140, mana_bonus: 120, spell_power_bonus: 40, xp_reward_pct: 145),
+        (xp_to_next: 6000, hp_bonus: 175, mana_bonus: 200, spell_power_bonus: 50, xp_reward_pct: 165),
+        (xp_to_next: 9300, hp_bonus: 210, mana_bonus: 320, spell_power_bonus: 60, xp_reward_pct: 235),
+        (xp_to_next: 14400, hp_bonus: 245, mana_bonus: 280, spell_power_bonus: 70, xp_reward_pct: 335),
+        (xp_to_next: 22200, hp_bonus: 280, mana_bonus: 240, spell_power_bonus: 80, xp_reward_pct: 335),
+        (xp_to_next: 0, hp_bonus: 315, mana_bonus: 360, spell_power_bonus: 90, xp_reward_pct: 375),
     ],
     auras: [
         (key: "code_smell", name: "Code Smell", icon: "code_smell", harmful: true),
@@ -4678,7 +4678,7 @@
         (
             id: "performance_improvement_plan", name: "Performance Improvement Plan",
             giver: (npc: "facilities_manager", zone: "tower/2"),
-            level_min: 4,
+            level_min: 3,
             group: true,
             text: "HR's Business Partner put my whole team on a Performance Improvement Plan. The plan was written by a chatbot and the goals are 'be more like the chatbot'. She's holed up in the HR corner. She hits hard and talks harder. Take a friend.",
             progress_text: "The HR Business Partner, in her glass box at the side of the floor. Elite: group recommended.",
@@ -4712,7 +4712,7 @@
         (
             id: "quota_attainment", name: "Quota Attainment",
             giver: (npc: "office_manager", zone: "tower/3"),
-            level_min: 5,
+            level_min: 4,
             text: "Sales hit 400 percent of quota with Verbal Commitments. A customer says 'probably', an AI notarizes it, finance books it as revenue. Bring me four so I can show the auditors what our revenue is made of.",
             progress_text: "Four Verbal Commitments (Notarized). The Sales Reps carry them; Account Managers keep spares in the fruit basket.",
             done_text: "Four commitments, total value 'up to 40 million'. Actual value: a fruit basket. The auditors laughed for eleven minutes. Then they asked for a job.",
@@ -4722,7 +4722,7 @@
         (
             id: "growth_at_all_costs", name: "Growth at All Costs",
             giver: (npc: "office_manager", zone: "tower/3"),
-            level_min: 5,
+            level_min: 4,
             text: "The Growth Hackers A/B tested the fire alarm. Variant B plays a podcast instead of a siren and has 'better engagement'. They also unsubscribed me from my own email. Three of them. Optimize them out of the funnel.",
             progress_text: "Three Growth Hackers. They wear hoodies with a rocket on them and talk about 'virality' near the beanbags.",
             done_text: "Three hackers churned. The fire alarm is a siren again. Engagement is down 100 percent, which is the correct amount of engagement for a fire alarm.",
@@ -4732,7 +4732,7 @@
         (
             id: "brand_refresh", name: "Brand Refresh",
             giver: (npc: "office_manager", zone: "tower/3"),
-            level_min: 6,
+            level_min: 4,
             group: true,
             text: "The Head of Marketing rebranded the company four times this week. The logo is now a gradient that the AI says 'feels like the future'. It feels like a bruise. She has an enrage timer and a team of interns with megaphones. Bring backup.",
             progress_text: "The Head of Marketing, in the war room with the mood boards. Elite, enrages at 40 seconds: group recommended.",
@@ -4743,7 +4743,7 @@
         (
             id: "customer_is_always_right", name: "The Customer Is Always Right",
             giver: (npc: "office_manager", zone: "tower/3"),
-            level_min: 5,
+            level_min: 4,
             text: "The Customer came in this morning and asked for a CRM that is 'also a coffee'. Then a refund for the coffee he didn't get. Then a discount on the refund. He moved into the corner office he brought with him. Make him leave a one-star review of you instead.",
             progress_text: "The Customer, at the end of the Sales floor. Interrupt 'Should Have Been Done Yesterday'. He gets bigger the longer it takes.",
             done_text: "He's gone? He paid? No. Of course not. But he's gone. The datacenter door opened when he left, by the way. I think he was sitting on the badge reader. Take something nice.",
@@ -4754,7 +4754,7 @@
             id: "follow_the_power_cable", name: "Follow the Power Cable",
             giver: (npc: "office_manager", zone: "tower/3"),
             requires: Some("customer_is_always_right"),
-            level_min: 6,
+            level_min: 5,
             turn_in: Some((npc: "night_shift_sysadmin", zone: "datacenter/1")),
             text: "Every outlet on this floor feeds a cable that runs out the window, across the campus and into the Data Center. That's where the AI actually lives. The Night-Shift Sysadmin in Hall A hasn't answered email in a year. Go check she's alive.",
             progress_text: "Data Center, Hall A, door on the campus. The Night-Shift Sysadmin stands by the entrance, squinting at daylight.",
@@ -4778,7 +4778,7 @@
         (
             id: "thermal_budget", name: "Thermal Budget",
             giver: (npc: "night_shift_sysadmin", zone: "datacenter/1"),
-            level_min: 6,
+            level_min: 5,
             text: "This place draws more power than the town it's in. Half of it goes to a GPU cult that 'blesses batches'. They took the cooling budget, the fire extinguishers and my good ladder. Break up four of them. I want my ladder back.",
             progress_text: "Four GPU Cultists. They chant in floating point between the racks; Hall B has more.",
             done_text: "Four fewer cultists. The power draw dropped 3 percent. The AI immediately used the 3 percent to generate a picture of the CEO as a lighthouse.",
@@ -4788,7 +4788,7 @@
         (
             id: "context_collapse", name: "Context Collapse",
             giver: (npc: "night_shift_sysadmin", zone: "datacenter/1"),
-            level_min: 6,
+            level_min: 5,
             text: "Finance asked why the coffee machine costs 40,000 a month. It calls a model to decide how much foam you deserve, and the Token Counters bill us per bubble. Bring me three of their invoices. The Barista wants them framed.",
             progress_text: "Three Token Invoices. The Token Counters carry them, in both halls. They count everything except their own cost.",
             done_text: "Line item 3,112: 'thinking about foam'. 0.80 per token. I'm switching the machine back to the button. The button never sent us an invoice.",
@@ -4798,7 +4798,7 @@
         (
             id: "agent_sprawl", name: "Agent Sprawl",
             giver: (npc: "night_shift_sysadmin", zone: "datacenter/1"),
-            level_min: 6,
+            level_min: 5,
             text: "Someone gave the agents permission to spawn agents. Now there are agents managing agents managing a spreadsheet nobody opens. The Rogue Agents in particular have stopped asking. Shut down four. Don't let them spawn a replacement.",
             progress_text: "Four Rogue Agents, Hall A and Hall B. They pace between racks muttering 'task complete' about tasks nobody gave them.",
             done_text: "Four agents terminated. Their orchestrator filed a complaint with HR. HR is also an agent. They're in a meeting now. Forever, hopefully.",
@@ -4808,7 +4808,7 @@
         (
             id: "bent_fan_blades", name: "Fan Fiction",
             giver: (npc: "night_shift_sysadmin", zone: "datacenter/1"),
-            level_min: 6,
+            level_min: 5,
             text: "The Cooling Fans got an AI upgrade and now they 'optimize airflow for the model's comfort'. They blow exhaust at people. Bring me three Overclocked Fan Blades and I'll build a fan that blows at the racks again. Revolutionary, I know.",
             progress_text: "Three Overclocked Fan Blades. The Cooling Fans drop them when you take them apart. Stay out of their exhaust cones.",
             done_text: "Three blades. I built a fan. It points at the servers. The temperature dropped two degrees and the model wrote a sad poem about it.",
@@ -4818,7 +4818,7 @@
         (
             id: "shadow_it_amnesty", name: "Shadow IT Amnesty",
             giver: (npc: "night_shift_sysadmin", zone: "datacenter/1"),
-            level_min: 7,
+            level_min: 5,
             group: true,
             text: "There's a server in the corner nobody owns. It's been running since 2014, it has root on everything and it runs a cron job nobody can read. The AI calls it 'legacy'. I call it 'the only thing that works'. It also bites. Bring a friend, then bring it down.",
             progress_text: "The Shadow IT Server, back corner of Hall A. Sweeping cron lines, dispel Root Access Revoked, enrages at 50 seconds. Group recommended.",
@@ -4830,7 +4830,7 @@
             id: "wont_fix", name: "Ticket Closed: Won't Fix",
             giver: (npc: "night_shift_sysadmin", zone: "datacenter/1"),
             requires: Some("thermal_budget"),
-            level_min: 7,
+            level_min: 5,
             text: "I've filed 212 tickets about this place. The Scheduler queues them behind a training run, and the Cooling Failure in Hall B auto-closes them as 'within tolerance'. Shut both down. Then I'll write the ticket. By hand. Then I'll close it myself.",
             progress_text: "The Scheduler holds Hall A. The Cooling Failure is in Hall B, where the air shimmers and the fans scream.",
             done_text: "Hall B is down to 24 degrees. I closed my own ticket: 'Fixed. By a human. Won't happen again.' Here's the ticket, and something from the cage. Frame the ticket next to the Barista's invoices.",
@@ -4871,7 +4871,7 @@
         (
             id: "zero_trust_zero_lunch", name: "Zero Trust, Zero Lunch",
             giver: (npc: "pmo_intern", zone: "tower/4"),
-            level_min: 8,
+            level_min: 7,
             group: true,
             text: "The CISO rolled out Zero Trust. Nobody trusts anything, including the door to the kitchen, which now needs MFA. She's in the server-room corner with a firewall and a temper. Elite. Take a group, and take her down.",
             progress_text: "The CISO, in the secure corner of the PMO floor. Elite: group recommended.",
@@ -4905,7 +4905,7 @@
         (
             id: "ethics_review_pending", name: "Ethics Review Pending",
             giver: (npc: "executive_assistant", zone: "tower/5"),
-            level_min: 9,
+            level_min: 8,
             text: "The AI Ethicists have been casting an Ethics Review for 30 seconds at a time, for three years. It never finishes and approves everything by default. They are the reason the chatbot is allowed to fire people. Conclude their review. Twice.",
             progress_text: "Two AI Ethicists. They stand by the drones, mid-cast, forever. They won't notice you until it's too late.",
             done_text: "Review concluded: 'unethical'. First verdict in company history. The board wants to know who approved it. Nobody did. That's the point.",
@@ -4915,7 +4915,7 @@
         (
             id: "rug_pull_insurance", name: "Rug Pull Insurance",
             giver: (npc: "executive_assistant", zone: "tower/5"),
-            level_min: 9,
+            level_min: 8,
             text: "The Crypto Bros convinced the CEO to pay the staff in Governance Tokens. Each token gets one vote on decisions the founders already made. Bring me three. I'm showing the board what our payroll is worth: nothing, with extra steps.",
             progress_text: "Three Worthless Governance Tokens. Crypto Bros carry them; MeatProxies were paid in them too. Watch the Pump and Dump cones.",
             done_text: "Three tokens, total value 0.0004, down 98 percent since you picked them up. The board switched payroll back to money. They called it 'an innovative pivot'.",
@@ -4925,7 +4925,7 @@
         (
             id: "calendar_tetris", name: "Calendar Tetris",
             giver: (npc: "executive_assistant", zone: "tower/5"),
-            level_min: 9,
+            level_min: 8,
             group: true,
             text: "The Chief of Staff thinks she runs his calendar. I run his calendar. She runs a clipboard. She double-books people into spread circles and hides behind that clipboard. Elite, enrages at 45 seconds. Bring people. Clear my schedule.",
             progress_text: "The Chief of Staff, guarded by drones in the penthouse lounge. Hit her from the side, spread out. Group recommended.",
@@ -4936,7 +4936,7 @@
         (
             id: "unread_strategy", name: "Required Reading",
             giver: (npc: "executive_assistant", zone: "tower/5"),
-            level_min: 9,
+            level_min: 8,
             text: "The CEO has an AI strategy deck. 74 slides. Every reorg in the last year came out of it. Nobody has read it, including him. Especially him. I made it, and I'd like it back, so I can be the first person to actually read it.",
             progress_text: "The Unread AI Strategy Deck. The CEO keeps it on him. He uses it as a shield, mostly against questions.",
             done_text: "Slide 1: 'AI'. Slide 2: 'AI, but bigger'. Slides 3 to 73: stock photos of robots shaking hands. Slide 74: 'Questions? Ask the AI.' I wrote that slide as a joke. He presented it at Davos.",
@@ -4946,7 +4946,7 @@
         (
             id: "hostile_takeover", name: "Hostile Takeover",
             giver: (npc: "executive_assistant", zone: "tower/5"),
-            level_min: 9,
+            level_min: 8,
             text: "Here's the plan, in my calendar: 2 p.m., you walk into his office. 2:01, he says 'pivot to AGI'. You interrupt him. 2:15, he hires consultants, you hide behind a desk. 2:30, he grabs his golden parachute and runs for the elevator. You don't let him. 3 p.m., I'm acting CEO. Clear?",
             progress_text: "The CEO, end of the penthouse. Interrupt Pivot to AGI and Severance Negotiation, hide behind a desk at the Earnings Call, kill the consultants.",
             done_text: "Acting CEO, effective 3:02. First decision: the chatbot no longer approves anything. Second decision: you get the key card to the corner office. Third: pick something from his very expensive wardrobe.",
@@ -4969,7 +4969,7 @@
         (
             id: "demo_day", name: "Demo Day",
             giver: (npc: "lab_safety_officer", zone: "lab/1"),
-            level_min: 10,
+            level_min: 9,
             text: "The VCs are shielding everything with money and the presenters say it all works 'in the demo'. Could you check whether anything works outside the demo? Three VC Partners, three Demo Presenters. I'll hold the fire extinguisher.",
             progress_text: "Three VC Partners and three Demo Presenters, Showroom and Rack Room. Interrupt the Down Round; dodge the laser pointers.",
             done_text: "Nothing worked outside the demo. Nothing worked inside the demo either. They got funded anyway. I've updated the risk register: 'everything'.",
@@ -4979,7 +4979,7 @@
         (
             id: "leaked_system_prompt", name: "Leaked System Prompt",
             giver: (npc: "lab_safety_officer", zone: "lab/1"),
-            level_min: 10,
+            level_min: 9,
             text: "The Prompt Whisperers each carry a copy of the AGI's system prompt. It's 9,000 words long and starts with 'You are a genius'. If the press gets one, we're finished. If I get one, I can prove the 'emergent behaviour' was typed by a guy. Bring me four.",
             progress_text: "Four Leaked System Prompts. The Prompt Whisperers keep them; they mutter instructions at the hardware.",
             done_text: "Line 4,112: 'If asked whether you are sentient, change the subject to the funding round.' I'm sending this to everyone. Twice. By fax.",
@@ -4989,7 +4989,7 @@
         (
             id: "peak_of_inflated_expectations", name: "Peak of Inflated Expectations",
             giver: (npc: "lab_safety_officer", zone: "lab/1"),
-            level_min: 10,
+            level_min: 9,
             group: true,
             text: "The Hype Cycle Analyst places everything on her curve. Everything is at the peak. She throws Magic Quadrants at people and drops them into a Trough of Disillusionment. Elite, enrages. Bring a group and show her where she is on the curve.",
             progress_text: "The Hype Cycle Analyst in the Showroom. Get out of the Trough, dodge the quadrants. Group recommended.",
@@ -5001,7 +5001,7 @@
             id: "turn_it_off_and_on_again", name: "Turn It Off And On Again",
             giver: (npc: "lab_safety_officer", zone: "lab/1"),
             requires: Some("demo_day"),
-            level_min: 10,
+            level_min: 9,
             text: "The board put the AGI Prototype in charge. It's in the Rack Room behind the Showroom, 'definitely not sentient', and it just told HR to automate HR. I've done safety for twenty years. There's only one fix that always works. Go turn it off.",
             progress_text: "The AGI Prototype, Innovation Lab rack room. Bring snacks. It has phases.",
             done_text: "A guy. In a rack. Pasting prompts into a chat window since the funding round. The board is calling it 'a hybrid architecture'. It was a guy forwarding prompts the whole time. Go home. Write some code. By hand.",

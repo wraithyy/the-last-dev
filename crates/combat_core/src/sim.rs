@@ -84,6 +84,9 @@ pub(crate) struct Unit {
     pub spell_yell_next: u64,
     pub spell_yell_cursor: BTreeMap<SpellId, usize>,
     pub respawn_at: Option<u64>,
+    /// Tick of the last death, and when that corpse despawns (`refresh_corpse`).
+    pub died_at: u64,
+    pub corpse_until: Option<u64>,
     /// One roll per group member (`None` when the kill happened with no player in the sim).
     pub loot: Vec<LootShare>,
     /// Cached sum of the player's trophy bonuses; zero for everyone else.
@@ -289,6 +292,11 @@ impl Sim {
                 u.state.lootable = false;
             }
         }
+        for c in 0..self.units.len() {
+            if self.units[c].corpse_until.is_some() {
+                self.refresh_corpse(c);
+            }
+        }
         self.rescale_group_hp();
         true
     }
@@ -418,6 +426,8 @@ impl Sim {
             spell_yell_next: 0,
             spell_yell_cursor: BTreeMap::new(),
             respawn_at: None,
+            died_at: 0,
+            corpse_until: None,
             loot: Vec::new(),
             item_bonus: ItemTotals::default(),
             yell_pending: None,
@@ -631,6 +641,7 @@ impl Sim {
         self.update_combat_flags();
         self.update_world();
         self.update_sprint();
+        self.update_corpses();
         self.flush_yells();
         self.sync_views();
     }
@@ -818,6 +829,7 @@ impl Sim {
             sp = 0;
         }
         self.units[ci].state.lootable = !self.units[ci].loot.is_empty();
+        self.refresh_corpse(ci);
         let e = Event::Looted {
             looter,
             corpse,
@@ -1624,6 +1636,8 @@ impl Sim {
         self.units[ti].respawn_at = self.units[ti]
             .respawns
             .then(|| self.now + ticks(respawn_ms));
+        self.units[ti].died_at = self.now;
+        self.refresh_corpse(ti);
         if let Some(k) = killer {
             self.award_kill_xp(k, ti);
         }
