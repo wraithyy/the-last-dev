@@ -493,6 +493,72 @@ static TABLE: &[(&str, UnitVisual)] = &[
         "ceo",
         v(SUIT_M_BALD, 2.7, "CEO", "<Chief AI Visionary>", &[]),
     ),
+    // ---- live world: the Board Meeting (campus world boss), its Yes-Men, the night shift
+    (
+        "the_board",
+        v(
+            SUIT_M,
+            3.6,
+            "The Board",
+            "<Quarterly Visionaries>",
+            &[
+                paint("Black", 0.12, 0.12, 0.16),
+                paint("Skin", 0.62, 0.55, 0.5),
+                glow("Tie", 1.0, 0.78, 0.2),
+            ],
+        ),
+    ),
+    (
+        "yes_man_advisor",
+        v(
+            SUIT_M,
+            1.85,
+            "Yes-Man Advisor",
+            "<Agrees in Advance>",
+            &[
+                paint("Black", 0.35, 0.36, 0.42),
+                paint("Skin", 0.75, 0.66, 0.58),
+            ],
+        ),
+    ),
+    (
+        "scrum_master_bot",
+        v(
+            "prim/delivery_robot",
+            1.15,
+            "Scrum Master Bot",
+            "<Standup Is Mandatory>",
+            &[],
+        ),
+    ),
+    (
+        "deadline_wraith",
+        v(
+            SUIT_F,
+            2.0,
+            "Deadline Wraith",
+            "<Due Yesterday>",
+            &[
+                paint("Black", 0.18, 0.2, 0.32),
+                paint("Skin", 0.62, 0.7, 0.9),
+                glow("Face", 0.4, 0.7, 1.6),
+            ],
+        ),
+    ),
+    (
+        "sleep_deprived_contractor",
+        v(
+            CASUAL2,
+            1.8,
+            "Sleep-Deprived Contractor",
+            "<Billing Hour 19>",
+            &[
+                paint("Shirt", 0.35, 0.38, 0.3),
+                paint("Pants", 0.18, 0.18, 0.2),
+                paint("Skin", 0.66, 0.6, 0.52),
+            ],
+        ),
+    ),
     // ---- campus
     (
         "facilities_guy",
@@ -1008,6 +1074,46 @@ static TABLE: &[(&str, UnitVisual)] = &[
                 paint("Shirt", 0.35, 0.38, 0.3),
                 paint("Pants", 0.25, 0.25, 0.22),
                 glow("Face", 0.3, 1.0, 0.4),
+            ],
+        ),
+    ),
+    // ---- onboarding corner (campus)
+    (
+        "hr_onboarding_bot",
+        v(
+            "prim/delivery_robot",
+            1.0,
+            "HR Onboarding Bot",
+            "<Your Buddy, Allegedly>",
+            &[],
+        ),
+    ),
+    (
+        "training_dummy",
+        v(
+            SUIT_M_BALD,
+            1.8,
+            "Mandatory Training Dummy",
+            "<Completion Is Tracked>",
+            &[
+                paint("Skin", 0.78, 0.72, 0.6),
+                paint("Shirt", 0.9, 0.9, 0.86),
+                paint("Pants", 0.55, 0.52, 0.45),
+                glow("Face", 1.0, 0.75, 0.2),
+            ],
+        ),
+    ),
+    (
+        "burnt_out_colleague",
+        v(
+            CASUAL2,
+            1.78,
+            "Burnt-Out Colleague",
+            "<On Call Since 2019>",
+            &[
+                paint("Shirt", 0.32, 0.33, 0.36),
+                paint("Pants", 0.2, 0.2, 0.24),
+                paint("Skin", 0.72, 0.62, 0.55),
             ],
         ),
     ),

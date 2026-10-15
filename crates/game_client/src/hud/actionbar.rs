@@ -152,24 +152,48 @@ pub struct ActionBarPlugin;
 
 impl Plugin for ActionBarPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_bar).add_systems(
-            Update,
-            (
-                click_slots,
-                click_attack,
-                click_coffee,
-                click_rez,
-                click_extras,
-                update_extras,
-                update_slots,
-                update_attack,
-                update_coffee,
-                update_rez,
-                update_tooltip,
-            )
-                .chain()
-                .in_set(SimReady),
-        );
+        app.add_systems(Startup, spawn_bar)
+            .add_systems(Update, tag_spots)
+            .add_systems(
+                Update,
+                (
+                    click_slots,
+                    click_attack,
+                    click_coffee,
+                    click_rez,
+                    click_extras,
+                    update_extras,
+                    update_slots,
+                    update_attack,
+                    update_coffee,
+                    update_rez,
+                    update_tooltip,
+                )
+                    .chain()
+                    .in_set(SimReady),
+            );
+    }
+}
+
+/// Onboarding highlight anchors on the keys it points at.
+fn tag_spots(
+    mut commands: Commands,
+    slots: Query<(Entity, &Slot), Added<Slot>>,
+    attack: Query<Entity, Added<AttackButton>>,
+    extras: Query<(Entity, &ExtraButton), Added<ExtraButton>>,
+) {
+    use crate::onboarding::Spot;
+    for (e, Slot(i)) in &slots {
+        let i = u8::try_from(*i).unwrap_or(u8::MAX);
+        commands.entity(e).insert(Spot::Slot(i));
+    }
+    for e in &attack {
+        commands.entity(e).insert(Spot::AutoAttack);
+    }
+    for (e, ExtraButton(mount)) in &extras {
+        if *mount {
+            commands.entity(e).insert(Spot::Mount);
+        }
     }
 }
 

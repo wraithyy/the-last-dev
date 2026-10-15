@@ -98,6 +98,116 @@ fn campus(p: &mut Plan) {
     p.boxed(v(x, 1.45, z + 0.05), v(0.66, 0.5, 0.06), Mat::Dark, false);
     p.sign(v(x, 1.45, z + 0.09), 0.0, 0.62, Sign::SprintTerminal);
     spot(p, "prop:sprint_terminal", (x, 1.2, z), (x, z + 1.5));
+    live_world(p);
+}
+
+/// Where the night shift (`live.night`, anchors `night_<n>`) waits on the campus: the edges of
+/// the lawn, away from the arrival and the graveyard.
+pub const NIGHT_SPOTS: [(&str, f32, f32); 6] = [
+    ("night_1", -30.0, -21.0),
+    ("night_2", 38.0, 32.0),
+    ("night_3", -55.0, -3.0),
+    ("night_4", 33.0, -25.0),
+    ("night_5", 6.0, 29.0),
+    ("night_6", 52.0, 13.0),
+];
+
+/// The live world on the campus: the Daily Standup board with its Scrum Master Bot on the
+/// plaza's east side, the Board Meeting's spot on the east lawn, the night-shift anchors and
+/// the office windows that light up after dusk.
+fn live_world(p: &mut Plan) {
+    let (x, z) = (9.0, 12.0);
+    p.boxed(v(x, 1.6, z), v(2.6, 1.5, 0.06), Mat::Board, true);
+    p.sign(v(x, 1.6, z + 0.05), 0.0, 2.5, Sign::ScrumBoard);
+    for dx in [-1.2, 1.2] {
+        p.boxed(
+            v(x + dx, 0.8, z - 0.06),
+            v(0.07, 1.6, 0.07),
+            Mat::Metal,
+            false,
+        );
+    }
+    spot(p, "prop:scrum_board", (x, 1.6, z), (x, z + 2.0));
+    let bot = v(x + 2.4, 0.0, z + 1.4);
+    p.anchor(
+        "scrum_bot",
+        bot,
+        super::layout::yaw_towards(bot, v(x, 0.0, z + 2.5)),
+    );
+    // Off the paths between the doors, so nobody walks into a level-10 meeting by accident.
+    let boss = v(37.0, 0.0, 15.0);
+    p.anchor(
+        "world_boss",
+        boss,
+        super::layout::yaw_towards(boss, v(0.0, 0.0, 2.0)),
+    );
+    for (name, x, z) in NIGHT_SPOTS {
+        let at = v(x, 0.0, z);
+        p.anchor(name, at, super::layout::yaw_towards(at, v(0.0, 0.0, 0.0)));
+    }
+    lit_windows(p);
+}
+
+/// Office windows on the tower's three visible faces (some offices lit, some not, the same
+/// pattern every night) and the lab's ribbon; `Mat::Window` glows after dusk.
+fn lit_windows(p: &mut Plan) {
+    let (c, s) = super::campus::TOWER;
+    let floors = (s.y / 3.5) as i32;
+    // (face centre along the run, run direction x or z, columns, outward normal).
+    let faces = [
+        (
+            v(c.x, 0.0, c.y + s.z / 2.0 + 0.13),
+            true,
+            (s.x / 4.0) as i32,
+            0,
+        ),
+        (
+            v(c.x + s.x / 2.0 + 0.13, 0.0, c.y),
+            false,
+            (s.z / 4.0) as i32,
+            1,
+        ),
+        (
+            v(c.x - s.x / 2.0 - 0.13, 0.0, c.y),
+            false,
+            (s.z / 4.0) as i32,
+            2,
+        ),
+    ];
+    for (centre, along_x, cols, face) in faces {
+        for k in 1..floors {
+            let y = k as f32 * 3.5 + 1.75;
+            let lit = |j: i32| (k * 5 + j * 3 + face * 2) % 7 < 4;
+            let mut j = 0;
+            while j < cols {
+                if !lit(j) {
+                    j += 1;
+                    continue;
+                }
+                let start = j;
+                while j < cols && lit(j) {
+                    j += 1;
+                }
+                let n = (j - start) as f32;
+                let mid = (start as f32 + n / 2.0) * 4.0 - cols as f32 * 2.0;
+                let (pos, size) = if along_x {
+                    (v(centre.x + mid, y, centre.z), v(n * 4.0 - 0.5, 1.7, 0.06))
+                } else {
+                    (v(centre.x, y, centre.z + mid), v(0.06, 1.7, n * 4.0 - 0.5))
+                };
+                p.boxed(pos, size, Mat::Window, false);
+            }
+        }
+    }
+    let (c, s) = super::campus::LAB;
+    for sz in [-1.0, 1.0] {
+        p.boxed(
+            v(c.x, 3.2, c.y + sz * (s.z / 2.0 + 0.02)),
+            v(s.x - 2.4, 1.8, 0.04),
+            Mat::Window,
+            false,
+        );
+    }
 }
 
 fn open_space(p: &mut Plan) {
@@ -231,6 +341,48 @@ mod tests {
             }
         }
         assert!(n > 20, "only {n} seats registered");
+    }
+
+    /// The live world's campus anchors (the Scrum Master Bot, the Board Meeting, the night
+    /// shift) exist where the content wants them and can be walked to.
+    #[test]
+    fn live_world_anchors_are_reachable() {
+        let c = match combat_core::Content::from_ron(include_str!("../../../../content/game.ron")) {
+            Ok(c) => c,
+            Err(e) => panic!("{e}"),
+        };
+        let Some(l) = build_zone("campus") else {
+            panic!("no campus")
+        };
+        let g = Grid::from(
+            &l,
+            l.anchor("player_spawn")
+                .map_or(bevy::prelude::Vec3::ZERO, |a| a.0),
+        );
+        let mut wanted: Vec<String> = c
+            .live
+            .night
+            .spawns
+            .iter()
+            .map(|s| s.anchor.clone())
+            .collect();
+        wanted.extend(c.live.board.iter().map(|b| b.anchor.clone()));
+        wanted.extend(c.world_boss().map(|b| b.anchor.clone()));
+        assert!(wanted.len() >= 8, "{wanted:?}");
+        let spawn = l.anchor("player_spawn").map(|a| a.0);
+        for name in wanted {
+            match l.anchor(&name) {
+                None => panic!("campus: no anchor {name}"),
+                Some((pos, _)) => {
+                    assert!(g.at(pos).is_finite(), "{name} at {pos} unreachable");
+                    if name.starts_with("night_") {
+                        // Nobody gets ambushed at the car park.
+                        let d = spawn.map_or(f32::MAX, |s| s.distance(pos));
+                        assert!(d > 20.0, "{name} is {d} m from the arrival");
+                    }
+                }
+            }
+        }
     }
 
     /// Every prop of the content sits in its zone's layout, at a stand spot a player can reach,

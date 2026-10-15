@@ -1,4 +1,4 @@
-//! `~/metrics (Q3 velocity report)`: a damage meter fed by the same `CombatEvent`s as the combat log,
+//! `~/metrics (Q3 OKR dashboard)`: a damage meter fed by the same `CombatEvent`s as the combat log,
 //! so it works offline (just you) and online (every group member: the server sends damage and heal
 //! events to all clients; only quest, loot, XP and own cast failures are private).
 //!
@@ -38,7 +38,7 @@ impl Mode {
 
     fn title(self) -> &'static str {
         match self {
-            Self::Damage => "Story points burned",
+            Self::Damage => "Blame assigned",
             Self::Healing => "Incidents resolved",
             Self::Taken => "Blame absorbed",
         }
@@ -323,7 +323,7 @@ fn spawn_meter(mut commands: Commands) {
                         flex_grow: 1.0,
                         ..default()
                     },
-                    label("~/metrics (Q3 velocity report)", 10.0),
+                    label("~/metrics (Q3 OKR dashboard)", 10.0),
                     TextColor(DIM),
                 ));
                 close_button(bar, Win::Meter);

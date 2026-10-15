@@ -18,6 +18,7 @@ const MM: f32 = 150.0;
 const PAD: f32 = 6.0;
 /// Top margin shared with the unit frames.
 pub const TOP: f32 = 26.0;
+pub const WIDTH: f32 = MM + 2.0 * PAD + 2.0;
 /// Whole widget height (header, view, footer), so the rows below it can start under it.
 pub const HEIGHT: f32 = 214.0;
 /// Metres from the centre to the view edge at each zoom step.
@@ -99,7 +100,7 @@ fn spawn_radar(mut commands: Commands) {
                 position_type: PositionType::Absolute,
                 right: px(12),
                 top: px(TOP),
-                width: px(MM + 2.0 * PAD + 2.0),
+                width: px(WIDTH),
                 height: px(HEIGHT),
                 padding: UiRect::all(px(PAD)),
                 flex_direction: FlexDirection::Column,
@@ -132,6 +133,7 @@ fn spawn_radar(mut commands: Commands) {
             root.spawn((
                 Button,
                 RadarOpen,
+                crate::onboarding::Spot::Minimap,
                 Node {
                     width: px(MM),
                     height: px(MM),
@@ -243,10 +245,12 @@ fn to_view(world: Vec2, player: Vec2, px_per_m: f32) -> Vec2 {
 }
 
 fn update_radar(
-    (keys, binds, paused): (
+    (keys, binds, paused, live, time): (
         Res<ButtonInput<KeyCode>>,
         Res<Keybinds>,
         Res<crate::input::Paused>,
+        Res<crate::live::LiveState>,
+        Res<Time>,
     ),
     sim: SimView,
     flow: Res<GameFlow>,
@@ -365,6 +369,15 @@ fn update_radar(
                 p,
                 Kind::Glyph("#", if open { DOOR_OPEN } else { DOOR_LOCKED }),
             ));
+        }
+    }
+    // The Board Meeting's spot while its countdown runs (the boss itself is a boss dot later).
+    if live.boss_in(time.elapsed_secs()).is_some_and(|s| s > 0)
+        && let Some((_, pos, _)) = flow.anchors.iter().find(|a| a.0 == "world_boss")
+    {
+        let p = Vec2::new(pos.x, pos.z);
+        if in_view(p) {
+            marks.push((p, Kind::Glyph("B", ACCENT_WARM)));
         }
     }
     // Draw order is pool order: hostiles at the bottom, the group on top.

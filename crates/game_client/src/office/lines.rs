@@ -148,11 +148,11 @@ pub fn mine(def: &PropDef, outcome: u32, nth: u32, content: &Content) -> Option<
         PropKind::Coffee if n == 0 => "Descaling required. Since 2019.".to_string(),
         PropKind::Coffee => pick(&COFFEE_OK, nth).to_string(),
         PropKind::Vending if n == 0 => format!(
-            "The spiral turns. Nothing falls. The machine keeps your {} Story Points.",
+            "The spiral turns. Nothing falls. The machine keeps your {} Kudos.",
             def.cost_sp
         ),
         PropKind::Vending => format!(
-            "*clunk* Out drops: {}. ({} SP)",
+            "*clunk* Out drops: {}. ({} Kudos)",
             reward_name(def, n, content),
             def.cost_sp
         ),
@@ -176,6 +176,9 @@ pub fn mine(def: &PropDef, outcome: u32, nth: u32, content: &Content) -> Option<
         PropKind::SprintBoard => {
             "The board shows this week's affixes. Someone already estimated your death at 3 points."
                 .to_string()
+        }
+        PropKind::ScrumBoard => {
+            "Your name is on three sticky notes. One of them just says 'why'.".to_string()
         }
     })
 }
@@ -224,16 +227,20 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::BikeRack => "Keep the bike company",
         PropKind::Scooter => "Borrow (unlock with your face)",
         PropKind::SprintBoard => "Plan a sprint (timed run)",
+        PropKind::ScrumBoard => "Daily Standup (daily and weekly tasks)",
     };
     let extra = match def.kind {
         PropKind::FireAlarm => "WARNING: every enemy on this floor will come for you.".to_string(),
         PropKind::Coffee => format!("{}% chance: descaling required.", def.fail_pct),
-        PropKind::Vending => format!("Costs {} Story Points. No refunds.", def.cost_sp),
+        PropKind::Vending => format!("Costs {} Kudos. No refunds.", def.cost_sp),
         PropKind::Scooter => "+60% speed out of combat. Damage ends the ride.".to_string(),
         PropKind::Printer => "Users report persistence helps. Users are wrong.".to_string(),
         PropKind::BikeRack => "It has been waiting a long time.".to_string(),
         PropKind::SprintBoard => {
             "Story points, affixes, a par time. Velocity is mandatory.".to_string()
+        }
+        PropKind::ScrumBoard => {
+            "Three dailies a day, one Sprint Goal a week. Attendance is tracked.".to_string()
         }
         _ => String::new(),
     };

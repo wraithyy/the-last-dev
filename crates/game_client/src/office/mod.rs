@@ -145,7 +145,8 @@ fn hover_radius(kind: PropKind) -> f32 {
         | PropKind::Table
         | PropKind::BikeRack
         | PropKind::Whiteboard
-        | PropKind::SprintBoard => 1.0,
+        | PropKind::SprintBoard
+        | PropKind::ScrumBoard => 1.0,
         PropKind::Bench => 0.9,
         PropKind::Scooter | PropKind::Printer => 0.6,
         PropKind::Coffee => 0.5,

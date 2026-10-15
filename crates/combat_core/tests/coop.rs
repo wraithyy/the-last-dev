@@ -42,6 +42,10 @@ fn anchor(name: &str) -> Option<(Vec3, f32)> {
     if let Some(n) = num("npc_") {
         return Some((Vec3::new(40.0, 0.0, -15.0 * n), 0.0));
     }
+    // The campus onboarding corner (named, not numbered), far out of every pull.
+    if name.starts_with("npc_") {
+        return Some((Vec3::new(-400.0, 0.0, 400.0), 0.0));
+    }
     (name == "boss").then_some((Vec3::new(0.0, 0.0, -PACK_SPACING * 7.0), 0.0))
 }
 
@@ -846,6 +850,91 @@ fn a_group_delivers_sprint_level_five() {
         );
         if result != Some(combat_core::SprintResult::Delivered) {
             failures.push(format!("{building} seed {seed}: {result:?} {time}/{par}"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+// ---- the campus world boss ----
+
+/// The campus with its packs out of the way and the Board's spot 40 m north.
+fn lawn(name: &str) -> Option<(Vec3, f32)> {
+    match name {
+        n if n.starts_with("pack_") || n.starts_with("night_") => {
+            Some((Vec3::new(500.0, 0.0, 500.0), 0.0))
+        }
+        "world_boss" => Some((Vec3::new(0.0, 0.0, -40.0), 0.0)),
+        n if n.starts_with("npc_") || n == "scrum_bot" => Some((Vec3::new(-60.0, 0.0, 60.0), 0.0)),
+        _ => None,
+    }
+}
+
+/// Geared level-10 members (`keep` of tank, DPS, healer) meet the Board on the lawn. Returns
+/// (killed, fight seconds, most dead at once).
+fn board_meeting(keep: &[Role], seed: u64) -> (bool, u64, u32) {
+    let mut g = Group::new_at(content(), "campus", 10, seed, &lawn);
+    for k in (0..g.m.len()).rev() {
+        if !keep.contains(&g.m[k].role) {
+            let id = g.m[k].id;
+            assert!(g.sim.remove_player(id));
+            g.m.remove(k);
+        }
+    }
+    g.gear_up(5);
+    // 2026-10-15 12:00 UTC: daytime, so no night shift joins in.
+    g.sim.set_clock(1_792_065_600);
+    assert!(g.sim.debug_world_boss_in(2));
+    for _ in 0..90 {
+        g.tick();
+    }
+    let Some(boss) = g.sim.world_boss_unit() else {
+        panic!("the Board did not show up")
+    };
+    let at = g.unit(boss).map_or(Vec3::new(0.0, 0.0, -40.0), |u| u.pos);
+    let start = g.sim.now().0;
+    g.in_boss = true;
+    // A lone DPS has no tank to open: it walks into aggro range itself.
+    let solo = g.m.len() == 1;
+    g.front = at;
+    for k in 0..g.m.len() {
+        let back = match g.m[k].role {
+            Role::Tank => 4.0,
+            _ if solo => 10.0,
+            _ => 22.0,
+        };
+        g.m[k].pos = Vec3::new(at.x + k as f32 * 1.5, 0.0, at.z + back);
+    }
+    g.tick();
+    g.fight();
+    let secs = (g.sim.now().0 - start) / 30;
+    let killed = g.unit(boss).is_none_or(|u| !u.alive) && !g.wiped;
+    (killed, secs, g.deaths)
+}
+
+#[test]
+fn three_players_beat_the_board_and_one_does_not_trivially() {
+    let mut failures = Vec::new();
+    let mut group_secs = Vec::new();
+    for seed in [7, 42, 1234] {
+        let (killed, secs, deaths) = board_meeting(&[Role::Tank, Role::Dps, Role::Healer], seed);
+        println!(
+            "Board Meeting, group of 3, seed {seed}: killed {killed} in {secs} s, most dead at once {deaths}"
+        );
+        if !killed {
+            failures.push(format!("group seed {seed}: no kill in {secs} s"));
+        }
+        group_secs.push(secs);
+    }
+    for seed in [7, 42, 1234] {
+        let (killed, secs, deaths) = board_meeting(&[Role::Dps], seed);
+        println!(
+            "Board Meeting, solo DPS, seed {seed}: killed {killed} in {secs} s, died {deaths}"
+        );
+        // Solo is possible in principle, but never quick: a kill must take far longer than a
+        // group's.
+        let quickest = group_secs.iter().copied().max().unwrap_or(0);
+        if killed && secs < quickest * 2 {
+            failures.push(format!("solo seed {seed}: trivial kill in {secs} s"));
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));

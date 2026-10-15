@@ -246,8 +246,12 @@ impl Plugin for CombatPlugin {
 
 /// The embedded content; also used to restart with a fresh sim.
 pub fn new_sim() -> Result<Sim, ContentError> {
-    Content::from_ron(include_str!("../../../content/game.ron"))
-        .map(|content| Sim::new(content, SIM_SEED))
+    Content::from_ron(include_str!("../../../content/game.ron")).map(|content| {
+        let mut sim = Sim::new(content, SIM_SEED);
+        // Offline the device clock is the world clock (dailies, day/night, the world boss).
+        sim.set_clock(crate::live::start_clock());
+        sim
+    })
 }
 
 fn create_sim(mut commands: Commands, mut exit: MessageWriter<AppExit>) {
@@ -726,7 +730,11 @@ fn interact_input(
     mut target: ResMut<Target>,
     sim: SimView,
     mut pending: ResMut<PendingCommands>,
-    (mut notices, mut talked): (MessageWriter<UiNotice>, MessageWriter<Talked>),
+    (mut notices, mut talked, mut player_menu): (
+        MessageWriter<UiNotice>,
+        MessageWriter<Talked>,
+        MessageWriter<crate::social::PlayerMenu>,
+    ),
     mut press: Local<Option<(Vec2, f32)>>,
     player: Single<(&Transform, &SimUnit), With<Player>>,
     units: Query<(Entity, &Transform, &Unit)>,
@@ -783,6 +791,12 @@ fn interact_input(
             pending
                 .0
                 .push(Command::StartAutoAttack { unit: player_su.0 });
+        }
+    } else if state.alive && su.0 != player_su.0 && sim.players().contains(&su.0) {
+        // Another group member (online only: offline there is nobody else): duel menu.
+        target.0 = Some(entity);
+        if clicked {
+            player_menu.write(crate::social::PlayerMenu(su.0));
         }
     } else if state.alive {
         target.0 = Some(entity);

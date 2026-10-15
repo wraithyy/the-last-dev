@@ -163,6 +163,12 @@ impl RoomState {
         if let Err(e) = world.load(&mut sim, START_ZONE, None) {
             tracing::error!(error = %e, "cannot load start zone");
         }
+        // The room runs on the server's clock: dailies roll over at UTC midnight, the campus
+        // day/night and the world boss follow it.
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs());
+        sim.set_clock(now);
         Self {
             code,
             world,
@@ -373,7 +379,15 @@ impl RoomState {
         };
         match msg {
             // apply_as rebinds the actor to `eid`: a client can only ever act as itself.
-            ClientMsg::Cmd(cmd) => self.sim.apply_as(eid, cmd),
+            ClientMsg::Cmd(cmd) => {
+                // ponytail: online characters start fresh, so the server takes the client's
+                // word for its (purely cosmetic) pet collection; check against a server-side
+                // account if pets ever grant more than a junk sweep.
+                if let combat_core::Command::SummonPet { pet } = &cmd {
+                    self.sim.grant_pet(eid, pet);
+                }
+                self.sim.apply_as(eid, cmd)
+            }
             ClientMsg::Move {
                 pos,
                 facing,
@@ -1269,6 +1283,51 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// The room runs on the server's clock; the joiner learns it, daily progress goes only to
+    /// its owner and the Board Meeting warning goes to everyone.
+    #[tokio::test(start_paused = true)]
+    async fn the_live_world_runs_on_server_time_and_reaches_the_right_players() {
+        let mut s = room();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        assert!(s.sim.clock_on());
+        assert!(s.sim.unix_s().abs_diff(now) < 60);
+        s.on_join(0, "lead", "fullstack");
+        s.on_join(1, "member", "devops");
+        let out = s.tick();
+        let got = |out: &[(Audience, Bytes)], p, f: &dyn Fn(&Event) -> bool| {
+            msgs(out, p)
+                .iter()
+                .any(|m| matches!(m, ServerMsg::Events { events, .. } if events.iter().any(f)))
+        };
+        let clock = |e: &Event| matches!(e, Event::Clock { unix_s } if unix_s.abs_diff(now) < 60);
+        assert!(got(&out, 0, &clock) && got(&out, 1, &clock));
+        let lead = eid_of(&s, 0);
+        assert!(s.sim.debug_join_standup(lead));
+        let task = s.sim.task_board(lead).tasks[0].clone();
+        let full: Vec<u32> = task.goals.iter().map(|g| g.need).collect();
+        assert!(s.sim.debug_task_counts(lead, &task.key, &full));
+        assert!(s.sim.debug_world_boss_in(30));
+        let mut out = Vec::new();
+        for _ in 0..40 {
+            out.extend(s.tick());
+        }
+        let done = |e: &Event| matches!(e, Event::TaskCompleted { key, .. } if *key == task.key);
+        assert!(got(&out, 0, &done) && !got(&out, 1, &done));
+        let warned = |e: &Event| {
+            matches!(
+                e,
+                Event::WorldBoss {
+                    state: combat_core::WorldBossState::Warning,
+                    ..
+                }
+            )
+        };
+        assert!(got(&out, 0, &warned) && got(&out, 1, &warned));
     }
 
     #[tokio::test(start_paused = true)]

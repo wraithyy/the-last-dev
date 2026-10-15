@@ -135,6 +135,10 @@ struct Look<'w, 's> {
     sun: Query<'w, 's, &'static mut DirectionalLight, With<Sun>>,
 }
 
+/// The zone's shared office-window material, if its layout has windows.
+#[derive(Resource, Default)]
+pub struct WindowMats(pub Option<Handle<StandardMaterial>>);
+
 /// The shared materials of the blinking LEDs with their resting emissive colour and pattern.
 #[derive(Resource, Default)]
 struct BlinkMats(Vec<(Handle<StandardMaterial>, LinearRgba, Mat)>);
@@ -300,7 +304,8 @@ fn load_floor(
     );
     // Small, low or see-through things: no shadow, culled with distance when small.
     let finish = |e: &mut EntityCommands, size: Vec3, mat: Option<Mat>| {
-        if mat.is_some_and(|m| matches!(m, Mat::Glass | Mat::LightPanel | Mat::Facade))
+        if mat
+            .is_some_and(|m| matches!(m, Mat::Glass | Mat::LightPanel | Mat::Facade | Mat::Window))
             || size.y < SHADOW_MIN_HEIGHT && layout.outdoor
         {
             e.insert(NotShadowCaster);
@@ -463,6 +468,8 @@ fn load_floor(
             Piece::Block(_) => {}
         }
     }
+    // Office windows light up at night (`live::daynight`); one shared material per zone.
+    commands.insert_resource(WindowMats(mats.get(&Mat::Window).cloned()));
     blink.0 = mats
         .iter()
         .filter(|(m, _)| is_blink(**m))

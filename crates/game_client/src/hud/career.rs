@@ -1,6 +1,6 @@
 //! `~/career`: the Career Ladder window (R). Five promotion rows of three cards; a row opens at
 //! its level, a click on an open card takes that promotion (out of combat, the sim decides), and
-//! the Performance Review button resets every pick for Story Points. A toast and a glowing dock
+//! the Performance Review button resets every pick for Kudos. A toast and a glowing dock
 //! button announce a waiting promotion; anyone's promotion in the group goes to the chat log.
 //! QA: `WOW_CAREER=1` opens the window, `WOW_TALENTS=1,2,3,0,0` sets picks once at start.
 
@@ -282,13 +282,16 @@ fn update_window(
         &mut header,
         &format!("{class_name}, level {}   {worn}", u.level),
     );
-    let cost = content.talents.respec_cost(u.level);
+    let cost = content.talents.respec_cost(u.level, u.respecs);
     let any = picks.iter().any(|k| *k > 0);
+    let next = content.talents.respec_cost(u.level, u.respecs + 1);
     set_text(
         &mut review.0,
         &format!(
-            "Performance Review: reset all for {cost} SP (you have {})",
-            u.sp
+            "Performance Review: reset all for {} (you have {}; the next one costs {})",
+            crate::copy::kudos(cost),
+            crate::copy::kudos(u.sp),
+            crate::copy::thousands(next)
         ),
     );
     review.1.0 = if any && u.sp >= cost { ACCENT } else { LOCKED };

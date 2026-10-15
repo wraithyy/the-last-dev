@@ -241,13 +241,59 @@ perks    : SpellDamage / SpellHeal +pct on that spell; Cooldown and ManaCost -pc
            Echo repeats a landed hit at pct (chance roll on the combat rng, only when worn)
 ```
 
-Story Points per kill and member: `(level * sp_per_level + U[0, level]) * mult` (elite 4, boss 12; summons 0). Gear drop chance: trash 12%, elite 60%, boss 100%; rarity weights Common/Uncommon/Rare/Epic trash 50/35/13/2, elite 10/45/37/8, boss 0/25/55/20; the piece is from the mob's tier (`ceil(level / 2)`), from the looter's role 70% of the time. Bosses with named Legendaries add one 25% of the time; non-bosses drop junk 30%. Quest turn-ins pay `reward.xp * 15%` SP (authored XP, before `xp_reward_pct`). Prices: `base(rarity) * (2 + ilvl) / 4` with base 8/20/50/120/300 unless authored; sell price 25% (junk 100%).
+Kudos (`sp` in code and saves) per kill and member: `(level * sp_per_level + U[0, level]) * mult` (elite 4, boss 12; summons 0). Gear drop chance: trash 12%, elite 60%, boss 100%; rarity weights Common/Uncommon/Rare/Epic trash 50/35/13/2, elite 10/45/37/8, boss 0/25/55/20; the piece is from the mob's tier (`ceil(level / 2)`), from the looter's role 70% of the time. Bosses with named Legendaries add one 25% of the time; non-bosses drop junk 30%. Quest turn-ins pay `reward.xp * 15%` Kudos plus `reward.sp` (authored XP, before `xp_reward_pct`). Prices and level requirements: see Kudos below.
 
 Measured (combat_core tests, level-capped bots, 3 seeds): a full set of tier-appropriate Rare gear cuts boss kill time to 72-80% of fresh and raises the boss-fight minimum HP by 13-32 points; Code Review damage over 10 s goes up by about 60% at tier 5.
+
+## Kudos
+
+The currency is Kudos ("redeemable for nothing, except here"); code and saves keep the old `sp` names so saves load unchanged.
+
+```
+price(gear)     = base(rarity) * (3 * ilvl + 2)        // base 8/20/50/150/400; authored `price` wins (All-Hands hoodies 30)
+required_level  = max(1, ilvl - 1) + (1 if Epic or Legendary)   // vendors only; drops ignore it
+sell            = price * 10%  (junk 100%), buyback at the sell price
+rotating shelf  = rotate_count items per rotate_ms window ("Procurement approved 3 extra items this week")
+```
+
+Why linear in ilvl: zone income grows about linearly with the band level, so a tier's Rare costs one to two zones at any point and Epics (3x a Rare) are a multi-zone goal. Purchases of 500 Kudos or more ask for a second click.
+
+Expected income of one solo pass (`kudos_never_buy_the_whole_stock_and_upgrades_take_zones`, `cargo test -p combat_core --test kudos -- --nocapture`): expected kill Kudos `(level * sp_per_level + level / 2) * mult` for every unit of the zone, every quest the zone closes, drops sold (gear chance times the tier's average price by rarity weights, junk 30%), one day of dailies plus a seventh of the weekly at the band's first level. "Stock" is every vendor gear piece (fixed and rotating) the band's top level may buy; "share" is everything earned so far, spending nothing.
+
+| zone | band top | kills | quests | sales | dailies | zone total | cumulative | stock at band top | share | tier Rare | zones per Rare |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| campus | 2 | 30 | 162 | 32 | 22 | 246 | 246 | 2360 | 10% | 400 | 1.6 |
+| tower/1 | 2 | 56 | 141 | 68 | 22 | 287 | 533 | 2360 | 22% | 400 | 1.4 |
+| tower/2 | 4 | 148 | 224 | 165 | 66 | 603 | 1136 | 5720 | 19% | 700 | 1.2 |
+| tower/3 | 6 | 238 | 195 | 234 | 111 | 778 | 1914 | 11320 | 16% | 1000 | 1.3 |
+| datacenter/1 | 7 | 223 | 453 | 225 | 133 | 1034 | 2948 | 18600 | 15% | 1300 | 1.3 |
+| datacenter/2 | 8 | 284 | 0 | 253 | 156 | 693 | 3641 | 22500 | 16% | 1300 | 1.9 |
+| tower/4 | 8 | 302 | 487 | 295 | 156 | 1240 | 4881 | 22500 | 21% | 1300 | 1.0 |
+| tower/5 | 10 | 346 | 607 | 296 | 200 | 1449 | 6330 | 27300 | 23% | 1600 | 1.1 |
+| lab/1 | 10 | 165 | 675 | 88 | 222 | 1150 | 7480 | 27300 | 27% | 1600 | 1.4 |
+| lab/2 | 10 | 285 | 0 | 256 | 222 | 763 | 8243 | 27300 | 30% | 1600 | 2.1 |
+
+Sprint chests add `40 * level` per delivered run (80 at +2, 400 at +10); the world boss pays boss Kudos (`12 * (level * 1 + level / 2)`, 180 at level 10). Gates: the share stays under 35% after every zone, the tier Rare is 0.8-2.5 zones of that zone's income, and a tier-4 Epic costs at least three tier-4 Rares (`epics_are_steep_and_vendors_gate_by_level`).
+
+## Live world
+
+```
+game minute  = unix_s mod 1440                 // one office day = 24 real minutes
+night        = minute >= 18:00 or < 06:00      // spawns, chatter
+darkness     = smoothstep over 17:15-18:15 and 05:45-06:45   // client lighting only
+day / week   = unix_s / 86400 ; (unix_s / 86400 + 3) / 7   // Monday 00:00 UTC starts a week
+daily reward = xp_to_next(level) * 15% XP, 6 * level Kudos    // level when joined
+weekly       = xp_to_next(level) * 70% XP, 30 * level Kudos, gear_choices(ceil(level / 2), epic)
+```
+
+- Rotation: `per_day` distinct dailies by a SplitMix64 partial shuffle seeded with the day; the weekly is `SplitMix64(week).below(n)`.
+- Throughput goals: `n * level` damage plus healing. Work zone: the reachable zone with packs whose band start is the highest at or below the level and whose top is at least `level - 1`; else the highest band start below the level; else the board's zone.
+- Night units spawn at the highest group level; the Board at level 10 with the usual group scaling (+40% HP per extra member in the shipped config).
+- Measured (`dailies_keep_the_campaign_inside_the_level_bands`): one day of dailies plus a seventh of the weekly per zone of a single campaign pass keeps every arrival inside its zone band (at most one level above its top). `three_players_beat_the_board_and_one_does_not_trivially`: a geared level-10 trio kills the Board in 90-97 s with at most one death; a lone geared DPS bot dies at about 36-41 s.
 
 ## Talents
 
 - Splash: extra targets within the radius of the primary target (nearest first, enemies already in combat, injured allies for heals) take `pct` of the spell's damage or healing; DoTs and HoTs land at full strength.
 - `CastTime` adds to the cast-time aura percent after haste (-100 = instant); `ManaCost` subtracts from 100% of the cost; `HpCost` pays `mana * pct / 100` HP instead (never below 1 HP); `Periodic` scales the snapshotted tick; `DamageTaken` adds to the damage-taken percent with auras and class armour.
-- Performance Review: `respec_sp_per_level * level` Story Points (15 per level: 150 SP at level 10, about 3% of a campaign's SP).
+- Performance Review: `respec_sp_per_level * level * (100 + respec_growth_pct * reviews_taken) / 100` Kudos (15 per level, +100% per earlier review: 150, 300, 450, ... at level 10). `reviews_taken` is `UnitState::respecs`, saved as `respecs=`; online the client counts resets from `TalentsChanged` (rooms start fresh).
 - Balance gate (`every_talent_build_clears_the_campaign`): each class clears the campaign on 3 seeds with options 1, 2 and 3 in every row; total boss time may not drop below 80% of the fastest class without talents.

@@ -27,7 +27,7 @@ impl Sim {
             .state
             .target
             .and_then(|t| self.index(t))
-            .is_some_and(|ti| self.units[ti].state.alive && self.units[ti].state.hostile);
+            .is_some_and(|ti| self.units[ti].state.alive && self.hostile_to(i, ti));
         if u.state.alive && has_def && target_ok {
             self.set_auto_attack(i, true);
         }
@@ -50,7 +50,7 @@ impl Sim {
             return self.set_auto_attack(i, false);
         };
         let t = &self.units[ti].state;
-        if !u.state.alive || !t.alive || !t.hostile {
+        if !u.state.alive || !t.alive || !self.hostile_to(i, ti) {
             return self.set_auto_attack(i, false);
         }
         // Out of range, facing or LoS, a cast, or an evading target just waits.

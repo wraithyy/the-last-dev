@@ -16,7 +16,7 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 
 ## Co-op (online)
 
-- Gear, bag and Story Points are per room session; joiners start fresh (no import of the offline save, which the server could not trust).
+- Gear, bag and Kudos are per room session; joiners start fresh (no import of the offline save, which the server could not trust).
 
 - Player interaction is deliberately narrow: target a teammate (click, party frame, F1 self / F2-F5 members), cast the helpful spells on them (Guardrails, Rollback, On-Call Caffeine), resurrect with "Have You Tried Turning It Off and On Again" (V), and aim emotes at them. There is no trading, no free-text chat, no duels, no inspect and no item handover; trophies are personal.
 - Loot is per player and private: each member gets their own roll, only the looter sees `LootDropped`/`Looted`, and sparkles, the gold plate and the loot cursor follow your own unclaimed roll (a corpse a teammate still has to loot shows nothing for you). A corpse whose roll was empty for you looks like an empty corpse offline: no sparkles, and looting says there was nothing. Corpse decay is timed per client from when it first saw the death or its own roll emptied, so after a late join or a reconnect an old corpse can stay up to its full timer again (the server's sim still despawns it on time).

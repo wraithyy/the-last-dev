@@ -785,6 +785,9 @@ pub struct UnitDef {
     /// Named rare: elite nameplate and a guaranteed better drop.
     #[serde(default)]
     pub elite: bool,
+    /// Friendly NPC that `Ally` spells may target (the onboarding's burnt-out colleague).
+    #[serde(default)]
+    pub healable: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
@@ -1030,6 +1033,13 @@ pub struct Content {
     /// Sprint mode buildings, affixes and rewards (`sprint.rs`); absent in minimal test content.
     #[serde(default)]
     pub sprint: crate::sprint::SprintDef,
+    /// Daily/weekly tasks, the world boss and Crunch-mode nights (`live.rs`, `dailies.rs`);
+    /// absent in minimal test content.
+    #[serde(default)]
+    pub live: crate::live::LiveDef,
+    /// Companions (`pets.rs`); absent in minimal test content.
+    #[serde(default)]
+    pub pets: Vec<crate::pets::PetDef>,
 }
 
 impl Content {
@@ -1324,6 +1334,8 @@ impl Content {
         self.world.validate(self)?;
         self.talents.validate(self)?;
         self.sprint.validate(self)?;
+        self.live.validate(self)?;
+        crate::pets::validate(self)?;
         Ok(())
     }
 }

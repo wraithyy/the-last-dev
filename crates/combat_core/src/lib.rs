@@ -6,11 +6,15 @@
 mod ai;
 mod auto_attack;
 pub mod content;
+pub mod dailies;
+pub mod duel;
 pub mod economy;
 mod effects;
 mod floors;
 pub mod geom;
+pub mod live;
 mod nav;
+pub mod pets;
 mod progression;
 mod quests;
 mod rng;
@@ -34,12 +38,16 @@ pub use content::{
     QuestDef, QuestGiver, QuestReward, Role, School, SpellDef, SpellId, SpellTarget, TelegraphAt,
     TelegraphDef, UnitDef, Unlock, XpRules, YellDef, ZoneDef, ZoneKind, ZoneLink, ZoneSpawn,
 };
+pub use dailies::{BoardView, GoalSpec, GoalView, SavedTask, TaskState, TaskView};
+pub use duel::{DuelError, DuelOutcome};
 pub use economy::{
     ActivePerk, ConsumableDef, Economy, GearDef, GearSource, GearStats, GearVisual, Goods, JunkDef,
-    Perk, PerkView, Rarity, SLOTS, SetDef, Slot, VendorDef,
+    Perk, PerkView, Rarity, SLOTS, SetDef, Slot, VendorDef, role_package,
 };
 pub use floors::{CORPSE_EMPTY_MS, CORPSE_LOOT_MS, pack_offsets};
 pub use geom::{Aabb, Vec3, distance, forward, in_range, is_facing, line_of_sight};
+pub use live::WorldBossState;
+pub use pets::{PetDef, PetDrop, duck_tip};
 pub use progression::GROUP_SHARE_RANGE_M;
 pub use quests::{ActiveQuest, GIVER_REACH_SLACK_M, QuestLog, QuestStatus};
 pub use save::{SAVE_VERSION, SaveData};

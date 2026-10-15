@@ -21,6 +21,10 @@ fn anchor(name: &str) -> Option<(Vec3, f32)> {
     if let Some(n) = num("npc_") {
         return Some((Vec3::new(60.0, 0.0, -15.0 * n), 0.0));
     }
+    // The campus onboarding corner (named, not numbered), far out of every pull.
+    if name.starts_with("npc_") {
+        return Some((Vec3::new(-400.0, 0.0, 400.0), 0.0));
+    }
     (name == "boss").then_some((Vec3::new(0.0, 0.0, -SPACING * 7.0), 0.0))
 }
 
@@ -738,4 +742,130 @@ fn legacy_code_is_invulnerable_until_interrupted() {
     assert_eq!(s.affix_events("legacy_code"), 1);
     s.secs(4);
     assert!(s.sim.unit(mono.id).is_some_and(|u| u.hp < u.max_hp));
+}
+
+fn kill_drops(log: &[Event]) -> (usize, usize, u32) {
+    log.iter().fold((0, 0, 0), |(n, i, sp), e| match e {
+        Event::LootDropped { items, sp: s, .. } => (n + 1, i + items.len(), sp + s),
+        _ => (n, i, sp),
+    })
+}
+
+fn sp_of(s: &S) -> u32 {
+    s.sim.unit(s.p).map_or(0, |u| u.sp)
+}
+
+#[test]
+fn sprint_kills_leave_lootable_quest_free_corpses() {
+    let c = no_affixes();
+    let quest_items: Vec<String> = c
+        .units
+        .iter()
+        .flat_map(|u| u.loot.iter())
+        .filter(|l| l.quest.is_some())
+        .map(|l| l.item.clone())
+        .collect();
+    let mut s = S::new(c, 10);
+    s.start_in("tower", 5);
+    let trash: Vec<EntityId> = s
+        .hostiles()
+        .iter()
+        .filter(|u| !u.boss)
+        .map(|u| u.id)
+        .collect();
+    assert!(!trash.is_empty());
+    for id in trash {
+        s.sim.debug_kill(id);
+    }
+    s.tick();
+    let (n, _, sp) = kill_drops(&s.log);
+    assert!(n > 0 && sp > 0, "kills drop during the run");
+    for e in &s.log {
+        if let Event::LootDropped { items, .. } = e {
+            assert!(items.iter().all(|i| !quest_items.contains(i)), "{items:?}");
+        }
+    }
+    let Some(corpse) = s
+        .sim
+        .units()
+        .find(|u| !u.alive && u.lootable && u.hostile)
+        .map(|u| (u.id, u.pos))
+    else {
+        panic!("no lootable corpse");
+    };
+    s.walk_to(corpse.1);
+    let before = sp_of(&s);
+    s.sim.push(Command::Loot {
+        looter: s.p,
+        corpse: corpse.0,
+    });
+    s.tick();
+    assert!(sp_of(&s) > before, "the corpse paid out");
+    assert!(
+        s.log
+            .iter()
+            .any(|e| matches!(e, Event::Looted { corpse: c, .. } if *c == corpse.0))
+    );
+}
+
+#[test]
+fn unclaimed_kill_loot_follows_the_group_to_the_next_floor() {
+    let mut s = S::new(no_affixes(), 10);
+    // Co-op: every member keeps their own share.
+    let mate = s
+        .sim
+        .spawn_player("fullstack", Vec3::new(2.0, 0.0, 20.0), 0.0);
+    s.start_in("tower", 1);
+    let mate_sp = |s: &S| s.sim.unit(mate).map_or(0, |u| u.sp);
+    let before = sp_of(&s) + mate_sp(&s);
+    s.clear_stage();
+    let (_, _, dropped) = kill_drops(&s.log);
+    assert!(dropped > 0);
+    let first = s.zones()[0].clone();
+    for _ in 0..10 * TICKS_PER_S {
+        if s.sim.zone() != Some(first.as_str()) {
+            break;
+        }
+        s.tick();
+    }
+    assert_ne!(s.sim.zone(), Some(first.as_str()));
+    s.tick();
+    assert!(mate_sp(&s) > 0 && sp_of(&s) > 0);
+    assert_eq!(
+        sp_of(&s) + mate_sp(&s) - before,
+        dropped,
+        "nothing left behind on the floor"
+    );
+}
+
+/// Same seed with and without the sprint cut: kills pay at most `kill_loot_pct` of a
+/// normal zone's Kudos and the chest still comes on top.
+#[test]
+fn kill_loot_is_trimmed_and_the_chest_still_pays() {
+    let run = |pct: u32| {
+        let mut c = no_affixes();
+        c.sprint.kill_loot_pct = pct;
+        let mut s = S::new(c, 10);
+        s.start_in("tower", 5);
+        for _ in s.zones() {
+            s.clear_stage();
+            s.secs(5);
+        }
+        let chest = s.log.iter().find_map(|e| match e {
+            Event::SprintEnded { summary, .. } => Some(summary.rewards[0].clone()),
+            _ => None,
+        });
+        let Some(chest) = chest else { panic!("no end") };
+        (kill_drops(&s.log), chest)
+    };
+    let ((n, _, full), _) = run(100);
+    let pct = content().sprint.kill_loot_pct;
+    assert!(pct < 100, "sprint kills pay less than a zone");
+    let ((m, items, cut), chest) = run(pct);
+    assert_eq!(n, m);
+    // Gear rolls fork the loot stream between the two runs, hence the slack.
+    assert!(cut > 0 && cut * 100 <= full * (pct + 15), "{cut} vs {full}");
+    assert!(items <= 2 * m, "{items} items from {m} kills");
+    assert_eq!(chest.sp, 200);
+    assert!(chest.items.len() >= 2);
 }

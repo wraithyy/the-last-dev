@@ -133,7 +133,10 @@ impl Plugin for FramesPlugin {
         app.init_resource::<CastFlash>()
             .init_resource::<PhaseFlash>()
             .add_systems(Startup, spawn_frames)
-            .add_systems(Update, reset_phase_flash_on_restart)
+            .add_systems(
+                Update,
+                (reset_phase_flash_on_restart, tag_target_frame, recolor_hp),
+            )
             .add_systems(
                 Update,
                 (
@@ -196,6 +199,32 @@ fn spawn_bar(parent: &mut ChildSpawnerCommands, who: Who, pool: Pool) {
             bar.spawn(gloss(0.18));
             bar.spawn((TextOf(who, field), label("", 10.0), TextColor::WHITE));
         });
+}
+
+/// HP bars follow the colourblind palette.
+fn recolor_hp(
+    pal: Res<crate::settings::Palette>,
+    mut fills: Query<(&Fill, &mut BackgroundGradient)>,
+) {
+    if !pal.is_changed() {
+        return;
+    }
+    for (f, mut g) in &mut fills {
+        if f.1 == Pool::Hp {
+            *g = glossy(pal.health);
+        }
+    }
+}
+
+/// The onboarding points at the target frame (its cast bar sits right under it).
+fn tag_target_frame(mut commands: Commands, frames: Query<(Entity, &FrameRoot), Added<FrameRoot>>) {
+    for (e, f) in &frames {
+        if f.0 == Who::Target {
+            commands
+                .entity(e)
+                .insert(crate::onboarding::Spot::TargetFrame);
+        }
+    }
 }
 
 /// Frameless unit frame: square avatar, name with an optional tag, title and two thin bars.

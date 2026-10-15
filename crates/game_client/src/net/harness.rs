@@ -170,7 +170,8 @@ fn fake_server_round_trip_keeps_networld_in_step() {
                 let me = sim.unit(you).map(|u| u.pos).unwrap_or_default();
                 let Some(target) = sim
                     .units()
-                    .filter(|u| u.hostile && u.alive)
+                    // The onboarding dummy is passive and scripted; the test wants a real pack.
+                    .filter(|u| u.hostile && u.alive && u.key != "training_dummy")
                     .min_by(|a, b| {
                         combat_core::distance(a.pos, me)
                             .total_cmp(&combat_core::distance(b.pos, me))

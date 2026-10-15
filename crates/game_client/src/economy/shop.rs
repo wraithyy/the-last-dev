@@ -1,18 +1,20 @@
 //! `~/procurement`: the vendor window. Opens when you talk to a vendor NPC; lists the current
-//! stock (with upgrade marks and prices), your bag (click to sell) and the buyback shelf.
-//! Purchases of `CONFIRM_SP` or more need a second click.
+//! stock (with upgrade arrows, level requirements and prices), your bag (click to sell) and the
+//! buyback shelf. Purchases of `CONFIRM_SP` or more need a second click; on touch every item
+//! takes a first tap to inspect.
 
-use super::goods::{self, SP_GOLD, UPGRADE_GREEN};
+use super::goods::{self, SP_GOLD};
 use super::sheet::grouped;
-use super::{EconomyUi, HoverItem, item_tile, window_node};
+use super::{EconomyUi, HoverItem, Inspect, compare_badge, item_tile, tap_position, window_node};
 use crate::combat::{PendingCommands, SimReady, SimView, Talked};
+use crate::copy::{kudos, thousands};
 use crate::hud::{DIM, IconCache, PANEL_EDGE, label, set_text};
 use crate::player::{Player, PlayerBody};
 use bevy::prelude::*;
 use combat_core::{Command, EntityId, ticks_to_ms};
 
 /// Purchases at or above this price ask "are you sure?" first.
-const CONFIRM_SP: u32 = 100;
+const CONFIRM_SP: u32 = 500;
 const CONFIRM_SECS: f32 = 4.0;
 const ROW_ICON: f32 = 22.0;
 
@@ -191,19 +193,27 @@ fn rebuild(
     let stock = content.economy.stock(def, now_ms);
     let confirm = ui.confirm.as_ref().map(|(n, _)| n.clone());
     let key = format!(
-        "{stock:?}|{:?}|{:?}|{}|{confirm:?}|{:?}",
-        me.bag, me.buyback, me.sp, me.equipped
+        "{stock:?}|{:?}|{:?}|{}|{confirm:?}|{:?}|{}",
+        me.bag, me.buyback, me.sp, me.equipped, me.level
     );
     for (mut t, title, status) in &mut texts {
         if title.is_some() {
             set_text(&mut t, &def.title);
         } else if status.is_some() {
+            let wallet = format!("Wallet: {}", kudos(me.sp));
+            let approved = if def.rotate_count > 0 {
+                format!(
+                    "  |  Procurement approved {} extra items this week",
+                    def.rotate_count
+                )
+            } else {
+                String::new()
+            };
             let msg = match &confirm {
                 Some(n) => format!(
-                    "{} SP. Click [{n}] again within a few seconds to approve the purchase order.",
-                    me.sp
+                    "{wallet}. Click [{n}] again within a few seconds to approve the purchase order."
                 ),
-                None => format!("{} SP  |  \"{}\"", me.sp, def.greeting),
+                None => format!("{wallet}{approved}\n\"{}\"", def.greeting),
             };
             set_text(&mut t, &msg);
         }
@@ -220,7 +230,12 @@ fn rebuild(
             for name in &stock {
                 let price = content.economy.goods(name).map_or(0, |g| g.price());
                 let affordable = me.sp >= price;
-                let upgrade = goods::is_upgrade(content, name, &equipped, role);
+                let need = content
+                    .economy
+                    .gear(name)
+                    .map_or(1, combat_core::GearDef::required_level);
+                let locked = me.level < need;
+                let ord = goods::compare(content, name, &equipped, role);
                 let pending = confirm.as_deref() == Some(name.as_str());
                 let row = commands
                     .spawn((
@@ -241,40 +256,62 @@ fn rebuild(
                         }),
                     ))
                     .with_children(|r| {
-                        r.spawn(item_tile(content, &mut icons, &assets, name, ROW_ICON, 1));
-                        r.spawn((
-                            label(name.clone(), 11.0),
-                            TextColor(goods::name_color(content, name)),
-                            Node {
-                                flex_grow: 1.0,
-                                flex_basis: px(0),
-                                ..default()
-                            },
-                        ));
-                        if upgrade {
-                            r.spawn((label("UPGRADE", 10.0), TextColor(UPGRADE_GREEN)));
+                        let mut tile =
+                            r.spawn(item_tile(content, &mut icons, &assets, name, ROW_ICON, 1));
+                        if let Some(b) = compare_badge(ord) {
+                            tile.with_child(b);
                         }
+                        let name_color = if locked {
+                            goods::JUNK_GREY.with_alpha(0.7)
+                        } else {
+                            goods::name_color(content, name)
+                        };
+                        r.spawn(Node {
+                            flex_direction: FlexDirection::Column,
+                            flex_grow: 1.0,
+                            flex_basis: px(0),
+                            ..default()
+                        })
+                        .with_children(|t| {
+                            t.spawn((label(name.clone(), 11.0), TextColor(name_color)));
+                            if locked {
+                                t.spawn((
+                                    label(format!("Requires Level {need}"), 10.0),
+                                    TextColor(goods::DOWNGRADE_RED.with_alpha(0.8)),
+                                ));
+                            }
+                        });
+                        let price_color = if locked {
+                            goods::JUNK_GREY
+                        } else if affordable {
+                            SP_GOLD
+                        } else {
+                            goods::DOWNGRADE_RED
+                        };
                         r.spawn((
-                            label(format!("{price} SP"), 12.0),
-                            TextColor(if affordable {
-                                SP_GOLD
-                            } else {
-                                goods::DOWNGRADE_RED
-                            }),
+                            label(format!("{} K", thousands(price)), 12.0),
+                            TextColor(price_color),
                         ));
                     })
                     .id();
+                if locked {
+                    commands
+                        .entity(row)
+                        .insert(BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)));
+                }
                 commands.entity(e).add_child(row);
             }
         } else if sell.is_some() {
             commands.entity(e).despawn_related::<Children>();
             for (name, count) in grouped(content, &me.bag) {
-                let tile = commands
-                    .spawn((
-                        item_tile(content, &mut icons, &assets, &name, 36.0, count),
-                        ShopAction::Sell(name.clone()),
-                    ))
-                    .id();
+                let mut tile = commands.spawn((
+                    item_tile(content, &mut icons, &assets, &name, 36.0, count),
+                    ShopAction::Sell(name.clone()),
+                ));
+                if let Some(b) = compare_badge(goods::compare(content, &name, &equipped, role)) {
+                    tile.with_child(b);
+                }
+                let tile = tile.id();
                 commands.entity(e).add_child(tile);
             }
         } else if buyback.is_some() {
@@ -295,7 +332,10 @@ fn rebuild(
 fn clicks(
     mut ui: ResMut<EconomyUi>,
     sim: SimView,
+    touch: Res<crate::touch::TouchMode>,
+    touches: Res<bevy::input::touch::Touches>,
     mut hover: ResMut<HoverItem>,
+    mut inspect: ResMut<Inspect>,
     mut pending: ResMut<PendingCommands>,
     pressed: Query<(&Interaction, &ShopAction), Changed<Interaction>>,
     hovered: Query<(&Interaction, &ShopAction)>,
@@ -304,11 +344,16 @@ fn clicks(
     for (i, a) in &hovered {
         if *i != Interaction::None {
             let (ShopAction::Buy(n) | ShopAction::Sell(n) | ShopAction::Buyback(n)) = a;
-            hover.0 = Some(n.clone());
+            hover.set(n, matches!(a, ShopAction::Buy(_)));
         }
     }
     for (i, a) in &pressed {
         if *i != Interaction::Pressed {
+            continue;
+        }
+        let (ShopAction::Buy(n) | ShopAction::Sell(n) | ShopAction::Buyback(n)) = a;
+        let buying = matches!(a, ShopAction::Buy(_));
+        if !inspect.gate(touch.active, n, buying, tap_position(&touches)) {
             continue;
         }
         match a {

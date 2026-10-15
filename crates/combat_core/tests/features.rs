@@ -126,6 +126,10 @@ fn anchor(name: &str) -> Option<(Vec3, f32)> {
     if let Some(n) = num("npc_") {
         return Some((Vec3::new(40.0, 0.0, -15.0 * n), 0.0));
     }
+    // The campus onboarding corner (named, not numbered), far out of every pull.
+    if name.starts_with("npc_") {
+        return Some((Vec3::new(-400.0, 0.0, 400.0), 0.0));
+    }
     (name == "boss").then_some((Vec3::new(0.0, 0.0, -490.0), 0.0))
 }
 

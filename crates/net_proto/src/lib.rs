@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 11;
+pub const PROTOCOL_VERSION: u16 = 13;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -537,6 +537,8 @@ pub struct PlayerSnap {
     pub title: String,
     /// Career Ladder pick per row (0 = none), so others see the promotions.
     pub talents: combat_core::TalentPicks,
+    /// The companion following the player (`PetDef::key`, "" for none).
+    pub pet: String,
 }
 
 impl PlayerSnap {
@@ -582,6 +584,7 @@ impl PlayerSnap {
                 .collect(),
             title: u.title.clone(),
             talents: u.talents,
+            pet: u.pet.clone(),
         }
     }
 }
@@ -644,6 +647,9 @@ pub fn is_player_command(cmd: &Command) -> bool {
         }
         Command::ResetTalents => true,
         Command::StartSprint { building, .. } => building.len() <= MAX_QUEST_ID_BYTES,
+        Command::JoinStandup | Command::ClaimSprintGoal { .. } | Command::GoHome => true,
+        Command::SummonPet { pet } => pet.len() <= combat_core::world::WORLD_KEY_MAX,
+        Command::DuelRequest { .. } | Command::DuelRespond { .. } => true,
     }
 }
 
@@ -773,6 +779,7 @@ impl Msg for ServerMsg {
                         p.class.len() <= MAX_CLASS_BYTES
                             && p.gear.len() <= combat_core::SLOTS
                             && p.title.len() <= combat_core::world::WORLD_KEY_MAX
+                            && p.pet.len() <= combat_core::world::WORLD_KEY_MAX
                             && talents_ok(&p.talents)
                     })
                     && units.iter().all(|u| u.auras.len() <= MAX_LIST_LEN)
@@ -856,7 +863,12 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
             finite(&[pos.x, pos.y, pos.z, *facing, dims[0], dims[1]])?;
             cover.iter().try_for_each(|c| finite(&[c.x, c.y, c.z]))
         }
-        Event::LootDropped { items, .. } | Event::Looted { items, .. } => names(items),
+        Event::LootDropped { items, .. }
+        | Event::Looted { items, .. }
+        | Event::PetLooted { items, .. } => names(items),
+        Event::DuelCountdown {
+            center, radius_m, ..
+        } => finite(&[center.x, center.y, center.z, *radius_m]),
         Event::Bag {
             bag,
             equipped,
@@ -870,7 +882,9 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
         Event::QuestOffered { quests, .. } => list(quests.len()),
         Event::Interacted { prop: k, .. }
         | Event::Achievement { key: k, .. }
-        | Event::TitleChanged { title: k, .. } => {
+        | Event::TitleChanged { title: k, .. }
+        | Event::PetChanged { pet: k, .. }
+        | Event::PetLearned { pet: k, .. } => {
             if k.len() <= combat_core::world::WORLD_KEY_MAX {
                 Ok(())
             } else {
@@ -899,8 +913,31 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
         {
             Err(ProtoError::TooMany)
         }
+        Event::DailyBoard { board, .. } => check_board(board),
+        Event::TaskCompleted { key, .. } if key.len() > combat_core::world::WORLD_KEY_MAX => {
+            Err(ProtoError::TooMany)
+        }
         _ => Ok(()),
     }
+}
+
+/// A board is a handful of tasks with a few goals each; keys and names are short content keys.
+fn check_board(b: &combat_core::BoardView) -> Result<(), ProtoError> {
+    use combat_core::GoalSpec;
+    let key = |k: &str| k.len() <= MAX_ITEM_NAME_BYTES;
+    let goal_ok = |g: &GoalSpec| match g {
+        GoalSpec::Kill { zone, unit } => {
+            zone.as_deref().is_none_or(key) && unit.as_deref().is_none_or(key)
+        }
+        GoalSpec::Idle { zone } => key(zone),
+        GoalSpec::Talk { unit } => key(unit),
+        _ => true,
+    };
+    let ok = b.tasks.len() <= MAX_LIST_LEN
+        && b.tasks.iter().all(|t| {
+            key(&t.key) && t.goals.len() <= MAX_LIST_LEN && t.goals.iter().all(|g| goal_ok(&g.goal))
+        });
+    if ok { Ok(()) } else { Err(ProtoError::TooMany) }
 }
 
 /// Building and affix keys are short content keys, at most one per affix level.
@@ -1431,6 +1468,7 @@ mod tests {
                     gear: vec![3, PlayerSnap::NO_GEAR, 0, PlayerSnap::NO_GEAR, 7],
                     title: "pc_load_letter".into(),
                     talents: [1, 3, 0, 2, 0],
+                    pet: "rubber_duck".into(),
                 }],
             },
             ServerMsg::MoveCorrection {
@@ -1631,6 +1669,92 @@ mod tests {
             level: 3,
         });
         assert_eq!(roundtrip(&long), Err(ProtoError::IllegalCommand));
+    }
+
+    fn live_events() -> Vec<Event> {
+        use combat_core::{BoardView, GoalSpec, GoalView, TaskState, TaskView, WorldBossState};
+        let goals = vec![
+            GoalView {
+                goal: GoalSpec::Kill {
+                    zone: Some("tower/2".into()),
+                    unit: Some("scrum_master".into()),
+                },
+                count: 3,
+                need: 8,
+            },
+            GoalView {
+                goal: GoalSpec::Idle {
+                    zone: "tower/2".into(),
+                },
+                count: 12,
+                need: 60,
+            },
+            GoalView {
+                goal: GoalSpec::Sprint { level: 2 },
+                count: 0,
+                need: 1,
+            },
+        ];
+        vec![
+            Event::Clock {
+                unix_s: 1_792_065_600,
+            },
+            Event::DailyBoard {
+                board: BoardView {
+                    day: 20_741,
+                    week: 2_963,
+                    tasks: vec![TaskView {
+                        key: "do_nothing".into(),
+                        weekly: false,
+                        state: TaskState::Active,
+                        goals,
+                        xp: 900,
+                        sp: 30,
+                        level: 5,
+                    }],
+                },
+                open: true,
+            },
+            Event::TaskCompleted {
+                key: "do_nothing".into(),
+                weekly: false,
+                xp: 900,
+                sp: 30,
+            },
+            Event::WorldBoss {
+                state: WorldBossState::Warning,
+                secs: 300,
+                unit: 0,
+            },
+        ]
+    }
+
+    #[test]
+    fn live_world_crosses_the_wire_and_is_capped() {
+        let msg = ServerMsg::Events {
+            tick: 9,
+            events: live_events(),
+        };
+        assert_eq!(roundtrip(&msg), Ok(msg.clone()));
+        for cmd in [
+            Command::JoinStandup,
+            Command::ClaimSprintGoal { choice: 2 },
+            Command::GoHome,
+        ] {
+            let m = ClientMsg::Cmd(cmd);
+            assert_eq!(roundtrip(&m), Ok(m.clone()));
+        }
+        let mut big = live_events();
+        if let Event::DailyBoard { board, .. } = &mut big[1] {
+            board.tasks[0].goals[0].goal = combat_core::GoalSpec::Talk {
+                unit: "x".repeat(MAX_ITEM_NAME_BYTES + 1),
+            };
+        }
+        let msg = ServerMsg::Events {
+            tick: 9,
+            events: vec![big[1].clone()],
+        };
+        assert_eq!(roundtrip(&msg), Err(ProtoError::TooMany));
     }
 
     fn roundtrip<M: Msg + PartialEq + fmt::Debug>(m: &M) -> Result<M, ProtoError> {
@@ -2105,5 +2229,37 @@ mod tests {
                 spells: vec![(SpellId(2), 4_000, 6_000)],
             }
         );
+    }
+
+    #[test]
+    fn pet_and_duel_commands_pass_and_long_pet_keys_do_not() {
+        for cmd in [
+            Command::SummonPet {
+                pet: "roomba".into(),
+            },
+            Command::SummonPet { pet: String::new() },
+            Command::DuelRequest { target: 2 },
+            Command::DuelRespond { accept: false },
+        ] {
+            let bytes = encode(&ClientMsg::Cmd(cmd.clone())).unwrap_or_default();
+            assert_eq!(decode::<ClientMsg>(&bytes), Ok(ClientMsg::Cmd(cmd)));
+        }
+        let long = ClientMsg::Cmd(Command::SummonPet {
+            pet: "p".repeat(combat_core::world::WORLD_KEY_MAX + 1),
+        });
+        let bytes = encode(&long).unwrap_or_default();
+        assert!(decode::<ClientMsg>(&bytes).is_err());
+        let ev = ServerMsg::Events {
+            tick: 1,
+            events: vec![Event::DuelCountdown {
+                a: 1,
+                b: 2,
+                center: Vec3::new(f32::NAN, 0.0, 0.0),
+                radius_m: 20.0,
+                ms: 3000,
+            }],
+        };
+        let bytes = encode(&ev).unwrap_or_default();
+        assert_eq!(decode::<ServerMsg>(&bytes), Err(ProtoError::BadNumber));
     }
 }

@@ -43,6 +43,9 @@ struct LootState {
 struct LootWindow;
 #[derive(Component)]
 struct LootRow;
+/// The item a loot row shows (hover or tap it for the comparison tooltip).
+#[derive(Component)]
+struct LootItem(String);
 #[derive(Component)]
 struct LootClose;
 
@@ -717,7 +720,7 @@ fn collect_events(
                     );
                 }
                 if *sp > 0 {
-                    out.push(format!("You receive {sp} Story Points."), goods::SP_GOLD);
+                    out.push(format!("You receive {sp} Kudos."), goods::SP_GOLD);
                 }
                 if items.is_empty() && *sp == 0 {
                     out.push(
@@ -770,8 +773,21 @@ fn update_loot(
     mut loot: ResMut<LootState>,
     mut window: Single<(Entity, &mut Node), With<LootWindow>>,
     rows: Query<Entity, With<LootRow>>,
-    clicks: Query<&Interaction, (Or<(With<LootRow>, With<LootClose>)>, Changed<Interaction>)>,
+    clicks: Query<
+        (&Interaction, Option<&LootItem>),
+        (Or<(With<LootRow>, With<LootClose>)>, Changed<Interaction>),
+    >,
+    hovered: Query<(&Interaction, &LootItem)>,
+    touch: Res<crate::touch::TouchMode>,
+    touches: Res<bevy::input::touch::Touches>,
+    mut hover: ResMut<crate::economy::HoverItem>,
+    mut inspect: ResMut<crate::economy::Inspect>,
 ) {
+    for (i, item) in &hovered {
+        if *i != Interaction::None {
+            hover.set(&item.0, false);
+        }
+    }
     let (window_entity, node) = &mut *window;
     if loot.dirty {
         loot.dirty = false;
@@ -789,9 +805,12 @@ fn update_loot(
         let mut rows: Vec<(String, Color, String, Color, String, &str)> = Vec::new();
         if loot.sp > 0 {
             rows.push((
-                format!("{} Story Points", loot.sp),
+                crate::copy::kudos(loot.sp),
                 goods::SP_GOLD,
-                "Spend them at Procurement (campus) or the IT Asset Store.".into(),
+                format!(
+                    "{} Spend them at Procurement (campus) or the IT Asset Store.",
+                    copy::KUDOS_FLAVOUR
+                ),
                 DIM,
                 String::new(),
                 "story_points",
@@ -819,7 +838,7 @@ fn update_loot(
                 }
                 Some(g) => (
                     format!(
-                        "Sells for {} SP",
+                        "Sells for {} Kudos",
                         content.economy.sell_price(g.name()).unwrap_or(0)
                     ),
                     goods::SP_GOLD,
@@ -841,7 +860,14 @@ fn update_loot(
         }
         for (item, color, bonus, bonus_color, desc, icon) in rows {
             let icon = icons.get(&assets, icon);
-            commands.entity(*window_entity).with_child((
+            let is_item = content.economy.goods(&item).is_some() || content.item(&item).is_some();
+            let mut row = commands.spawn_empty();
+            if is_item {
+                row.insert(LootItem(item.clone()));
+            }
+            let row = row.id();
+            commands.entity(*window_entity).add_child(row);
+            commands.entity(row).insert((
                 LootRow,
                 Button,
                 Node {
@@ -882,7 +908,28 @@ fn update_loot(
             Display::Flex
         };
     }
-    if clicks.iter().any(|i| *i == Interaction::Pressed) {
+    let mut close = false;
+    for (i, item) in &clicks {
+        if *i != Interaction::Pressed {
+            continue;
+        }
+        close |= match item {
+            Some(LootItem(name)) => {
+                let act = inspect.gate(
+                    touch.active,
+                    name,
+                    false,
+                    crate::economy::tap_position(&touches),
+                );
+                inspect.loot = !act;
+                act
+            }
+            None => true,
+        };
+    }
+    if close {
+        inspect.loot = false;
+        inspect.name = None;
         loot.items.clear();
         loot.sp = 0;
         node.display = Display::None;
@@ -905,7 +952,7 @@ fn update_xp(
         set_text(
             &mut text,
             &format!(
-                "Lv {} | sprint progress: max level, backlog infinite",
+                "Lv {} | career progress: maxed out, still not promoted",
                 u.level
             ),
         );
@@ -916,7 +963,7 @@ fn update_xp(
     set_text(
         &mut text,
         &format!(
-            "Lv {} | sprint progress {} / {} ({pct:.0}%)",
+            "Lv {} | career progress {} / {} XP ({pct:.0}%)",
             u.level, u.xp, u.xp_to_next
         ),
     );

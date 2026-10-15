@@ -40,6 +40,11 @@ impl OrbitCamera {
         self.yaw
     }
 
+    /// The zoom the player asked for (the onboarding's "look around" step watches it).
+    pub fn zoom(&self) -> f32 {
+        self.zoom
+    }
+
     /// Touch drag: same axes as the mouse orbit, in radians.
     pub fn orbit(&mut self, dyaw: f32, dpitch: f32) {
         self.yaw += dyaw;
@@ -237,9 +242,13 @@ fn place_camera(
     colliders: Res<Colliders>,
     ceiling: Res<CameraCeiling>,
     mut shake: ResMut<CameraShake>,
+    settings: Res<crate::settings::Settings>,
     player: Single<&Transform, (With<Player>, Without<OrbitCamera>)>,
     cam: Single<(&mut OrbitCamera, &mut Transform)>,
 ) {
+    if settings.reduce_motion {
+        shake.trauma = 0.0;
+    }
     let (mut cam, mut tf) = cam.into_inner();
     let focus = player.translation + Vec3::Y * focus_height();
     let dir = Quat::from_rotation_y(cam.yaw) * Vec3::new(0.0, cam.pitch.sin(), cam.pitch.cos());

@@ -527,6 +527,113 @@ async fn ping_emote_and_leave() {
     s.shutdown().await;
 }
 
+/// Waits for an `Events` frame holding an event that `pred` picks, and returns that event.
+async fn wait_event(ws: &mut Ws, pred: impl Fn(&Event) -> bool) -> Event {
+    loop {
+        if let ServerMsg::Events { events, .. } = next_msg(ws).await
+            && let Some(e) = events.into_iter().find(|e| pred(e))
+        {
+            return e;
+        }
+    }
+}
+
+#[tokio::test]
+async fn code_review_duel_between_two_clients() {
+    use combat_core::{DuelError, DuelOutcome};
+    let s = start(cfg()).await;
+    let (mut a, code, a_id) = create(s.addr).await;
+    let (mut b, b_id) = join(s.addr, &code).await;
+    let cmd = |c: Command| enc(&ClientMsg::Cmd(c));
+    // Not a player: refused, to the asker only.
+    a.send(cmd(Command::DuelRequest { target: 9_999 }))
+        .await
+        .unwrap();
+    let refused = wait_event(&mut a, |e| matches!(e, Event::DuelRefused { .. })).await;
+    assert_eq!(
+        refused,
+        Event::DuelRefused {
+            reason: DuelError::NoSuchPlayer
+        }
+    );
+    a.send(cmd(Command::DuelRequest { target: b_id }))
+        .await
+        .unwrap();
+    wait_event(&mut b, |e| {
+        *e == Event::DuelRequested {
+            from: a_id,
+            to: b_id,
+        }
+    })
+    .await;
+    // Only the asked player can accept; A trying does nothing, and asking again is too soon.
+    a.send(cmd(Command::DuelRespond { accept: true }))
+        .await
+        .unwrap();
+    a.send(cmd(Command::DuelRequest { target: b_id }))
+        .await
+        .unwrap();
+    let again = wait_event(&mut a, |e| matches!(e, Event::DuelRefused { .. })).await;
+    assert_eq!(
+        again,
+        Event::DuelRefused {
+            reason: DuelError::TooSoon
+        }
+    );
+    b.send(cmd(Command::DuelRespond { accept: true }))
+        .await
+        .unwrap();
+    wait_event(&mut a, |e| matches!(e, Event::DuelCountdown { .. })).await;
+    wait_event(&mut a, |e| *e == Event::DuelBegan { a: a_id, b: b_id }).await;
+    // Leaving the room mid-duel forfeits it.
+    b.send(enc(&ClientMsg::LeaveRoom)).await.unwrap();
+    let ended = wait_event(&mut a, |e| matches!(e, Event::DuelEnded { .. })).await;
+    let Event::DuelEnded {
+        winner, outcome, ..
+    } = ended
+    else {
+        unreachable!()
+    };
+    assert_eq!((winner, outcome), (Some(a_id), DuelOutcome::Forfeit));
+    s.shutdown().await;
+}
+
+#[tokio::test]
+async fn pets_show_up_in_everyones_snapshot() {
+    let s = start(cfg()).await;
+    let (mut a, code, a_id) = create(s.addr).await;
+    let (mut b, _) = join(s.addr, &code).await;
+    a.send(enc(&ClientMsg::Cmd(Command::SummonPet {
+        pet: "rubber_duck".into(),
+    })))
+    .await
+    .unwrap();
+    wait_event(&mut b, |e| {
+        *e == Event::PetChanged {
+            unit: a_id,
+            pet: "rubber_duck".into(),
+        }
+    })
+    .await;
+    loop {
+        if let ServerMsg::Snapshot { players, .. } =
+            wait_for(&mut b, |m| matches!(m, ServerMsg::Snapshot { .. })).await
+            && players
+                .iter()
+                .any(|p| p.id == a_id && p.pet == "rubber_duck")
+        {
+            break;
+        }
+    }
+    // Unknown pets are not granted, so nothing changes.
+    a.send(enc(&ClientMsg::Cmd(Command::SummonPet {
+        pet: "dodo".into(),
+    })))
+    .await
+    .unwrap();
+    s.shutdown().await;
+}
+
 #[tokio::test]
 async fn commands_act_only_as_the_sender() {
     let s = start(cfg()).await;

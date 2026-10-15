@@ -19,8 +19,6 @@ const PLATE_W: f32 = 180.0;
 const PLATE_RANGE: f32 = 40.0;
 const PLATE_GAP: f32 = 0.3;
 const BAR_W: f32 = 110.0;
-const HOSTILE: Color = Color::srgb(1.0, 0.3, 0.25);
-const FRIENDLY: Color = Color::srgb(0.4, 1.0, 0.45);
 /// Group members, as WoW's party blue, so a colleague never reads as an NPC.
 pub const PARTY_BLUE: Color = Color::srgb(0.35, 0.65, 1.0);
 
@@ -57,6 +55,7 @@ impl Plugin for NameplatePlugin {
             Update,
             (
                 spawn_plates,
+                recolor_plates,
                 place_plates.in_set(PlatePlacement),
                 update_marks,
                 update_titles,
@@ -69,6 +68,7 @@ impl Plugin for NameplatePlugin {
 
 fn spawn_plates(
     mut commands: Commands,
+    pal: Res<crate::settings::Palette>,
     sim: SimView,
     added: Query<(Entity, &SimUnit), (Added<SimUnit>, With<Unit>, Without<Player>)>,
 ) {
@@ -140,11 +140,11 @@ fn spawn_plates(
                     PlateName(u.id),
                     label(format!("{} {}", u.level, u.name), 13.0),
                     TextColor(if u.hostile {
-                        HOSTILE
+                        pal.hostile
                     } else if party {
                         PARTY_BLUE
                     } else {
-                        FRIENDLY
+                        pal.friendly
                     }),
                 ));
                 if u.hostile {
@@ -183,7 +183,7 @@ fn spawn_plates(
                         width: percent(100),
                         ..default()
                     },
-                    BackgroundColor(Color::srgb(0.85, 0.15, 0.12)),
+                    BackgroundColor(pal.enemy_health),
                 ));
             } else {
                 p.spawn((
@@ -193,6 +193,31 @@ fn spawn_plates(
                 ));
             }
         });
+    }
+}
+
+/// A colourblind palette switch repaints the plates already up (living units only: corpse
+/// names belong to `loot_fx`).
+fn recolor_plates(
+    pal: Res<crate::settings::Palette>,
+    sim: SimView,
+    mut names: Query<(&PlateName, &mut TextColor)>,
+    mut fills: Query<(&PlateFill, &mut BackgroundColor)>,
+) {
+    if !pal.is_changed() || pal.is_added() {
+        return;
+    }
+    for (n, mut c) in &mut names {
+        let Some(u) = sim.unit(n.0).filter(|u| u.alive) else {
+            continue;
+        };
+        if sim.players().contains(&u.id) {
+            continue;
+        }
+        c.0 = if u.hostile { pal.hostile } else { pal.friendly };
+    }
+    for (_, mut bg) in &mut fills {
+        bg.0 = pal.enemy_health;
     }
 }
 

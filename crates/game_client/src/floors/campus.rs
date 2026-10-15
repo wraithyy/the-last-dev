@@ -36,10 +36,16 @@ const NPCS: [(f32, f32); 6] = [
     (-9.0, 15.0),
 ];
 const PLAZA: (f32, f32) = (0.0, 2.0);
+/// The "First Day" onboarding corner between the arrival spot and the plaza.
+const ONBOARDING: [(&str, (f32, f32)); 3] = [
+    ("npc_hr", (-26.5, 18.0)),
+    ("npc_dummy", (-21.0, 11.5)),
+    ("npc_colleague", (-25.5, 13.5)),
+];
 
-const TOWER: (Vec2, Vec3) = (Vec2::new(0.0, -36.0), Vec3::new(36.0, 26.0, 22.0));
+pub(super) const TOWER: (Vec2, Vec3) = (Vec2::new(0.0, -36.0), Vec3::new(36.0, 26.0, 22.0));
 const DATA_CENTER: (Vec2, Vec3) = (Vec2::new(54.0, -8.0), Vec3::new(24.0, 11.0, 30.0));
-const LAB: (Vec2, Vec3) = (Vec2::new(-50.0, -36.0), Vec3::new(26.0, 9.0, 22.0));
+pub(super) const LAB: (Vec2, Vec3) = (Vec2::new(-50.0, -36.0), Vec3::new(26.0, 9.0, 22.0));
 
 fn theme() -> Theme {
     let c = Color::srgb;
@@ -130,6 +136,10 @@ pub fn build() -> FloorLayout {
             spawn
         };
         p.anchor(name, at, yaw_towards(at, target));
+    }
+    for (name, (x, z)) in ONBOARDING {
+        let at = v(x, 0.0, z);
+        p.anchor(name, at, yaw_towards(at, spawn));
     }
     for (name, (pos, yaw)) in doors {
         p.anchor(name, pos, yaw);

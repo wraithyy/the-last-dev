@@ -128,6 +128,12 @@ pub fn material(mat: Mat, t: &Theme) -> StandardMaterial {
         Mat::NeonRed => glow(LinearRgba::rgb(4.0, 0.2, 0.3)),
         Mat::Hazard => matte(c(0.95, 0.72, 0.05)),
         Mat::Sand => matte(c(0.72, 0.64, 0.45)),
+        Mat::Window => StandardMaterial {
+            base_color: c(0.1, 0.15, 0.2),
+            metallic: 0.5,
+            perceptual_roughness: 0.2,
+            ..default()
+        },
     }
 }
 
@@ -693,6 +699,12 @@ fn sign_spec(s: Sign) -> SignSpec {
             &["SPRINT PLANNING", "PICK A BUILDING", "STORY POINTS: YES"],
             [244, 246, 248],
             [30, 60, 160],
+            [210, 60, 40],
+        ),
+        Sign::ScrumBoard => sp(
+            &["DAILY STANDUP", "YESTERDAY / TODAY", "BLOCKERS: YOU"],
+            [250, 246, 230],
+            [40, 120, 70],
             [210, 60, 40],
         ),
         Sign::SprintTerminal => sp(

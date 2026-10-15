@@ -198,6 +198,28 @@ pub enum Command {
         building: String,
         level: u8,
     },
+    /// Daily Standup (`dailies.rs`): at the Scrum board, join today's dailies and the week's
+    /// Sprint Goal.
+    JoinStandup,
+    /// Claim the finished Sprint Goal at the board; `choice` picks the gear
+    /// (`Content::sprint_goal_gear`).
+    ClaimSprintGoal {
+        choice: u8,
+    },
+    /// The client is quitting: clocking out at 18:00 sharp earns "Go Home" (`live.rs`).
+    GoHome,
+    /// Companions (`pets.rs`): bring out an owned pet (`PetDef::key`), or "" to dismiss it.
+    SummonPet {
+        pet: String,
+    },
+    /// Code Review Duel (`duel.rs`): ask another group member for a 1v1.
+    DuelRequest {
+        target: EntityId,
+    },
+    /// Accept or decline the duel request aimed at you.
+    DuelRespond {
+        accept: bool,
+    },
 }
 
 /// Why an item command did nothing; routed to the player.
@@ -216,13 +238,15 @@ pub enum ItemError {
     InCombat,
     /// Talent row locked, already taken or nothing to reset.
     NotEligible,
+    /// The vendor wants a higher level for that piece (`GearDef::required_level`).
+    LevelTooLow,
 }
 
 impl ItemError {
     pub fn message(self) -> &'static str {
         match self {
             ItemError::TooFar => "Procurement only talks to you in person. Walk closer.",
-            ItemError::NotEnoughSp => "Not enough Story Points. Have you tried estimating higher?",
+            ItemError::NotEnoughSp => "Not enough Kudos. Have you tried being visible in meetings?",
             ItemError::BagFull => "Your bag is full. So is your calendar.",
             ItemError::NotForSale => "That is not in stock. Expected delivery: 3-6 weeks.",
             ItemError::NotInBag => "You don't have that. Check the other laptop.",
@@ -232,6 +256,9 @@ impl ItemError {
             ItemError::Dead => "You are dead. Equipment is the least of your problems.",
             ItemError::InCombat => "Performance reviews are not scheduled during incidents.",
             ItemError::NotEligible => "Not eligible for that promotion. Try again next cycle.",
+            ItemError::LevelTooLow => {
+                "Procurement says that is above your pay grade. Come back after a promotion."
+            }
         }
     }
 }
@@ -520,6 +547,80 @@ pub enum Event {
     SprintRefused {
         reason: crate::sprint::SprintError,
     },
+    /// The world clock: unix seconds at this tick (`Sim::set_clock`; sent to a joiner too).
+    /// Day/night and the task reset timers follow from it.
+    Clock {
+        unix_s: u64,
+    },
+    /// The player's Scrum board (routed): `open` when they walked up to it, else an update.
+    DailyBoard {
+        board: crate::dailies::BoardView,
+        open: bool,
+    },
+    /// A daily paid out, or the Sprint Goal was claimed (routed).
+    TaskCompleted {
+        key: String,
+        weekly: bool,
+        xp: u32,
+        sp: u32,
+    },
+    /// The campus world boss: a warning `secs` before it spawns, the spawn (`unit`, leaves after
+    /// `secs` unless engaged), a cancelled meeting or the kill.
+    WorldBoss {
+        state: crate::live::WorldBossState,
+        secs: u32,
+        unit: EntityId,
+    },
+    /// A player's active pet changed ("" = none); everyone sees it follow them.
+    PetChanged {
+        unit: EntityId,
+        pet: String,
+    },
+    /// A pet joined the player's collection (routed to the owner).
+    PetLearned {
+        unit: EntityId,
+        pet: String,
+    },
+    /// The Roomba swept junk off a nearby corpse into the owner's bag (routed to the owner);
+    /// `emptied` when nothing of the owner's roll is left there.
+    PetLooted {
+        unit: EntityId,
+        corpse: EntityId,
+        items: Vec<String>,
+        emptied: bool,
+    },
+    /// `from` asked `to` for a code review duel (routed to both).
+    DuelRequested {
+        from: EntityId,
+        to: EntityId,
+    },
+    /// Accepted: the arena is a circle at `center`; the fight starts in `ms`.
+    DuelCountdown {
+        a: EntityId,
+        b: EntityId,
+        center: Vec3,
+        radius_m: f32,
+        ms: u32,
+    },
+    /// The countdown is over: `a` and `b` may now hurt each other (and only each other).
+    DuelBegan {
+        a: EntityId,
+        b: EntityId,
+    },
+    /// The request or duel between `a` (asker) and `b` is over. `comments` counts the hits
+    /// that landed; `streak` is the winner's run of wins (0 without a winner).
+    DuelEnded {
+        a: EntityId,
+        b: EntityId,
+        winner: Option<EntityId>,
+        outcome: crate::duel::DuelOutcome,
+        comments: u32,
+        streak: u32,
+    },
+    /// `DuelRequest` was refused (routed to the asker).
+    DuelRefused {
+        reason: crate::duel::DuelError,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -596,6 +697,16 @@ pub struct UnitState {
     pub title: String,
     /// Player: Career Ladder pick per row (0 = none, else option 1..=3); zeros for others.
     pub talents: crate::talents::TalentPicks,
+    /// Player: the companion following them (`PetDef::key`), "" for none.
+    pub pet: String,
+    /// Player: owned pet keys, oldest first.
+    pub pets: Vec<String>,
+    /// Player: the opponent while a code review duel is being fought.
+    pub duel_foe: Option<EntityId>,
+    /// Player: duels won in a row (cosmetic).
+    pub duel_streak: u32,
+    /// Player: Performance Reviews taken so far (each makes the next one dearer).
+    pub respecs: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

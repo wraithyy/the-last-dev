@@ -225,6 +225,7 @@ impl Sim {
             self.set_respawn_point(pos, yaw);
         }
         self.load_world(id, anchors);
+        self.load_live(id, anchors);
         self.events.push(Event::ZoneLoaded {
             zone: id.to_string(),
         });

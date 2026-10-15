@@ -246,6 +246,8 @@ pub enum Mat {
     NeonRed,
     Hazard,
     Sand,
+    /// Office windows: dark glass by day, lit after dusk (`live::daynight` drives the glow).
+    Window,
 }
 
 /// Procedurally drawn textures (see `textures.rs`); several carry short text
@@ -321,6 +323,7 @@ pub enum Sign {
     GraveSprint,
     SprintBoard,
     SprintTerminal,
+    ScrumBoard,
     // data center
     ColdAisle,
     HotAisle,

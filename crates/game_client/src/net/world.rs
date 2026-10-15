@@ -407,6 +407,11 @@ impl NetWorld {
             achievements: Vec::new(),
             title: String::new(),
             talents: [0; combat_core::TALENT_ROWS],
+            pet: String::new(),
+            pets: Vec::new(),
+            duel_foe: None,
+            duel_streak: 0,
+            respecs: 0,
         })
     }
 
@@ -481,6 +486,7 @@ impl NetWorld {
                 u.equipped = p.equipped(&self.content);
                 u.title.clone_from(&p.title);
                 u.talents = p.talents;
+                u.pet.clone_from(&p.pet);
             }
         }
     }
@@ -915,7 +921,65 @@ impl NetWorld {
             }
             Event::TalentsChanged { unit, talents } => {
                 if let Some(u) = self.units.get_mut(unit) {
+                    // ponytail: the wire has no review counter; picks dropping to none online
+                    // only happen through a Performance Review (rooms start fresh).
+                    if u.talents.iter().any(|k| *k > 0) && talents.iter().all(|k| *k == 0) {
+                        u.respecs += 1;
+                    }
                     u.talents = *talents;
+                }
+            }
+            Event::PetChanged { unit, pet } => {
+                if let Some(u) = self.units.get_mut(unit) {
+                    u.pet.clone_from(pet);
+                }
+            }
+            Event::PetLearned { unit, pet } => {
+                if let Some(u) = self.units.get_mut(unit)
+                    && !u.pets.contains(pet)
+                {
+                    u.pets.push(pet.clone());
+                }
+            }
+            Event::PetLooted {
+                unit,
+                corpse,
+                emptied: true,
+                ..
+            } if *unit == you => {
+                self.my_loot.remove(corpse);
+            }
+            // The mirror marks the opponent hostile for the fight, so targeting, nameplates
+            // and right-click attack work unchanged; the server still decides every hit.
+            Event::DuelBegan { a, b } => {
+                for (me, foe) in [(*a, *b), (*b, *a)] {
+                    if let Some(u) = self.units.get_mut(&me) {
+                        u.duel_foe = Some(foe);
+                    }
+                    if me == you
+                        && let Some(f) = self.units.get_mut(&foe)
+                    {
+                        f.hostile = true;
+                    }
+                }
+            }
+            Event::DuelEnded {
+                a,
+                b,
+                winner,
+                streak,
+                ..
+            } => {
+                for p in [*a, *b] {
+                    if let Some(u) = self.units.get_mut(&p) {
+                        u.duel_foe = None;
+                        u.hostile = false;
+                        if *winner == Some(p) {
+                            u.duel_streak = *streak;
+                        } else if winner.is_some() {
+                            u.duel_streak = 0;
+                        }
+                    }
                 }
             }
             Event::ItemCooldown { item, ms } => {
@@ -1358,6 +1422,39 @@ mod tests {
             }
         }
         out
+    }
+
+    #[test]
+    fn duel_opponent_is_hostile_only_during_the_duel_and_pets_sync() {
+        let mut w = world_with(&[(2, "senior_engineer", UnitSnap::ALIVE)]);
+        w.receive_events(
+            2,
+            vec![
+                Event::DuelBegan { a: 1, b: 2 },
+                Event::PetChanged {
+                    unit: 2,
+                    pet: "roomba".into(),
+                },
+            ],
+            0.0,
+        );
+        assert!(w.units[&2].hostile && !w.units[&1].hostile);
+        assert_eq!(w.units[&1].duel_foe, Some(2));
+        assert_eq!(w.units[&2].pet, "roomba");
+        w.receive_events(
+            3,
+            vec![Event::DuelEnded {
+                a: 1,
+                b: 2,
+                winner: Some(1),
+                outcome: combat_core::DuelOutcome::Won,
+                comments: 12,
+                streak: 2,
+            }],
+            0.1,
+        );
+        assert!(!w.units[&2].hostile && w.units[&1].duel_foe.is_none());
+        assert_eq!((w.units[&1].duel_streak, w.units[&2].duel_streak), (2, 0));
     }
 
     #[test]

@@ -157,7 +157,7 @@ pub enum Event {
 
 `EntityId` here is a sim id (u64), not a Bevy `Entity`. The client keeps a mapping through the `SimUnit(EntityId)` component. Ids are never reused.
 
-## Economy (gear, Story Points, vendors)
+## Economy (gear, Kudos, vendors)
 
 Content: `Content::economy` (`content/game.ron`, section `economy`), types in `combat_core::economy`. Per player in `UnitState`: `sp`, `bag` (one entry per item, `bag_size` 24), `equipped` (by `Slot::index`: Headgear, Hoodie, Keyboard, Mug, Lanyard; `""` empty), `buyback` (last `buyback_size` sales).
 
@@ -165,12 +165,14 @@ Commands (players only, `apply_as` binds the actor): `Equip { item }` (from the 
 
 Events: `Bag { unit, sp, bag, equipped, buyback }` (owner only, after every change), `GearChanged { unit, equipped }` (everyone: it is visible), `Proc { unit, item }` (a perk, set bonus or consumable fired), `ItemCooldown { item, ms }` (owner; `item` is `"consumable"` for the shared cooldown). `LootDropped` and `Looted` carry `sp`; their `items` mix trophies (`Content::items`), gear, junk and consumables. Looting puts goods in the bag and SP in the wallet; what does not fit stays on the corpse (`ItemError::BagFull`).
 
+`Command::Buy` also checks `GearDef::required_level()` against the buyer's level (`ItemError::LevelTooLow`). Prices come from `GearDef::price()` (docs/FORMULAS.md, Kudos).
+
 Loot uses its own rng stream (`loot_rng`), so changing drop tables never shifts combat replays. Perks (`Perk`) hook into damage, heals, mana cost, cooldowns, spell resolution and taking damage; item spells are ordinary content spells (ids 900+) resolved by `fire_item_spell` without mana, cooldown or cast bar. Saves: `Sim::export_save` / `import_save` and `SaveData::encode` / `decode` (versioned text, tolerant of unknown names and bad numbers).
 
 ## Career Ladder (talents.rs)
 
 - Content: `talents: (respec_sp_per_level, classes: [(class, rows: [(level, name, options: [(key, name, icon, title, text, perks)])])])`, 5 rows x 3 options per class, rising levels; perks are economy `Perk`s (validated like gear perks; no `OnUse`).
-- State: `UnitState::talents: [u8; 5]` (0 = none, 1..=3). `Command::PickTalent { row, choice }` (row open by level, unpicked, alive, out of combat) and `Command::ResetTalents` (any pick, out of combat, `respec_sp_per_level * level` SP); failures are `ItemError::{NotEligible, InCombat, NotEnoughSp, Dead}`. `Event::TalentsChanged { unit, talents }` goes to everyone; picking row 5 wears its key as the title (`TitleChanged`), a reset takes it off.
+- State: `UnitState::talents: [u8; 5]` (0 = none, 1..=3). `Command::PickTalent { row, choice }` (row open by level, unpicked, alive, out of combat) and `Command::ResetTalents` (any pick, out of combat, `Talents::respec_cost(level, UnitState::respecs)` Kudos, growing per review); failures are `ItemError::{NotEligible, InCombat, NotEnoughSp, Dead}`. `Event::TalentsChanged { unit, talents }` goes to everyone; picking row 5 wears its key as the title (`TitleChanged`), a reset takes it off.
 - Talent perks join the gear perks in `Unit::perks`. New perk kinds: `CastTime`, `CastWhileMoving`, `Splash`, `OnKill`, `Reset`, `Replace`, `Periodic`, `ManaReturn`, `HpCost`, `DamageTaken`; `ManaCost` may be negative, `Leech` may name a spell. A perk naming a bar spell also applies to its `Replace` variant. `Sim::cooldown` and casts of a replaced bar spell use the variant; `PerkView` gives the HUD the same cost, cast time and cooldown math.
 - Save version 2 adds `talents=a,b,c,d,e`; version 1 saves load with no picks. Protocol: `PlayerSnap::talents`, the two commands and the event.
 
@@ -194,6 +196,17 @@ Content: `Content::sprint` (`content/game.ron`, section `sprint`), rules in `com
 - Clock: from the first stage's arrival; `death_penalty_ms` per player death. A stage ends when its boss dies (bossless: no trash left). The run ends after the last stage once `forces_need_pct` of its trash is dead or none is left: `Delivered` when the scope is met and time <= par (`par_ms * (100 + par_pct_per_level * (level - 1)) / 100`), else `CarriedOver`. `upgrade_for` / `next_level` give the keystone change; `Sim::sprint_key(player, building)` the next recommended level, `sprint_records(player)` delivered runs (5 per building), both in `SaveData` (`sprint_keys`, `sprint_records`).
 - Events: `SprintStarted { status, zones }`, `SprintProgress { status }` (once a second), `SprintAffix { affix, unit, text }`, `SprintEnded { result, time_ms, upgrade, summary }` (meter per member, chest per member, next level); `SprintStatus` carries building, level, affixes, par, elapsed, penalty, forces %, bosses, stage and Technical Debt stacks. `retro_lines(result, summary)` writes the review's retrospective.
 - QA: `Sim::debug_end_sprint(delivered)`, `sprint_last_result()`.
+
+## Live world (live.rs, dailies.rs)
+
+Content: `Content::live` (`content/game.ron`, section `live`): `board: Option<(zone, npc, anchor)>`, `per_day`, reward knobs, `dailies` / `weeklies: [(key, name, text, goals: [Goal], title)]`, `boss: Option<WorldBossDef>`, `night: (zone, spawns: [(anchor, unit)], respawn_ms, ambient: [(unit, lines)])`.
+
+- Clock: `Sim::set_clock(unix_s)` anchors the world clock at the current tick (the client offline with the device clock, the server per room) and emits `Event::Clock { unix_s }` (also to every member who joins later). `unix_s()`, `unix_secs_f64()`, `game_minute()`, `is_night()`, `clock_on()`. Without a clock (tests, golden replays) there is no world boss and no night, and the date is day 0. Helpers in `combat_core::live`: `game_minute`, `is_night_minute`, `darkness`, `day_index`, `week_index`, `secs_to_day_reset`, `secs_to_week_reset`.
+- Tasks: `Sim::task_board(player) -> BoardView { day, week, tasks: [TaskView { key, weekly, state: Open|Active|Ready|Done, goals: [GoalView { goal: GoalSpec, count, need }], xp, sp, level }] }` (today's dailies then the weekly). `GoalSpec`: `Kill { zone, unit }`, `Elite`, `Loot`, `Props`, `Output`, `Sprint { level }`, `Idle { zone }`, `Talk { unit }`, `Night`, `WorldBoss`. `Content::daily_rotation(day)`, `weekly_rotation(week)`, `task_reward`, `sprint_goal_gear(level, role)`, `gear_choices(tier, epic, role)` (quest gear uses it too); `Sim::work_zone(level)`.
+- Commands: `JoinStandup` (within reach of the Scrum Master Bot or a `ScrumBoard` prop: every Open task becomes Active), `ClaimSprintGoal { choice }` (the Ready weekly at the board; a full bag refuses with `ItemError::BagFull`), `GoHome` (between 18:00 and 18:10 game time: achievements with `Trigger::Event("go_home")`). Talking to the bot or using a `ScrumBoard` prop sends `DailyBoard { board, open: true }`; progress sends `DailyBoard { open: false }` at most once a second (routed). A finished daily pays at once: `TaskCompleted { key, weekly, xp, sp }` (routed), `XpGained`, `Bag`; a finished weekly turns Ready. Credit: kills via `record_kill` (shared like quest kill credit), `Looted` items, `Interacted` (not the boards), `Damage` + `Heal` amounts, `SprintEnded` (not abandoned, level at least the goal's), `Talk`, standing still out of combat in the zone (Idle, reset by moving). Saves: `SaveData::tasks_day`, `tasks_week`, `tasks: [SavedTask]` (`tasks_date=day*week`, `tasks=key*weekly*state*level*counts`); stale dates are cleared on the next second.
+- World boss: counts down `every_ms` while the group is in its zone (not during a Sprint) and the layout has its anchor; `WorldBoss { state: Warning, secs }` at `warn_ms` and at 60 s, then the spawn (`Spawned`, `unit`, a yell). Not engaged within `idle_ms`: the cancel yell, `Despawned`, `Cancelled`. Killed: `Defeated` and achievements with `Trigger::Event(<unit key>)` for every member. Leaving the zone despawns it and restarts the countdown. `world_boss_in()`, `world_boss_unit()`, debug `debug_world_boss_in(secs)`.
+- Night: from 18:00 to 06:00 game time the `night.spawns` appear at layout anchors `night_<n>` of `night.zone` at the highest group level, come back `respawn_ms` after a death while it is night, and leave at dawn once out of combat. Friendly units listed in `night.ambient` say those lines instead of their day ambient. `Content::is_night_unit(key)`.
+- Protocol 13 carries the three commands and four events; `check_event` bounds the board (64 tasks, 64 goals, short keys).
 
 ## Co-op group
 

@@ -100,6 +100,14 @@ pub struct SprintDef {
     pub buildings: Vec<SprintBuilding>,
     pub affixes: Vec<AffixDef>,
     pub reward: SprintRewardDef,
+    /// Per-kill Story Points and drop chances inside a run, percent of a normal zone's: the
+    /// end chest pays the rest.
+    #[serde(default = "full_pct")]
+    pub kill_loot_pct: u32,
+}
+
+fn full_pct() -> u32 {
+    100
 }
 
 /// What an affix does; content names it by key.
@@ -581,6 +589,49 @@ impl Sim {
         self.live_run().is_some_and(|r| r.has(a))
     }
 
+    /// Per-kill loot scale in percent: `kill_loot_pct` in a run, 100 outside.
+    pub(crate) fn sprint_kill_loot_pct(&self) -> u32 {
+        self.live_run()
+            .map_or(100, |_| self.sprint_def().kill_loot_pct)
+    }
+
+    /// Leaving a stage: each player's unclaimed corpse loot goes into their bag, since the
+    /// timer leaves no time to walk back and the floor's corpses are gone after the load.
+    fn sprint_sweep_loot(&mut self) {
+        let in_stage = self.sprint.run.as_ref().is_some_and(|r| {
+            r.started.is_some() && self.zone.as_ref().is_some_and(|z| r.stages.contains(z))
+        });
+        if !in_stage {
+            return;
+        }
+        for ci in 0..self.units.len() {
+            let u = &self.units[ci];
+            if u.despawned || u.state.alive || !u.state.lootable {
+                continue;
+            }
+            for p in self.players.clone() {
+                if let Some(li) = self.index(p) {
+                    self.claim_loot(li, ci);
+                }
+            }
+            // A full bag would leave shares on a corpse the load is about to remove: liquidate
+            // them for Kudos instead of losing them silently.
+            for share in std::mem::take(&mut self.units[ci].loot) {
+                let Some(li) = share.owner.and_then(|o| self.index(o)) else {
+                    continue;
+                };
+                let value: u32 = share
+                    .items
+                    .iter()
+                    .map(|n| self.economy().sell_price(n).unwrap_or(0))
+                    .sum();
+                let sp = &mut self.units[li].state.sp;
+                *sp = sp.saturating_add(value.saturating_add(share.sp));
+            }
+            self.units[ci].state.lootable = false;
+        }
+    }
+
     pub(crate) fn sprint_keys_of(&self, player: EntityId) -> Vec<(String, u8)> {
         self.sprint
             .keys
@@ -765,6 +816,7 @@ impl Sim {
     /// Called by `load_zone` before it spawns anything: the expected stage continues the run,
     /// any other zone abandons it (or closes an ended one).
     pub(crate) fn sprint_on_load(&mut self, id: &str) {
+        self.sprint_sweep_loot();
         let Some(run) = self.sprint.run.as_mut() else {
             self.sprint.travel = None;
             return;
@@ -1509,6 +1561,7 @@ impl Sim {
                         name: String::new(),
                     });
                 self.sort_records(p);
+                self.sprint_pets(p, level);
             }
             if result != SprintResult::Abandoned {
                 rewards.push(self.grant_chest(p, level, result));

@@ -98,6 +98,7 @@ fn spawn_window(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
             })
             .with_children(|h| {
                 h.spawn((HeaderText, label("~/whoami", 14.0), TextColor(DIM)));
+                h.spawn((crate::social::PetsButton, Button, label("[~/pets]", 14.0)));
                 h.spawn((SheetClose, Button, label("[x]", 14.0)));
             });
             c.spawn(Node {
@@ -292,7 +293,7 @@ fn rebuild(
             Some(Goods::Consumable(_)) => Some(TileAction::Use(name.clone())),
             _ => None,
         };
-        let upgrade = goods::is_upgrade(content, &name, &equipped, role);
+        let ord = goods::compare(content, &name, &equipped, role);
         let mut tile = commands.spawn((
             item_tile(content, &mut icons, &assets, &name, BAG_TILE, count),
             TileItem(name.clone()),
@@ -300,18 +301,8 @@ fn rebuild(
         if let Some(a) = action {
             tile.insert(a);
         }
-        if upgrade {
-            // Green corner flag: worth equipping.
-            tile.with_child((
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: px(1),
-                    top: px(-1),
-                    ..default()
-                },
-                label("+", 15.0),
-                TextColor(goods::UPGRADE_GREEN),
-            ));
+        if let Some(b) = super::compare_badge(ord) {
+            tile.with_child(b);
         }
         let id = tile.id();
         commands.entity(*grid).add_child(id);
@@ -339,7 +330,7 @@ fn rebuild(
         goods::gear_score(content, &equipped)
     );
     let mut stats = vec![
-        format!("{} Story Points", me.sp),
+        format!("Wallet: {}", crate::copy::kudos(me.sp)),
         format!("HP {} / mana {}", me.max_hp, me.max_mana),
         String::new(),
     ];
@@ -379,7 +370,10 @@ fn rebuild(
 fn tiles(
     ui: Res<EconomyUi>,
     sim: SimView,
+    touch: Res<crate::touch::TouchMode>,
+    touches: Res<bevy::input::touch::Touches>,
     mut hover: ResMut<HoverItem>,
+    mut inspect: ResMut<super::Inspect>,
     mut pending: ResMut<PendingCommands>,
     tiles: Query<(&Interaction, &TileItem, Option<&TileAction>), Changed<Interaction>>,
     hovered: Query<(&Interaction, &TileItem)>,
@@ -389,15 +383,18 @@ fn tiles(
     }
     for (i, item) in &hovered {
         if *i != Interaction::None {
-            hover.0 = Some(item.0.clone());
+            hover.set(&item.0, false);
         }
     }
-    for (i, _, action) in &tiles {
+    for (i, item, action) in &tiles {
         if *i != Interaction::Pressed {
             continue;
         }
         // While the shop is open, bag clicks sell instead (the shop window handles those).
         if ui.shop.is_some() && !matches!(action, Some(TileAction::Unequip(_))) {
+            continue;
+        }
+        if !inspect.gate(touch.active, &item.0, false, super::tap_position(&touches)) {
             continue;
         }
         match action {
@@ -559,7 +556,7 @@ fn gadgets(
         }
         *border = BorderColor::all(goods::name_color(sim.content(), item));
         if *interaction == Interaction::Hovered {
-            hover.0 = Some(item.clone());
+            hover.set(item, false);
         }
         let pressed = *interaction == Interaction::Pressed
             || (!paused.0 && binds.just(&keys, Action::Gadget(b.0 as u8)));

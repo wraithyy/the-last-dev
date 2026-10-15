@@ -48,10 +48,31 @@ pub fn is_elite(key: &str) -> bool {
     )
 }
 
+/// The wallet's flavour line (HUD tooltip and the vendor header).
+pub const KUDOS_FLAVOUR: &str = "Kudos: redeemable for nothing, except here.";
+
+/// "1,240": digit groups for wallet amounts.
+pub fn thousands(n: u32) -> String {
+    let s = n.to_string();
+    let mut out = String::new();
+    for (k, ch) in s.chars().enumerate() {
+        if k > 0 && (s.len() - k).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(ch);
+    }
+    out
+}
+
+/// "1,240 Kudos": the one way the currency is written.
+pub fn kudos(n: u32) -> String {
+    format!("{} Kudos", thousands(n))
+}
+
 /// Green used for trophy bonuses everywhere (loot window, log, inventory).
 pub const BONUS_GREEN: Color = Color::srgb(0.3, 0.9, 0.4);
 
-/// "+8 HP, +1 SP, +1.5% crit": only the non-zero parts, empty when there are none.
+/// "+8 HP, +1 spell power, +1.5% crit": only the non-zero parts, empty when there are none.
 pub fn bonus_text(t: &ItemTotals) -> String {
     let mut parts = Vec::new();
     if t.max_hp > 0 {
@@ -61,7 +82,7 @@ pub fn bonus_text(t: &ItemTotals) -> String {
         parts.push(format!("+{} mana", t.max_mana));
     }
     if t.spell_power > 0 {
-        parts.push(format!("+{} SP", t.spell_power));
+        parts.push(format!("+{} spell power", t.spell_power));
     }
     if t.crit_tenths > 0 {
         parts.push(format!("+{}% crit", tenths(t.crit_tenths)));
@@ -104,7 +125,7 @@ pub const VICTORY_SUBTITLE: &str =
     "The board calls it a hybrid architecture. The AGI asked for a raise.";
 
 /// The zone transition overlay.
-pub const LOADING_LINE: &str = "Loading next sprint...";
+pub const LOADING_LINE: &str = "Loading next floor... the open space is extra loud today.";
 
 /// One per transition, in order.
 pub const LOADING_TIPS: [&str; 12] = [
@@ -121,10 +142,12 @@ pub const LOADING_TIPS: [&str; 12] = [
     "Tip: Locked doors list their requirements. The requirements were not generated, so they are correct.",
     "Tip: The board measures AI adoption in tokens burned. Please do not turn the lights off on your way out.",
 ];
-pub const VICTORY_PROMPT: &str = "Press R to start a new sprint.";
+pub const VICTORY_PROMPT: &str = "Press R to start a new fiscal year.";
+/// Victory screen button: the cleared world stays, every door open (post-game).
+pub const VICTORY_CAMPUS: &str = "cd ~/campus  (Enter: post-game, everything stays unlocked)";
 /// The server owns an online run, so R does nothing there.
 pub const VICTORY_PROMPT_ONLINE: &str =
-    "Restart is offline only. Leave the room to start a new sprint.";
+    "Restart is offline only. Leave the room to start a new fiscal year.";
 
 /// End credits, rendered as a commit log.
 pub const CREDITS: [&str; 7] = [
@@ -149,6 +172,14 @@ mod tests {
     }
 
     #[test]
+    fn kudos_amounts_group_thousands() {
+        assert_eq!(kudos(0), "0 Kudos");
+        assert_eq!(kudos(999), "999 Kudos");
+        assert_eq!(kudos(1240), "1,240 Kudos");
+        assert_eq!(thousands(1_234_567), "1,234,567");
+    }
+
+    #[test]
     fn bonus_text_lists_only_set_parts_and_keeps_tenths() {
         let t = ItemTotals {
             max_hp: 18,
@@ -156,7 +187,7 @@ mod tests {
             crit_tenths: 15,
             ..ItemTotals::default()
         };
-        assert_eq!(bonus_text(&t), "+18 HP, +2 SP, +1.5% crit");
+        assert_eq!(bonus_text(&t), "+18 HP, +2 spell power, +1.5% crit");
         let t = ItemTotals {
             crit_tenths: 10,
             mana_regen: 3,

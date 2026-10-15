@@ -1,4 +1,4 @@
-//! Economy: gear (five visible slots, rarity, role-weighted stats, perks, sets), Story Points,
+//! Economy: gear (five visible slots, rarity, role-weighted stats, perks, sets), Kudos (`sp`),
 //! junk, consumables and vendors. Content lives in `Content::economy`; per-player state lives in
 //! `UnitState` (`sp`, `bag`, `equipped`, `buyback`). See docs/FORMULAS.md, Gear.
 
@@ -92,7 +92,7 @@ impl Rarity {
     }
 
     fn price_base(self) -> u32 {
-        [8, 20, 50, 120, 300][self as usize]
+        [8, 20, 50, 150, 400][self as usize]
     }
 }
 
@@ -255,8 +255,8 @@ pub struct GearDef {
 }
 
 /// Per-slot stats at budget 100: max HP, mana, spell power, crit (tenths), haste (tenths),
-/// mana per 5 s, armour (tenths), power (tenths).
-fn role_package(role: Option<Role>) -> [u64; 8] {
+/// mana per 5 s, armour (tenths), power (tenths). Also what a role values when comparing gear.
+pub fn role_package(role: Option<Role>) -> [u64; 8] {
     match role {
         Some(Role::Ranged) => [0, 15, 6, 12, 20, 0, 0, 35],
         Some(Role::Melee) => [30, 0, 6, 18, 0, 0, 0, 35],
@@ -314,7 +314,15 @@ impl GearDef {
         if self.price > 0 {
             return self.price;
         }
-        self.rarity.price_base() * (2 + u32::from(self.ilvl)) / 4
+        // Linear in ilvl like zone income, so a tier's Rare costs one to two zones of play.
+        self.rarity.price_base() * (3 * u32::from(self.ilvl) + 2)
+    }
+
+    /// Level a vendor wants before selling the piece: the bottom of its tier's zone band
+    /// (ilvl - 1), one more for Epic and up. Drops ignore it.
+    pub fn required_level(&self) -> u8 {
+        let epic = u8::from(self.rarity >= Rarity::Epic);
+        (self.ilvl.saturating_sub(1) + epic).max(1)
     }
 }
 
@@ -753,7 +761,7 @@ impl PerkView<'_> {
 }
 
 impl Sim {
-    fn economy(&self) -> &Economy {
+    pub(crate) fn economy(&self) -> &Economy {
         &self.content.economy
     }
 
@@ -1251,6 +1259,10 @@ impl Sim {
             return self.item_error(pid, ItemError::NotForSale);
         }
         let price = self.economy().goods(item).map_or(u32::MAX, |g| g.price());
+        let need = self.economy().gear(item).map_or(1, GearDef::required_level);
+        if self.units[pi].state.level < need {
+            return self.item_error(pid, ItemError::LevelTooLow);
+        }
         if self.units[pi].state.sp < price {
             return self.item_error(pid, ItemError::NotEnoughSp);
         }
@@ -1318,6 +1330,14 @@ impl Sim {
             let Some(k) = self.units[pi].state.bag.iter().position(|n| n == item) else {
                 return self.item_error(pid, ItemError::NotInBag);
             };
+            // A pet carrier is opened, not drunk: no shared cooldown, kept if already owned.
+            if let Some(learned) = self.use_carrier(pid, item) {
+                if learned {
+                    self.units[pi].state.bag.remove(k);
+                    self.bag_event(pi);
+                }
+                return;
+            }
             if !self.item_cd_ready(pi, "consumable") {
                 return self.item_error(pid, ItemError::NotReady);
             }
@@ -1412,6 +1432,7 @@ impl Sim {
         role: Option<Role>,
     ) -> (Vec<String>, u32) {
         let freeze = self.sprint_has(crate::sprint::Affix::BudgetFreeze);
+        let scale = self.sprint_kill_loot_pct();
         let u = &self.units[mob];
         let d = &self.content.units[u.def];
         if !d.hostile || u.summoner.is_some() || d.ai.is_none() {
@@ -1432,6 +1453,7 @@ impl Sim {
         let sp = (level * eco.sp_per_level + rng.below(level + 1)) * mult.max(1);
         // Sprint Budget Freeze: no Story Points, but the loot budget doubles.
         let (sp, loot_mult) = if freeze { (0, 2) } else { (sp, 1) };
+        let sp = sp * scale / 100;
         let mut items = Vec::new();
         let gear_pct = if boss {
             100
@@ -1440,7 +1462,7 @@ impl Sim {
         } else {
             eco.trash_gear_pct
         };
-        let gear_pct = (gear_pct * loot_mult).min(100);
+        let gear_pct = (gear_pct * loot_mult * scale / 100).min(100);
         let tier = u.state.level.div_ceil(2).max(1);
         if rng.chance_pct(gear_pct) {
             let weights = if boss {
@@ -1502,7 +1524,7 @@ impl Sim {
                 };
                 items.push(k.name.clone());
             }
-        } else if !eco.junk.is_empty() && rng.chance_pct(eco.junk_pct) {
+        } else if !eco.junk.is_empty() && rng.chance_pct(eco.junk_pct * scale / 100) {
             let k = rng.below(eco.junk.len() as u32) as usize;
             items.push(eco.junk[k].name.clone());
         }

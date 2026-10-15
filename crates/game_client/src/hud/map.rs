@@ -292,7 +292,12 @@ fn update_map(
     paused: Res<Paused>,
     sim: SimView,
     flow: Res<GameFlow>,
-    (mut windows, track): (ResMut<QuestWindows>, Res<super::quests::QuestTrack>),
+    (mut windows, track, live, time): (
+        ResMut<QuestWindows>,
+        Res<super::quests::QuestTrack>,
+        Res<crate::live::LiveState>,
+        Res<Time>,
+    ),
     mut view: ResMut<MapView>,
     mut images: ResMut<Assets<Image>>,
     mut root: Single<&mut Node, (With<MapRoot>, Without<PlayerDot>)>,
@@ -360,6 +365,13 @@ fn update_map(
             }
         })
         .collect();
+    // The Board Meeting's spot while its countdown runs.
+    let mut marks = marks;
+    if live.boss_in(time.elapsed_secs()).is_some_and(|s| s > 0)
+        && let Some((_, pos, _)) = flow.anchors.iter().find(|a| a.0 == "world_boss")
+    {
+        marks.push((view.to_canvas(*pos), "B", super::ACCENT_WARM));
+    }
     // Zones where a tracked quest still has work, for the tree.
     let quest_zones: Vec<String> = super::quests::tracked(&*sim, &track)
         .into_iter()

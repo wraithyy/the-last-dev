@@ -96,6 +96,20 @@ mod platform {
         let _ = std::fs::write(p, text);
     }
 
+    pub fn load_settings() -> Option<String> {
+        std::fs::read_to_string(path()?.with_file_name("settings.txt")).ok()
+    }
+
+    pub fn save_settings(text: &str) {
+        let Some(p) = path().map(|p| p.with_file_name("settings.txt")) else {
+            return;
+        };
+        if let Some(dir) = p.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let _ = std::fs::write(p, text);
+    }
+
     pub fn load_class() -> Option<String> {
         let p = path()?.with_file_name("class.txt");
         let s = std::fs::read_to_string(p).ok()?;
@@ -166,6 +180,18 @@ mod platform {
         }
     }
 
+    const SETTINGS: &str = "tld.settings";
+
+    pub fn load_settings() -> Option<String> {
+        storage()?.get_item(SETTINGS).ok().flatten()
+    }
+
+    pub fn save_settings(text: &str) {
+        if let Some(s) = storage() {
+            let _ = s.set_item(SETTINGS, text);
+        }
+    }
+
     const CLASS: &str = "tld.class";
 
     pub fn load_class() -> Option<String> {
@@ -192,7 +218,8 @@ mod platform {
 }
 
 pub use platform::{
-    load, load_class, load_hud, load_keys, page, save, save_class, save_hud, save_keys,
+    load, load_class, load_hud, load_keys, load_settings, page, save, save_class, save_hud,
+    save_keys, save_settings,
 };
 
 #[cfg(test)]

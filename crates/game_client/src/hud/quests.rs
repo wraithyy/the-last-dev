@@ -23,16 +23,16 @@ pub const GREY_MARK: Color = Color::srgb(0.62, 0.64, 0.7);
 const DONE_GREEN: Color = Color::srgb(0.4, 1.0, 0.5);
 const DONE_GREY: Color = Color::srgb(0.5, 0.53, 0.58);
 const WINDOW_W: f32 = 460.0;
-const TRACKER_W: f32 = 290.0;
+pub(crate) const TRACKER_W: f32 = 290.0;
 /// Quests the tracker shows at most; touch screens have less room under the minimap.
 const TRACKER_MAX: usize = 6;
 const TRACKER_MAX_TOUCH: usize = 3;
 const TOAST_SECS: f32 = 2.5;
-const TRACKER_TOP: f32 = super::BELOW_MINIMAP + 34.0;
+pub(crate) const TRACKER_TOP: f32 = super::BELOW_MINIMAP + 34.0;
 /// Height kept free for the chat / combat log / meter windows docked bottom right.
 const DOCK_RESERVE: f32 = 230.0;
 /// Touch layout: under the player frame on the left, above the move stick.
-const TOUCH_TOP: f32 = 120.0;
+pub(crate) const TOUCH_TOP: f32 = 120.0;
 const TOUCH_RESERVE: f32 = 340.0;
 /// Rough height of one tracker text line, for the fit check.
 const LINE_PX: f32 = 16.0;
@@ -383,6 +383,7 @@ fn spawn_quest_ui(mut commands: Commands) {
         .id();
     commands.spawn((
         Tracker,
+        crate::onboarding::Spot::Tracker,
         ChildOf(area),
         Node {
             padding: UiRect::all(px(8)),
@@ -491,7 +492,7 @@ fn objectives(c: &mut ChildSpawnerCommands, content: &Content, sim: &dyn SimRead
     }
 }
 
-/// Reward block: XP and SP, the trophy (hover for its joke) and the "choose one" gear row.
+/// Reward block: XP and Kudos, the trophy (hover for its joke) and the "choose one" gear row.
 fn reward(
     c: &mut ChildSpawnerCommands,
     sim: &dyn SimRead,
@@ -506,7 +507,7 @@ fn reward(
     let sp = (u64::from(def.reward.xp) * u64::from(content.economy.quest_sp_pct) / 100) as u32
         + def.reward.sp;
     let xp = if def.reward.xp > 0 {
-        format!("+{} XP   +{sp} SP", content.quest_xp(def))
+        format!("+{} XP   +{sp} Kudos", content.quest_xp(def))
     } else {
         "Exposure".into()
     };
@@ -521,7 +522,14 @@ fn reward(
         text(c, "Choose one:", 12.0, DIM);
         for (k, name) in choices.iter().enumerate() {
             let picked = usize::from(choice).min(choices.len() - 1) == k;
-            let lines = goods::tooltip(content, name, &[], role);
+            let viewer = goods::Viewer {
+                equipped: &[],
+                role,
+                level: 1,
+                kudos: 0,
+                buying: false,
+            };
+            let lines = goods::tooltip(content, name, &viewer).main;
             c.spawn((
                 ActionButton(Action::Choose(k as u8)),
                 Button,
@@ -980,11 +988,15 @@ fn update_log(
             h.spawn((label("~/jira  (J to close)", 14.0), TextColor(DIM)));
             button(h, "", "x", Action::CloseLog, false);
         });
-        let tracked_n = log.active.iter().filter(|q| track.is_tracked(&q.id)).count();
+        let tracked_n = log
+            .active
+            .iter()
+            .filter(|q| track.is_tracked(&q.id))
+            .count();
         text(
             c,
             format!(
-                "{} open ({tracked_n} tracked), {} closed. Velocity: whatever the dashboard needs it to be.",
+                "{} open ({tracked_n} tracked), {} closed. OKR status: green, decided in advance.",
                 log.active.len(),
                 log.completed.len()
             ),
@@ -1079,6 +1091,8 @@ fn update_tracker(
     mut area: Single<(&mut Node, &ComputedNode), (With<TrackerArea>, Without<Tracker>)>,
     mut shown: ResMut<Shown>,
     mut tracker: Single<(Entity, &mut Node), With<Tracker>>,
+    live: Res<crate::live::LiveTracker>,
+    sprint: Res<crate::sprint::SprintHud>,
 ) {
     let (area_node, computed) = &mut *area;
     // Touch: the right side holds the buttons, so the tracker moves under the player frame
@@ -1097,7 +1111,9 @@ fn update_tracker(
     let room = computed.size().y * computed.inverse_scale_factor();
     let (root, node) = &mut *tracker;
     let list = tracked(&*sim, &track);
-    let visible = !list.is_empty() && !trophies.0 && !windows.map;
+    // A sprint's run panel takes the tracker's slot, as WoW's challenge timer does.
+    let visible =
+        (!list.is_empty() || !live.is_empty()) && !trophies.0 && !windows.map && !sprint.active;
     node.display = if visible {
         Display::Flex
     } else {
@@ -1110,13 +1126,16 @@ fn update_tracker(
     };
     // Whole quests only, as many as fit the area; before its first layout it reads 0: show all.
     let room = if room > 0.0 { room } else { f32::MAX };
-    let sig = format!("{list:?}|{}|{max}|{room:.0}", track.collapsed);
+    let sig = format!("{list:?}|{}|{max}|{room:.0}|{}", track.collapsed, live.sig);
     if !visible || sig == shown.tracker {
         return;
     }
     shown.tracker = sig;
     let content = sim.content();
-    let mut used = LINE_PX * 2.0;
+    // Daily Standup lines and the Board Meeting countdown go first, then the quests that fit.
+    let live_lines: usize =
+        live.entries.iter().map(|e| e.2.len() + 1).sum::<usize>() + live.footer.len();
+    let mut used = LINE_PX * (2 + live_lines) as f32;
     let entries: Vec<(String, String, Vec<(String, Line)>)> = list
         .iter()
         .take(max)
@@ -1144,7 +1163,10 @@ fn update_tracker(
         })
         .with_children(|h| {
             h.spawn((
-                label(format!("~/jira  Objectives ({})", list.len()), 12.0),
+                label(
+                    format!("~/jira  Objectives ({})", list.len() + live.entries.len()),
+                    12.0,
+                ),
                 TextColor(ACCENT),
             ));
             h.spawn((
@@ -1163,6 +1185,27 @@ fn update_tracker(
         });
         if collapsed {
             return;
+        }
+        for (title, color, lines) in &live.entries {
+            c.spawn((
+                label(title.clone(), 13.0),
+                TextColor(*color),
+                Node {
+                    margin: UiRect::top(px(3)),
+                    ..default()
+                },
+            ));
+            for (line, state) in lines {
+                let (mark, color) = match state {
+                    Line::Pending => ("  - ", Color::srgb(0.82, 0.86, 0.92)),
+                    Line::Done => ("  \u{2713} ", DONE_GREY),
+                    Line::Ready => ("  ", GOLD),
+                };
+                text(c, format!("{mark}{line}"), 11.5, color);
+            }
+        }
+        for (line, color) in &live.footer {
+            text(c, format!("  {line}"), 11.0, *color);
         }
         for (id, name, lines) in entries {
             let ready = lines.last().is_some_and(|(_, l)| *l == Line::Ready);

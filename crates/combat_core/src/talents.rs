@@ -1,6 +1,6 @@
 //! Career Ladder: at five levels each class takes one of three promotions. A talent is a list of
 //! economy perks (spell modifiers, procs, spell variants), so it runs through the same hooks as
-//! gear. Picks live in `UnitState::talents`; resetting them costs Story Points (Performance
+//! gear. Picks live in `UnitState::talents`; resetting them costs Kudos (Performance
 //! Review). See docs/GAME_DESIGN.md, Career Ladder.
 
 use crate::content::{Content, ContentError, SpellId};
@@ -46,8 +46,10 @@ pub struct ClassTalents {
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct Talents {
-    /// Resetting every pick costs this many Story Points per character level.
+    /// Resetting every pick costs this many Kudos per character level...
     pub respec_sp_per_level: u32,
+    /// ...plus this percent of that for every earlier Performance Review.
+    pub respec_growth_pct: u32,
     pub classes: Vec<ClassTalents>,
 }
 
@@ -116,8 +118,11 @@ impl Talents {
             .find(|t| t.key == key)
     }
 
-    pub fn respec_cost(&self, level: u8) -> u32 {
-        self.respec_sp_per_level * u32::from(level)
+    /// Cost of the next Performance Review after `done` earlier ones.
+    pub fn respec_cost(&self, level: u8, done: u32) -> u32 {
+        let base = u64::from(self.respec_sp_per_level * u32::from(level));
+        let pct = 100 + u64::from(self.respec_growth_pct) * u64::from(done);
+        (base * pct / 100).min(u64::from(u32::MAX)) as u32
     }
 
     /// Drops picks the class does not have or the level does not allow yet.
@@ -279,13 +284,13 @@ impl Sim {
         }
     }
 
-    /// Performance Review: clears every pick for `respec_sp_per_level * level` Story Points.
+    /// Performance Review: clears every pick for `respec_cost` Kudos (it grows per review).
     pub(crate) fn reset_talents(&mut self, pid: EntityId) {
         let Some(i) = self.index(pid).filter(|_| self.is_player(pid)) else {
             return;
         };
         let s = &self.units[i].state;
-        let cost = self.content.talents.respec_cost(s.level);
+        let cost = self.content.talents.respec_cost(s.level, s.respecs);
         if s.talents.iter().all(|k| *k == 0) {
             return self.item_error(pid, ItemError::NotEligible);
         }
@@ -300,6 +305,7 @@ impl Sim {
         }
         let s = &mut self.units[i].state;
         s.sp -= cost;
+        s.respecs = s.respecs.saturating_add(1);
         s.talents = [0; TALENT_ROWS];
         let worn_capstone = self.content.talents.capstone(&s.title).is_some();
         if worn_capstone {

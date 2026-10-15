@@ -98,10 +98,7 @@ impl Plugin for TouchPlugin {
                 .after(UiSystems::Focus)
                 .after(collect_input),
         )
-        .add_systems(
-            Update,
-            (detect_touch, apply_mode, draw_stick, mobile_quality),
-        );
+        .add_systems(Update, (detect_touch, apply_mode, draw_stick, tag_spots));
     }
 }
 
@@ -129,31 +126,22 @@ pub fn initial_resolution() -> bevy::window::WindowResolution {
     res
 }
 
+/// Onboarding highlight anchors on the touch buttons it points at.
+fn tag_spots(mut commands: Commands, buttons: Query<(Entity, &TouchButton), Added<TouchButton>>) {
+    for (e, b) in &buttons {
+        if let TouchButton::Act(a) = b {
+            commands
+                .entity(e)
+                .insert(crate::onboarding::Spot::Touch(*a));
+        }
+    }
+}
+
 fn detect_touch(mut touches: MessageReader<TouchInput>, mut mode: ResMut<TouchMode>) {
     if !mode.active && touches.read().next().is_some() {
         mode.active = true;
     }
     touches.clear();
-}
-
-/// Cheaper preset for phones: no shadow map, no bloom pass. Desktop is untouched.
-fn mobile_quality(
-    mode: Res<TouchMode>,
-    mut commands: Commands,
-    mut lights: Query<&mut DirectionalLight, Added<DirectionalLight>>,
-    blooms: Query<Entity, Added<bevy::post_process::bloom::Bloom>>,
-) {
-    if !mode.mobile {
-        return;
-    }
-    for mut l in &mut lights {
-        l.shadow_maps_enabled = false;
-    }
-    for e in &blooms {
-        commands
-            .entity(e)
-            .remove::<bevy::post_process::bloom::Bloom>();
-    }
 }
 
 fn gestures(

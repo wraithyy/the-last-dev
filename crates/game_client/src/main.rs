@@ -9,6 +9,7 @@ mod combat;
 mod combat_anim;
 mod config;
 mod copy;
+mod cutscene;
 mod debug;
 mod economy;
 mod floating_text;
@@ -19,14 +20,18 @@ mod hair;
 mod hud;
 mod input;
 mod keybinds;
+mod live;
 mod loot_fx;
 mod nameplates;
 mod net;
 mod office;
+mod onboarding;
 mod player;
 mod presentation;
 mod rigs;
 mod seat;
+mod settings;
+mod social;
 mod spell_fx;
 mod sprint;
 mod targeting;
@@ -109,12 +114,22 @@ fn main() {
             economy::EconomyPlugin,
             office::OfficePlugin,
             sprint::SprintPlugin,
+            onboarding::OnboardingPlugin,
         ))
+        // After TouchPlugin: the settings default to Low on phones.
+        .add_plugins((settings::SettingsPlugin, cutscene::CutscenePlugin))
+        .add_plugins(social::SocialPlugin)
+        .add_plugins(live::LivePlugin)
         .run();
 }
 
 /// HUD sizes are authored for a 900 px tall window; scale up on bigger screens.
-fn scale_ui(window: Single<&Window>, touch: Res<touch::TouchMode>, mut ui_scale: ResMut<UiScale>) {
+fn scale_ui(
+    window: Single<&Window>,
+    touch: Res<touch::TouchMode>,
+    settings: Res<settings::Settings>,
+    mut ui_scale: ResMut<UiScale>,
+) {
     // Width matters too: the combat log and the centred action bar collide on narrow windows.
     let (w, h) = if debug::shooting() {
         let (w, h) = debug::shot_size();
@@ -137,7 +152,8 @@ fn scale_ui(window: Single<&Window>, touch: Res<touch::TouchMode>, mut ui_scale:
             config::UI_MIN_SCALE,
         )
     };
-    let scale = (h / ref_h).min(w / ref_w).clamp(min, config::UI_MAX_SCALE);
+    let auto = (h / ref_h).min(w / ref_w).clamp(min, config::UI_MAX_SCALE);
+    let scale = settings.ui_scale.unwrap_or(auto);
     if (ui_scale.0 - scale).abs() > 0.01 {
         ui_scale.0 = scale;
     }

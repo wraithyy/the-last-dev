@@ -203,6 +203,9 @@ struct VictoryScreen;
 struct VictoryPrompt;
 #[derive(Component)]
 struct VictoryStats;
+/// Victory screen button: back to the campus with the cleared world kept (post-game).
+#[derive(Component)]
+struct VictoryCampus;
 /// Client-only figures (ambient NPCs, the AGI's operator) that go with the zone.
 #[derive(Component)]
 pub struct ZoneDecor;
@@ -241,6 +244,7 @@ impl Plugin for GamePlugin {
                     run_fade,
                     animate_doors,
                     update_victory,
+                    back_to_campus,
                 )
                     .chain()
                     .in_set(SimReady),
@@ -452,7 +456,7 @@ fn zone_tagline(id: &str) -> &'static str {
         "datacenter/2" => "The cooling budget was reallocated to a keynote about cooling.",
         "lab/1" => "Demo Day. Everything works, as long as nobody touches it.",
         "lab/2" => "Definitely not sentient. Please stop asking it how it feels.",
-        _ => "A new sprint begins.",
+        _ => "A new quarter begins. Same OKRs.",
     }
 }
 
@@ -868,6 +872,20 @@ fn spawn_overlays(mut commands: Commands) {
                 label(copy::VICTORY_PROMPT, 18.0),
                 TextColor(ACCENT),
             ));
+            c.spawn((
+                Button,
+                VictoryCampus,
+                Node {
+                    margin: UiRect::top(px(6)),
+                    padding: UiRect::axes(px(14), px(5)),
+                    border: UiRect::all(px(2)),
+                    border_radius: BorderRadius::all(px(5)),
+                    ..default()
+                },
+                BorderColor::all(crate::hud::KEY_RIM),
+                crate::hud::vgrad(crate::hud::KEY_TOP_HI, crate::hud::KEY_TOP),
+                children![label(copy::VICTORY_CAMPUS, 16.0)],
+            ));
         });
 }
 
@@ -879,10 +897,18 @@ fn update_victory(
     mut prompt: Single<(&mut Text, &mut TextColor), (With<VictoryPrompt>, Without<VictoryStats>)>,
     mut stats: Single<&mut Text, With<VictoryStats>>,
     mode: Res<GameMode>,
+    mut cinema: ResMut<crate::cutscene::Cinema>,
 ) {
+    // The epilogue and credits come first; the stats card follows them straight away.
+    let hold = cinema.holds_victory();
+    let credits_over = cinema.take_epilogue_done();
     if let Some(left) = flow.victory_in.as_mut() {
-        *left -= time.delta_secs();
-        if *left <= 0.0 {
+        if credits_over {
+            *left = 0.0;
+        } else if !hold {
+            *left -= time.delta_secs();
+        }
+        if *left <= 0.0 && !hold {
             flow.victory_in = None;
             flow.victory = true;
             let me = sim.player().and_then(|p| sim.unit(p));
@@ -918,6 +944,30 @@ fn update_victory(
     } else {
         ACCENT.with_alpha(if on { 1.0 } else { 0.35 })
     };
+}
+
+/// Enter or the button on the victory screen: back to the campus, world kept (offline only).
+fn back_to_campus(
+    keys: Res<ButtonInput<KeyCode>>,
+    mode: Res<GameMode>,
+    mut flow: ResMut<GameFlow>,
+    button: Query<&Interaction, (Changed<Interaction>, With<VictoryCampus>)>,
+    mut node: Single<&mut Node, With<VictoryCampus>>,
+) {
+    let show = if mode.is_online() {
+        Display::None
+    } else {
+        Display::Flex
+    };
+    if node.display != show {
+        node.display = show;
+    }
+    let asked =
+        keys.just_pressed(KeyCode::Enter) || button.iter().any(|i| *i == Interaction::Pressed);
+    if flow.victory && asked && !mode.is_online() {
+        flow.victory = false;
+        flow.travel_to("campus");
+    }
 }
 
 /// A fresh sim (level 1, campus, current class) after victory + R or a `RestartRun`; the

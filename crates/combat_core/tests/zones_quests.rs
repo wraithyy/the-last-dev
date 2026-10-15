@@ -24,6 +24,10 @@ fn anchor(name: &str) -> Option<(Vec3, f32)> {
     if let Some(n) = num("npc_") {
         return Some((Vec3::new(40.0, 0.0, -15.0 * n), 0.0));
     }
+    // The campus onboarding corner (named, not numbered), far out of every pull.
+    if name.starts_with("npc_") {
+        return Some((Vec3::new(-400.0, 0.0, 400.0), 0.0));
+    }
     match name {
         "boss" => Some((Vec3::new(0.0, 0.0, -630.0), 0.0)),
         "graveyard" => Some((GRAVEYARD, 0.0)),
@@ -205,7 +209,7 @@ fn load_zone_spawns_the_campus_and_reports_its_links() {
     assert!(t.has(|e| matches!(e, Event::ZoneLoaded { zone } if zone == "campus")));
     assert!(!t.has(|e| matches!(e, Event::FloorLoaded { .. })));
     let hostiles = t.sim.units().filter(|u| u.hostile).count();
-    assert_eq!(hostiles, 15, "8 packs, no boss");
+    assert_eq!(hostiles, 16, "8 packs, no boss, the onboarding dummy");
     for key in ["intern", "facilities_guy", "barista", "smoking_corner_dev"] {
         assert!(t.sim.units().any(|u| u.key == key && !u.hostile), "{key}");
     }

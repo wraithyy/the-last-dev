@@ -1,4 +1,4 @@
-//! Offline progress: one player's level, gear, bag, Story Points, trophies and world progress as
+//! Offline progress: one player's level, gear, bag, Kudos, trophies and world progress as
 //! a small versioned text file (`key=value` lines, lists split by `|`). Decoding is tolerant:
 //! unknown keys, bad numbers and names the content no longer has are dropped, never fatal.
 
@@ -6,7 +6,8 @@ use crate::economy::SLOTS;
 use crate::sim::Sim;
 use crate::targeting::EntityId;
 
-/// Bumped when a field changes meaning. Version 1 (before talents) still loads, with no picks;
+/// Bumped when a field changes meaning (new optional keys, like the daily tasks, need no bump).
+/// Version 1 (before talents) still loads, with no picks;
 /// versions 1-2 (before the levelling curve) carry `xp` against the old table and are rescaled
 /// on import; anything else loads as no save at all.
 pub const SAVE_VERSION: u32 = 3;
@@ -44,6 +45,20 @@ pub struct SaveData {
     pub sprint_records: Vec<crate::sprint::SprintRecord>,
     /// Decoded from a save before version 3: `xp` is progress against `V2_XP_TO_NEXT`.
     pub xp_v2: bool,
+    /// Daily Standup / Sprint Goal: the UTC day and ISO week the joined tasks belong to.
+    pub tasks_day: u32,
+    pub tasks_week: u32,
+    pub tasks: Vec<crate::dailies::SavedTask>,
+    /// The "First Day" onboarding is still to be finished (client-owned: the sim exports
+    /// false and the client sets it). Optional key: older saves are past onboarding.
+    pub onboarding_pending: bool,
+    /// Owned pets, the one following ("" for none) and the duel win streak. Optional keys:
+    /// older saves simply have none.
+    pub pets: Vec<String>,
+    pub pet: String,
+    pub duel_streak: u32,
+    /// Performance Reviews taken (optional key; older saves have none).
+    pub respecs: u32,
 }
 
 fn list(v: &str) -> Vec<String> {
@@ -119,6 +134,42 @@ impl SaveData {
             keys.join("|"),
             records.join("|")
         ));
+        out.push_str(&format!(
+            "pets={}\npet={}\nduel_streak={}\n",
+            self.pets.join("|"),
+            self.pet,
+            self.duel_streak
+        ));
+        out.push_str(&format!("respecs={}\n", self.respecs));
+        if self.onboarding_pending {
+            out.push_str("onboarding=pending\n");
+        }
+        let tasks: Vec<String> = self
+            .tasks
+            .iter()
+            .map(|t| {
+                let c: Vec<String> = t.counts.iter().map(u32::to_string).collect();
+                let state = match t.state {
+                    crate::dailies::TaskState::Open => 0,
+                    crate::dailies::TaskState::Active => 1,
+                    crate::dailies::TaskState::Ready => 2,
+                    crate::dailies::TaskState::Done => 3,
+                };
+                format!(
+                    "{}*{}*{state}*{}*{}",
+                    t.key,
+                    u8::from(t.weekly),
+                    t.level,
+                    c.join(",")
+                )
+            })
+            .collect();
+        out.push_str(&format!(
+            "tasks_date={}*{}\ntasks={}\n",
+            self.tasks_day,
+            self.tasks_week,
+            tasks.join("|")
+        ));
         out
     }
 
@@ -166,7 +217,18 @@ impl SaveData {
                 "quests_done" => s.quests_done = list(v),
                 "cleared" => s.cleared = list(v),
                 "bosses" => s.bosses = list(v),
+                "tasks_date" => {
+                    let (d, w) = v.split_once('*').unwrap_or((v, "0"));
+                    s.tasks_day = d.parse().unwrap_or(0);
+                    s.tasks_week = w.parse().unwrap_or(0);
+                }
+                "tasks" => s.tasks = list(v).iter().filter_map(|t| saved_task(t)).collect(),
+                "onboarding" => s.onboarding_pending = v == "pending",
                 "achievements" => s.achievements = list(v),
+                "pets" => s.pets = list(v),
+                "pet" => s.pet = v.chars().take(crate::world::WORLD_KEY_MAX).collect(),
+                "duel_streak" => s.duel_streak = v.parse().unwrap_or(0),
+                "respecs" => s.respecs = v.parse().unwrap_or(0),
                 "title" => s.title = v.chars().take(crate::world::WORLD_KEY_MAX).collect(),
                 "sprint_keys" => {
                     s.sprint_keys = list(v)
@@ -232,6 +294,7 @@ impl Sim {
         let s = &self.units[i].state;
         // Mid-sprint the sim plays in the run's own world; the save keeps the campaign's.
         let world = self.campaign_world();
+        let (tasks_day, tasks_week, tasks) = self.export_tasks(player);
         let mut cleared: Vec<String> = world.cleared.iter().cloned().collect();
         cleared.sort();
         Some(SaveData {
@@ -248,6 +311,14 @@ impl Sim {
             sprint_keys: self.sprint_keys_of(player),
             sprint_records: self.sprint_records(player).to_vec(),
             xp_v2: false,
+            tasks_day,
+            tasks_week,
+            tasks,
+            onboarding_pending: false,
+            pets: s.pets.clone(),
+            pet: s.pet.clone(),
+            duel_streak: s.duel_streak,
+            respecs: s.respecs,
             achievements: s.achievements.clone(),
             title: s.title.clone(),
             talents: s.talents,
@@ -374,9 +445,26 @@ impl Sim {
             .filter(|t| achievements.contains(t) || self.worn_capstone_ok(i, t))
             .cloned()
             .unwrap_or_default();
+        let pets: Vec<String> = save
+            .pets
+            .iter()
+            .filter(|p| self.content.pet(p).is_some())
+            .fold(Vec::new(), |mut v, p| {
+                if !v.contains(p) {
+                    v.push(p.clone());
+                }
+                v
+            });
         let u = &mut self.units[i].state;
         u.achievements = achievements;
         u.title = title;
+        u.pet = Some(&save.pet)
+            .filter(|p| pets.contains(p))
+            .cloned()
+            .unwrap_or_default();
+        u.pets = pets;
+        u.duel_streak = save.duel_streak;
+        u.respecs = save.respecs;
         self.set_level_of(player, level);
         let need = self.content.xp_to_next(level);
         // Keep the share of the level already done, not the raw number, across a table change.
@@ -390,6 +478,66 @@ impl Sim {
         let u = &mut self.units[i].state;
         u.hp = u.max_hp;
         u.mana = u.max_mana;
+        self.import_tasks(player, save.tasks_day, save.tasks_week, &save.tasks);
         true
+    }
+}
+
+/// `key*weekly*state*level*c1,c2`; anything malformed is dropped.
+fn saved_task(t: &str) -> Option<crate::dailies::SavedTask> {
+    use crate::dailies::TaskState;
+    let mut f = t.split('*');
+    let key: String = f
+        .next()?
+        .chars()
+        .take(crate::world::WORLD_KEY_MAX)
+        .collect();
+    let weekly = f.next()? == "1";
+    let state = match f.next()? {
+        "1" => TaskState::Active,
+        "2" => TaskState::Ready,
+        "3" => TaskState::Done,
+        _ => return None,
+    };
+    let level = f.next()?.parse().ok()?;
+    let counts = f
+        .next()
+        .unwrap_or("")
+        .split(',')
+        .filter_map(|n| n.trim().parse().ok())
+        .collect();
+    Some(crate::dailies::SavedTask {
+        key,
+        weekly,
+        state,
+        level,
+        counts,
+    })
+}
+
+#[cfg(test)]
+mod onboarding_tests {
+    use super::SaveData;
+
+    #[test]
+    fn onboarding_flag_round_trips_and_old_saves_count_as_onboarded() {
+        let pending = SaveData {
+            class: "devops".into(),
+            level: 1,
+            onboarding_pending: true,
+            ..SaveData::default()
+        };
+        let back = SaveData::decode(&pending.encode()).map(|s| s.onboarding_pending);
+        assert_eq!(back, Some(true));
+        let done = SaveData {
+            onboarding_pending: false,
+            ..pending
+        };
+        assert!(!done.encode().contains("onboarding="));
+        let old = "the-last-dev save\nversion=3\nclass=devops\nlevel=4\n";
+        assert_eq!(
+            SaveData::decode(old).map(|s| s.onboarding_pending),
+            Some(false)
+        );
     }
 }

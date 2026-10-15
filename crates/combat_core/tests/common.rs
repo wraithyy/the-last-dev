@@ -418,6 +418,31 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
         } => format!("sprint ends {result:?} in {time_ms} ms, upgrade {upgrade}"),
         Event::SprintAffix { affix, text, .. } => format!("affix {affix}: {text}"),
         Event::SprintRefused { reason } => format!("sprint refused: {}", reason.message()),
+        Event::Clock { unix_s } => format!("clock {unix_s}"),
+        Event::DailyBoard { board, open } => format!(
+            "board day {} open {open}: {} tasks",
+            board.day,
+            board.tasks.len()
+        ),
+        Event::TaskCompleted {
+            key,
+            weekly,
+            xp,
+            sp,
+        } => format!("task {key} done (weekly {weekly}): {xp} XP, {sp} SP"),
+        Event::WorldBoss { state, secs, unit } => {
+            format!("world boss {state:?} {secs} s ({})", t(*unit))
+        }
+        Event::PetChanged { unit, pet } => format!("{} pet: {pet}", t(*unit)),
+        Event::PetLearned { unit, pet } => format!("{} learns pet {pet}", t(*unit)),
+        Event::PetLooted { unit, items, .. } => {
+            format!("{}'s pet sweeps up {}", t(*unit), items.join(", "))
+        }
+        Event::DuelRequested { from, to } => format!("{} asks {} for a duel", t(*from), t(*to)),
+        Event::DuelCountdown { a, b, .. } => format!("duel {} vs {} counts down", t(*a), t(*b)),
+        Event::DuelBegan { a, b } => format!("duel {} vs {} begins", t(*a), t(*b)),
+        Event::DuelEnded { outcome, .. } => format!("duel over: {outcome:?}"),
+        Event::DuelRefused { reason } => format!("duel refused: {}", reason.message()),
     };
     format!("[{tick:05}] {body}")
 }

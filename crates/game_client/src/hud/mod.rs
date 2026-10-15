@@ -13,7 +13,7 @@ mod logs;
 mod map;
 mod meter;
 mod minimap;
-mod quests;
+pub(crate) mod quests;
 mod trophies;
 
 use crate::combat::{SimReady, SimView};
@@ -30,6 +30,9 @@ pub use hovertip::TipSource;
 /// Top edge (HUD px) of the first row under the minimap: player auras, then the quest tracker.
 pub const BELOW_MINIMAP: f32 = minimap::TOP + minimap::HEIGHT + 4.0;
 pub use quests::giver_mark;
+pub use quests::{GOLD, Line, plural, unit_name};
+/// The radar's outer box, for widgets that sit on it (the office clock).
+pub const MINIMAP_BOX: (f32, f32) = (minimap::TOP, minimap::WIDTH);
 
 /// Terminal cyan: focus, hover and "active" states across the HUD.
 pub const ACCENT: Color = Color::srgb(0.36, 0.82, 0.86);
@@ -497,7 +500,7 @@ fn spawn_misc(mut commands: Commands) {
         GlobalZIndex(50),
         BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
         children![label(
-            "// paused: the AI is regenerating your sprint. Esc to resume.",
+            "// paused: the AI is regenerating your roadmap. Esc to resume.",
             24.0
         )],
     ));

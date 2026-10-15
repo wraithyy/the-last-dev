@@ -200,6 +200,10 @@ pub struct Sim {
     pub(crate) fun: crate::world::WorldRt,
     /// Sprint mode runs, keystones and records (`sprint.rs`).
     pub(crate) sprint: crate::sprint::SprintState,
+    /// World clock, nights, the world boss and daily/weekly tasks (`live.rs`, `dailies.rs`).
+    pub(crate) live: crate::live::LiveRt,
+    /// Code review duels and request cooldowns (`duel.rs`).
+    pub(crate) duels: crate::duel::DuelState,
 }
 
 impl Sim {
@@ -228,6 +232,8 @@ impl Sim {
             zone_packs: Vec::new(),
             fun: crate::world::WorldRt::new(seed),
             sprint: Default::default(),
+            live: Default::default(),
+            duels: Default::default(),
         }
     }
 
@@ -273,6 +279,7 @@ impl Sim {
         }
         self.rescale_group_hp();
         self.grow_packs();
+        self.live_on_join(id);
         id
     }
 
@@ -283,9 +290,12 @@ impl Sim {
         let Some(i) = self.index(id).filter(|_| self.is_player(id)) else {
             return false;
         };
+        self.duel_left(id);
         self.despawn(i);
         self.players.retain(|p| *p != id);
         self.quest_logs.remove(&id);
+        self.live.tasks.remove(&id);
+        self.duels.next_request.remove(&id);
         for u in &mut self.units {
             u.loot.retain(|l| l.owner != Some(id));
             if u.state.lootable && u.loot.is_empty() {
@@ -402,6 +412,11 @@ impl Sim {
             achievements: Vec::new(),
             title: String::new(),
             talents: [0; crate::talents::TALENT_ROWS],
+            pet: String::new(),
+            pets: Vec::new(),
+            duel_foe: None,
+            duel_streak: 0,
+            respecs: 0,
         };
         self.units.push(Unit {
             state,
@@ -514,7 +529,13 @@ impl Sim {
             | Command::SetTitle { .. }
             | Command::PickTalent { .. }
             | Command::ResetTalents
-            | Command::StartSprint { .. } => {}
+            | Command::StartSprint { .. }
+            | Command::JoinStandup
+            | Command::ClaimSprintGoal { .. }
+            | Command::GoHome
+            | Command::SummonPet { .. }
+            | Command::DuelRequest { .. }
+            | Command::DuelRespond { .. } => {}
         }
         self.pending.push((Some(player), cmd));
     }
@@ -641,6 +662,9 @@ impl Sim {
         self.update_combat_flags();
         self.update_world();
         self.update_sprint();
+        self.update_live();
+        self.update_duels();
+        self.update_pets();
         self.update_corpses();
         self.flush_yells();
         self.sync_views();
@@ -710,6 +734,12 @@ impl Sim {
             Command::PickTalent { row, choice } => self.pick_talent(actor, row, choice),
             Command::ResetTalents => self.reset_talents(actor),
             Command::StartSprint { building, level } => self.start_sprint(actor, &building, level),
+            Command::JoinStandup => self.join_standup(actor),
+            Command::ClaimSprintGoal { choice } => self.claim_sprint_goal(actor, choice),
+            Command::GoHome => self.go_home(actor),
+            Command::SummonPet { pet } => self.summon_pet(actor, &pet),
+            Command::DuelRequest { target } => self.duel_request(actor, target),
+            Command::DuelRespond { accept } => self.duel_respond(actor, accept),
             other => self.apply_named(other),
         }
     }
@@ -755,7 +785,13 @@ impl Sim {
             | Command::SetTitle { .. }
             | Command::PickTalent { .. }
             | Command::ResetTalents
-            | Command::StartSprint { .. } => {}
+            | Command::StartSprint { .. }
+            | Command::JoinStandup
+            | Command::ClaimSprintGoal { .. }
+            | Command::GoHome
+            | Command::SummonPet { .. }
+            | Command::DuelRequest { .. }
+            | Command::DuelRespond { .. } => {}
         }
     }
 
@@ -792,6 +828,13 @@ impl Sim {
         if !self.units[li].state.alive || !self.units[ci].state.lootable || !near {
             return;
         }
+        self.claim_loot(li, ci);
+    }
+
+    /// Hands `looter` (unit `li`) their share of corpse `ci`, range and life already checked.
+    pub(crate) fn claim_loot(&mut self, li: usize, ci: usize) {
+        let looter = Self::id_of(li);
+        let corpse = Self::id_of(ci);
         // Own roll first; an ownerless roll (killed before anyone joined) is anyone's.
         let shares = &mut self.units[ci].loot;
         let Some(k) = shares
@@ -1047,7 +1090,7 @@ impl Sim {
             let tid = u.state.target.ok_or(CastError::NoTarget)?;
             let ti = self.index(tid).ok_or(CastError::InvalidTarget)?;
             let t = &self.units[ti];
-            if !t.state.hostile || t.state.ai == Some(AiState::Evade) || t.despawned {
+            if !self.hostile_to(ci, ti) || t.state.ai == Some(AiState::Evade) || t.despawned {
                 return Err(CastError::InvalidTarget);
             }
             validate_target(
@@ -1093,7 +1136,7 @@ impl Sim {
     fn ally_target(&self, ci: usize, spell: &SpellDef) -> Result<EntityId, CastError> {
         let me = Self::id_of(ci);
         match self.units[ci].state.target {
-            Some(t) if t != me && self.is_player(t) => {
+            Some(t) if t != me && (self.is_player(t) || self.healable_npc(t)) => {
                 self.check_friend(ci, t, spell)?;
                 Ok(t)
             }
@@ -1101,12 +1144,24 @@ impl Sim {
         }
     }
 
+    /// A friendly NPC authored as `healable` (the onboarding colleague): `Ally` spells land on it.
+    fn healable_npc(&self, id: EntityId) -> bool {
+        self.index(id).is_some_and(|i| {
+            let u = &self.units[i];
+            !u.state.hostile && self.content.units[u.def].healable
+        })
+    }
+
     /// A friendly-player target of `spell` (not the caster): still in the group, alive for
     /// `Ally` and dead for `DeadAlly`, in range and line of sight. No facing, as for heals in WoW.
     fn check_friend(&self, ci: usize, tid: EntityId, spell: &SpellDef) -> Result<(), CastError> {
         let ti = self
             .index(tid)
-            .filter(|&ti| ti != ci && self.is_player(tid) && !self.units[ti].despawned)
+            .filter(|&ti| {
+                let npc_ok = spell.target == SpellTarget::Ally && self.healable_npc(tid);
+                ti != ci && (self.is_player(tid) || npc_ok) && !self.units[ti].despawned
+            })
+            .filter(|&ti| !self.duel_blocks_help(ci, ti))
             .ok_or(CastError::InvalidTarget)?;
         let (u, t) = (&self.units[ci].state, &self.units[ti].state);
         match (spell.target == SpellTarget::DeadAlly, t.alive) {
@@ -1459,6 +1514,11 @@ impl Sim {
         if !t.state.alive || t.state.ai == Some(AiState::Evade) {
             return;
         }
+        // Players hurt each other only inside a duel (a DoT outliving it does nothing).
+        let duel = self.index(source).is_some_and(|si| self.duel_foes(si, ti));
+        if !duel && source != target && self.is_player(source) && self.is_player(target) {
+            return;
+        }
         // Reflected once: the caster cannot bounce it back even if it reflects too.
         if spell.is_some()
             && source != target
@@ -1479,6 +1539,11 @@ impl Sim {
         }
         let amount = self.modified_damage(source, ti, amount);
         let amount = self.sprint_damage(source, ti, amount, spell, school);
+        let amount = if duel {
+            crate::duel::pvp_amount(amount)
+        } else {
+            amount
+        };
         let amount = if dot {
             amount
         } else {
@@ -1499,7 +1564,15 @@ impl Sim {
                 }
             }
         }
-        let dealt = amount - absorbed;
+        let mut dealt = amount - absorbed;
+        // A duel ends at 1 HP: nobody dies over a code review.
+        let duel_won = duel && dealt >= self.units[ti].state.hp;
+        if duel_won {
+            dealt = self.units[ti].state.hp.saturating_sub(1);
+        }
+        if duel {
+            self.duel_hit(ti);
+        }
         self.events.push(Event::Damage {
             source,
             target,
@@ -1527,7 +1600,9 @@ impl Sim {
                 self.perk_on_hurt(ti);
             }
         }
-        if hp == 0 {
+        if duel_won {
+            self.duel_won(source, target);
+        } else if hp == 0 {
             self.die(ti, Some(source));
         }
     }
@@ -1556,6 +1631,7 @@ impl Sim {
 
     pub(crate) fn die(&mut self, ti: usize, killer: Option<EntityId>) {
         let id = Self::id_of(ti);
+        self.duel_cancel_for(id);
         self.spread_auras(ti);
         let keys: Vec<String> = self.units[ti].auras.iter().map(|a| a.key.clone()).collect();
         for k in keys {
@@ -1607,12 +1683,15 @@ impl Sim {
             false => self.players.iter().copied().map(Some).collect(),
         };
         let mut shares = Vec::with_capacity(owners.len());
+        let sprint = self.sprint_active();
         for owner in owners {
             let mut items: Vec<String> = Vec::new();
             for e in &loot_table {
                 // Quest-only drops use the loot stream, so taking a quest never shifts combat.
                 let drop = match (&e.quest, owner) {
                     (None, _) => self.rng.chance_pct(e.chance_pct),
+                    // A sprint is quest-free: its floors' quest drops stay in the campaign.
+                    (Some(_), _) if sprint => false,
                     (Some(q), Some(p)) => {
                         self.wants_quest_drop(p, q, &e.item)
                             && self.loot_rng.chance_pct(e.chance_pct)
@@ -1629,6 +1708,7 @@ impl Sim {
                 .map(|c| c.role);
             let (goods, sp) = self.roll_economy_loot(ti, role);
             items.extend(goods);
+            items.extend(self.pet_drops(ti, owner));
             shares.push(LootShare { owner, items, sp });
         }
         self.units[ti].loot = shares.clone();

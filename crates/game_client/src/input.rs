@@ -22,16 +22,20 @@ pub struct TrophiesOpen(pub bool);
 #[derive(Resource, Default)]
 pub struct CareerOpen(pub bool);
 
-/// Sprint planner and Sprint Review windows (`sprint.rs`); Esc closes them like the others.
+/// Sprint planner and Sprint Review windows (`sprint.rs`) and the Daily Standup board
+/// (`live/board.rs`); Esc closes them like the others.
 #[derive(Resource, Default)]
 pub struct SprintWindows {
     pub planner: bool,
     pub review: bool,
+    pub standup: bool,
 }
 
 impl SprintWindows {
     pub fn close_one(&mut self) -> bool {
-        std::mem::take(&mut self.review) || std::mem::take(&mut self.planner)
+        std::mem::take(&mut self.review)
+            || std::mem::take(&mut self.planner)
+            || std::mem::take(&mut self.standup)
     }
 }
 

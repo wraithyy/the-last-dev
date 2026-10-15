@@ -121,7 +121,8 @@ impl Sim {
                 u.state.alive
                     && !u.despawned
                     && u.state.ai != Some(AiState::Evade)
-                    && (u.state.hostile == c.hostile) == area.allies
+                    && self.hostile_to(ci, i) != area.allies
+                    && !(area.allies && self.duel_blocks_help(ci, i))
                     && dist_xz(u.state.pos, c.pos) <= area.radius_m
             })
             .collect()
@@ -547,6 +548,21 @@ impl Sim {
         if def.stun && self.units[ti].state.boss {
             return;
         }
+        // Outside a duel players never debuff each other (a cast that outlived the duel).
+        let si = self.index(source);
+        let pvp = si.is_some_and(|s| s != ti && self.is_player(source))
+            && self.is_player(Self::id_of(ti));
+        if def.harmful && pvp && !si.is_some_and(|s| self.duel_foes(s, ti)) {
+            return;
+        }
+        let duration_ms = if pvp && (def.stun || def.silence) {
+            match self.duel_cc_ms(ti, duration_ms) {
+                0 => return,
+                ms => ms,
+            }
+        } else {
+            duration_ms
+        };
         let old = self.units[ti].auras.iter().position(|a| a.key == key);
         let stacks = old.map_or(1, |k| {
             (self.units[ti].auras[k].stacks + 1).min(def.max_stacks)
@@ -554,7 +570,6 @@ impl Sim {
         if let Some(k) = old {
             self.units[ti].auras.remove(k);
         }
-        let si = self.index(source);
         let (sp, dmg_pct) = si.map_or((0, 100), |s| (self.units[s].sp, self.units[s].dmg_pct));
         let talent_pct = 100 + si.map_or(0, |s| self.perk_periodic_pct(s, spell));
         let tick_amount = def.periodic.as_ref().map_or(0, |p| {

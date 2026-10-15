@@ -351,6 +351,10 @@ fn zone_load_moves_the_whole_group_to_the_spawn_anchor() {
         if let Some(n) = num("npc_") {
             return Some((Vec3::new(40.0, 0.0, -15.0 * n), 0.0));
         }
+        // The campus onboarding corner (named, not numbered), far out of every pull.
+        if name.starts_with("npc_") {
+            return Some((Vec3::new(-400.0, 0.0, 400.0), 0.0));
+        }
         match name {
             "boss" => Some((Vec3::new(0.0, 0.0, -630.0), 0.0)),
             "player_spawn" => Some((spawn, 1.5)),

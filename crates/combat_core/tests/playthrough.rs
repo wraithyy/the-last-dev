@@ -68,6 +68,10 @@ fn anchor(name: &str) -> Option<(Vec3, f32)> {
     if let Some(n) = num("npc_") {
         return Some((Vec3::new(40.0, 0.0, -15.0 * n), 0.0));
     }
+    // The campus onboarding corner (named, not numbered), far out of every pull.
+    if name.starts_with("npc_") {
+        return Some((Vec3::new(-400.0, 0.0, 400.0), 0.0));
+    }
     (name == "boss").then_some((Vec3::new(0.0, 0.0, -PACK_SPACING * 7.0), 0.0))
 }
 
@@ -1666,4 +1670,78 @@ fn time_at_level() {
     let lab = ends.iter().position(|e| e.0.starts_with("lab/"));
     let capped = ends.iter().position(|e| e.1 == content().max_level());
     assert!(capped.is_some() && capped >= lab, "{ends:?}");
+}
+
+/// The campaign's natural levels with and without the Daily Standup: one pass through every
+/// zone (each unit killed once, the zone's quests closed), plus one day of dailies and a
+/// seventh of the weekly goal per zone at the arrival level. Dailies are the long-tail XP, not a
+/// shortcut: with them the character still arrives at every zone inside its band (at most one
+/// level above its top) and gains at most about one level over the whole campaign.
+#[test]
+fn dailies_keep_the_campaign_inside_the_level_bands() {
+    let c = content();
+    let walk = |dailies: bool| -> Vec<(String, u8, u8)> {
+        let mut sim = combat_core::Sim::new(content(), 3);
+        sim.set_wandering(false);
+        let p = sim.spawn_player("fullstack", combat_core::Vec3::new(0.0, 0.0, 20.0), 0.0);
+        let (mut level, mut xp) = (1u8, 0u32);
+        let gain = |level: &mut u8, xp: &mut u32, n: u32| {
+            *xp += n;
+            loop {
+                let need = c.xp_to_next(*level);
+                if need == 0 || *xp < need {
+                    break;
+                }
+                *xp -= need;
+                *level += 1;
+            }
+        };
+        let mut out = Vec::new();
+        for zone in CAMPAIGN {
+            let arrive = level;
+            if dailies {
+                let n = 3 * c.task_reward(false, level).0;
+                gain(&mut level, &mut xp, n);
+                let n = c.task_reward(true, level).0 / 7;
+                gain(&mut level, &mut xp, n);
+            }
+            let any = |n: &str| anchor(n).or(Some((combat_core::Vec3::new(-300.0, 0.0, 0.0), 0.0)));
+            if let Err(e) = sim.load_zone(zone, &any, Vec::new()) {
+                panic!("{zone}: {e}");
+            }
+            let mobs: Vec<(u8, u32)> = sim
+                .units()
+                .filter(|u| u.hostile && u.id != p)
+                .map(|u| (u.level, u.xp))
+                .collect();
+            for (ml, reward) in mobs {
+                let n = c.kill_xp(level, ml, reward);
+                gain(&mut level, &mut xp, n);
+            }
+            for q in c.quests.iter().filter(|q| q.ender().zone == zone) {
+                gain(&mut level, &mut xp, c.quest_xp(q));
+            }
+            out.push((zone.to_string(), arrive, level));
+        }
+        out
+    };
+    let plain = walk(false);
+    let with = walk(true);
+    println!("campaign levels (zone, arrival, leaving) without dailies: {plain:?}");
+    println!("campaign levels (zone, arrival, leaving) with dailies:    {with:?}");
+    for (zone, arrive, _) in &with {
+        let (_, hi) = c.zone(zone).map_or((1, 10), |z| z.level_range);
+        assert!(
+            *arrive <= hi + 1,
+            "{zone}: arrives at {arrive}, band tops out at {hi}"
+        );
+    }
+    let (end_plain, end_with) = (
+        plain.last().map_or(0, |l| l.2),
+        with.last().map_or(0, |l| l.2),
+    );
+    assert!(
+        end_with <= end_plain + 1,
+        "dailies add more than a level over the campaign: {end_plain} -> {end_with}"
+    );
 }

@@ -13,11 +13,13 @@
 
 use crate::combat::{CombatEvent, CombatSim, PendingCommands, SimReady, SimView, UiNotice};
 use crate::game::GameFlow;
+use crate::hud::quests::{TOUCH_TOP, TRACKER_TOP, TRACKER_W};
 use crate::hud::{
     ACCENT, Banner, DIM, IconCache, LogLineMsg, PANEL_EDGE, drop_shadow, label, panel_bg, set_text,
 };
 use crate::input::{Paused, SprintWindows};
 use crate::net::NetWorld;
+use crate::touch::TouchMode;
 use bevy::prelude::*;
 use combat_core::{
     Command, Event, PropKind, SprintPreview, SprintRecord, SprintResult, SprintStatus,
@@ -133,7 +135,7 @@ impl Plugin for SprintPlugin {
         if std::env::var_os("WOW_SPRINT_UI").is_some() {
             app.insert_resource(SprintWindows {
                 planner: true,
-                review: false,
+                ..default()
             });
         }
     }
@@ -245,16 +247,16 @@ fn spawn_ui(mut commands: Commands) {
                 ..default()
             },
         ));
-    // The run HUD: top centre, under the key hints, in the dev-terminal style.
+    // The run HUD takes the quest tracker's slot (the tracker hides during a run), like WoW's
+    // challenge timer; `update_run_hud` moves it with the touch layout.
     commands
         .spawn((
             RunHud,
             Node {
                 position_type: PositionType::Absolute,
-                left: percent(50),
-                top: px(44),
-                width: px(360),
-                margin: UiRect::left(px(-180)),
+                right: px(12),
+                top: px(TRACKER_TOP),
+                width: px(TRACKER_W),
                 padding: UiRect::axes(px(10), px(6)),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(3),
@@ -269,7 +271,7 @@ fn spawn_ui(mut commands: Commands) {
         ))
         .with_children(|c| {
             c.spawn((RunText::Title, label("", 13.0), TextColor(ACCENT)));
-            c.spawn((RunText::Timer, label("", 30.0), TextColor(GOOD)));
+            c.spawn((RunText::Timer, label("", 26.0), TextColor(GOOD)));
             c.spawn((RunText::Forces, label("", 12.0), TextColor(DIM)));
             c.spawn((
                 Node {
@@ -295,7 +297,7 @@ fn spawn_ui(mut commands: Commands) {
                 AffixTip,
                 Node {
                     display: Display::None,
-                    max_width: px(340),
+                    max_width: px(TRACKER_W - 22.0),
                     ..default()
                 },
                 label("", 12.0),
@@ -892,6 +894,7 @@ fn update_run_hud(
     >,
     mut flash_text: Query<&mut Text, Without<RunText>>,
     mut shown_affixes: Local<Vec<String>>,
+    touch: Res<TouchMode>,
 ) {
     let now = time.elapsed_secs();
     let (fnode, kids) = &mut *flash;
@@ -912,6 +915,17 @@ fn update_run_hud(
         return;
     };
     root.display = Display::Flex;
+    // Touch keeps the right side for buttons: the panel sits under the player frame instead.
+    let (left, right, top) = if touch.active {
+        (px(12), Val::Auto, px(TOUCH_TOP))
+    } else {
+        (Val::Auto, px(12), px(TRACKER_TOP))
+    };
+    if root.top != top || root.left != left {
+        root.left = left;
+        root.right = right;
+        root.top = top;
+    }
     // Between the once-a-second updates the clock runs locally (not while paused offline).
     let frozen = paused.0 && net.is_none();
     let extra = if frozen || st.elapsed_ms == 0 {
@@ -926,7 +940,11 @@ fn update_run_hud(
             RunText::Title => format!(
                 "SPRINT +{}  {}  {}/{}",
                 st.level,
-                building_name(content, &st.building),
+                // The planner's "(3 random floors)" note would wrap the narrow panel.
+                building_name(content, &st.building)
+                    .split(" (")
+                    .next()
+                    .unwrap_or_default(),
                 st.stage,
                 st.stages
             ),
@@ -1123,7 +1141,7 @@ fn review_window(
                 chest.items.join(", ")
             };
             c.spawn((
-                label(format!("sprint chest: {items}  +{} SP", chest.sp), 13.0),
+                label(format!("sprint chest: {items}  +{} Kudos", chest.sp), 13.0),
                 TextColor(GOLD),
             ));
         }

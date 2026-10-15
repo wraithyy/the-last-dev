@@ -656,7 +656,7 @@ fn respec_costs_story_points_and_clears_the_capstone_title() {
         c.title_text(&capstone.key),
         Some("Backend-for-Frontend Lead")
     );
-    let cost = c.talents.respec_cost(10);
+    let cost = c.talents.respec_cost(10, 0);
     assert_eq!(cost, 150);
     // Too poor: nothing changes.
     sim.grant_sp(me, cost - 1);

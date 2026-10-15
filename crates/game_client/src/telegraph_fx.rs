@@ -34,10 +34,8 @@ impl Plugin for TelegraphFxPlugin {
 const FLASH_SECS: f32 = 0.35;
 /// A decal whose `TelegraphResolved` never arrives (missed packet) is dropped this late.
 const STALE_SECS: f32 = 1.5;
-const DANGER: [f32; 3] = [1.0, 0.28, 0.06];
 /// Shared (stack) telegraphs are gold: standing in them is the right call.
 const SHARE: [f32; 3] = [1.0, 0.82, 0.2];
-const COVER: [f32; 3] = [0.25, 0.95, 0.45];
 const KICK_RED: Color = Color::srgb(1.0, 0.15, 0.1);
 const LABEL_W: f32 = 320.0;
 
@@ -184,7 +182,10 @@ fn spawn_decals(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut decals: Query<&mut Decal>,
+    pal: Res<crate::settings::Palette>,
 ) {
+    // Danger and safe-spot colours follow the colourblind palette.
+    let (danger, safe) = (pal.danger, pal.safe);
     for CombatEvent(ev) in events.read() {
         match ev {
             Event::TelegraphStarted {
@@ -202,7 +203,7 @@ fn spawn_decals(
                     .spell(*spell)
                     .and_then(|s| s.telegraph.clone());
                 let split = def.as_ref().is_some_and(|d| d.split);
-                let color = if split { SHARE } else { DANGER };
+                let color = if split { SHARE } else { danger };
                 let pos = v3(*pos);
                 // Stacked decals each get their own height so they do not z-fight.
                 let lift = 0.03 + (id % 8) as f32 * 0.004;
@@ -270,7 +271,7 @@ fn spawn_decals(
                     let ring = commands
                         .spawn((
                             Mesh3d(assets.disc.clone()),
-                            MeshMaterial3d(materials.add(unlit(rgba(COVER, 0.35)))),
+                            MeshMaterial3d(materials.add(unlit(rgba(safe, 0.35)))),
                             ground(at, 0.0, lift + 0.01).with_scale(Vec3::splat(cover_r)),
                         ))
                         .id();
@@ -284,7 +285,7 @@ fn spawn_decals(
                     let tag = commands
                         .spawn(label_bundle(
                             "Behind the desk: safe".into(),
-                            rgba(COVER, 1.0),
+                            rgba(safe, 1.0),
                             14.0,
                         ))
                         .id();

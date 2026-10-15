@@ -51,6 +51,8 @@ impl Plugin for SpellFxPlugin {
 #[derive(Resource, Default)]
 pub struct FxBudget {
     live: usize,
+    /// Reduce motion (settings): no bright impact flashes.
+    pub calm: bool,
 }
 
 /// What the sim said about the hit a projectile carries, read when it lands.
@@ -864,6 +866,9 @@ fn flash(
     at: Vec3,
     (life, from, to): (f32, f32, f32),
 ) {
+    if budget.calm {
+        return;
+    }
     emit_mesh(
         commands,
         budget,

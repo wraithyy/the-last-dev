@@ -1,4 +1,4 @@
-//! Offline persistence: one save per class (level, XP, gear, bag, Story Points, trophies,
+//! Offline persistence: one save per class (level, XP, gear, bag, Kudos, trophies,
 //! completed quests, cleared zones) in a native file next to `coop.txt` or in localStorage on
 //! the web. Loaded when an offline run starts, written every few seconds when it changed.
 //! Online runs are session-only and never touch the save. After the final victory the save
@@ -48,6 +48,7 @@ fn load(
     mode: Res<GameMode>,
     mut state: ResMut<SaveState>,
     mut restarted: MessageReader<GameRestarted>,
+    mut onboarding: ResMut<crate::onboarding::Onboarding>,
 ) {
     if restarted.read().count() > 0 {
         state.loaded = None;
@@ -64,18 +65,24 @@ fn load(
     }
     state.loaded = Some((p, class.clone()));
     let Some(text) = platform::read(&class) else {
+        // No save for this class yet: a new hire.
+        onboarding.class_loaded(true);
         return;
     };
     match SaveData::decode(&text) {
         Some(save) if save.class == class => {
+            onboarding.class_loaded(save.onboarding_pending);
             sim.0.import_save(p, &save);
             state.last_written = text;
             info!(
-                "loaded the {class} save: level {}, {} SP",
+                "loaded the {class} save: level {}, {} Kudos",
                 save.level, save.sp
             );
         }
-        _ => warn!("ignoring an unreadable or foreign {class} save"),
+        _ => {
+            warn!("ignoring an unreadable or foreign {class} save");
+            onboarding.class_loaded(true);
+        }
     }
 }
 
@@ -84,6 +91,7 @@ fn write(
     sim: Res<CombatSim>,
     mode: Res<GameMode>,
     flow: Res<GameFlow>,
+    onboarding: Res<crate::onboarding::Onboarding>,
     mut state: ResMut<SaveState>,
 ) {
     if mode.is_online() || disabled() || state.loaded.is_none() {
@@ -97,6 +105,7 @@ fn write(
     let Some(mut save) = sim.0.player().and_then(|p| sim.0.export_save(p)) else {
         return;
     };
+    save.onboarding_pending = onboarding.pending;
     if flow.victory {
         save.cleared.clear();
         save.bosses.clear();
@@ -127,6 +136,35 @@ pub fn record_online_sprint(
     save.sprint_keys.retain(|(b, _)| *b != key.0);
     save.sprint_keys.push(key);
     platform::write(class, &save.encode());
+}
+
+/// Online Daily Standup progress goes into the local save of the class too (the room itself is
+/// session-only), so an offline session the same day picks it up. Needs an existing save.
+pub fn record_online_tasks(class: &str, board: &combat_core::BoardView) {
+    if disabled() {
+        return;
+    }
+    let Some(mut save) = platform::read(class).and_then(|t| SaveData::decode(&t)) else {
+        return;
+    };
+    save.tasks_day = board.day;
+    save.tasks_week = board.week;
+    save.tasks = board
+        .tasks
+        .iter()
+        .filter(|t| t.state != combat_core::TaskState::Open)
+        .map(|t| combat_core::SavedTask {
+            key: t.key.clone(),
+            weekly: t.weekly,
+            state: t.state,
+            level: t.level,
+            counts: t.goals.iter().map(|g| g.count).collect(),
+        })
+        .collect();
+    let text = save.encode();
+    if platform::read(class).as_deref() != Some(text.as_str()) {
+        platform::write(class, &text);
+    }
 }
 
 /// The local leaderboard of a class's save (empty without one).

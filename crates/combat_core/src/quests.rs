@@ -4,7 +4,6 @@
 //! zone or carried items.
 
 use crate::content::{Content, Objective, QuestDef, QuestGiver, Role};
-use crate::economy::{GearSource, Rarity};
 use crate::geom::in_range;
 use crate::sim::Sim;
 use crate::targeting::EntityId;
@@ -228,6 +227,7 @@ impl Sim {
             .entry(key.to_string())
             .or_default() += 1;
         self.quest_credit(pid, |o| matches!(o, Objective::Kill(k, _) if k == key));
+        self.task_kill(pid, key);
     }
 
     /// Whether quest-only drop `item` of `quest` should roll for `pid`: active, objective not full.
@@ -352,47 +352,11 @@ impl Sim {
     }
 }
 
-/// Gear rarities a quest can offer, best first; group quests reach one step higher.
-const QUEST_RARITIES: [Rarity; 3] = [Rarity::Epic, Rarity::Rare, Rarity::Uncommon];
-
 impl Content {
-    /// "Choose one" gear for a quest and role: world gear of the reward tier, own role or
-    /// generalist, best rarity first (Epic only for group quests), one piece per slot while
-    /// that still leaves two to choose from, at most three. Deterministic, so client and sim
-    /// agree without sending the list.
+    /// "Choose one" gear for a quest and role (`gear_choices` of its tier; Epic only for group
+    /// quests).
     pub fn quest_gear_choices(&self, def: &QuestDef, role: Option<Role>) -> Vec<String> {
-        let tier = def.reward.gear_tier;
-        if tier == 0 {
-            return Vec::new();
-        }
-        let rarities = if def.group {
-            &QUEST_RARITIES[..]
-        } else {
-            &QUEST_RARITIES[1..]
-        };
-        let pool: Vec<&crate::economy::GearDef> = rarities
-            .iter()
-            .flat_map(|r| {
-                self.economy.gear.iter().filter(move |g| {
-                    g.source == GearSource::World
-                        && g.tier() == tier
-                        && g.rarity == *r
-                        && (role.is_none() || g.role.is_none() || g.role == role)
-                })
-            })
-            .collect();
-        let mut out: Vec<&crate::economy::GearDef> = Vec::new();
-        for g in &pool {
-            if out.len() < 3 && !out.iter().any(|o| o.slot == g.slot) {
-                out.push(g);
-            }
-        }
-        for g in &pool {
-            if out.len() < 2 && !out.iter().any(|o| o.name == g.name) {
-                out.push(g);
-            }
-        }
-        out.into_iter().map(|g| g.name.clone()).collect()
+        self.gear_choices(def.reward.gear_tier, def.group, role)
     }
 
     /// Zones where an objective can be worked on: the zones spawning the unit (pack or boss),
@@ -404,6 +368,8 @@ impl Content {
                 .filter(|z| {
                     z.packs.iter().any(|p| p.units.iter().any(|u| u == key))
                         || z.boss.as_ref().is_some_and(|b| b.unit == key)
+                        // Fixed spawns can be hostile too (the campus training dummy).
+                        || z.friendly.iter().any(|f| f.unit == key)
                 })
                 .map(|z| z.id.as_str())
                 .collect::<Vec<_>>()

@@ -4,7 +4,7 @@
 //!
 //! Props are placed by the zone layout: anchor `prop:<key>` is the spot a player stands on to
 //! use it, so the server validates reach with the same geometry the client draws. Everything
-//! that changes state (buffs, Story Points, items, aggro, achievements) is decided here; purely
+//! that changes state (buffs, Kudos, items, aggro, achievements) is decided here; purely
 //! cosmetic props still go through the sim so co-op peers see the same random line.
 
 use crate::content::{Content, ContentError, Effect, SpellDef, SpellId, ticks};
@@ -52,6 +52,8 @@ pub enum PropKind {
     Scooter,
     /// Sprint planning (board or terminal): the client opens the planner on its own use.
     SprintBoard,
+    /// The Daily Standup board: using it shows the player's daily and weekly tasks.
+    ScrumBoard,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -103,6 +105,9 @@ pub enum Trigger {
     Mount,
     /// Has this many achievements.
     Count(u32),
+    /// Granted by a live-world event of this key: the world boss kill (its unit key), a
+    /// titled Sprint Goal (its task key), clocking out at 18:00 sharp (`go_home`).
+    Event(String),
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -391,6 +396,7 @@ impl Sim {
 
     pub(crate) fn on_talk(&mut self, player: EntityId, unit_key: &str) {
         self.check_achievements(player, |t| matches!(t, Trigger::Talk(k) if k == unit_key));
+        self.task_talk(player, unit_key);
     }
 
     pub(crate) fn set_title(&mut self, player: EntityId, key: &str) {
