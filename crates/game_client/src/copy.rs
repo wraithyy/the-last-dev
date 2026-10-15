@@ -112,6 +112,17 @@ const XP_QUIPS: [&str; 3] = [
 ];
 
 /// Deterministic rotation so replays and screenshots stay reproducible.
+/// A burnout change (per mille) as a signed percent: -50 -> "-5%", 15 -> "+1.5%".
+pub fn burnout_pct(delta: i16) -> String {
+    let sign = if delta < 0 { "-" } else { "+" };
+    let d = delta.unsigned_abs();
+    if d.is_multiple_of(10) {
+        format!("{sign}{}%", d / 10)
+    } else {
+        format!("{sign}{}.{}%", d / 10, d % 10)
+    }
+}
+
 pub fn xp_quip(n: usize) -> &'static str {
     XP_QUIPS[n % XP_QUIPS.len()]
 }
@@ -195,6 +206,13 @@ mod tests {
         };
         assert_eq!(bonus_text(&t), "+1% crit, +3 mp5");
         assert_eq!(bonus_text(&ItemTotals::default()), "");
+    }
+
+    #[test]
+    fn burnout_changes_read_as_percent() {
+        assert_eq!(burnout_pct(-50), "-5%");
+        assert_eq!(burnout_pct(150), "+15%");
+        assert_eq!(burnout_pct(-15), "-1.5%");
     }
 
     #[test]

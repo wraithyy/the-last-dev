@@ -22,6 +22,10 @@ pub struct TrophiesOpen(pub bool);
 #[derive(Resource, Default)]
 pub struct CareerOpen(pub bool);
 
+/// The `~/endgame` window (`); Esc closes it like the others.
+#[derive(Resource, Default)]
+pub struct EndgameOpen(pub bool);
+
 /// Sprint planner and Sprint Review windows (`sprint.rs`) and the Daily Standup board
 /// (`live/board.rs`); Esc closes them like the others.
 #[derive(Resource, Default)]
@@ -110,6 +114,7 @@ impl Plugin for InputPlugin {
             .init_resource::<TextFocus>()
             .init_resource::<TrophiesOpen>()
             .init_resource::<CareerOpen>()
+            .init_resource::<EndgameOpen>()
             .init_resource::<QuestWindows>()
             .init_resource::<SprintWindows>()
             .init_resource::<PlayerInput>()

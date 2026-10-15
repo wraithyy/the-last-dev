@@ -393,6 +393,19 @@ pub struct VendorDef {
     pub rotate_count: usize,
     #[serde(default)]
     pub rotate_ms: u32,
+    /// Always listed, sold only to players a department likes enough.
+    #[serde(default)]
+    pub rep: Vec<RepGoods>,
+}
+
+/// A vendor item gated by department standing.
+#[derive(Clone, Debug, Deserialize)]
+pub struct RepGoods {
+    pub item: String,
+    /// `DepartmentDef::name`.
+    pub dept: String,
+    /// Index into `EndgameDef::rep_tiers`.
+    pub tier: u8,
 }
 
 /// Anything that can sit in a bag.
@@ -514,7 +527,19 @@ impl Economy {
             let start = window * v.rotate_count % n;
             out.extend((0..v.rotate_count.min(n)).map(|k| v.rotating[(start + k) % n].clone()));
         }
+        out.extend(v.rep.iter().map(|r| r.item.clone()));
         out
+    }
+
+    /// The (department index, tier) an item of this vendor needs; `None` when ungated.
+    pub fn rep_gate(
+        &self,
+        v: &VendorDef,
+        item: &str,
+        content: &crate::Content,
+    ) -> Option<(usize, u8)> {
+        let r = v.rep.iter().find(|r| r.item == item)?;
+        Some((content.endgame.department_index(&r.dept)?, r.tier))
     }
 
     pub fn sell_price(&self, name: &str) -> Option<u32> {
@@ -689,6 +714,16 @@ impl Economy {
                 .find(|n| !matches!(self.goods(n), Some(Goods::Gear(_) | Goods::Consumable(_))))
             {
                 return bad(format!("vendor {} sells unknown {n}", v.unit));
+            }
+            for r in &v.rep {
+                let known = matches!(
+                    self.goods(&r.item),
+                    Some(Goods::Gear(_) | Goods::Consumable(_))
+                );
+                let dept = content.endgame.department_index(&r.dept).is_some();
+                if !known || !dept || usize::from(r.tier) >= content.endgame.rep_tiers.len() {
+                    return bad(format!("vendor {} rep item {} is bad", v.unit, r.item));
+                }
             }
         }
         if let Some(e) = self.elites.iter().find(|e| content.unit_def(e).is_none()) {
@@ -1313,6 +1348,12 @@ impl Sim {
         let need = self.economy().gear(item).map_or(1, GearDef::required_level);
         if self.units[pi].state.level < need {
             return self.item_error(pid, ItemError::LevelTooLow);
+        }
+        if let Some((dept, tier)) = self.economy().rep_gate(v, item, &self.content) {
+            let rep = self.units[pi].state.career.rep[dept];
+            if self.content.endgame.tier_of(rep) < usize::from(tier) {
+                return self.item_error(pid, ItemError::RepTooLow);
+            }
         }
         if self.units[pi].state.sp < price {
             return self.item_error(pid, ItemError::NotEnoughSp);

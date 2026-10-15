@@ -909,6 +909,15 @@ fn the_chest_hands_out_sprint_only_gear() {
         _ => None,
     });
     let Some(chest) = chest else { panic!("no end") };
+    // A Sprint is a minigame, and minigames are work too.
+    assert!(s.log.iter().any(|e| matches!(
+        e,
+        Event::Burnout {
+            cause: combat_core::BurnoutCause::Minigame,
+            delta: 60,
+            ..
+        }
+    )));
     let items = &chest.rewards[0].items;
     assert!(items.iter().any(|i| sprint.contains(i)), "{items:?}");
     for i in items {

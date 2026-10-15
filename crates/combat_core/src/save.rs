@@ -59,6 +59,13 @@ pub struct SaveData {
     pub duel_streak: u32,
     /// Performance Reviews taken (optional key; older saves have none).
     pub respecs: u32,
+    /// Endgame (optional keys; older saves have none): Promotion rank and its XP, standing
+    /// per department, burnout and the unix time it was saved at (0 = unknown, no holiday).
+    pub rank: u8,
+    pub rank_xp: u32,
+    pub rep: [u32; crate::endgame::DEPARTMENTS],
+    pub burnout: u16,
+    pub burnout_at: u64,
 }
 
 fn list(v: &str) -> Vec<String> {
@@ -141,6 +148,15 @@ impl SaveData {
             self.duel_streak
         ));
         out.push_str(&format!("respecs={}\n", self.respecs));
+        let rep: Vec<String> = self.rep.iter().map(u32::to_string).collect();
+        out.push_str(&format!(
+            "rank={}*{}\nrep={}\nburnout={}*{}\n",
+            self.rank,
+            self.rank_xp,
+            rep.join(","),
+            self.burnout,
+            self.burnout_at
+        ));
         if self.onboarding_pending {
             out.push_str("onboarding=pending\n");
         }
@@ -229,6 +245,21 @@ impl SaveData {
                 "pet" => s.pet = v.chars().take(crate::world::WORLD_KEY_MAX).collect(),
                 "duel_streak" => s.duel_streak = v.parse().unwrap_or(0),
                 "respecs" => s.respecs = v.parse().unwrap_or(0),
+                "rank" => {
+                    let (r, x) = v.split_once('*').unwrap_or((v, "0"));
+                    s.rank = r.parse().unwrap_or(0);
+                    s.rank_xp = x.parse().unwrap_or(0);
+                }
+                "rep" => {
+                    for (slot, n) in s.rep.iter_mut().zip(v.split(',')) {
+                        *slot = n.trim().parse().unwrap_or(0);
+                    }
+                }
+                "burnout" => {
+                    let (b, at) = v.split_once('*').unwrap_or((v, "0"));
+                    s.burnout = b.parse().unwrap_or(0);
+                    s.burnout_at = at.parse().unwrap_or(0);
+                }
                 "title" => s.title = v.chars().take(crate::world::WORLD_KEY_MAX).collect(),
                 "sprint_keys" => {
                     s.sprint_keys = list(v)
@@ -319,6 +350,16 @@ impl Sim {
             pet: s.pet.clone(),
             duel_streak: s.duel_streak,
             respecs: s.respecs,
+            rank: s.career.rank,
+            rank_xp: s.career.rank_xp,
+            rep: s.career.rep,
+            burnout: s.career.burnout,
+            // Whole minutes: the client rewrites the save only when its text changes.
+            burnout_at: if self.clock_on() {
+                self.unix_s() / 60 * 60
+            } else {
+                0
+            },
             achievements: s.achievements.clone(),
             title: s.title.clone(),
             talents: s.talents,
@@ -465,6 +506,16 @@ impl Sim {
         u.pets = pets;
         u.duel_streak = save.duel_streak;
         u.respecs = save.respecs;
+        let eg = &self.content.endgame;
+        let rank = save
+            .rank
+            .min(eg.ranks.len().min(usize::from(u8::MAX)) as u8);
+        let rank_need = eg.rank_xp_to_next(rank);
+        let cap = eg.rep_cap();
+        let c = &mut u.career;
+        c.rank = rank;
+        c.rank_xp = save.rank_xp.min(rank_need.saturating_sub(1));
+        c.rep = save.rep.map(|r| r.min(cap));
         self.set_level_of(player, level);
         let need = self.content.xp_to_next(level);
         // Keep the share of the level already done, not the raw number, across a table change.
@@ -479,6 +530,7 @@ impl Sim {
         u.hp = u.max_hp;
         u.mana = u.max_mana;
         self.import_tasks(player, save.tasks_day, save.tasks_week, &save.tasks);
+        self.import_burnout(i, save.burnout, save.burnout_at);
         true
     }
 }

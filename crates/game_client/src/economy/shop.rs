@@ -220,8 +220,8 @@ fn rebuild(
     let stock = content.economy.stock(def, now_ms);
     let confirm = ui.confirm.as_ref().map(|(n, _)| n.clone());
     let key = format!(
-        "{stock:?}|{:?}|{:?}|{}|{confirm:?}|{:?}|{}",
-        me.bag, me.buyback, me.sp, me.equipped, me.level
+        "{stock:?}|{:?}|{:?}|{}|{confirm:?}|{:?}|{}|{:?}",
+        me.bag, me.buyback, me.sp, me.equipped, me.level, me.career.rep
     );
     for (mut t, title, status) in &mut texts {
         if title.is_some() {
@@ -265,7 +265,23 @@ fn rebuild(
                     .economy
                     .gear(name)
                     .map_or(1, combat_core::GearDef::required_level);
-                let locked = me.level < need;
+                // Department-gated items stay listed so the reward is visible before it is earned.
+                let eg = &content.endgame;
+                let rep_need = content
+                    .economy
+                    .rep_gate(def, name, content)
+                    .filter(|&(d, tier)| eg.tier_of(me.career.rep[d]) < usize::from(tier))
+                    .map(|(d, tier)| {
+                        let dept = eg.departments.get(d).map_or("", |x| x.name.as_str());
+                        let tier = eg
+                            .rep_tiers
+                            .get(usize::from(tier))
+                            .map_or("", |x| x.name.as_str());
+                        format!("Requires {dept}: {tier}")
+                    });
+                let level_need = (me.level < need).then(|| format!("Requires Level {need}"));
+                let lock_line = level_need.or(rep_need);
+                let locked = lock_line.is_some();
                 let ord = goods::compare(content, name, &equipped, role);
                 let pending = confirm.as_deref() == Some(name.as_str());
                 let row = commands
@@ -305,9 +321,9 @@ fn rebuild(
                         })
                         .with_children(|t| {
                             t.spawn((label(name.clone(), 11.0), TextColor(name_color)));
-                            if locked {
+                            if let Some(l) = &lock_line {
                                 t.spawn((
-                                    label(format!("Requires Level {need}"), 10.0),
+                                    label(l.clone(), 10.0),
                                     TextColor(goods::DOWNGRADE_RED.with_alpha(0.8)),
                                 ));
                             }

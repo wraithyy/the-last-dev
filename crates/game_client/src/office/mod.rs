@@ -147,7 +147,8 @@ fn hover_radius(kind: PropKind) -> f32 {
         | PropKind::Whiteboard
         | PropKind::SprintBoard
         | PropKind::ScrumBoard => 1.0,
-        PropKind::Bench => 0.9,
+        PropKind::Bench | PropKind::BeanBag | PropKind::Dog => 0.9,
+        PropKind::QuietRoom => 1.2,
         PropKind::Scooter | PropKind::Printer => 0.6,
         PropKind::Coffee => 0.5,
         PropKind::FireAlarm | PropKind::Music => 0.4,
@@ -388,11 +389,11 @@ fn prop_events(
                 match (def.kind, spot) {
                     // `/sit` snaps to the nearest free slot of the bench (`ride::apply_emotes`);
                     // the stand spot is within reach of it.
-                    (PropKind::Bench, Some(s)) if Some(*unit) == me => {
+                    (PropKind::Bench | PropKind::BeanBag, Some(s)) if Some(*unit) == me => {
                         body.teleport(s.stand);
                         emotes.write(EmoteRequest(Emote::Sit));
                     }
-                    (PropKind::Table, _) if Some(*unit) == me => {
+                    (PropKind::Table, _) if Some(*unit) == me && lines::table_won(*outcome) => {
                         emotes.write(EmoteRequest(Emote::Dance));
                     }
                     _ => {}

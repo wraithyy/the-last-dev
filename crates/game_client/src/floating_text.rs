@@ -7,7 +7,7 @@ use crate::config::*;
 use crate::player::Player;
 use crate::presentation::PresentEvent;
 use bevy::prelude::*;
-use combat_core::{Content, Effect, EntityId, Event, SpellId};
+use combat_core::{BurnoutCause, Content, Effect, EntityId, Event, SpellId};
 
 const DOT_TEXT_SIZE: f32 = 18.0;
 const HEAL_GREEN: Color = Color::srgb(0.35, 1.0, 0.4);
@@ -91,7 +91,10 @@ fn spawn_texts(
     let interrupts = raw.read().map(|CombatEvent(ev)| ev).filter(|ev| {
         matches!(
             ev,
-            Event::CastInterrupted { .. } | Event::Heal { .. } | Event::ManaGain { .. }
+            Event::CastInterrupted { .. }
+                | Event::Heal { .. }
+                | Event::ManaGain { .. }
+                | Event::Burnout { .. }
         )
     });
     let presented = present.read().map(|PresentEvent(ev)| ev);
@@ -223,6 +226,26 @@ fn spawn_texts(
                         size: 16.0,
                         color: Color::srgb(0.68, 0.68, 0.72),
                         offset: Vec2::new(stagger, 0.0),
+                        pop: false,
+                    }],
+                )
+            }
+            // Relief you earned (a manager down, a prop, a coffee) floats; slow drifts do not.
+            Event::Burnout {
+                unit, delta, cause, ..
+            } if *unit == player.0
+                && matches!(
+                    cause,
+                    BurnoutCause::Kill | BurnoutCause::Prop | BurnoutCause::CoffeeBreak
+                ) =>
+            {
+                (
+                    *unit,
+                    vec![Spec {
+                        text: format!("{} burnout", crate::copy::burnout_pct(*delta)),
+                        size: 18.0,
+                        color: HEAL_GREEN,
+                        offset: Vec2::new(0.0, -30.0),
                         pop: false,
                     }],
                 )

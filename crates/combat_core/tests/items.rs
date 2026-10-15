@@ -138,7 +138,12 @@ fn every_item_is_reachable_from_some_source() {
     let shelves: Vec<&String> = eco
         .vendors
         .iter()
-        .flat_map(|v| v.stock.iter().chain(&v.rotating))
+        .flat_map(|v| {
+            v.stock
+                .iter()
+                .chain(&v.rotating)
+                .chain(v.rep.iter().map(|r| &r.item))
+        })
         .collect();
     let top = eco.gear.iter().map(GearDef::tier).max().unwrap_or(1);
     let mut bad = Vec::new();

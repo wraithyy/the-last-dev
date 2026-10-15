@@ -6,6 +6,7 @@
 pub(crate) mod actionbar;
 mod banners;
 mod career;
+mod endgame;
 mod feed;
 mod frames;
 mod hovertip;
@@ -73,6 +74,7 @@ impl Plugin for HudPlugin {
                 banners::BannersPlugin,
                 trophies::TrophiesPlugin,
                 career::CareerPlugin,
+                endgame::EndgamePlugin,
                 quests::QuestsPlugin,
                 map::MapPlugin,
                 minimap::MinimapPlugin,

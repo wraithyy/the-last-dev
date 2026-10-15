@@ -413,6 +413,7 @@ impl NetWorld {
             duel_foe: None,
             duel_streak: 0,
             respecs: 0,
+            career: Default::default(),
         })
     }
 
@@ -488,6 +489,7 @@ impl NetWorld {
                 u.title.clone_from(&p.title);
                 u.talents = p.talents;
                 u.pet.clone_from(&p.pet);
+                u.career.burnout = p.burnout;
             }
         }
     }
@@ -913,6 +915,33 @@ impl NetWorld {
                     && !u.achievements.contains(key)
                 {
                     u.achievements.push(key.clone());
+                }
+            }
+            Event::RankProgress { unit, rank, xp, .. } => {
+                if let Some(u) = self.units.get_mut(unit) {
+                    u.career.rank = *rank;
+                    u.career.rank_xp = *xp;
+                }
+            }
+            Event::RankUp { unit, rank } => {
+                if let Some(u) = self.units.get_mut(unit) {
+                    u.career.rank = u.career.rank.max(*rank);
+                }
+            }
+            Event::Reputation {
+                unit, dept, total, ..
+            } => {
+                if let Some(r) = self
+                    .units
+                    .get_mut(unit)
+                    .and_then(|u| u.career.rep.get_mut(usize::from(*dept)))
+                {
+                    *r = *total;
+                }
+            }
+            Event::Burnout { unit, value, .. } => {
+                if let Some(u) = self.units.get_mut(unit) {
+                    u.career.burnout = *value;
                 }
             }
             Event::TitleChanged { unit, title } => {
@@ -1459,6 +1488,38 @@ mod tests {
         );
         assert!(!w.units[&2].hostile && w.units[&1].duel_foe.is_none());
         assert_eq!((w.units[&1].duel_streak, w.units[&2].duel_streak), (2, 0));
+    }
+
+    #[test]
+    fn endgame_events_update_the_mirror() {
+        let mut w = world_with(&[(2, "senior_engineer", UnitSnap::ALIVE)]);
+        w.receive_events(
+            2,
+            vec![
+                Event::RankProgress {
+                    unit: 1,
+                    rank: 2,
+                    xp: 900,
+                    gained: 300,
+                },
+                Event::Reputation {
+                    unit: 1,
+                    dept: 3,
+                    total: 2_100,
+                    gained: 25,
+                },
+                Event::Burnout {
+                    unit: 2,
+                    value: 640,
+                    delta: 80,
+                    cause: combat_core::BurnoutCause::Death,
+                },
+            ],
+            0.0,
+        );
+        let me = &w.units[&1].career;
+        assert_eq!((me.rank, me.rank_xp, me.rep[3]), (2, 900, 2_100));
+        assert_eq!(w.units[&2].career.burnout, 640);
     }
 
     #[test]

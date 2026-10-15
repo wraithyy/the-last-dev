@@ -144,12 +144,13 @@ fn handle_keys(
     keys: Res<ButtonInput<KeyCode>>,
     binds: Res<Keybinds>,
     // Grouped because Esc closes these in priority order.
-    (mut paused, mut trophies, mut windows, mut sprint, mut career): (
+    (mut paused, mut trophies, mut windows, mut sprint, mut career, mut endgame): (
         ResMut<Paused>,
         ResMut<TrophiesOpen>,
         ResMut<QuestWindows>,
         ResMut<crate::input::SprintWindows>,
         ResMut<crate::input::CareerOpen>,
+        ResMut<crate::input::EndgameOpen>,
     ),
     mut target: ResMut<Target>,
     player: Single<&PlayerBody, With<Player>>,
@@ -161,6 +162,7 @@ fn handle_keys(
             || windows.close_one()
             || std::mem::take(&mut trophies.0)
             || std::mem::take(&mut career.0)
+            || std::mem::take(&mut endgame.0)
         {
             // The window closes first; the next Esc clears the target or pauses.
         } else if target.0.take().is_none() {

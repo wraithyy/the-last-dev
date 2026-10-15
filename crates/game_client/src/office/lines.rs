@@ -105,13 +105,72 @@ const MUSIC: [&str; 6] = [
     "(elevator music) It got louder. You pressed it again. It got worse.",
 ];
 
-const TABLE: [&str; 6] = [
-    "You play a round. The AI coach rates your form 'pre-revenue'.",
-    "Goal! Nobody saw it. It still counts for your culture-fit score.",
-    "You win. HR logs it as 'mandatory fun: completed'.",
-    "The ball rolls under the vending machine. Like the last three.",
-    "An agent challenges you to a rematch. It concedes, then files a ticket.",
+const TABLE_WIN: [&str; 4] = [
+    "The winning goal: nobody saw it. It still counts for your culture-fit score.",
+    "HR logs it as 'mandatory fun: completed'.",
     "You dance in victory. Somewhere, an engagement survey ticks up.",
+    "An agent challenges you to a rematch. It concedes, then files a ticket.",
+];
+
+const TABLE_LOSS: [&str; 4] = [
+    "The AI coach rates your form 'pre-revenue'.",
+    "The ball rolls under the vending machine. Like the last three.",
+    "They ask for a rematch via calendar invite. You accept as 'tentative'.",
+    "You lose with dignity. Your manager calls it a learning opportunity.",
+];
+
+/// Who you play a quick table round against.
+const RIVALS: [&str; 6] = [
+    "the AI-Native Intern",
+    "a Product Owner who stays on a call the whole time",
+    "the Scrum Master Bot",
+    "two contractors at once",
+    "a VP who 'used to play semi-pro'",
+    "the Agile Coach, who keeps stopping to retro",
+];
+
+/// Whether the player won the table round of outcome `n` (see `table_round`).
+pub fn table_won(n: u32) -> bool {
+    n & 4 == 0
+}
+
+/// Foosball (first to 10) or ping-pong (first to 11): a seeded quick round, then a quip.
+pub fn table_round(def: &PropDef, n: u32) -> String {
+    let (game, to) = if def.key.contains("pingpong") {
+        ("ping-pong", 11)
+    } else {
+        ("foosball", 10)
+    };
+    let rival = pick(&RIVALS, n >> 3);
+    let other = n % to;
+    let (score, quip) = if table_won(n) {
+        (format!("{to}-{other} to you"), pick(&TABLE_WIN, n >> 6))
+    } else {
+        (format!("{to}-{other} to them"), pick(&TABLE_LOSS, n >> 6))
+    };
+    format!("Quick round of {game} vs {rival}: {score}. {quip}")
+}
+
+const BEANBAG: [&str; 4] = [
+    "You sink into the bean bag. It keeps sinking. For ten minutes nobody can find you.",
+    "Power nap. You dream of a meeting that ended early. Doctors call it a lucid dream.",
+    "The bean bag exhales as you sit. Same, bean bag. Same.",
+    "You close your eyes 'to think about the architecture'. It works. You think about nothing.",
+];
+
+const QUIET: [&str; 4] = [
+    "The Quiet Room. No screens, no calls, no AI. Just a fern and the hum of your thoughts.",
+    "Someone left a note: 'Please do not book this room'. Below it, three people booked it.",
+    "You sit in silence. For the first time this quarter, nobody needs a quick sync.",
+    "The room is so quiet you can hear the open space deciding things without you.",
+];
+
+const DOG: [&str; 5] = [
+    "Biscuit sniffs your badge and approves your access without a ticket. Best stakeholder here.",
+    "Biscuit rolls over. You pet the belly. Your heart rate drops below 'incident'.",
+    "Biscuit brings you a tennis ball covered in what you hope is drool. You throw it. Joy.",
+    "Biscuit leans on your leg. No agenda, no follow-up, no action items.",
+    "Biscuit has never once asked for an ETA. You feel seen.",
 ];
 
 const BIKE: [&str; 4] = [
@@ -161,7 +220,10 @@ pub fn mine(def: &PropDef, outcome: u32, nth: u32, content: &Content) -> Option<
         PropKind::Billboard => format!("AI Billboard: \"{}\"", pick(&BILLBOARD, n)),
         PropKind::AiCar => format!("The AI-powered car: {}", pick(&CAR, n)),
         PropKind::Music => pick(&MUSIC, n).to_string(),
-        PropKind::Table => pick(&TABLE, n).to_string(),
+        PropKind::Table => table_round(def, n),
+        PropKind::BeanBag => pick(&BEANBAG, nth).to_string(),
+        PropKind::QuietRoom => pick(&QUIET, nth).to_string(),
+        PropKind::Dog => pick(&DOG, nth).to_string(),
         PropKind::BikeRack => pick(&BIKE, n).to_string(),
         PropKind::Bench => BENCH[0].to_string(),
         PropKind::DaysSign => {
@@ -228,6 +290,9 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::Scooter => "Borrow (unlock with your face)",
         PropKind::SprintBoard => "Plan a sprint (timed run)",
         PropKind::ScrumBoard => "Daily Standup (daily and weekly tasks)",
+        PropKind::BeanBag => "Take a power nap",
+        PropKind::QuietRoom => "Hide in the quiet room",
+        PropKind::Dog => "Pet the office dog",
     };
     let extra = match def.kind {
         PropKind::FireAlarm => "WARNING: every enemy on this floor will come for you.".to_string(),
@@ -243,6 +308,16 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
             "Three dailies a day, one Sprint Goal a week. Attendance is tracked.".to_string()
         }
         _ => String::new(),
+    };
+    let extra = match def.calm {
+        Some((amount, cd_ms)) => format!(
+            "{extra} Burnout -{}% (every {} min).",
+            amount / 10,
+            cd_ms.div_ceil(60_000)
+        )
+        .trim_start()
+        .to_string(),
+        None => extra,
     };
     (action, extra)
 }
@@ -282,5 +357,22 @@ mod tests {
             .collect();
         assert_eq!(names[0], "Sugar Rush");
         assert_eq!(names[4], "Energy Drink");
+    }
+
+    #[test]
+    fn a_table_round_has_a_score_and_relief_props_say_so() {
+        let c = match Content::from_ron(include_str!("../../../../content/game.ron")) {
+            Ok(c) => c,
+            Err(e) => panic!("{e}"),
+        };
+        let Some(foosball) = c.prop("foosball_open_space") else {
+            panic!("no foosball");
+        };
+        let line = table_round(foosball, 3);
+        assert!(line.starts_with("Quick round of foosball vs "), "{line}");
+        assert!(line.contains("10-3 to you"), "{line}");
+        let pong = c.prop("pingpong_open_space").map(|p| table_round(p, 4 + 2));
+        assert!(pong.is_some_and(|l| l.contains("ping-pong") && l.contains("11-6 to them")));
+        assert!(tooltip(foosball).1.ends_with("Burnout -12% (every 3 min)."));
     }
 }

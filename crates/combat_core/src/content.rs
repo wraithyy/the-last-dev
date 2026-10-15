@@ -1050,6 +1050,10 @@ pub struct Content {
     /// Companions (`pets.rs`); absent in minimal test content.
     #[serde(default)]
     pub pets: Vec<crate::pets::PetDef>,
+    /// Promotion ranks, department reputation and burnout (`endgame.rs`, `burnout.rs`);
+    /// absent in minimal test content.
+    #[serde(default)]
+    pub endgame: crate::endgame::EndgameDef,
 }
 
 impl Content {
@@ -1346,6 +1350,7 @@ impl Content {
         self.sprint.validate(self)?;
         self.live.validate(self)?;
         crate::pets::validate(self)?;
+        self.endgame.validate(self)?;
         Ok(())
     }
 }

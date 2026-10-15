@@ -204,6 +204,8 @@ pub struct Sim {
     pub(crate) live: crate::live::LiveRt,
     /// Code review duels and request cooldowns (`duel.rs`).
     pub(crate) duels: crate::duel::DuelState,
+    /// Burnout timers, prop relief cooldowns and the quip stream (`burnout.rs`).
+    pub(crate) burnout: crate::burnout::BurnoutRt,
 }
 
 impl Sim {
@@ -234,6 +236,7 @@ impl Sim {
             sprint: Default::default(),
             live: Default::default(),
             duels: Default::default(),
+            burnout: crate::burnout::BurnoutRt::new(seed),
         }
     }
 
@@ -280,6 +283,7 @@ impl Sim {
         self.rescale_group_hp();
         self.grow_packs();
         self.live_on_join(id);
+        self.burnout_on_join(id);
         id
     }
 
@@ -296,6 +300,7 @@ impl Sim {
         self.quest_logs.remove(&id);
         self.live.tasks.remove(&id);
         self.duels.next_request.remove(&id);
+        self.burnout_on_leave(id);
         for u in &mut self.units {
             u.loot.retain(|l| l.owner != Some(id));
             if u.state.lootable && u.loot.is_empty() {
@@ -417,6 +422,7 @@ impl Sim {
             duel_foe: None,
             duel_streak: 0,
             respecs: 0,
+            career: Default::default(),
         };
         self.units.push(Unit {
             state,
@@ -667,6 +673,7 @@ impl Sim {
         self.update_sprint();
         self.update_live();
         self.update_duels();
+        self.update_burnout();
         self.update_pets();
         self.update_corpses();
         self.flush_yells();
@@ -1665,6 +1672,9 @@ impl Sim {
         self.events.push(Event::Death { unit: id, killer });
         self.kill_adds_of(id);
         self.request_yell(ti, YellKind::Death);
+        if self.is_player(id) {
+            self.burnout_on_death(ti);
+        }
         if self.is_player(id)
             && let Some(k) = killer.and_then(|k| self.index(k))
         {
@@ -1735,6 +1745,7 @@ impl Sim {
         if let Some(k) = killer {
             self.award_kill_xp(k, ti);
         }
+        self.endgame_on_kill(ti, killer);
         if let Some(ki) = killer
             .filter(|k| self.is_player(*k))
             .and_then(|k| self.index(k))

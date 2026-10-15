@@ -44,6 +44,8 @@ pub enum Action {
     Career,
     /// `~/pets`: the pet journal.
     Pets,
+    /// `~/endgame`: Promotion rank, reputations, lockouts and the weekly seed.
+    Endgame,
     /// Gadget bar slot 0..3: equipped on-use items.
     Gadget(u8),
     Chat,
@@ -109,6 +111,7 @@ impl Action {
             CharacterSheet,
             Career,
             Pets,
+            Endgame,
             Chat,
             CombatLog,
             Meter,
@@ -150,6 +153,7 @@ impl Action {
             CharacterSheet => "character_sheet".into(),
             Career => "career".into(),
             Pets => "pets".into(),
+            Endgame => "endgame".into(),
             Gadget(i) => format!("gadget{i}"),
             Chat => "chat".into(),
             CombatLog => "combat_log".into(),
@@ -188,6 +192,7 @@ impl Action {
             CharacterSheet => "~/whoami gear and bag".into(),
             Career => "~/career talents".into(),
             Pets => "~/pets journal".into(),
+            Endgame => "~/endgame ranks and reputation".into(),
             Gadget(i) => format!("gadget {} (on-use gear)", i + 1),
             Chat => "chat window".into(),
             CombatLog => "combat log".into(),
@@ -208,8 +213,8 @@ impl Action {
             AutoAttack | Coffee | Resurrect | Interact | Gadget(_) => Group::Combat,
             Slot(_) => Group::Bar,
             NumSlot(_) => Group::Numpad,
-            QuestLog | Map | Trophies | CharacterSheet | Career | Pets | Chat | CombatLog
-            | Meter | Emotes | Mute | MinimapZoomIn | MinimapZoomOut => Group::Windows,
+            QuestLog | Map | Trophies | CharacterSheet | Career | Pets | Endgame | Chat
+            | CombatLog | Meter | Emotes | Mute | MinimapZoomIn | MinimapZoomOut => Group::Windows,
         }
     }
 
@@ -247,6 +252,8 @@ impl Action {
             Career => KeyCode::KeyR,
             // Z for zoo: P is already the third gadget.
             Pets => KeyCode::KeyZ,
+            // The tilde key: `~/endgame`.
+            Endgame => KeyCode::Backquote,
             Gadget(i) => [KeyCode::KeyU, KeyCode::KeyO, KeyCode::KeyP][usize::from(i).min(2)],
             Chat => KeyCode::KeyH,
             CombatLog => KeyCode::KeyL,
@@ -306,7 +313,7 @@ key_table! {
     NumpadDecimal => "N.",
     F1 => "F1", F2 => "F2", F3 => "F3", F4 => "F4", F5 => "F5", F6 => "F6", F7 => "F7",
     F8 => "F8", F10 => "F10", F11 => "F11", F12 => "F12",
-    Space => "Spc", Tab => "Tab", Backquote => "`", Minus => "-", Equal => "=",
+    Space => "Spc", Tab => "Tab", Backquote => "~", Minus => "-", Equal => "=",
     BracketLeft => "[", BracketRight => "]", Semicolon => ";", Quote => "'", Comma => ",",
     Period => ".", Slash => "/", Backslash => "\\", IntlBackslash => "<>",
     ArrowUp => "Up", ArrowDown => "Down", ArrowLeft => "Left", ArrowRight => "Right",
@@ -422,12 +429,26 @@ impl Keybinds {
         let mut out = Self::default();
         let by_id: HashMap<String, Action> =
             Action::all().into_iter().map(|a| (a.id(), a)).collect();
+        let mut from_file = std::collections::HashSet::new();
         for line in text.lines() {
             let Some((id, name)) = line.split_once('=') else {
                 continue;
             };
             if let (Some(a), Some(k)) = (by_id.get(id.trim()), key_from_name(name.trim())) {
                 out.keys.insert(*a, k);
+                from_file.insert(*a);
+            }
+        }
+        // An action added after the file was written keeps its default unless the player
+        // already uses that key; then it moves to a free one instead of voiding the file.
+        for a in Action::all() {
+            let k = out.key(a);
+            let taken = out.keys.iter().any(|(o, ok)| *o != a && *ok == k);
+            if !from_file.contains(&a) && taken {
+                let used: Vec<KeyCode> = out.keys.values().copied().collect();
+                if let Some(free) = KEYS.iter().map(|e| e.0).find(|c| !used.contains(c)) {
+                    out.keys.insert(a, free);
+                }
             }
         }
         let mut seen = std::collections::HashSet::new();
@@ -463,6 +484,14 @@ fn install(app: &mut App) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_new_action_never_voids_an_old_file_that_uses_its_key() {
+        let b = Keybinds::parse("jump=Backquote\nforward=KeyW\n");
+        assert_eq!(b.key(Action::Jump), KeyCode::Backquote);
+        assert_ne!(b.key(Action::Endgame), KeyCode::Backquote);
+        assert_eq!(Keybinds::default().key(Action::Endgame), KeyCode::Backquote);
+    }
 
     #[test]
     fn defaults_are_unique_and_bindable() {

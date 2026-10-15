@@ -5,7 +5,7 @@ use crate::config::{BUBBLE_HEAD_GAP, PLAYER_HEIGHT, head_height};
 use crate::copy::yell_color;
 use crate::player::Player;
 use bevy::prelude::*;
-use combat_core::{EntityId, Event};
+use combat_core::{EntityId, Event, QuipKind};
 
 /// Bosses and friendly NPCs are read carefully; trash chatter should clear quickly.
 const BUBBLE_SECS_LONG: f32 = 5.0;
@@ -80,8 +80,21 @@ fn spawn_bubbles(
     old: Query<(Entity, &YellBubble)>,
 ) {
     for CombatEvent(ev) in events.read() {
-        let Event::Yell { unit, text } = ev else {
-            continue;
+        // Burnt-out players yawn and mutter in bubbles too; reply-all stays in the chat.
+        let (unit, text) = match ev {
+            Event::Yell { unit, text } => (unit, text.clone()),
+            Event::BurnoutQuip {
+                unit,
+                kind: kind @ (QuipKind::Yawn | QuipKind::Mutter),
+                line,
+            } => {
+                let def = &sim.content().endgame.burnout;
+                let Some(t) = def.quip_line(*kind, *line) else {
+                    continue;
+                };
+                (unit, t.to_string())
+            }
+            _ => continue,
         };
         let Some((anchor, _)) = units.iter().find(|(_, su)| su.0 == *unit) else {
             continue;

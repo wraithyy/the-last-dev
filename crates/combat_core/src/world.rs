@@ -54,6 +54,12 @@ pub enum PropKind {
     SprintBoard,
     /// The Daily Standup board: using it shows the player's daily and weekly tasks.
     ScrumBoard,
+    /// A nap spot in the open space.
+    BeanBag,
+    /// The one meeting room nobody may book.
+    QuietRoom,
+    /// The office dog, who reports to nobody.
+    Dog,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -81,6 +87,10 @@ pub struct PropDef {
     /// Scooters: the parked one is gone for everyone this long after a borrow.
     #[serde(default)]
     pub respawn_ms: u32,
+    /// Burnout relief (per mille) and its own per-player cooldown in ms (`burnout.rs`), so a
+    /// prop with a short use cooldown still cannot be spammed for relief.
+    #[serde(default)]
+    pub calm: Option<(u16, u32)>,
 }
 
 /// A friendly unit spawned at a layout anchor of one zone, outside `ZoneDef::friendly`.
@@ -487,6 +497,7 @@ impl Sim {
             prop: def.key.clone(),
             outcome,
         });
+        self.burnout_on_prop(pi, k);
         let kind = def.kind;
         if rewards && outcome == 0 {
             self.check_achievements(player, |t| *t == Trigger::Fail(kind));

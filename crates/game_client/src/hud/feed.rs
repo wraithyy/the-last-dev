@@ -10,7 +10,9 @@ use crate::config::*;
 use crate::copy;
 use crate::economy::goods;
 use bevy::prelude::*;
-use combat_core::{AuraEnd, Command, EntityId, Event, ITEM_STACK_CAP, School};
+use combat_core::{
+    AuraEnd, BurnoutCause, Command, EntityId, Event, ITEM_STACK_CAP, QuipKind, School,
+};
 
 const XP_BAR_H: f32 = 14.0;
 const XP_TICKS: usize = 10;
@@ -314,7 +316,10 @@ pub fn event_sink(ev: &Event) -> Sink {
         | Event::QuestReady { .. }
         | Event::QuestCompleted { .. }
         | Event::Looted { .. }
-        | Event::GearChanged { .. } => Sink::Chat,
+        | Event::GearChanged { .. }
+        | Event::RankProgress { .. }
+        | Event::RankUp { .. }
+        | Event::BurnoutQuip { .. } => Sink::Chat,
         _ => Sink::Combat,
     }
 }
@@ -354,6 +359,7 @@ fn collect_events(
     mut xp_gains: Local<usize>,
     // Mana ticks of the running Coffee Break, reported once as a single line.
     mut coffee_mana: Local<u32>,
+    mut therapy: Local<usize>,
 ) {
     let me = sim.player();
     let coffee = sim.content().channel_spell().map(|s| s.id);
@@ -733,10 +739,120 @@ fn collect_events(
                     loot.dirty = true;
                 }
             }
+            Event::RankProgress { unit, gained, .. } if Some(*unit) == me && *gained > 0 => {
+                out.push(
+                    format!("You gain {gained} promotion experience."),
+                    Color::srgb(0.75, 0.45, 1.0),
+                );
+            }
+            Event::RankUp { unit, rank } => {
+                let title = sim
+                    .content()
+                    .endgame
+                    .rank_name(*rank)
+                    .unwrap_or("something")
+                    .to_string();
+                let line = if Some(*unit) == me {
+                    format!("You have been promoted to {title}. Same desk, more meetings.")
+                } else {
+                    format!("{} has been promoted to {title}.", who(&*sim, *unit))
+                };
+                out.push(line, Color::srgb(1.0, 0.82, 0.3));
+            }
+            Event::Reputation {
+                unit,
+                dept,
+                total,
+                gained,
+            } if Some(*unit) == me => {
+                let eg = &sim.content().endgame;
+                let name = eg
+                    .departments
+                    .get(usize::from(*dept))
+                    .map_or("A department", |d| d.name.as_str());
+                let tier = eg.tier_of(*total);
+                let tier_name = eg.rep_tiers.get(tier).map_or("", |t| t.name.as_str());
+                if tier > eg.tier_of(total - gained) {
+                    out.sink = Sink::Chat;
+                    out.push(
+                        format!("{name} now considers you: {tier_name}."),
+                        Color::srgb(0.4, 0.85, 1.0),
+                    );
+                } else {
+                    out.push(
+                        format!("{name} standing +{gained} ({tier_name})."),
+                        Color::srgb(0.4, 0.75, 0.9),
+                    );
+                }
+            }
+            Event::Burnout {
+                unit, delta, cause, ..
+            } if Some(*unit) == me => {
+                let pct = copy::burnout_pct(*delta);
+                let line = match cause {
+                    BurnoutCause::Kill => {
+                        let lines = &sim.content().endgame.burnout.therapy;
+                        let t = lines
+                            .get(*therapy % lines.len().max(1))
+                            .map_or("Therapeutic.", String::as_str)
+                            .to_string();
+                        *therapy += 1;
+                        Some(format!("{t} (burnout {pct})"))
+                    }
+                    BurnoutCause::Holiday => {
+                        out.sink = Sink::Chat;
+                        Some(format!(
+                            "Welcome back. Time off did its job: burnout {pct}. HR calls it 'recharging'."
+                        ))
+                    }
+                    BurnoutCause::Death => Some(format!(
+                        "Burnout {pct}. Dying at work still counts as working late."
+                    )),
+                    BurnoutCause::Meeting => Some(format!("Burnout {pct}: another meeting.")),
+                    BurnoutCause::Minigame => {
+                        Some(format!("Burnout {pct}: mandatory fun is still mandatory."))
+                    }
+                    BurnoutCause::CoffeeBreak => Some(format!("Burnout {pct}: coffee.")),
+                    _ => None,
+                };
+                if let Some(l) = line {
+                    let color = if *delta < 0 {
+                        Color::srgb(0.35, 1.0, 0.4)
+                    } else {
+                        Color::srgb(1.0, 0.6, 0.35)
+                    };
+                    out.push(l, color);
+                }
+            }
+            Event::BurnoutQuip { unit, kind, line } => {
+                let def = &sim.content().endgame.burnout;
+                let Some(text) = def.quip_line(*kind, *line) else {
+                    continue;
+                };
+                let name = sim.unit(*unit).map_or("Someone", |u| u.name.as_str());
+                out.sink = Sink::Chat;
+                match kind {
+                    QuipKind::ReplyAll => {
+                        out.chat
+                            .push(&format!("[Reply All] {name}: "), REPLY_ALL, text, REPLY_ALL);
+                    }
+                    QuipKind::Mutter => {
+                        let (_, head, body) = ChatKind::Emote.style();
+                        out.chat
+                            .push(&format!("{name} mutters: "), head, text, body);
+                    }
+                    QuipKind::Yawn => {
+                        out.push(format!("{name} {text}"), Color::srgb(0.6, 0.6, 0.66))
+                    }
+                }
+            }
             _ => {}
         }
     }
 }
+
+/// Reply-all mails stand out like they do in a real inbox.
+const REPLY_ALL: Color = Color::srgb(1.0, 0.78, 0.35);
 
 fn update_error(
     time: Res<Time>,
@@ -948,14 +1064,36 @@ fn update_xp(
         return;
     };
     if u.xp_to_next == 0 {
-        fill.width = percent(100);
-        set_text(
-            &mut text,
-            &format!(
-                "Lv {} | career progress: maxed out, still not promoted",
-                u.level
+        // Past the cap the bar fills towards the next Promotion rank.
+        let eg = &sim.content().endgame;
+        let (rank, xp) = (u.career.rank, u.career.rank_xp);
+        let need = eg.rank_xp_to_next(rank);
+        let title = eg.rank_name(rank).unwrap_or("No promotion yet");
+        let (width, line) = match (need, eg.ranks.is_empty()) {
+            (_, true) => (
+                100.0,
+                format!("Lv {} | maxed out, still not promoted", u.level),
             ),
-        );
+            (0, false) => (
+                100.0,
+                format!(
+                    "Lv {} | {title} | out of titles. HR is drafting one.",
+                    u.level
+                ),
+            ),
+            (need, false) => {
+                let pct = (100.0 * xp as f32 / need as f32).clamp(0.0, 100.0);
+                (
+                    pct,
+                    format!(
+                        "Lv {} | {title} | promotion {xp} / {need} XP ({pct:.0}%)",
+                        u.level
+                    ),
+                )
+            }
+        };
+        fill.width = percent(width);
+        set_text(&mut text, &line);
         return;
     }
     let pct = (100.0 * u.xp as f32 / u.xp_to_next as f32).clamp(0.0, 100.0);

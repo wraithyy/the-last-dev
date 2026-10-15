@@ -485,7 +485,7 @@ fn spawn_hud(mut commands: Commands) {
                     // A button without behaviour, so taps on the card's padding do not dismiss.
                     Button,
                     Node {
-                        width: px(4.0 * 112.0 + 3.0 * 8.0 + 36.0),
+                        width: px(5.0 * 112.0 + 4.0 * 8.0 + 36.0),
                         padding: UiRect::all(px(14)),
                         flex_direction: FlexDirection::Row,
                         flex_wrap: FlexWrap::Wrap,
@@ -506,6 +506,7 @@ fn spawn_hud(mut commands: Commands) {
                         ("Career", TouchButton::Act(Action::Career)),
                         ("Gear", TouchButton::Act(Action::CharacterSheet)),
                         ("Pets", TouchButton::Act(Action::Pets)),
+                        ("Endgame", TouchButton::Act(Action::Endgame)),
                         ("Sound", TouchButton::Act(Action::Mute)),
                         ("Pause", TouchButton::Key(KeyCode::Escape)),
                     ] {

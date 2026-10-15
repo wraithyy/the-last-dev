@@ -596,6 +596,9 @@ impl Sim {
             target: Self::id_of(ti),
             key: key.to_string(),
         });
+        if def.harmful {
+            self.burnout_on_aura(ti, key);
+        }
         if def.max_hp_pct != 0 {
             self.refresh_max_hp(ti);
         }

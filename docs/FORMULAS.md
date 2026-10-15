@@ -301,3 +301,37 @@ weekly       = xp_to_next(level) * 70% XP, 30 * level Kudos, gear_choices(ceil(l
 - `CastTime` adds to the cast-time aura percent after haste (-100 = instant); `ManaCost` subtracts from 100% of the cost; `HpCost` pays `mana * pct / 100` HP instead (never below 1 HP); `Periodic` scales the snapshotted tick; `DamageTaken` adds to the damage-taken percent with auras and class armour.
 - Performance Review: `respec_sp_per_level * level * (100 + respec_growth_pct * reviews_taken) / 100` Kudos (15 per level, +100% per earlier review: 150, 300, 450, ... at level 10). `reviews_taken` is `UnitState::respecs`, saved as `respecs=`; online the client counts resets from `TalentsChanged` (rooms start fresh).
 - Balance gate (`every_talent_build_clears_the_campaign`): each class clears the campaign on 3 seeds with options 1, 2 and 3 in every row; total boss time may not drop below 80% of the fastest class without talents.
+
+## Endgame: Promotion, reputation, burnout
+
+All in `content/game.ron` under `endgame` (`endgame.rs`, `burnout.rs`). Burnout is per mille (1000 = 100%).
+
+```
+promotion xp     = kill / quest / daily XP earned at level 10 (level XP rules, group bonus as usual)
+rank_xp_to_next  = rank_base_xp + rank_step_xp * rank       // 30000 + 6000 * r: 30k, 36k, ... 84k
+all ten ranks    = 570000 XP
+paragon          = min(rank * 1%, 5%) of max HP and max mana  // applied after gear and auras, never heals
+rep tiers        = Ignored 0, Tolerated 300, Cc'd 900, Invited 2100, Trusted 4200, Exalted 8400 (cap)
+rep per kill     = trash 5, elite 25, boss 75 (level 10 only, the zone's department; summons give none)
+rep per task     = daily 80, Sprint Goal 300, to the department with the lowest standing (ties: content order)
+world boss       = 150 to every department
+```
+
+Departments by zone: Engineering (tower/1, lab/1, lab/2), Security (tower/4), HR (tower/2), Marketing (campus, tower/5), Internal IT (datacenter/1-2), Sales (tower/3). Rep vendor items stay listed and are refused below their tier (`ItemError::RepTooLow`): HR Cc'd mug, Marketing Invited hoodie, Sales Exalted headgear (Procurement); Engineering Cc'd keyboard, Security Invited lanyard, Internal IT Trusted headset (Hardware Broker).
+
+```
+burnout up    : meeting debuff +2% (standup, quick_sync, recurring_meeting, wellness_survey, culture_fit,
+                mandatory_fun, deadline), Sprint run end +6%, death +8%,
+                per minute: night (Crunch mode) +1%, session past 45 min +0.5%
+burnout down  : Coffee Break channel -3% (once per 2 min), Friday from 12:00 UTC -2%/min,
+                rubber duck out -1%/min, holiday -10% per full hour logged off (after 15 min; offline
+                from the save's timestamp, online rooms start fresh at 0), management kill -5%
+                (bosses -15%), props (own cooldown per prop and player): coffee -6%/2 min,
+                vending -4%/2 min, foosball and ping-pong -12%/3 min, bean bag -15%/5 min,
+                quiet room -10%/4 min, office dog -10%/2 min, Sad Bench -5%/2 min
+effects       : >= 75% move 10% slower (client speed, server budget is a ceiling); quips every 45 s at
+                35%: yawn from 30%, mutter from 50%, reply-all from 70%; hair stages come
+                burnout * 25 HP points earlier
+```
+
+Drifts tick once a minute from the player's join; quips use their own SplitMix64 stream, so neither shifts combat or loot. Save keys (optional): `rank=<r>*<xp>`, `rep=<6 numbers>`, `burnout=<value>*<unix minute>`.

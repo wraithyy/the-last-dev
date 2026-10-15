@@ -252,6 +252,8 @@ pub enum ItemError {
     LevelTooLow,
     /// A trophy or an active quest item cannot be deleted.
     Protected,
+    /// The department behind that item does not like you enough yet (`RepGoods::tier`).
+    RepTooLow,
 }
 
 impl ItemError {
@@ -272,6 +274,9 @@ impl ItemError {
                 "Procurement says that is above your pay grade. Come back after a promotion."
             }
             ItemError::Protected => "That one is load-bearing. Compliance would notice.",
+            ItemError::RepTooLow => {
+                "That department has not added you to the right mailing list yet. Earn more reputation."
+            }
         }
     }
 }
@@ -634,6 +639,39 @@ pub enum Event {
     DuelRefused {
         reason: crate::duel::DuelError,
     },
+    /// Promotion progress after the level cap (routed): `xp` towards the next rank, `gained`
+    /// by this grant.
+    RankProgress {
+        unit: EntityId,
+        rank: u8,
+        xp: u32,
+        gained: u32,
+    },
+    /// A player reached a Promotion rank (everyone sees it).
+    RankUp {
+        unit: EntityId,
+        rank: u8,
+    },
+    /// Department standing changed (routed): `dept` indexes `EndgameDef::departments`.
+    Reputation {
+        unit: EntityId,
+        dept: u8,
+        total: u32,
+        gained: u32,
+    },
+    /// Burnout moved to `value` (per mille) by `delta` (everyone sees it: hair follows it).
+    Burnout {
+        unit: EntityId,
+        value: u16,
+        delta: i16,
+        cause: crate::burnout::BurnoutCause,
+    },
+    /// A burnt-out player yawned, muttered or replied to all (`line` indexes the content list).
+    BurnoutQuip {
+        unit: EntityId,
+        kind: crate::burnout::QuipKind,
+        line: u16,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -720,6 +758,21 @@ pub struct UnitState {
     pub duel_streak: u32,
     /// Player: Performance Reviews taken so far (each makes the next one dearer).
     pub respecs: u32,
+    /// Player: endgame progress (Promotion rank, department reputation, burnout).
+    pub career: Career,
+}
+
+/// Endgame state of one player; all zero for everyone else.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Career {
+    /// Promotion ranks reached after the level cap (0 = none yet).
+    pub rank: u8,
+    /// XP towards the next rank.
+    pub rank_xp: u32,
+    /// Standing per department, in `EndgameDef::departments` order.
+    pub rep: [u32; crate::endgame::DEPARTMENTS],
+    /// Per mille (0..=1000).
+    pub burnout: u16,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

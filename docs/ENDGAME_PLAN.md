@@ -64,6 +64,13 @@ play that reuses existing zones and systems, works solo and in co-op, and stays 
 - **Acceptance**: native screenshots, keybind works, touch layout
 - **Prompt seed**: Build the endgame panel showing rank, reputations, lockouts and the weekly seed.
 
+#### Status (2026-10-15): E1 and the burnout meter are built
+- 1.1: ten ranks, curve `30000 + 6000 * r`, Paragon +1%/rank capped at +5%, titles as `rank_<k>` achievements; the XP bar shows rank progress.
+- 1.2: departments, tiers and gains as in FORMULAS.md; six rep-gated vendor items. Legacy kills and the raid do not exist yet, so kills at level 10 in a department's zones stand in for "Legacy kills".
+- 1.3: `~/endgame` (key ~, Esc menu, touch Menu). Lockouts and the weekly seed rows say what is coming (E2/E3) instead of showing empty tables. No tracker lines yet: nothing weekly exists to track beyond the Sprint Goal, which already has one.
+- 5.3/3 burnout: strip under the mana bar with tooltip; props reuse the office (foosball, ping-pong, vending, coffee, Sad Bench) plus three new spots (bean bag, unbookable quiet-room booth, Biscuit the office dog). The table "mini-round" is a seeded score line, not an interactive minigame. Yawns and mutters reuse speech bubbles; no yawn animation. Online characters start each room at 0 burnout (the holiday at session start).
+- Clutter review: only the 5 px strip is new on the HUD (1280x720 and 844x390 touch screenshots in `.playwright-mcp/endgame/`); the touch Menu drawer went from 4 to 5 columns to fit "Endgame" in two rows; no new dock button or hint-bar entry.
+
 ### Wave E2: Legacy Mode
 
 #### Task 2.1: Legacy Mode zone variants

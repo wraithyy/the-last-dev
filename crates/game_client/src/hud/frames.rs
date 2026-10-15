@@ -50,6 +50,14 @@ enum Field {
 }
 #[derive(Component)]
 struct FrameRoot(Who);
+/// The thin burnout strip under the player's mana bar (its node carries the tooltip source).
+#[derive(Component)]
+struct BurnoutStrip;
+#[derive(Component)]
+struct BurnoutFill;
+const BURNOUT_H: f32 = 5.0;
+const BURNOUT_LOW: Color = Color::srgb(0.85, 0.7, 0.3);
+const BURNOUT_HIGH: Color = Color::srgb(0.95, 0.22, 0.18);
 #[derive(Component)]
 struct TextOf(Who, Field);
 #[derive(Component)]
@@ -142,6 +150,7 @@ impl Plugin for FramesPlugin {
                 (
                     collect_phase_flash,
                     update_frames,
+                    update_burnout_strip,
                     collect_cast_flash,
                     update_cast_bars,
                     update_auras,
@@ -352,8 +361,71 @@ fn spawn_frame(commands: &mut Commands, who: Who, left: f32) {
                     });
                     spawn_bar(body, who, Pool::Hp);
                     spawn_bar(body, who, Pool::Mana);
+                    if who == Who::Player {
+                        spawn_burnout_strip(body);
+                    }
                 });
         });
+}
+
+fn spawn_burnout_strip(parent: &mut ChildSpawnerCommands) {
+    parent
+        .spawn((
+            BurnoutStrip,
+            Button,
+            TipSource {
+                tag: "burnout",
+                ..default()
+            },
+            Node {
+                height: px(BURNOUT_H),
+                width: percent(100),
+                border_radius: BorderRadius::all(px(2)),
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.02, 0.02, 0.04, 0.6)),
+            BoxShadow::new(Color::srgba(0.0, 0.0, 0.0, 0.6), px(0), px(1), px(0), px(3)),
+        ))
+        .with_children(|s| {
+            s.spawn((
+                BurnoutFill,
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(0),
+                    top: px(0),
+                    bottom: px(0),
+                    width: percent(0),
+                    ..default()
+                },
+                BackgroundColor(BURNOUT_LOW),
+            ));
+        });
+}
+
+/// Fill width and colour follow the player's burnout; the tooltip reads it from `TipSource`.
+fn update_burnout_strip(
+    sim: SimView,
+    mut strip: Query<&mut TipSource, With<BurnoutStrip>>,
+    mut fill: Query<(&mut Node, &mut BackgroundColor), With<BurnoutFill>>,
+) {
+    let b = sim
+        .player()
+        .and_then(|id| sim.unit(id))
+        .map_or(0, |u| u.career.burnout);
+    for mut tip in &mut strip {
+        if tip.burnout != Some(b) {
+            tip.burnout = Some(b);
+        }
+    }
+    let k = f32::from(b.min(combat_core::BURNOUT_MAX)) / f32::from(combat_core::BURNOUT_MAX);
+    for (mut node, mut color) in &mut fill {
+        let w = percent(k * 100.0);
+        if node.width != w {
+            node.width = w;
+        }
+        color.0 = BURNOUT_LOW.mix(&BURNOUT_HIGH, k);
+    }
 }
 
 fn spawn_cast_bar(

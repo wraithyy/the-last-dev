@@ -1591,6 +1591,7 @@ impl Sim {
                 next_level: next,
             },
         });
+        self.burnout_on_sprint_end();
     }
 
     /// The end-of-sprint chest for one player: Story Points and top-tier gear whose rarity

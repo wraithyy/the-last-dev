@@ -74,6 +74,10 @@ impl Sim {
                 (i64::from(base_hp) * (100 + hp_aura_pct).max(10) / 100) as u32
             };
             u.state.max_mana = d.max_mana + mana + t.max_mana;
+            // Paragon: Promotion ranks add a small capped share of HP and mana.
+            let paragon = u64::from(self.content.endgame.paragon_pct(u.state.career.rank));
+            u.state.max_hp = (u64::from(u.state.max_hp) * (100 + paragon) / 100) as u32;
+            u.state.max_mana = (u64::from(u.state.max_mana) * (100 + paragon) / 100) as u32;
             u.sp = d.spell_power + sp + t.spell_power;
             u.dmg_pct = 100;
         } else {
@@ -250,9 +254,6 @@ impl Sim {
         let (ml, reward) = (self.units[mob].state.level, self.units[mob].state.xp);
         for p in sharers {
             let pl = self.units[p].state.level;
-            if self.content.xp_to_next(pl) == 0 {
-                continue;
-            }
             let solo = u64::from(self.content.kill_xp(pl, ml, reward));
             self.grant_xp(p, (solo * u64::from(bonus) / 100 / n as u64) as u32);
         }
@@ -261,8 +262,11 @@ impl Sim {
     /// Adds XP to the player at `killer` (kills, quest rewards) and runs the level-ups.
     pub(crate) fn grant_xp(&mut self, killer: usize, amount: u32) {
         let level = self.units[killer].state.level;
-        if amount == 0 || self.content.xp_to_next(level) == 0 {
+        if amount == 0 {
             return;
+        }
+        if self.content.xp_to_next(level) == 0 {
+            return self.grant_rank_xp(killer, amount);
         }
         let id = Self::id_of(killer);
         self.units[killer].state.xp += amount;

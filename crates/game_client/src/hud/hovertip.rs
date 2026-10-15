@@ -16,7 +16,10 @@ const GAP: f32 = 6.0;
 pub struct TipSource {
     pub aura: Option<AuraView>,
     pub cast: Option<CastView>,
-    /// QA handle for `WOW_HOVER_TIP`: "player-aura", "target-aura", "party-aura", "target-cast".
+    /// The player's burnout (per mille), for the strip under the mana bar.
+    pub burnout: Option<u16>,
+    /// QA handle for `WOW_HOVER_TIP`: "player-aura", "target-aura", "party-aura", "target-cast",
+    /// "burnout".
     pub tag: &'static str,
 }
 
@@ -221,6 +224,39 @@ fn aura_tip(a: &AuraView, content: &Content) -> Tip {
     }
 }
 
+/// `fn burnout() -> 72%`, what it does to you now, and the content's advice for that level.
+fn burnout_tip(b: u16, content: &Content) -> Tip {
+    let def = &content.endgame.burnout;
+    let pct = u32::from(b.min(combat_core::BURNOUT_MAX)) / 10;
+    let mut effects = Vec::new();
+    if def.speed_pct(b) < 100 {
+        effects.push(format!("{}% slower", 100 - def.speed_pct(b)));
+    }
+    for (at, what) in [
+        (def.yawn_at, "yawning"),
+        (def.mutter_at, "muttering"),
+        (def.reply_all_at, "replies to all"),
+    ] {
+        if at > 0 && b >= at {
+            effects.push(what.to_string());
+        }
+    }
+    if b > 0 {
+        effects.push("hair thins faster".into());
+    }
+    let stats = if effects.is_empty() {
+        "no side effects yet".to_string()
+    } else {
+        effects.join(" | ")
+    };
+    Tip {
+        name: "burnout".into(),
+        sig: format!("() -> {pct}%"),
+        stats,
+        doc: format!("/// Burnout {pct}%. {}", def.tip(b)),
+    }
+}
+
 fn cast_tip(c: &CastView, content: &Content) -> Option<Tip> {
     let d = content.spell(c.spell)?;
     let (name, sig) = spell_signature(d, content);
@@ -258,7 +294,7 @@ fn update_tip(
 ) {
     // QA hook: `WOW_HOVER_TIP=<tag>` pretends the pointer rests on the first node with that tag.
     let forced = std::env::var("WOW_HOVER_TIP").ok();
-    let live = |s: &TipSource| s.aura.is_some() || s.cast.is_some();
+    let live = |s: &TipSource| s.aura.is_some() || s.cast.is_some() || s.burnout.is_some();
     let hit = sources
         .iter()
         .find(|(s, i, ..)| **i != Interaction::None && live(s))
@@ -268,9 +304,10 @@ fn update_tip(
         });
     let content = sim.content();
     let shown = hit.and_then(|(s, _, node, gt)| {
-        let t = match (&s.aura, &s.cast) {
-            (Some(a), _) => aura_tip(a, content),
-            (None, Some(c)) => cast_tip(c, content)?,
+        let t = match (&s.aura, &s.cast, s.burnout) {
+            (Some(a), _, _) => aura_tip(a, content),
+            (None, Some(c), _) => cast_tip(c, content)?,
+            (None, None, Some(b)) => burnout_tip(b, content),
             _ => return None,
         };
         Some((t, node, gt))
@@ -307,6 +344,18 @@ fn update_tip(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_burnout_tip_quotes_the_level_and_its_advice() {
+        let Ok(sim) = crate::combat::new_sim() else {
+            panic!("embedded content invalid");
+        };
+        let t = burnout_tip(720, sim.content());
+        assert_eq!(t.sig, "() -> 72%");
+        assert_eq!(t.doc, "/// Burnout 72%. Have you tried a wellness webinar?");
+        assert!(t.stats.contains("replies to all") && !t.stats.contains("slower"));
+        assert_eq!(burnout_tip(0, sim.content()).stats, "no side effects yet");
+    }
 
     #[test]
     fn remaining_time_reads_like_a_timer() {

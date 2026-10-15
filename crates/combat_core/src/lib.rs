@@ -5,11 +5,13 @@
 
 mod ai;
 mod auto_attack;
+pub mod burnout;
 pub mod content;
 pub mod dailies;
 pub mod duel;
 pub mod economy;
 mod effects;
+pub mod endgame;
 mod floors;
 pub mod geom;
 pub mod live;
@@ -30,6 +32,7 @@ mod wander;
 pub mod world;
 mod zones;
 
+pub use burnout::{BURNOUT_MAX, BurnoutCause, BurnoutDef, QuipKind};
 pub use content::{
     AiAbility, AiDef, AiTarget, ApplyAura, Area, AuraDef, AutoAttackDef, ClassDef, Config,
     ConsumeAura, Content, ContentError, DispelType, Effect, EnrageDef, Execute, FleeDef,
@@ -44,6 +47,7 @@ pub use economy::{
     ActivePerk, ConsumableDef, Economy, GearDef, GearSource, GearStats, GearVisual, Goods, JunkDef,
     Perk, PerkView, Rarity, SLOTS, SetDef, Slot, VendorDef, role_package,
 };
+pub use endgame::{DEPARTMENTS, DepartmentDef, EndgameDef, RankDef, RepTier};
 pub use floors::{CORPSE_EMPTY_MS, CORPSE_LOOT_MS, pack_offsets};
 pub use geom::{Aabb, Vec3, distance, forward, in_range, is_facing, line_of_sight};
 pub use live::WorldBossState;
@@ -66,8 +70,8 @@ pub use targeting::{
 pub use telegraph::{TelegraphShape, TelegraphView};
 pub use time::{FixedStepper, TICK_HZ, Tick, ms_to_ticks, ticks_to_ms};
 pub use types::{
-    AiState, Audience, AuraEnd, AuraView, CastError, CastView, Command, CooldownView, Event,
-    ItemError, UnitState,
+    AiState, Audience, AuraEnd, AuraView, Career, CastError, CastView, Command, CooldownView,
+    Event, ItemError, UnitState,
 };
 pub use world::{AchievementDef, PropDef, PropKind, SecretNpc, Trigger, WorldDef};
 pub use zones::{TRASH_RESPAWN_MS, ZoneLinkView};

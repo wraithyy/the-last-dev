@@ -659,6 +659,7 @@ impl Sim {
             },
         );
         self.grant_xp(pi, task.xp);
+        self.rep_for_task(pi, task.weekly);
         let item = self
             .content
             .task_def(&task.key, task.weekly)

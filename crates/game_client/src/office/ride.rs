@@ -215,9 +215,13 @@ pub fn player_speed(
     player: Single<&SimUnit, With<Player>>,
     mut speed: ResMut<MoveSpeed>,
 ) {
+    // Burnout drags on top of any ride or sprint; the server's movement budget is only a
+    // ceiling, so a slower client never trips it.
     let pct = sim.unit(player.0).map_or(100, |u| {
-        sim.content()
-            .speed_pct(u.auras.iter().map(|a| a.key.as_str()))
+        let c = sim.content();
+        c.speed_pct(u.auras.iter().map(|a| a.key.as_str()))
+            * c.endgame.burnout.speed_pct(u.career.burnout)
+            / 100
     });
     let want = pct as f32 / 100.0;
     if speed.0 != want {

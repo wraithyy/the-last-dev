@@ -24,7 +24,7 @@ pub const DUSK_MIN: u32 = 18 * 60;
 pub const DAWN_MIN: u32 = 6 * 60;
 /// "Go home" counts when clocking out within this many game minutes after 18:00 (real seconds).
 pub const GO_HOME_WINDOW_MIN: u32 = 10;
-const DAY_S: u64 = 86_400;
+pub(crate) const DAY_S: u64 = 86_400;
 
 /// Game minute of the day (0..1440) at a unix time.
 pub fn game_minute(unix_s: u64) -> u32 {

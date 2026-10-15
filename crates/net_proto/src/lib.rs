@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 14;
+pub const PROTOCOL_VERSION: u16 = 15;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -539,6 +539,8 @@ pub struct PlayerSnap {
     pub talents: combat_core::TalentPicks,
     /// The companion following the player (`PetDef::key`, "" for none).
     pub pet: String,
+    /// Burnout per mille: peers' hair thins with it too (late joiners included).
+    pub burnout: u16,
 }
 
 impl PlayerSnap {
@@ -585,6 +587,7 @@ impl PlayerSnap {
             title: u.title.clone(),
             talents: u.talents,
             pet: u.pet.clone(),
+            burnout: u.career.burnout,
         }
     }
 }
@@ -919,6 +922,12 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
         Event::DailyBoard { board, .. } => check_board(board),
         Event::TaskCompleted { key, .. } if key.len() > combat_core::world::WORLD_KEY_MAX => {
             Err(ProtoError::TooMany)
+        }
+        Event::Reputation { dept, .. } if usize::from(*dept) >= combat_core::DEPARTMENTS => {
+            Err(ProtoError::BadNumber)
+        }
+        Event::Burnout { value, .. } if *value > combat_core::BURNOUT_MAX => {
+            Err(ProtoError::BadNumber)
         }
         _ => Ok(()),
     }
@@ -1475,6 +1484,7 @@ mod tests {
                     title: "pc_load_letter".into(),
                     talents: [1, 3, 0, 2, 0],
                     pet: "rubber_duck".into(),
+                    burnout: 720,
                 }],
             },
             ServerMsg::MoveCorrection {
@@ -1733,6 +1743,64 @@ mod tests {
                 unit: 0,
             },
         ]
+    }
+
+    #[test]
+    fn endgame_events_cross_the_wire_and_are_checked() {
+        use combat_core::{BurnoutCause, QuipKind};
+        let msg = ServerMsg::Events {
+            tick: 12,
+            events: vec![
+                Event::RankProgress {
+                    unit: 1,
+                    rank: 2,
+                    xp: 1_200,
+                    gained: 300,
+                },
+                Event::RankUp { unit: 1, rank: 3 },
+                Event::Reputation {
+                    unit: 1,
+                    dept: 5,
+                    total: 8_400,
+                    gained: 75,
+                },
+                Event::Burnout {
+                    unit: 2,
+                    value: 650,
+                    delta: -50,
+                    cause: BurnoutCause::Kill,
+                },
+                Event::BurnoutQuip {
+                    unit: 2,
+                    kind: QuipKind::ReplyAll,
+                    line: 4,
+                },
+                Event::ItemError {
+                    reason: combat_core::ItemError::RepTooLow,
+                },
+            ],
+        };
+        assert_eq!(roundtrip(&msg), Ok(msg.clone()));
+        let bad_dept = ServerMsg::Events {
+            tick: 12,
+            events: vec![Event::Reputation {
+                unit: 1,
+                dept: combat_core::DEPARTMENTS as u8,
+                total: 1,
+                gained: 1,
+            }],
+        };
+        assert_eq!(roundtrip(&bad_dept), Err(ProtoError::BadNumber));
+        let bad_burnout = ServerMsg::Events {
+            tick: 12,
+            events: vec![Event::Burnout {
+                unit: 1,
+                value: combat_core::BURNOUT_MAX + 1,
+                delta: 1,
+                cause: BurnoutCause::Debug,
+            }],
+        };
+        assert_eq!(roundtrip(&bad_burnout), Err(ProtoError::BadNumber));
     }
 
     #[test]

@@ -1487,4 +1487,61 @@ mod tests {
         assert_eq!(s.sim.unit(eid_of(&s, 2)).unwrap().level, 2);
         assert_eq!(s.sim.unit(eid_of(&s, 3)).unwrap().level, 2);
     }
+
+    /// Endgame state is the server's: reputation reaches only its owner, burnout reaches the
+    /// whole room (hair follows it) and rides along in every snapshot for late joiners.
+    #[tokio::test(start_paused = true)]
+    async fn endgame_progress_is_server_side_and_routed() {
+        let mut s = room();
+        s.on_join(0, "a", "fullstack");
+        s.on_join(1, "b", "devops");
+        s.tick();
+        let (a, b) = (eid_of(&s, 0), eid_of(&s, 1));
+        for e in [a, b] {
+            s.sim.set_level_of(e, 10);
+            s.sim.debug_set_burnout(e, 500);
+        }
+        let at = s.sim.unit(a).map(|u| u.pos).unwrap();
+        let board = s.sim.spawn_unit("the_board", at, 0.0).unwrap();
+        assert!(s.sim.debug_kill(board));
+        let mut out = Vec::new();
+        for _ in 0..40 {
+            out.extend(s.tick());
+        }
+        let events = |p| -> Vec<Event> {
+            msgs(&out, p)
+                .into_iter()
+                .flat_map(|m| match m {
+                    ServerMsg::Events { events, .. } => events,
+                    _ => Vec::new(),
+                })
+                .collect()
+        };
+        for (p, me, other) in [(0, a, b), (1, b, a)] {
+            let ev = events(p);
+            let rep = |who| {
+                ev.iter()
+                    .filter(|e| matches!(e, Event::Reputation { unit, .. } if *unit == who))
+                    .count()
+            };
+            assert_eq!((rep(me), rep(other)), (6, 0), "player {p}");
+            for who in [a, b] {
+                assert!(
+                    ev.iter().any(|e| matches!(
+                        e,
+                        Event::Burnout { unit, value: 350, cause: combat_core::BurnoutCause::Kill, .. }
+                        if *unit == who
+                    )),
+                    "player {p} misses {who}'s burnout"
+                );
+            }
+        }
+        let snap = msgs(&out, 1).into_iter().rev().find_map(|m| match m {
+            ServerMsg::Snapshot { players, .. } => Some(players),
+            _ => None,
+        });
+        let burnouts: Vec<u16> = snap.unwrap().iter().map(|p| p.burnout).collect();
+        assert_eq!(burnouts, [350, 350]);
+        assert_eq!(s.sim.unit(a).map(|u| u.career.rep), Some([150; 6]));
+    }
 }

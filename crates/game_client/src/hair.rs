@@ -34,9 +34,10 @@ impl Plugin for HairPlugin {
     }
 }
 
-/// 0 = full hair .. 5 = completely bald.
-pub fn hair_stage(hp: u32, max_hp: u32) -> u8 {
-    let pct = 100.0 * hp as f32 / max_hp.max(1) as f32;
+/// 0 = full hair .. 5 = completely bald. `shift` (HP percent points, from burnout) makes
+/// every stage come that much earlier.
+pub fn hair_stage(hp: u32, max_hp: u32, shift: f32) -> u8 {
+    let pct = 100.0 * hp as f32 / max_hp.max(1) as f32 - shift;
     match pct {
         p if p > 90.0 => 0,
         p if p > 70.0 => 1,
@@ -98,7 +99,8 @@ fn thin_hair(
 ) {
     for (su, parts, is_player) in &engineers {
         let Some(u) = sim.unit(su.0) else { continue };
-        let stage = hair_stage(u.hp, u.max_hp);
+        let shift = sim.content().endgame.burnout.hair_shift(u.career.burnout);
+        let stage = hair_stage(u.hp, u.max_hp, shift);
         for (e, k) in &parts.0 {
             if let Ok(mut v) = vis.get_mut(*e) {
                 v.set_if_neq(if *k <= stage {
@@ -124,13 +126,21 @@ mod tests {
 
     #[test]
     fn hair_thins_in_five_steps() {
-        assert_eq!(hair_stage(100, 100), 0);
-        assert_eq!(hair_stage(91, 100), 0);
-        assert_eq!(hair_stage(90, 100), 1);
-        assert_eq!(hair_stage(60, 100), 2);
-        assert_eq!(hair_stage(40, 100), 3);
-        assert_eq!(hair_stage(13, 100), 4);
-        assert_eq!(hair_stage(12, 100), 5);
-        assert_eq!(hair_stage(0, 0), 5);
+        assert_eq!(hair_stage(100, 100, 0.0), 0);
+        assert_eq!(hair_stage(91, 100, 0.0), 0);
+        assert_eq!(hair_stage(90, 100, 0.0), 1);
+        assert_eq!(hair_stage(60, 100, 0.0), 2);
+        assert_eq!(hair_stage(40, 100, 0.0), 3);
+        assert_eq!(hair_stage(13, 100, 0.0), 4);
+        assert_eq!(hair_stage(12, 100, 0.0), 5);
+        assert_eq!(hair_stage(0, 0, 0.0), 5);
+    }
+
+    #[test]
+    fn burnout_brings_every_stage_forward() {
+        // Full burnout: every stage 25 points earlier, so the crown thins even at full HP.
+        assert_eq!(hair_stage(100, 100, 25.0), 1);
+        assert_eq!(hair_stage(60, 100, 25.0), 3);
+        assert_eq!(hair_stage(30, 100, 25.0), 5);
     }
 }

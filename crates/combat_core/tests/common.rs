@@ -443,6 +443,17 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
         Event::DuelBegan { a, b } => format!("duel {} vs {} begins", t(*a), t(*b)),
         Event::DuelEnded { outcome, .. } => format!("duel over: {outcome:?}"),
         Event::DuelRefused { reason } => format!("duel refused: {}", reason.message()),
+        Event::RankProgress { unit, rank, xp, .. } => {
+            format!("{} rank {rank}, {xp} XP to the next", t(*unit))
+        }
+        Event::RankUp { unit, rank } => format!("{} promoted to rank {rank}", t(*unit)),
+        Event::Reputation {
+            unit, dept, total, ..
+        } => format!("{} dept {dept} standing {total}", t(*unit)),
+        Event::Burnout {
+            unit, value, cause, ..
+        } => format!("{} burnout {value} ({cause:?})", t(*unit)),
+        Event::BurnoutQuip { unit, kind, line } => format!("{} {kind:?} #{line}", t(*unit)),
     };
     format!("[{tick:05}] {body}")
 }
