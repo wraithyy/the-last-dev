@@ -454,6 +454,11 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             unit, value, cause, ..
         } => format!("{} burnout {value} ({cause:?})", t(*unit)),
         Event::BurnoutQuip { unit, kind, line } => format!("{} {kind:?} #{line}", t(*unit)),
+        Event::Legacy { view } => format!(
+            "legacy {} in {:?}, week {} locked {:?}",
+            view.on, view.zone, view.week, view.locked
+        ),
+        Event::LegacyRefused { reason } => format!("legacy refused: {}", reason.message()),
     };
     format!("[{tick:05}] {body}")
 }

@@ -875,13 +875,8 @@ fn kill_loot_is_trimmed_and_the_chest_still_pays() {
 #[test]
 fn the_chest_hands_out_sprint_only_gear() {
     let mut c = no_affixes();
-    let top = c
-        .economy
-        .gear
-        .iter()
-        .map(combat_core::GearDef::tier)
-        .max()
-        .unwrap_or(1);
+    // The chest's tier: the highest outside Legacy Mode.
+    let top = c.economy.campaign_top_tier();
     for g in &mut c.economy.gear {
         match g.source {
             combat_core::GearSource::World if g.tier() == top => {

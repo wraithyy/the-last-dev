@@ -312,7 +312,8 @@ rank_xp_to_next  = rank_base_xp + rank_step_xp * rank       // 30000 + 6000 * r:
 all ten ranks    = 570000 XP
 paragon          = min(rank * 1%, 5%) of max HP and max mana  // applied after gear and auras, never heals
 rep tiers        = Ignored 0, Tolerated 300, Cc'd 900, Invited 2100, Trusted 4200, Exalted 8400 (cap)
-rep per kill     = trash 5, elite 25, boss 75 (level 10 only, the zone's department; summons give none)
+rep per kill     = trash 5, elite 25, boss 75 (level 10 only, the zone's department; summons give none;
+                   zones with a Legacy variant pay only on their Legacy floors, the campus as before)
 rep per task     = daily 80, Sprint Goal 300, to the department with the lowest standing (ties: content order)
 world boss       = 150 to every department
 ```
@@ -335,3 +336,44 @@ effects       : >= 75% move 10% slower (client speed, server budget is a ceiling
 ```
 
 Drifts tick once a minute from the player's join; quips use their own SplitMix64 stream, so neither shifts combat or loot. Save keys (optional): `rank=<r>*<xp>`, `rep=<6 numbers>`, `burnout=<value>*<unix minute>`.
+
+## Legacy Mode
+
+All in `content/game.ron` under `legacy` (`legacy.rs`); the affixes are the Sprint ones (`sprint.affixes`).
+
+```
+switch        = group lead, everyone at level 10, no sprint running (Command::SetLegacy)
+spawn level   = max(authored, 11) for packs and affix adds, max(authored, 12) for floor bosses
+enemy stats   = mob scaling from the authored level (+12% HP, +10% damage per level),
+                then the zone's hp_pct / damage_pct, then group scaling as usual
+per zone      = tower/1 Hotfix Friday 125/135, tower/2 Mandatory Fun 100/100,
+(affix hp/dmg)  tower/3 Scope Creep 100/100, tower/4 Reorg 100/100, tower/5 Budget Freeze 145/110,
+                datacenter/1 AI-Assisted 105/110, datacenter/2 Technical Debt 110/115,
+                lab/1 Pair Programming 110/130, lab/2 Legacy Code 100/100
+loot          = gear rolls as usual (chance, rarity weights, own role 70%) from `source: Legacy`
+                pieces only; no authored loot tables, no named Normal pieces, junk as usual
+boss bonus    = boss_items (2) Legacy pieces per member, unless the room's lockout has that boss;
+                locked out: Kudos only
+lockout       = per room (server) or per save (offline), ISO week (Monday 00:00 UTC, same as the
+                weekly); set when a Legacy floor boss dies
+world         = Legacy floors have their own cleared floors and open elevators (session only);
+                saves keep the campaign's
+```
+
+Legacy tier: 23 pieces at ilvl 12 (5 Common, 5 Uncommon, 8 Rare, 5 Epic), budget `quality * 106%` (+6% over ilvl 10: Rare 106, Epic 137), perks inside the Rare/Epic caps. Not sold, not in the Sprint chest (its tier is the highest non-Legacy one, `Economy::campaign_top_tier`), so the Kudos tables above do not change. Save key (optional): `legacy_locks=<iso week>*<boss>|<boss>`.
+
+Measured (`tests/coop.rs`, level-10 bots in the best tier-5 World Rares, packs pulled one by one, seeds 7/42/1234): the trio clears every Legacy floor, the lone DPS dies or scrapes through below 25% HP.
+
+| floor | trio time s | trio lowest HP | trio most dead | solo DPS | solo lowest HP when it survived |
+|---|---|---|---|---|---|
+| tower/1 | 109-117 | 54-57% | 0 | died 2/3 | 2% |
+| tower/2 | 207-223 | 42-50% | 0 | died 1/3 | 20%, 8% |
+| tower/3 | 298-310 | 45-54% | 0 | died 3/3 | - |
+| tower/4 | 327-416 | 39-47% | 0 | died 3/3 | - |
+| tower/5 | 250-254 | 49-63% | 0 | died 1/3 | 4%, 6% |
+| datacenter/1 | 203-207 | 55-59% | 0 | died 3/3 | - |
+| datacenter/2 | 224-239 | 47% | 0 | died 3/3 | - |
+| lab/1 | 157-171 | 67-70% | 0 | died 2/3 | 8% |
+| lab/2 | 159-184 | 0-43% | 1 | died 3/3 | - |
+
+Time alone does not separate solo from group: without the group HP bonus a surviving lone DPS is only 1.2-1.5x slower, so the gate is survival.

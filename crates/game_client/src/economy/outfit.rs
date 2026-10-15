@@ -623,6 +623,48 @@ fn build_piece(
                     ));
                 }
             }
+            13 => {
+                // Legacy: a beige CRT monitor worn as a helm, green text glowing on the face.
+                out.push((
+                    cube.clone(),
+                    main.clone(),
+                    at(0.0, 0.56, 0.02, Vec3::new(1.26, 1.0, 1.08)),
+                    None,
+                ));
+                out.push((
+                    cube.clone(),
+                    main.clone(),
+                    at(0.0, 0.58, -0.62, Vec3::new(0.86, 0.7, 0.36)),
+                    None,
+                ));
+                out.push((
+                    cube.clone(),
+                    dark.clone(),
+                    at(0.0, 0.58, 0.565, Vec3::new(1.0, 0.74, 0.02)),
+                    None,
+                ));
+                let phosphor = a.mat(materials, (0.25, 1.0, 0.35), 2);
+                for k in 0..4 {
+                    let w = [0.7, 0.5, 0.62, 0.3][k];
+                    out.push((
+                        cube.clone(),
+                        phosphor.clone(),
+                        at(
+                            -0.36 + w / 2.0,
+                            0.8 - k as f32 * 0.14,
+                            0.58,
+                            Vec3::new(w, 0.05, 0.01),
+                        ),
+                        None,
+                    ));
+                }
+                out.push((
+                    sphere,
+                    phosphor,
+                    at(0.5, 0.16, 0.57, Vec3::splat(0.05)),
+                    None,
+                ));
+            }
             6 => {
                 // Shades.
                 for side in [-1.0f32, 1.0] {
@@ -791,6 +833,41 @@ fn build_piece(
                             None,
                         ));
                     }
+                }
+                8 => {
+                    // Legacy: a monk's robe. Rope belt with a knot and hanging ends, a deep hood.
+                    let rope = a.mat(materials, (0.86, 0.76, 0.5), glow);
+                    out.push((
+                        torus,
+                        rope.clone(),
+                        at(0.0, -0.2, 0.0, Vec3::new(0.37, 0.4, 0.31)),
+                        None,
+                    ));
+                    out.push((
+                        sphere.clone(),
+                        rope.clone(),
+                        at(0.08, -0.2, 0.31, Vec3::splat(0.06)),
+                        None,
+                    ));
+                    for (k, x) in [0.05f32, 0.11].into_iter().enumerate() {
+                        out.push((
+                            cyl.clone(),
+                            rope.clone(),
+                            at(
+                                x,
+                                -0.36 - k as f32 * 0.03,
+                                0.31,
+                                Vec3::new(0.025, 0.26, 0.025),
+                            ),
+                            None,
+                        ));
+                    }
+                    out.push((
+                        sphere,
+                        main,
+                        at(0.0, 0.36, -0.22, Vec3::new(0.6, 0.34, 0.36)),
+                        None,
+                    ));
                 }
                 _ => {}
             }
@@ -1240,6 +1317,29 @@ fn build_piece(
                         cyl,
                         gold,
                         at(0.0, 0.15, 0.33, Vec3::new(0.05, 0.05, 0.05)),
+                        None,
+                    ));
+                    return out;
+                }
+                7 => {
+                    // Legacy: a 3.5" floppy disk on the cord, metal shutter and paper label.
+                    out.push((
+                        cube.clone(),
+                        main,
+                        at(0.0, -0.02, 0.33, Vec3::new(0.24, 0.25, 0.025)),
+                        None,
+                    ));
+                    let metal = a.mat(materials, (0.75, 0.77, 0.8), glow.max(1));
+                    out.push((
+                        cube.clone(),
+                        metal,
+                        at(0.02, 0.07, 0.345, Vec3::new(0.12, 0.07, 0.01)),
+                        None,
+                    ));
+                    out.push((
+                        cube,
+                        white,
+                        at(0.0, -0.07, 0.345, Vec3::new(0.18, 0.1, 0.01)),
                         None,
                     ));
                     return out;

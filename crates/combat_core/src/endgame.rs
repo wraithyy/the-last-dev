@@ -249,8 +249,10 @@ impl Sim {
 
     /// Endgame credit for a hostile kill, for every sharer: reputation for players at the cap
     /// (the zone's department, or all of them for the world boss) and burnout relief when the
-    /// victim was management. Summoned adds count for burnout only.
+    /// victim was management. Summoned adds count for burnout only. Zones with a Legacy Mode
+    /// variant pay reputation only on their Legacy floors; a Legacy boss also sets the lockout.
     pub(crate) fn endgame_on_kill(&mut self, ti: usize, killer: Option<crate::EntityId>) {
+        self.legacy_on_kill(ti);
         if !self.units[ti].state.hostile || self.sprint_active() {
             return;
         }
@@ -259,9 +261,11 @@ impl Sim {
         let summoned = self.units[ti].summoner.is_some();
         let world_boss = self.content.world_boss().is_some_and(|b| b.unit == key);
         let elite = self.content.economy.elites.contains(&key);
+        let legacy = self.legacy_zone().is_some();
         let dept = self
             .zone
             .as_deref()
+            .filter(|z| legacy || self.content.legacy.zone(z).is_none())
             .and_then(|z| self.content.endgame.department_of_zone(z));
         let g = &self.content.endgame.rep_gains;
         let amount = if world_boss {

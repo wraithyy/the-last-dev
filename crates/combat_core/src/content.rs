@@ -1054,6 +1054,9 @@ pub struct Content {
     /// absent in minimal test content.
     #[serde(default)]
     pub endgame: crate::endgame::EndgameDef,
+    /// Legacy Mode zone variants (`legacy.rs`); absent in minimal test content.
+    #[serde(default)]
+    pub legacy: crate::legacy::LegacyDef,
 }
 
 impl Content {
@@ -1351,6 +1354,7 @@ impl Content {
         self.live.validate(self)?;
         crate::pets::validate(self)?;
         self.endgame.validate(self)?;
+        self.legacy.validate(self)?;
         Ok(())
     }
 }

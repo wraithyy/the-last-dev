@@ -230,6 +230,10 @@ pub enum Command {
     DuelRespond {
         accept: bool,
     },
+    /// Group lead: Normal (false) or Legacy Mode (true) for the next zone loads (`legacy.rs`).
+    SetLegacy {
+        on: bool,
+    },
 }
 
 /// Why an item command did nothing; routed to the player.
@@ -564,6 +568,15 @@ pub enum Event {
     /// `StartSprint` was refused (routed to the asker).
     SprintRefused {
         reason: crate::sprint::SprintError,
+    },
+    /// Legacy Mode: the difficulty, the zone loaded in it and the room's weekly lockout; on
+    /// every change, every zone load and to a joiner.
+    Legacy {
+        view: crate::legacy::LegacyView,
+    },
+    /// `SetLegacy` was refused (routed to the asker).
+    LegacyRefused {
+        reason: crate::legacy::LegacyError,
     },
     /// The world clock: unix seconds at this tick (`Sim::set_clock`; sent to a joiner too).
     /// Day/night and the task reset timers follow from it.

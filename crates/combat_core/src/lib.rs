@@ -14,6 +14,7 @@ mod effects;
 pub mod endgame;
 mod floors;
 pub mod geom;
+pub mod legacy;
 pub mod live;
 mod nav;
 pub mod pets;
@@ -50,6 +51,7 @@ pub use economy::{
 pub use endgame::{DEPARTMENTS, DepartmentDef, EndgameDef, RankDef, RepTier};
 pub use floors::{CORPSE_EMPTY_MS, CORPSE_LOOT_MS, pack_offsets};
 pub use geom::{Aabb, Vec3, distance, forward, in_range, is_facing, line_of_sight};
+pub use legacy::{LegacyDef, LegacyError, LegacyView, LegacyZone};
 pub use live::WorldBossState;
 pub use pets::{PetDef, PetDrop, duck_tip};
 pub use progression::GROUP_SHARE_RANGE_M;

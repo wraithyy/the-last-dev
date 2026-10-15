@@ -235,6 +235,8 @@ pub enum GearSource {
     Boss(String),
     /// Only the end-of-sprint chest hands it out (top tier like the rest of the chest).
     Sprint,
+    /// Only Legacy Mode floors drop it (`legacy.rs`), whatever its item level.
+    Legacy,
 }
 
 /// How the piece looks on the character: a tint and a model variant per slot.
@@ -491,6 +493,16 @@ pub struct Economy {
 impl Economy {
     pub fn gear(&self, name: &str) -> Option<&GearDef> {
         self.gear.iter().find(|g| g.name == name)
+    }
+
+    /// The highest tier outside Legacy Mode: the Sprint chest's.
+    pub fn campaign_top_tier(&self) -> u8 {
+        self.gear
+            .iter()
+            .filter(|g| g.source != GearSource::Legacy)
+            .map(GearDef::tier)
+            .max()
+            .unwrap_or(1)
     }
 
     pub fn set(&self, key: &str) -> Option<&SetDef> {
@@ -1611,6 +1623,13 @@ impl Sim {
         let level = u32::from(u.state.level);
         let elite = eco.elites.contains(&d.key);
         let boss = d.boss;
+        // Legacy floors drop the Legacy tier; their boss pieces are the weekly-locked bonus.
+        let legacy = self.legacy.fx.is_some();
+        let rolls = match (legacy, boss) {
+            (true, true) if self.legacy_locked(&d.key) => 0,
+            (true, true) => self.content.legacy.boss_items.max(1),
+            _ => 1,
+        };
         let mult = if boss {
             eco.boss_mult
         } else if elite {
@@ -1633,7 +1652,10 @@ impl Sim {
         };
         let gear_pct = (gear_pct * loot_mult * scale / 100).min(100);
         let tier = u.state.level.div_ceil(2).max(1);
-        if rng.chance_pct(gear_pct) {
+        for _ in 0..rolls {
+            if !rng.chance_pct(gear_pct) {
+                continue;
+            }
             let weights = if boss {
                 eco.boss_rarity
             } else if elite {
@@ -1656,9 +1678,11 @@ impl Sim {
                 eco.gear
                     .iter()
                     .filter(|g| {
-                        g.source == GearSource::World
-                            && g.tier() == tier
-                            && g.rarity == r
+                        (if legacy {
+                            g.source == GearSource::Legacy
+                        } else {
+                            g.source == GearSource::World && g.tier() == tier
+                        }) && g.rarity == r
                             && (!own_only || g.role.is_none() || g.role == role)
                     })
                     .collect()
@@ -1688,7 +1712,7 @@ impl Sim {
         } else {
             eco.named_pct * scale / 100
         };
-        if !named.is_empty() && rng.chance_pct(named_pct) {
+        if !legacy && !named.is_empty() && rng.chance_pct(named_pct) {
             let own: Vec<&&GearDef> = named.iter().filter(|g| g.role == role).collect();
             let k = if own.is_empty() {
                 named[rng.below(named.len() as u32) as usize]

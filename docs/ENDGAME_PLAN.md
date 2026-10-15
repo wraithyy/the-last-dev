@@ -87,6 +87,12 @@ play that reuses existing zones and systems, works solo and in co-op, and stays 
 - **Acceptance**: ilvl budget test passes, every item reachable
 - **Prompt seed**: Add a Legacy ilvl tier to drops and rep vendors within the stat budget.
 
+#### Status (2026-10-15): E2 is built
+- 2.1: `legacy` in game.ron and `combat_core/src/legacy.rs`. The lead switches the group with `Command::SetLegacy` (everyone at 10, no sprint); all nine combat zones have a variant with one fixed Sprint affix, reusing the affix runtime (`sprint::Fx`, shared by runs and Legacy floors). Enemies spawn at 11 (bosses 12) with per-zone HP/damage knobs; Legacy floors play in their own world (clears, elevators). Kills at 10 pay rep only on Legacy floors where a variant exists (the E1 stand-in stays for the campus). Weekly boss lockout per room (server sim) or per save (`legacy_locks`), ISO week. Protocol 16: `Command::SetLegacy`, `Event::Legacy` (view: on, zone, week, locked) and `Event::LegacyRefused`.
+- 2.2: 23 Legacy pieces at ilvl 12 (`source: Legacy`), three new looks (CRT monitor helm, Perl monk robe, floppy disk badge); the Sprint chest stays on the top campaign tier.
+- Client: the "Normal | Legacy" switch near doors and elevators (lead clicks or taps, others see the call), a Legacy banner and the affix in the radar footer, lockout chips in `~/endgame`. Screenshots in `.playwright-mcp/legacy/`.
+- Balance: `three_players_clear_every_legacy_floor_and_one_does_not_trivially` (coop.rs); numbers in FORMULAS.md, Legacy Mode.
+
 ### Wave E3: Raid and weekly ladder
 
 #### Task 3.1: Raid instance "All-Hands Offsite"

@@ -66,6 +66,10 @@ pub struct SaveData {
     pub rep: [u32; crate::endgame::DEPARTMENTS],
     pub burnout: u16,
     pub burnout_at: u64,
+    /// Legacy Mode lockout (optional keys; older saves have none): the ISO week and the floor
+    /// bosses whose bonus loot was taken in it.
+    pub legacy_week: u32,
+    pub legacy_locks: Vec<String>,
 }
 
 fn list(v: &str) -> Vec<String> {
@@ -157,6 +161,13 @@ impl SaveData {
             self.burnout,
             self.burnout_at
         ));
+        if !self.legacy_locks.is_empty() {
+            out.push_str(&format!(
+                "legacy_locks={}*{}\n",
+                self.legacy_week,
+                self.legacy_locks.join("|")
+            ));
+        }
         if self.onboarding_pending {
             out.push_str("onboarding=pending\n");
         }
@@ -245,6 +256,11 @@ impl SaveData {
                 "pet" => s.pet = v.chars().take(crate::world::WORLD_KEY_MAX).collect(),
                 "duel_streak" => s.duel_streak = v.parse().unwrap_or(0),
                 "respecs" => s.respecs = v.parse().unwrap_or(0),
+                "legacy_locks" => {
+                    let (w, b) = v.split_once('*').unwrap_or(("0", ""));
+                    s.legacy_week = w.parse().unwrap_or(0);
+                    s.legacy_locks = list(b);
+                }
                 "rank" => {
                     let (r, x) = v.split_once('*').unwrap_or((v, "0"));
                     s.rank = r.parse().unwrap_or(0);
@@ -375,6 +391,8 @@ impl Sim {
                 .iter()
                 .map(|(k, c)| (k.clone(), *c))
                 .collect(),
+            legacy_week: self.legacy_lockout().0,
+            legacy_locks: self.legacy_lockout().1,
         })
     }
 
@@ -480,6 +498,7 @@ impl Sim {
             save.sprint_keys.clone(),
             save.sprint_records.clone(),
         );
+        self.set_legacy_lockout(save.legacy_week, &save.legacy_locks);
         let class = self.class_at(i).map(|c| c.key.clone()).unwrap_or_default();
         self.units[i].state.talents = self.content.talents.sanitize(&class, &save.talents, level);
         let title = Some(&save.title)

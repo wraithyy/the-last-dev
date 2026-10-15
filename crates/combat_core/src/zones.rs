@@ -97,6 +97,7 @@ impl Sim {
         }
         // May swap the campaign world back in (leaving a sprint), so it goes before any lookup.
         self.sprint_on_load(id);
+        self.legacy_on_load(id);
         let state = self.world.zones.get(id);
         let recent = state
             .and_then(|s| s.left_at)
@@ -149,7 +150,7 @@ impl Sim {
                     def,
                     pos: at,
                     yaw,
-                    level: self.sprint_level(self.content.units[def].level),
+                    level: self.legacy_boss_level(self.sprint_level(self.content.units[def].level)),
                     pack: Some(pack_id),
                     boss: true,
                     slot: None,
@@ -229,6 +230,7 @@ impl Sim {
         self.events.push(Event::ZoneLoaded {
             zone: id.to_string(),
         });
+        self.legacy_after_load();
         if let Some(floor) = floor_number(id) {
             self.events.push(Event::FloorLoaded { floor });
         }

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 15;
+pub const PROTOCOL_VERSION: u16 = 16;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -656,6 +656,7 @@ pub fn is_player_command(cmd: &Command) -> bool {
         Command::JoinStandup | Command::ClaimSprintGoal { .. } | Command::GoHome => true,
         Command::SummonPet { pet } => pet.len() <= combat_core::world::WORLD_KEY_MAX,
         Command::DuelRequest { .. } | Command::DuelRespond { .. } => true,
+        Command::SetLegacy { .. } => true,
     }
 }
 
@@ -928,6 +929,10 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
         }
         Event::Burnout { value, .. } if *value > combat_core::BURNOUT_MAX => {
             Err(ProtoError::BadNumber)
+        }
+        Event::Legacy { view } => {
+            names(&view.locked)?;
+            names(std::slice::from_ref(&view.zone))
         }
         _ => Ok(()),
     }
@@ -1801,6 +1806,42 @@ mod tests {
             }],
         };
         assert_eq!(roundtrip(&bad_burnout), Err(ProtoError::BadNumber));
+    }
+
+    #[test]
+    fn legacy_mode_crosses_the_wire_and_is_capped() {
+        use combat_core::{LegacyError, LegacyView};
+        let view = LegacyView {
+            on: true,
+            zone: "tower/3".into(),
+            week: 2_960,
+            locked: vec!["vibe_coder".into(), "customer".into()],
+        };
+        let msg = ServerMsg::Events {
+            tick: 40,
+            events: vec![
+                Event::Legacy { view: view.clone() },
+                Event::LegacyRefused {
+                    reason: LegacyError::LevelTooLow,
+                },
+            ],
+        };
+        assert_eq!(roundtrip(&msg), Ok(msg.clone()));
+        for on in [true, false] {
+            let cmd = ClientMsg::Cmd(Command::SetLegacy { on });
+            assert_eq!(roundtrip(&cmd), Ok(cmd.clone()));
+        }
+        let mut long = view.clone();
+        long.zone = "x".repeat(MAX_ITEM_NAME_BYTES + 1);
+        let mut many = view;
+        many.locked = vec!["boss".into(); MAX_LIST_LEN + 1];
+        for v in [long, many] {
+            let bad = ServerMsg::Events {
+                tick: 40,
+                events: vec![Event::Legacy { view: v }],
+            };
+            assert_eq!(roundtrip(&bad), Err(ProtoError::TooMany));
+        }
     }
 
     #[test]

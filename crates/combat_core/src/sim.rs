@@ -206,6 +206,8 @@ pub struct Sim {
     pub(crate) duels: crate::duel::DuelState,
     /// Burnout timers, prop relief cooldowns and the quip stream (`burnout.rs`).
     pub(crate) burnout: crate::burnout::BurnoutRt,
+    /// Legacy Mode difficulty, the parked world and the weekly lockout (`legacy.rs`).
+    pub(crate) legacy: crate::legacy::LegacyState,
 }
 
 impl Sim {
@@ -237,6 +239,7 @@ impl Sim {
             live: Default::default(),
             duels: Default::default(),
             burnout: crate::burnout::BurnoutRt::new(seed),
+            legacy: Default::default(),
         }
     }
 
@@ -283,6 +286,7 @@ impl Sim {
         self.rescale_group_hp();
         self.grow_packs();
         self.live_on_join(id);
+        self.legacy_on_join(id);
         self.burnout_on_join(id);
         id
     }
@@ -539,6 +543,7 @@ impl Sim {
             | Command::PickTalent { .. }
             | Command::ResetTalents
             | Command::StartSprint { .. }
+            | Command::SetLegacy { .. }
             | Command::JoinStandup
             | Command::ClaimSprintGoal { .. }
             | Command::GoHome
@@ -747,6 +752,7 @@ impl Sim {
             Command::PickTalent { row, choice } => self.pick_talent(actor, row, choice),
             Command::ResetTalents => self.reset_talents(actor),
             Command::StartSprint { building, level } => self.start_sprint(actor, &building, level),
+            Command::SetLegacy { on } => self.set_legacy(actor, on),
             Command::JoinStandup => self.join_standup(actor),
             Command::ClaimSprintGoal { choice } => self.claim_sprint_goal(actor, choice),
             Command::GoHome => self.go_home(actor),
@@ -802,6 +808,7 @@ impl Sim {
             | Command::PickTalent { .. }
             | Command::ResetTalents
             | Command::StartSprint { .. }
+            | Command::SetLegacy { .. }
             | Command::JoinStandup
             | Command::ClaimSprintGoal { .. }
             | Command::GoHome
@@ -1703,12 +1710,15 @@ impl Sim {
         };
         let mut shares = Vec::with_capacity(owners.len());
         let sprint = self.sprint_active();
+        let legacy = self.legacy_zone().is_some();
         for owner in owners {
             let mut items: Vec<String> = Vec::new();
             for e in &loot_table {
                 // Trophies roll on the loot stream like the rest of the loot, so loot table
                 // changes (or taking a quest) never shift combat.
                 let drop = match (&e.quest, owner) {
+                    // Legacy floors drop the Legacy tier only; trophies stay in the campaign.
+                    _ if legacy => false,
                     (None, _) => self.loot_rng.chance_pct(e.chance_pct),
                     // A sprint is quest-free: its floors' quest drops stay in the campaign.
                     (Some(_), _) if sprint => false,

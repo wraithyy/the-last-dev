@@ -36,8 +36,17 @@ fn every_gear_piece_follows_the_stat_budget() {
         if g.budget() != want {
             bad.push(format!("{}: budget {} != {want}", g.name, g.budget()));
         }
-        if g.ilvl == 0 || g.ilvl > 10 || g.ilvl % 2 == 1 {
+        // Tier levels 2..=10; Legacy Mode's tier sits one tier above the cap.
+        let top = if g.source == GearSource::Legacy {
+            12
+        } else {
+            10
+        };
+        if g.ilvl == 0 || g.ilvl > top || g.ilvl % 2 == 1 {
             bad.push(format!("{}: ilvl {} is not a tier level", g.name, g.ilvl));
+        }
+        if (g.source == GearSource::Legacy) != (g.ilvl == 12) {
+            bad.push(format!("{}: ilvl 12 is the Legacy tier only", g.name));
         }
         let s = g.stats();
         let total = u64::from(s.totals.max_hp)
@@ -145,7 +154,7 @@ fn every_item_is_reachable_from_some_source() {
                 .chain(v.rep.iter().map(|r| &r.item))
         })
         .collect();
-    let top = eco.gear.iter().map(GearDef::tier).max().unwrap_or(1);
+    let top = eco.campaign_top_tier();
     let mut bad = Vec::new();
     for g in &eco.gear {
         let ok = match &g.source {
@@ -153,6 +162,10 @@ fn every_item_is_reachable_from_some_source() {
             GearSource::Vendor => shelves.contains(&&g.name),
             GearSource::Boss(k) => c.unit_def(k).is_some_and(|u| u.hostile && u.ai.is_some()),
             GearSource::Sprint => g.tier() == top,
+            // Drops only: above the cap, so no vendor level gate could sell it.
+            GearSource::Legacy => {
+                !c.legacy.zones.is_empty() && g.tier() > top && !shelves.contains(&&g.name)
+            }
         };
         if !ok {
             bad.push(format!("gear {} ({:?})", g.name, g.source));
@@ -559,9 +572,11 @@ fn a_finished_daily_hands_out_its_item() {
 fn visual_styles_exist_for_their_slot() {
     let c = content();
     let max = |s: Slot| match s {
-        Slot::Headgear => 12,
-        Slot::Hoodie | Slot::Mug => 7,
-        Slot::Keyboard | Slot::Lanyard => 6,
+        Slot::Headgear => 13,
+        Slot::Hoodie => 8,
+        Slot::Mug => 7,
+        Slot::Lanyard => 7,
+        Slot::Keyboard => 6,
     };
     let bad: Vec<String> = c
         .economy

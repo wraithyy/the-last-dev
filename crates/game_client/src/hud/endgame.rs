@@ -1,7 +1,7 @@
 //! `~/endgame` (` by default): Promotion rank and its progress, the six department standings,
-//! Legacy Mode lockouts and the weekly Sprint seed. Lockouts and the weekly ladder belong to
-//! later waves, so those rows say what is coming instead of showing an empty table. Opened by
-//! its key, the Esc menu entry or the touch Menu drawer.
+//! Legacy Mode with this week's boss lockouts (one chip per Legacy floor boss) and the weekly
+//! Sprint seed. The weekly ladder belongs to a later wave, so that row says what is coming.
+//! Opened by its key, the Esc menu entry or the touch Menu drawer.
 //! QA: `WOW_ENDGAME=1` opens it; `WOW_CAREER_DEMO` (see `qa_career`) sets the numbers once.
 
 use super::{ACCENT, BAR_BG, DIM, KEY_RIM, KEY_TOP, KEY_TOP_HI, drop_shadow, label, panel_bg};
@@ -16,6 +16,9 @@ use bevy::prelude::*;
 use combat_core::DEPARTMENTS;
 
 const GOLD: Color = Color::srgb(1.0, 0.82, 0.3);
+const OPEN: Color = Color::srgb(0.45, 0.95, 0.55);
+/// Lockout chips spawned up front; content has one per Legacy floor boss.
+const LOCK_SLOTS: usize = 12;
 const REP_BLUE: Color = Color::srgb(0.35, 0.7, 0.95);
 const WIDTH: f32 = 600.0;
 const NAME_W: f32 = 96.0;
@@ -48,6 +51,8 @@ enum RepPart {
 }
 #[derive(Component)]
 struct RepFill(usize);
+#[derive(Component)]
+struct LockChip(usize);
 
 pub struct EndgamePlugin;
 
@@ -201,6 +206,30 @@ fn spawn_ui(mut commands: Commands) {
                 },
             ));
             w.spawn((Line::Lockouts, label("", 11.0), TextColor(DIM)));
+            w.spawn(Node {
+                flex_wrap: FlexWrap::Wrap,
+                column_gap: px(5),
+                row_gap: px(3),
+                ..default()
+            })
+            .with_children(|r| {
+                for k in 0..LOCK_SLOTS {
+                    r.spawn((
+                        LockChip(k),
+                        label("", 11.0),
+                        TextLayout::default().with_no_wrap(),
+                        TextColor(DIM),
+                        Node {
+                            padding: UiRect::axes(px(5), px(1)),
+                            border: UiRect::all(px(1)),
+                            border_radius: BorderRadius::all(px(3)),
+                            display: Display::None,
+                            ..default()
+                        },
+                        BorderColor::all(DIM),
+                    ));
+                }
+            });
             w.spawn((
                 section("WEEKLY SPRINT SEED"),
                 Node {
@@ -325,7 +354,23 @@ fn update_window(
     mut parts: Query<(&RepPart, &mut Text), (Without<Line>, Without<RepName>)>,
     mut names: Query<(&RepName, &mut Text), (Without<Line>, Without<RepPart>)>,
     mut rank_fill: Query<&mut Node, (With<RankFill>, Without<RepFill>)>,
-    mut rep_fill: Query<(&RepFill, &mut Node), Without<RankFill>>,
+    mut rep_fill: Query<(&RepFill, &mut Node), (Without<RankFill>, Without<LockChip>)>,
+    mut chips: Query<
+        (
+            &LockChip,
+            &mut Text,
+            &mut TextColor,
+            &mut BorderColor,
+            &mut Node,
+        ),
+        (
+            Without<Line>,
+            Without<RepPart>,
+            Without<RepName>,
+            Without<RankFill>,
+            Without<RepFill>,
+        ),
+    >,
 ) {
     if !open.0 {
         return;
@@ -382,6 +427,58 @@ fn update_window(
         ),
         None => "The weekly seed waits for the office clock.".to_string(),
     };
+    // Legacy Mode: one chip per floor boss, green while its bonus loot is still open this week.
+    let view = sim.legacy_view();
+    let week = unix.map(combat_core::live::week_index);
+    let locked = week.map_or(&[][..], |w| view.locked_in(w));
+    let bosses: Vec<(String, bool)> = eg_bosses(content)
+        .into_iter()
+        .map(|(key, name)| (name, locked.contains(&key)))
+        .collect();
+    let taken = bosses.iter().filter(|b| b.1).count();
+    let lockouts = if u.level < cap {
+        format!(
+            "Legacy Mode opens at level {cap}: every floor again with one affix, Legacy loot and reputation; boss bonus loot once a week."
+        )
+    } else {
+        let mode = if view.on {
+            "Legacy Mode on."
+        } else {
+            "Normal difficulty; pick Legacy at a floor door."
+        };
+        let here = crate::legacy::affix_name(content, &view.zone)
+            .map(|a| format!(" Here: {a}."))
+            .unwrap_or_default();
+        let reset = unix.map_or_else(String::new, |t| {
+            format!(
+                ", resets in {}",
+                crate::live::duration(combat_core::live::secs_to_week_reset(t))
+            )
+        });
+        format!(
+            "{mode}{here} Boss bonus loot taken {taken}/{}{reset}.",
+            bosses.len()
+        )
+    };
+    for (LockChip(k), mut text, mut color, mut border, mut node) in &mut chips {
+        let want = match bosses.get(*k) {
+            Some((name, done)) => {
+                let (s, c) = if *done {
+                    (format!("{name}: taken"), DIM.with_alpha(0.7))
+                } else {
+                    (format!("{name}: open"), OPEN)
+                };
+                set_text(&mut text, &s);
+                color.0 = c;
+                *border = BorderColor::all(c.with_alpha(0.6));
+                Display::Flex
+            }
+            None => Display::None,
+        };
+        if node.display != want {
+            node.display = want;
+        }
+    }
     for (line, mut text) in &mut lines {
         let s = match line {
             // Touch has no key to name; the [x] is right there.
@@ -390,7 +487,7 @@ fn update_window(
             Line::Rank => rank.clone(),
             Line::RankXp => xp.clone(),
             Line::Blurb => blurb.clone(),
-            Line::Lockouts => "Legacy Mode raid lockouts: none. Legacy Mode re-opens old floors at level 10 in a later update; until then nothing can lock you out.".to_string(),
+            Line::Lockouts => lockouts.clone(),
             Line::Seed => seed.clone(),
         };
         set_text(&mut text, &s);
@@ -439,4 +536,20 @@ fn update_window(
             n.width = w;
         }
     }
+}
+
+/// Legacy floor bosses in content order: (unit key, display name).
+fn eg_bosses(content: &combat_core::Content) -> Vec<(String, String)> {
+    content
+        .legacy
+        .zones
+        .iter()
+        .filter_map(|z| content.zone(&z.zone)?.boss.as_ref())
+        .map(|b| {
+            let name = content
+                .unit_def(&b.unit)
+                .map_or_else(|| b.unit.clone(), |d| d.name.clone());
+            (b.unit.clone(), name)
+        })
+        .collect()
 }

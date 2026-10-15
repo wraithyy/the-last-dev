@@ -54,6 +54,8 @@ pub trait SimRead: Send + Sync {
     fn zone_links(&self, zone: &str) -> Vec<ZoneLinkView>;
     fn known_spells(&self, unit: EntityId) -> Vec<SpellId>;
     fn now(&self) -> Tick;
+    /// Legacy Mode: the group's difficulty, the zone loaded in it and the weekly lockout.
+    fn legacy_view(&self) -> combat_core::LegacyView;
 
     /// The action bar of `unit`'s class (keys 1..9, 0); the default bar for unknown units.
     fn bar_of(&self, unit: EntityId) -> &[SpellId] {
@@ -139,6 +141,9 @@ impl SimRead for Sim {
     }
     fn now(&self) -> Tick {
         Sim::now(self)
+    }
+    fn legacy_view(&self) -> combat_core::LegacyView {
+        Sim::legacy_view(self)
     }
 }
 

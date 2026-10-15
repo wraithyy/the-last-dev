@@ -17,6 +17,8 @@ expect_used = "warn"
 # Bevy is slow in debug; optimize dependencies but keep our own code debuggable.
 [profile.dev]
 opt-level = 1
+# Full debuginfo on every test binary filled the disk overnight; line tables keep backtraces.
+debug = "line-tables-only"
 
 [profile.dev.package."*"]
 opt-level = 3

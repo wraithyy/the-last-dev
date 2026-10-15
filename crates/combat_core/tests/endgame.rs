@@ -46,6 +46,18 @@ fn world(zone: &str, level: u8, tweak: impl FnOnce(&mut Content)) -> (Sim, Entit
     (sim, p)
 }
 
+/// A level-10 player whose lead switched to Legacy Mode on campus, then entered `zone`.
+fn legacy_world(zone: &str) -> (Sim, EntityId) {
+    let (mut sim, p) = world("campus", 10, |_| {});
+    sim.apply_as(p, Command::SetLegacy { on: true });
+    run(&mut sim, 1);
+    if let Err(e) = sim.load_zone(zone, &anchors, Vec::new()) {
+        panic!("{e}");
+    }
+    assert_eq!(sim.legacy_zone(), Some(zone));
+    (sim, p)
+}
+
 fn run(sim: &mut Sim, ticks: u32) -> Vec<Event> {
     (0..ticks).flat_map(|_| sim.tick()).collect()
 }
@@ -153,11 +165,12 @@ fn below_the_cap_xp_is_levels_and_the_last_rank_stops_counting() {
 }
 
 #[test]
-fn kills_at_the_cap_earn_the_zone_department_by_kind() {
+fn legacy_kills_earn_the_zone_department_by_kind() {
     let c = content();
     let sales = c.endgame.department_index("Sales").expect("Sales");
     let hr = c.endgame.department_index("HR").expect("HR");
-    let (mut sim, p) = world("tower/3", 10, |_| {});
+    let marketing = c.endgame.department_index("Marketing").expect("Marketing");
+    let (mut sim, p) = legacy_world("tower/3");
     kill(&mut sim, "sales_rep");
     assert_eq!(rep(&sim, p)[sales], 5);
     // Elites pay more; other departments do not notice.
@@ -174,6 +187,14 @@ fn kills_at_the_cap_earn_the_zone_department_by_kind() {
     let (mut low, q) = world("tower/3", 9, |_| {});
     kill(&mut low, "sales_rep");
     assert_eq!(rep(&low, q), [0; 6]);
+    // Legacy kills replace the E1 stand-in: a Normal floor with a Legacy variant pays nothing at
+    // the cap, the campus (no Legacy variant) still does.
+    let (mut normal, n) = world("tower/3", 10, |_| {});
+    kill(&mut normal, "sales_rep");
+    assert_eq!(rep(&normal, n), [0; 6]);
+    let (mut campus, m) = world("campus", 10, |_| {});
+    kill(&mut campus, "delivery_robot");
+    assert_eq!(rep(&campus, m)[marketing], 5);
 }
 
 #[test]
@@ -197,7 +218,7 @@ fn tiers_have_thresholds_and_standing_is_capped() {
         .map(|r| e.tier_of(*r))
         .collect();
     assert_eq!(tiers, [0, 0, 1, 1, 2, 3, 3, 4, 5, 5]);
-    let (mut sim, p) = world("tower/3", 10, |_| {});
+    let (mut sim, p) = legacy_world("tower/3");
     sim.debug_set_career(p, 0, 0, [0, 0, 0, 0, 0, 8390]);
     kill(&mut sim, "customer");
     assert_eq!(rep(&sim, p)[5], 8400);
@@ -469,4 +490,197 @@ fn time_logged_off_is_a_holiday_and_progress_survives_the_save() {
     let old = SaveData::decode("the-last-dev save\nversion=3\nclass=devops\nlevel=10\n")
         .expect("old save");
     assert_eq!((old.rank, old.rep, old.burnout), (0, [0; 6], 0));
+}
+
+// ---- Legacy Mode (legacy.rs) ----
+
+fn legacy_refusal(ev: &[Event]) -> Option<combat_core::LegacyError> {
+    ev.iter().find_map(|e| match e {
+        Event::LegacyRefused { reason } => Some(*reason),
+        _ => None,
+    })
+}
+
+#[test]
+fn only_the_lead_at_the_cap_switches_to_legacy() {
+    let (mut sim, p) = world("campus", 9, |_| {});
+    sim.apply_as(p, Command::SetLegacy { on: true });
+    assert_eq!(
+        legacy_refusal(&run(&mut sim, 1)),
+        Some(combat_core::LegacyError::LevelTooLow)
+    );
+    sim.set_level_of(p, 10);
+    let q = sim.spawn_player("backend", Vec3::new(1.0, 0.0, 0.0), 0.0);
+    sim.set_level_of(q, 10);
+    sim.apply_as(q, Command::SetLegacy { on: true });
+    assert_eq!(
+        legacy_refusal(&run(&mut sim, 1)),
+        Some(combat_core::LegacyError::NotLeader)
+    );
+    sim.apply_as(p, Command::SetLegacy { on: true });
+    let ev = run(&mut sim, 1);
+    assert!(
+        ev.iter()
+            .any(|e| matches!(e, Event::Legacy { view } if view.on))
+    );
+    assert!(sim.legacy_on());
+    // The campus has no Legacy variant; a floor does, and Normal comes back when switched off.
+    assert_eq!(sim.legacy_zone(), None);
+    assert!(sim.load_zone("tower/2", &anchors, Vec::new()).is_ok());
+    assert_eq!(sim.legacy_zone(), Some("tower/2"));
+    sim.apply_as(p, Command::SetLegacy { on: false });
+    run(&mut sim, 1);
+    assert!(sim.load_zone("tower/3", &anchors, Vec::new()).is_ok());
+    assert_eq!(sim.legacy_zone(), None);
+}
+
+#[test]
+fn legacy_floors_scale_enemies_arm_their_affix_and_keep_their_own_world() {
+    let c = content();
+    let lv = |sim: &Sim, boss: bool| -> Vec<u8> {
+        sim.units()
+            .filter(|u| u.hostile && u.ai.is_some() && u.boss == boss)
+            .map(|u| u.level)
+            .collect()
+    };
+    let hp = |sim: &Sim, key: &str| sim.units().find(|u| u.key == key).map_or(0, |u| u.max_hp);
+    let (normal, _) = world("lab/2", 10, |_| {});
+    let (legacy, _) = legacy_world("lab/2");
+    assert!(lv(&normal, false).iter().all(|l| *l <= 10));
+    assert!(lv(&legacy, false).iter().all(|l| *l >= c.legacy.mob_level));
+    assert_eq!(lv(&legacy, true), [c.legacy.boss_level]);
+    assert!(hp(&legacy, "agi_prototype") > hp(&normal, "agi_prototype"));
+    // lab/2's affix is Legacy Code: one "Do Not Touch" elite guards a pack.
+    let monolith = |sim: &Sim| sim.units().filter(|u| u.key == "legacy_monolith").count();
+    assert_eq!((monolith(&normal), monolith(&legacy)), (0, 1));
+
+    // The campaign cleared tower/1; the Legacy tower/1 still has its boss and a shut elevator.
+    let (mut sim, p) = world("campus", 10, |_| {});
+    let save = SaveData {
+        class: "fullstack".into(),
+        level: 10,
+        cleared: vec!["tower/1".into()],
+        bosses: vec!["vibe_coder".into()],
+        ..SaveData::default()
+    };
+    assert!(sim.import_save(p, &save));
+    sim.apply_as(p, Command::SetLegacy { on: true });
+    run(&mut sim, 1);
+    assert!(sim.load_zone("tower/1", &anchors, Vec::new()).is_ok());
+    let elevator = |sim: &Sim| {
+        sim.zone_links("tower/1")
+            .iter()
+            .any(|l| l.anchor == "elevator_exit" && l.unlocked)
+    };
+    assert!(sim.units().any(|u| u.key == "vibe_coder" && u.alive));
+    assert!(!elevator(&sim));
+    // The save keeps the campaign's progress, not the Legacy world's.
+    let out = sim.export_save(p).map(|s| s.cleared).unwrap_or_default();
+    assert_eq!(out, ["tower/1"]);
+    assert!(sim.load_zone("campus", &anchors, Vec::new()).is_ok());
+    assert!(sim.zone_cleared("tower/1"));
+}
+
+fn dropped(ev: &[Event]) -> (Vec<String>, u32) {
+    ev.iter()
+        .find_map(|e| match e {
+            Event::LootDropped { items, sp, .. } => Some((items.clone(), *sp)),
+            _ => None,
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+fn a_legacy_boss_drops_the_legacy_tier_once_a_week_and_the_lockout_is_saved() {
+    let c = content();
+    let (mut sim, p) = legacy_world("tower/1");
+    sim.set_clock(THURSDAY);
+    let boss = sim
+        .units()
+        .find(|u| u.boss && u.alive)
+        .map(|u| u.id)
+        .expect("Legacy boss");
+    assert!(sim.debug_kill(boss));
+    let (items, sp) = dropped(&run(&mut sim, 1));
+    assert_eq!(items.len(), c.legacy.boss_items as usize, "{items:?}");
+    let legacy_gear = |n: &String| {
+        c.economy
+            .gear(n)
+            .is_some_and(|g| g.source == combat_core::GearSource::Legacy)
+    };
+    assert!(items.iter().all(legacy_gear), "{items:?}");
+    assert!(sp > 0);
+    let view = sim.legacy_view();
+    assert_eq!(view.locked, ["vibe_coder"]);
+    assert!(sim.legacy_locked("vibe_coder"));
+    // Locked out: the same boss pays Kudos only until Monday.
+    let again = spawn(&mut sim, "vibe_coder");
+    assert!(sim.debug_kill(again));
+    let (items, sp) = dropped(&run(&mut sim, 1));
+    assert!(items.is_empty() && sp > 0, "{items:?} {sp}");
+    // The save carries the lockout; a fresh sim in the same week is still locked.
+    let save = sim.export_save(p).expect("save");
+    let back = SaveData::decode(&save.encode()).expect("decode");
+    assert_eq!(
+        (back.legacy_week, back.legacy_locks.clone()),
+        (view.week, vec!["vibe_coder".to_string()])
+    );
+    let (mut fresh, q) = world("campus", 10, |_| {});
+    fresh.set_clock(THURSDAY + DAY);
+    assert!(fresh.import_save(q, &back));
+    assert!(fresh.legacy_locked("vibe_coder"));
+    // Monday 00:00 UTC resets it.
+    fresh.set_clock(THURSDAY + 4 * DAY);
+    assert!(!fresh.legacy_locked("vibe_coder"));
+    assert!(fresh.legacy_view().locked.is_empty());
+    // Older saves have no lockout keys.
+    let old = "the-last-dev save\nversion=3\nclass=devops\nlevel=10\n";
+    assert!(SaveData::decode(old).is_some_and(|s| s.legacy_locks.is_empty()));
+}
+
+#[test]
+fn normal_floors_never_drop_the_legacy_tier_and_the_sprint_chest_stays_top_campaign() {
+    let c = content();
+    assert_eq!(c.economy.campaign_top_tier(), 5);
+    let (mut sim, _) = world("lab/2", 10, |_| {});
+    for _ in 0..40 {
+        let id = spawn(&mut sim, "agi_prototype");
+        assert!(sim.debug_kill(id));
+        let (items, _) = dropped(&run(&mut sim, 1));
+        assert!(
+            items.iter().all(|n| c
+                .economy
+                .gear(n)
+                .is_none_or(|g| g.source != combat_core::GearSource::Legacy)),
+            "{items:?}"
+        );
+    }
+}
+
+/// Every Legacy piece actually drops on Legacy floors (trash for the Commons, bosses for the rest).
+#[test]
+fn every_legacy_piece_drops_somewhere() {
+    let c = content();
+    let want: Vec<&String> = c
+        .economy
+        .gear
+        .iter()
+        .filter(|g| g.source == combat_core::GearSource::Legacy)
+        .map(|g| &g.name)
+        .collect();
+    assert!(want.len() >= 20, "a whole tier, not a handful");
+    let (mut sim, _) = legacy_world("lab/2");
+    let mut seen = std::collections::BTreeSet::new();
+    for k in 0..800 {
+        let key = if k % 4 == 0 {
+            "agi_prototype"
+        } else {
+            "prompt_whisperer"
+        };
+        let id = spawn(&mut sim, key);
+        assert!(sim.debug_kill(id));
+        seen.extend(dropped(&run(&mut sim, 1)).0);
+    }
+    let missing: Vec<&&String> = want.iter().filter(|n| !seen.contains(**n)).collect();
+    assert!(missing.is_empty(), "never dropped: {missing:?}");
 }

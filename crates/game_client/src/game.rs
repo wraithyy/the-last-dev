@@ -280,7 +280,7 @@ fn debug_quests() -> Vec<(String, QuestStatus, Vec<u32>)> {
         .collect()
 }
 
-fn start_game(
+pub(crate) fn start_game(
     bare: Option<Res<BareStage>>,
     time: Res<Time>,
     mut sim: ResMut<CombatSim>,

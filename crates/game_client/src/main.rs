@@ -20,6 +20,7 @@ mod hair;
 mod hud;
 mod input;
 mod keybinds;
+mod legacy;
 mod live;
 mod loot_fx;
 mod nameplates;
@@ -120,6 +121,7 @@ fn main() {
         .add_plugins((settings::SettingsPlugin, cutscene::CutscenePlugin))
         .add_plugins(social::SocialPlugin)
         .add_plugins(live::LivePlugin)
+        .add_plugins(legacy::LegacyPlugin)
         .run();
 }
 

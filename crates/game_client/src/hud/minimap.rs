@@ -278,7 +278,10 @@ fn update_radar(
     mut glyphs: Query<(&RadarGlyph, &mut Text, &mut TextColor)>,
     (mut zone_text, mut coords): (
         Single<&mut Text, (With<RadarZone>, Without<RadarGlyph>, Without<RadarCoords>)>,
-        Single<&mut Text, (With<RadarCoords>, Without<RadarGlyph>, Without<RadarZone>)>,
+        Single<
+            (&mut Text, &mut TextColor),
+            (With<RadarCoords>, Without<RadarGlyph>, Without<RadarZone>),
+        >,
     ),
 ) {
     let mut step = 0;
@@ -323,10 +326,23 @@ fn update_radar(
 
     // Facing is (-sin yaw, -cos yaw) in (x, z); the arrow art points at -z.
     arrow.rotation = Rot2::radians(-player.yaw);
-    set_text(
-        &mut coords,
-        &format!("x {:>4.0}  z {:>4.0}", player.pos.x, player.pos.z),
-    );
+    // A Legacy floor keeps its affix in view where the coordinates usually are.
+    let (coords_text, coords_color) = &mut *coords;
+    let legacy = sim.legacy_view();
+    match crate::legacy::affix_name(sim.content(), &flow.zone).filter(|_| legacy.zone == flow.zone)
+    {
+        Some(affix) => {
+            set_text(coords_text, &format!("LEGACY  {affix}"));
+            coords_color.0 = crate::legacy::LEGACY;
+        }
+        None => {
+            set_text(
+                coords_text,
+                &format!("x {:>4.0}  z {:>4.0}", player.pos.x, player.pos.z),
+            );
+            coords_color.0 = DIM;
+        }
+    }
 
     let half = RADII[radar.zoom];
     let in_view = |p: Vec2| (p - me).abs().max_element() <= half;

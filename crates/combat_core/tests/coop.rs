@@ -476,11 +476,13 @@ impl Group {
     /// Tank opens from 4 m, the others hang back 20 m.
     fn pull(&mut self, at: Vec3) {
         self.front = at;
+        // A lone member has nobody to open for it: it walks into aggro range itself.
+        let solo = self.m.len() == 1;
         for k in 0..self.m.len() {
-            let back = if self.m[k].role == Role::Tank {
-                4.0
-            } else {
-                22.0
+            let back = match self.m[k].role {
+                Role::Tank => 4.0,
+                _ if solo => 5.0,
+                _ => 22.0,
             };
             self.m[k].pos = Vec3::new(at.x + k as f32 * 1.5, 0.0, at.z + back);
         }
@@ -490,7 +492,7 @@ impl Group {
 
     /// Clears the floor pack by pack, then the boss; the report is (lowest group HP % in the
     /// boss fight, cleared, most members dead at once).
-    fn clear(mut self, zone: &str) -> (u32, bool, u32) {
+    fn clear(&mut self, zone: &str) -> (u32, bool, u32) {
         let packs = self.sim.content().zone(zone).map_or(0, |z| z.packs.len());
         for n in 1..=packs {
             if let Some((at, _)) = anchor(&format!("pack_{n}")) {
@@ -935,6 +937,114 @@ fn three_players_beat_the_board_and_one_does_not_trivially() {
         let quickest = group_secs.iter().copied().max().unwrap_or(0);
         if killed && secs < quickest * 2 {
             failures.push(format!("solo seed {seed}: trivial kill in {secs} s"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+// ---- Legacy Mode ----
+
+const LEGACY_FLOORS: [&str; 9] = [
+    "tower/1",
+    "tower/2",
+    "tower/3",
+    "tower/4",
+    "tower/5",
+    "datacenter/1",
+    "datacenter/2",
+    "lab/1",
+    "lab/2",
+];
+
+struct LegacyRun {
+    cleared: bool,
+    secs: u64,
+    /// Lowest HP % any member reached on the floor.
+    low: u32,
+    deaths: u32,
+}
+
+/// Level-10 members (`keep` of tank, DPS, healer) in the best tier-5 World Rares switch the
+/// group to Legacy Mode on campus, take the door to `zone` and clear it pack by pack, boss
+/// last. Cleared means every enemy on the floor (affix adds included) is dead and nobody wiped.
+fn legacy_clear(zone: &str, keep: &[Role], seed: u64) -> LegacyRun {
+    let mut g = Group::new(content(), "campus", 10, seed);
+    for k in (0..g.m.len()).rev() {
+        if !keep.contains(&g.m[k].role) {
+            let id = g.m[k].id;
+            assert!(g.sim.remove_player(id));
+            g.m.remove(k);
+        }
+    }
+    g.gear_up(5);
+    let lead = g.m[0].id;
+    g.sim.apply_as(lead, Command::SetLegacy { on: true });
+    g.tick();
+    assert!(g.sim.legacy_on(), "the lead switched to Legacy");
+    if let Err(e) = g.sim.load_zone(zone, &anchor, Vec::new()) {
+        panic!("load_zone {zone}: {e}");
+    }
+    assert_eq!(g.sim.legacy_zone(), Some(zone));
+    let start = g.sim.now().0;
+    // Track the lowest HP over the whole floor, not just the boss.
+    g.in_boss = true;
+    let (low, _, deaths) = g.clear(zone);
+    // Stragglers: affix adds and anything a pull left behind.
+    for _ in 0..8 {
+        let next = g
+            .sim
+            .units()
+            .find(|u| u.hostile && u.alive && u.ai.is_some())
+            .map(|u| u.pos);
+        match next {
+            Some(at) if !g.wiped => {
+                g.pull(at);
+                g.rest();
+            }
+            _ => break,
+        }
+    }
+    let left: Vec<String> = g
+        .sim
+        .units()
+        .filter(|u| u.hostile && u.alive && u.ai.is_some())
+        .map(|u| format!("{} {:?} at {:?}", u.key, u.ai, u.pos))
+        .collect();
+    let left = left.len();
+    LegacyRun {
+        cleared: left == 0 && !g.wiped,
+        secs: (g.sim.now().0 - start) / 30,
+        low: low.min(g.boss_min_pct),
+        deaths: deaths.max(g.deaths),
+    }
+}
+
+/// The E2 balance gate (docs/FORMULAS.md, Legacy Mode): three level-10 bots in Normal-tier
+/// (tier-5 Rare) gear clear every Legacy floor on every seed, while a lone DPS in the same gear
+/// either dies or only scrapes through, below 25% HP at some point.
+#[test]
+fn three_players_clear_every_legacy_floor_and_one_does_not_trivially() {
+    let mut failures = Vec::new();
+    let trio = [Role::Tank, Role::Dps, Role::Healer];
+    for zone in LEGACY_FLOORS {
+        for seed in [7u64, 42, 1234] {
+            let g = legacy_clear(zone, &trio, seed);
+            let s = legacy_clear(zone, &[Role::Dps], seed);
+            println!(
+                "Legacy {zone} seed {seed}: group cleared {} in {} s (low {}%, most dead {}); solo DPS cleared {} in {} s (low {}%, died {})",
+                g.cleared, g.secs, g.low, g.deaths, s.cleared, s.secs, s.low, s.deaths
+            );
+            if !g.cleared {
+                failures.push(format!("{zone}: the group did not clear it"));
+            }
+            // Trivial: a solo clear that never got dangerous. (Time alone cannot tell: enemies lose
+            // the group HP bonus solo, so a lone DPS is only ~1.2-1.5x slower when it survives.)
+            if s.cleared && s.low >= 25 {
+                failures.push(format!(
+                    "{zone}: solo cleared it in {} s at {}% lowest (group {} s)",
+                    s.secs, s.low, g.secs
+                ));
+            }
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));

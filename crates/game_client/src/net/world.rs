@@ -209,6 +209,10 @@ pub struct NetWorld {
     item_cds: HashMap<String, (u64, u32)>,
     /// Animated emotes from `Emoted`, taken by the pose system (`office::ride`).
     pub poses: Vec<(EntityId, net_proto::Emote)>,
+    /// Legacy Mode as the server last announced it (`Event::Legacy`).
+    legacy: combat_core::LegacyView,
+    /// Zones cleared on Legacy floors: the server keeps them apart from the campaign's.
+    legacy_cleared: BTreeSet<String>,
 }
 
 impl NetWorld {
@@ -244,6 +248,8 @@ impl NetWorld {
             my_loot: BTreeSet::new(),
             item_cds: HashMap::new(),
             poses: Vec::new(),
+            legacy: Default::default(),
+            legacy_cleared: BTreeSet::new(),
         };
         for p in players {
             w.add_player(p);
@@ -859,9 +865,13 @@ impl NetWorld {
                 self.units.remove(unit);
                 self.interp.remove(unit);
             }
+            Event::ZoneCleared { zone } if !self.legacy.zone.is_empty() => {
+                self.legacy_cleared.insert(zone.clone());
+            }
             Event::ZoneCleared { zone } => {
                 self.cleared.insert(zone.clone());
             }
+            Event::Legacy { view } => self.legacy = view.clone(),
             Event::Unlocked { zone } => {
                 self.unlocked.insert(zone.clone());
             }
@@ -1171,9 +1181,28 @@ impl SimRead for NetWorld {
             .map_or((0, 0), |&(end, total)| (self.remaining_ms(end), total))
     }
     fn zone_cleared(&self, zone: &str) -> bool {
+        if self.legacy.zone == zone {
+            return self.legacy_cleared.contains(zone);
+        }
         self.cleared.contains(zone)
     }
     fn zone_links(&self, zone: &str) -> Vec<ZoneLinkView> {
+        // A Legacy floor's elevator opens on its own Legacy clear, like the server's.
+        if self.legacy.zone == zone {
+            return self.content.zone(zone).map_or_else(Vec::new, |z| {
+                z.links
+                    .iter()
+                    .map(|l| ZoneLinkView {
+                        anchor: l.anchor.clone(),
+                        to: l.to.clone(),
+                        unlocked: l.requires.as_ref().is_none_or(|r| match r {
+                            Unlock::ZoneCleared(c) => self.legacy_cleared.contains(c),
+                            _ => self.unlock_met(r),
+                        }),
+                    })
+                    .collect()
+            });
+        }
         self.content.zone(zone).map_or_else(Vec::new, |z| {
             z.links
                 .iter()
@@ -1206,6 +1235,9 @@ impl SimRead for NetWorld {
     }
     fn now(&self) -> Tick {
         Tick(self.tick)
+    }
+    fn legacy_view(&self) -> combat_core::LegacyView {
+        self.legacy.clone()
     }
 }
 

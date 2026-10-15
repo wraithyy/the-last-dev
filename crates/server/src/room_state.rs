@@ -816,6 +816,51 @@ mod tests {
         assert_eq!((bag(&s, a), bag(&s, b)), (Some(0), Some(1)));
     }
 
+    fn legacy_views(out: &[(Audience, Bytes)], to: PlayerId) -> Vec<combat_core::LegacyView> {
+        msgs(out, to)
+            .into_iter()
+            .flat_map(|m| match m {
+                ServerMsg::Events { events, .. } => events,
+                _ => Vec::new(),
+            })
+            .filter_map(|e| match e {
+                Event::Legacy { view } => Some(view),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The room owns Legacy Mode: the lead's switch reaches everyone, and the weekly lockout
+    /// outlives the members who earned it (online characters are ephemeral).
+    #[tokio::test(start_paused = true)]
+    async fn legacy_mode_and_its_lockout_belong_to_the_room() {
+        let mut s = room();
+        s.on_join(0, "Lead", "backend");
+        s.on_join(1, "Dps", "fullstack");
+        s.tick();
+        for p in [0, 1] {
+            let e = eid_of(&s, p);
+            assert!(s.sim.set_level_of(e, 10));
+        }
+        s.on_message(1, ClientMsg::Cmd(Command::SetLegacy { on: true }));
+        s.tick();
+        assert!(!s.sim.legacy_on(), "only the lead switches");
+        s.on_message(0, ClientMsg::Cmd(Command::SetLegacy { on: true }));
+        let out = s.tick();
+        assert!(legacy_views(&out, 1).iter().any(|v| v.on));
+        s.sim.debug_set_legacy_lockout(&["vibe_coder".to_string()]);
+        s.on_leave(0);
+        s.on_leave(1);
+        s.on_join(2, "Late", "devops");
+        let out = s.tick();
+        let late = legacy_views(&out, 2);
+        assert!(
+            late.iter()
+                .any(|v| v.on && v.locked == ["vibe_coder".to_string()]),
+            "{late:?}"
+        );
+    }
+
     #[tokio::test(start_paused = true)]
     async fn join_welcomes_and_announces() {
         let mut s = room();

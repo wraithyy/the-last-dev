@@ -459,11 +459,42 @@ fn class_name(key: &str) -> String {
 
 // ---- runtime ----
 
+/// Affix runtime of one Sprint run or one Legacy Mode floor: what is on, timers and state.
+pub(crate) struct Fx {
+    affixes: Vec<Affix>,
+    keys: Vec<String>,
+    rng: Rng,
+    last_cast: BTreeMap<EntityId, SpellId>,
+    hotfixed: BTreeSet<EntityId>,
+    pairs: BTreeMap<EntityId, EntityId>,
+    tech_debt: u32,
+    /// Next firing of AI-Assisted, Reorg, Mandatory Fun and Burnout.
+    next: [u64; 4],
+}
+
+impl Fx {
+    pub(crate) fn new(keys: Vec<String>, rng: Rng) -> Fx {
+        Fx {
+            affixes: keys.iter().filter_map(|k| Affix::from_key(k)).collect(),
+            keys,
+            rng,
+            last_cast: BTreeMap::new(),
+            hotfixed: BTreeSet::new(),
+            pairs: BTreeMap::new(),
+            tech_debt: 0,
+            next: [u64::MAX; 4],
+        }
+    }
+
+    fn has(&self, a: Affix) -> bool {
+        self.affixes.contains(&a)
+    }
+}
+
 pub(crate) struct Run {
     building: String,
     level: u8,
-    affixes: Vec<Affix>,
-    affix_keys: Vec<String>,
+    fx: Fx,
     stages: Vec<String>,
     stage: usize,
     /// Tick of the arrival in the first stage; the clock runs from there.
@@ -478,16 +509,9 @@ pub(crate) struct Run {
     ended: bool,
     /// The clock stops here once the run ended.
     ended_at: Option<u64>,
-    rng: Rng,
     /// The campaign's world state, restored when the run ends.
     campaign: World,
     meter: BTreeMap<EntityId, (u64, u64)>,
-    last_cast: BTreeMap<EntityId, SpellId>,
-    hotfixed: BTreeSet<EntityId>,
-    pairs: BTreeMap<EntityId, EntityId>,
-    tech_debt: u32,
-    /// Next firing of AI-Assisted, Reorg, Mandatory Fun and Burnout.
-    next: [u64; 4],
 }
 
 #[derive(Default)]
@@ -501,12 +525,6 @@ pub(crate) struct SprintState {
     splitting: bool,
     /// How the last run ended: result, time and upgrade.
     last: Option<(SprintResult, u32, i8)>,
-}
-
-impl Run {
-    fn has(&self, a: Affix) -> bool {
-        self.affixes.contains(&a)
-    }
 }
 
 impl Sim {
@@ -576,17 +594,29 @@ impl Sim {
             || world.bosses_killed.contains(&def.unlock_boss)
     }
 
-    /// The campaign's world state, also while a run has it parked.
+    /// The campaign's world state, also while a run or a Legacy floor has it parked.
     pub(crate) fn campaign_world(&self) -> &World {
-        self.sprint
-            .run
-            .as_ref()
-            .filter(|r| !r.ended)
-            .map_or(&self.world, |r| &r.campaign)
+        match self.sprint.run.as_ref().filter(|r| !r.ended) {
+            Some(r) => &r.campaign,
+            None if self.legacy.fx.is_some() => &self.legacy.parked,
+            None => &self.world,
+        }
+    }
+
+    /// The affix runtime in force: a live run's, else the Legacy floor's.
+    pub(crate) fn fx(&self) -> Option<&Fx> {
+        self.live_run().map(|r| &r.fx).or(self.legacy.fx.as_ref())
+    }
+
+    fn fx_mut(&mut self) -> Option<&mut Fx> {
+        match self.sprint.run.as_mut().filter(|r| !r.ended) {
+            Some(r) => Some(&mut r.fx),
+            None => self.legacy.fx.as_mut(),
+        }
     }
 
     pub(crate) fn sprint_has(&self, a: Affix) -> bool {
-        self.live_run().is_some_and(|r| r.has(a))
+        self.fx().is_some_and(|f| f.has(a))
     }
 
     /// Per-kill loot scale in percent: `kill_loot_pct` in a run, 100 outside.
@@ -686,7 +716,7 @@ impl Sim {
         SprintStatus {
             building: r.building.clone(),
             level: r.level,
-            affixes: r.affix_keys.clone(),
+            affixes: r.fx.keys.clone(),
             par_ms: r.par_ms,
             elapsed_ms: elapsed,
             penalty_ms: r
@@ -698,7 +728,7 @@ impl Sim {
             stage: (r.stage + 1).min(r.stages.len()) as u8,
             stages: r.stages.len() as u8,
             deaths: r.deaths.min(u32::from(u16::MAX)) as u16,
-            tech_debt: r.tech_debt.min(255) as u8,
+            tech_debt: r.fx.tech_debt.min(255) as u8,
         }
     }
 
@@ -732,10 +762,6 @@ impl Sim {
             .filter(|z| self.content.zone(z).is_some_and(|d| d.boss.is_some()))
             .count() as u8;
         let affix_keys = affixes_for(def, self.seed, level);
-        let affixes = affix_keys
-            .iter()
-            .filter_map(|k| Affix::from_key(k))
-            .collect();
         let need = (u64::from(trash) * u64::from(def.forces_need_pct)).div_ceil(100) as u32;
         let par = par_ms(def, &b, level);
         let delay = ticks(def.travel_delay_ms);
@@ -748,8 +774,7 @@ impl Sim {
         let run = Run {
             building: b.key.clone(),
             level,
-            affixes,
-            affix_keys,
+            fx: Fx::new(affix_keys, rng),
             stages: stages.clone(),
             stage: 0,
             started: None,
@@ -762,14 +787,8 @@ impl Sim {
             stage_done: false,
             ended: false,
             ended_at: None,
-            rng,
             campaign,
             meter: BTreeMap::new(),
-            last_cast: BTreeMap::new(),
-            hotfixed: BTreeSet::new(),
-            pairs: BTreeMap::new(),
-            tech_debt: 0,
-            next: [u64::MAX; 4],
         };
         let status = self.status_of(&run);
         self.sprint.run = Some(run);
@@ -831,8 +850,8 @@ impl Sim {
         {
             run.stage = k;
             run.stage_done = false;
-            run.hotfixed.clear();
-            run.pairs.clear();
+            run.fx.hotfixed.clear();
+            run.fx.pairs.clear();
             let now = self.now;
             run.started.get_or_insert(now);
             return;
@@ -840,24 +859,27 @@ impl Sim {
         self.end_sprint(SprintResult::Abandoned);
     }
 
-    /// Spawn level inside a sprint stage (sprint mob level at least); `level` otherwise.
+    /// Spawn level inside a sprint stage (sprint mob level at least) or on a Legacy floor
+    /// (Legacy mob level at least); `level` otherwise.
     pub(crate) fn sprint_level(&self, level: u8) -> u8 {
         if self.live_run().is_some() {
             level.max(self.sprint_def().mob_level)
+        } else if self.legacy.fx.is_some() {
+            level.max(self.content.legacy.mob_level)
         } else {
             level
         }
     }
 
-    /// Enemy (HP %, damage %) for the run's level; 100/100 outside a run.
+    /// Enemy (HP %, damage %) for the run's level or the Legacy floor; 100/100 elsewhere.
     pub(crate) fn sprint_mob_pct(&self, i: usize) -> (u32, u32) {
-        let Some(r) = self.live_run() else {
-            return (100, 100);
-        };
         let d = &self.content.units[self.units[i].def];
         if !d.hostile || d.ai.is_none() || self.units[i].class.is_some() {
             return (100, 100);
         }
+        let Some(r) = self.live_run() else {
+            return self.legacy_mob_pct();
+        };
         let def = self.sprint_def();
         let lv = u32::from(r.level.saturating_sub(1));
         (
@@ -873,10 +895,10 @@ impl Sim {
 
     /// After a stage's units exist: Pair Programming links, the Legacy Code elite, timers.
     pub(crate) fn sprint_after_load(&mut self) {
-        let Some(run) = self.sprint.run.as_ref().filter(|r| !r.ended) else {
+        let Some(fx) = self.fx() else {
             return;
         };
-        let (pairs, legacy) = (run.has(Affix::PairProgramming), run.has(Affix::LegacyCode));
+        let (pairs, legacy) = (fx.has(Affix::PairProgramming), fx.has(Affix::LegacyCode));
         let def = self.content.sprint.clone();
         let period = |k: &str| {
             def.affixes
@@ -891,8 +913,8 @@ impl Sim {
             now.saturating_add(period("mandatory_fun")),
             now.saturating_add(period("burnout")),
         ];
-        if let Some(r) = self.sprint.run.as_mut() {
-            r.next = next;
+        if let Some(f) = self.fx_mut() {
+            f.next = next;
         }
         let packs: Vec<(u32, crate::geom::Vec3, f32)> = self
             .zone_packs
@@ -913,19 +935,16 @@ impl Sim {
                 members.sort_by_key(|&i| std::cmp::Reverse(self.units[i].state.max_hp));
                 let (a, b) = (members[0], members[1]);
                 let (ia, ib) = (Self::id_of(a), Self::id_of(b));
-                if let Some(r) = self.sprint.run.as_mut() {
-                    r.pairs.insert(ia, ib);
-                    r.pairs.insert(ib, ia);
+                if let Some(f) = self.fx_mut() {
+                    f.pairs.insert(ia, ib);
+                    f.pairs.insert(ib, ia);
                 }
                 self.apply_aura(a, PAIR_AURA, PERMANENT_MS, None, ia, None);
                 self.apply_aura(b, PAIR_AURA, PERMANENT_MS, None, ib, None);
             }
         }
         if legacy && !packs.is_empty() {
-            let k = match self.sprint.run.as_mut() {
-                Some(r) => r.rng.below(packs.len() as u32) as usize,
-                None => 0,
-            };
+            let k = self.pick(packs.len());
             let (pack, at, yaw) = packs[k];
             if let Ok(d) = self.def_index(LEGACY_UNIT) {
                 let level = self.sprint_level(self.content.units[d].level);
@@ -962,7 +981,7 @@ impl Sim {
         spell: Option<SpellId>,
         school: School,
     ) -> u32 {
-        let Some(r) = self.live_run() else {
+        let Some(r) = self.fx() else {
             return amount;
         };
         let target = Self::id_of(ti);
@@ -1007,6 +1026,10 @@ impl Sim {
 
     pub(crate) fn update_sprint(&mut self) {
         if self.sprint.run.as_ref().is_none_or(|r| r.ended) {
+            if self.legacy.fx.is_some() {
+                self.scan_sprint_events();
+                self.run_affixes();
+            }
             return;
         }
         self.scan_sprint_events();
@@ -1068,7 +1091,7 @@ impl Sim {
                 _ => {}
             }
         }
-        if let Some(r) = self.sprint.run.as_mut() {
+        if let Some(r) = self.sprint.run.as_mut().filter(|r| !r.ended) {
             for (p, n, heal) in damage {
                 let m = r.meter.entry(p).or_default();
                 if heal {
@@ -1077,8 +1100,10 @@ impl Sim {
                     m.0 += u64::from(n);
                 }
             }
+        }
+        if let Some(f) = self.fx_mut() {
             for (p, s) in casts {
-                r.last_cast.insert(p, s);
+                f.last_cast.insert(p, s);
             }
         }
         for id in kicked {
@@ -1102,11 +1127,11 @@ impl Sim {
         let Some(i) = self.index(id) else { return };
         if self.is_player(id) {
             let debt = self.sprint_has(Affix::TechnicalDebt);
-            if let Some(r) = self.sprint.run.as_mut() {
+            if let Some(r) = self.sprint.run.as_mut().filter(|r| !r.ended) {
                 r.deaths += 1;
-                if debt {
-                    r.tech_debt = (r.tech_debt + 1).min(TECH_DEBT_MAX);
-                }
+            }
+            if let Some(f) = self.fx_mut().filter(|_| debt) {
+                f.tech_debt = (f.tech_debt + 1).min(TECH_DEBT_MAX);
             }
             if debt {
                 self.affix_fired(
@@ -1129,7 +1154,7 @@ impl Sim {
         let boss = self.units[i].floor_boss;
         let pack = self.units[i].state.pack;
         let pos = self.units[i].state.pos;
-        if let Some(r) = self.sprint.run.as_mut() {
+        if let Some(r) = self.sprint.run.as_mut().filter(|r| !r.ended) {
             if trash {
                 r.trash_killed += 1;
             }
@@ -1248,11 +1273,11 @@ impl Sim {
     }
 
     fn run_affixes(&mut self) {
-        let Some(r) = self.sprint.run.as_ref() else {
+        let Some(f) = self.fx() else {
             return;
         };
-        let affixes = r.affixes.clone();
-        let next = r.next;
+        let affixes = f.affixes.clone();
+        let next = f.next;
         let now = self.now;
         let fighting = !self.fighting_players().is_empty();
         for a in affixes {
@@ -1281,14 +1306,14 @@ impl Sim {
 
     fn set_next(&mut self, k: usize, key: &str) {
         let at = self.now.saturating_add(self.affix_period(key));
-        if let Some(r) = self.sprint.run.as_mut() {
-            r.next[k] = at;
+        if let Some(f) = self.fx_mut() {
+            f.next[k] = at;
         }
     }
 
     fn pick(&mut self, n: usize) -> usize {
-        match self.sprint.run.as_mut() {
-            Some(r) => r.rng.below(n as u32) as usize,
+        match self.fx_mut() {
+            Some(f) => f.rng.below(n as u32) as usize,
             None => 0,
         }
     }
@@ -1307,10 +1332,8 @@ impl Sim {
             .or_else(|| self.nearest_player(self.units[e].state.pos));
         let Some(victim) = victim else { return };
         let Some(spell) = self
-            .sprint
-            .run
-            .as_ref()
-            .and_then(|r| r.last_cast.get(&victim).copied())
+            .fx()
+            .and_then(|f| f.last_cast.get(&victim).copied())
             .and_then(|s| self.content.spell(s).cloned())
         else {
             return;
@@ -1450,11 +1473,7 @@ impl Sim {
             .collect();
         for i in low {
             let id = Self::id_of(i);
-            let fresh = self
-                .sprint
-                .run
-                .as_mut()
-                .is_some_and(|r| r.hotfixed.insert(id));
+            let fresh = self.fx_mut().is_some_and(|f| f.hotfixed.insert(id));
             if !fresh {
                 continue;
             }
@@ -1632,7 +1651,7 @@ impl Sim {
             })
             .unwrap_or_default();
         let eco = &self.content.economy;
-        let tier = eco.gear.iter().map(|g| g.tier()).max().unwrap_or(1);
+        let tier = eco.campaign_top_tier();
         let rarity = if level >= 7 {
             Rarity::Epic
         } else if level >= 3 {
