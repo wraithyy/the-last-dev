@@ -161,6 +161,78 @@ play that reuses existing zones and systems, works solo and in co-op, and stays 
   - Exit after the timesheet is approved: back to campus with the title "External Resource" and an achievement "Billable" ("Nothing happened. You billed it anyway.").
   - Keep it short and deadpan; the joke is the emptiness.
 
+### Wave E5: Corporate life (side content)
+
+**Design rule (user request): it must not feel cluttered.**
+- All side activities share one entry point: a "Company Calendar" board on campus.
+  - For now (user decision 2026-10-15) every minigame and every quest chain is available at all times, listed on the board.
+  - Rotation is a later switch: keep a `rotation` flag in content, default off, so it can later show one or two per day like the daily board.
+- **Company Calendar UX (user priority: easy to find, clear, easy to use):**
+  - Findable:
+    - The board stands on the main campus plaza next to the Scrum board.
+    - It has a calendar icon on the minimap and the map, plus a "!" marker while something is unplayed.
+    - A one-line hint goes into the tracker once at level 2.
+    - It is also reachable from the touch menu and the `~/endgame` panel, through a "Calendar" button and an optional keybind.
+  - Layout: one window shaped like a week-view calendar, with two groups, "Minigames" and "Quest chains". Each row is one entry and shows:
+    - a name and a one-line joke description
+    - a length estimate ("~4 min")
+    - a status: new, in progress, or best medal
+    - the reward icons
+    - one big "Join" or "Start" button
+    - No nested menus.
+  - Starting an entry teleports you or starts it directly. Quest chains add themselves to the tracker. Esc always exits back to campus with a confirm.
+  - Clutter check: the window must read cleanly at 1280x720 and on a phone (844x390), scrolling if needed. A screenshot of both is part of the acceptance criteria.
+- Nothing gets its own HUD element unless it replaces one.
+- Every item ships only if it passes a clutter review: a screenshot of the HUD at 1280x720 and on touch, plus the question "would a new player understand this in 5 seconds?". If an item makes the game feel busier without adding fun, skip or cut it and record that here.
+- Order: minigames first, quest chains second, background systems last and only if the screen stays calm.
+
+#### Task 5.1: Minigames (one per event day, from the calendar)
+- **Agent**: general-purpose (opus), one minigame per task
+- **Files**: crates/combat_core/src/corporate/*.rs, crates/game_client/src/floors/* or overlays, content/game.ron
+- **Depends on**: E4 (shares the minigame frame of Teambuilding: start, timer, score, medals)
+- **Acceptance**: sim tests per minigame, 3-5 minute runs, screenshots, clutter review
+- **Minigames**:
+  1. **Performance Review**: a dialogue "boss fight" with your manager. You pick answers, and the "Meets Expectations" gauge always drifts back to the middle. Every ending is "3 out of 5, no budget for raises this year". Title "Meets Expectations".
+  2. **Reorg**: the office layout shuffles every couple of minutes and NPCs swap names and roles. Quest: "find out who you report to now".
+  3. **Tool Migration**: move 20 tickets from the old system to the new one, each with different mandatory fields. At the end the company announces it is migrating back.
+  4. **Hackathon**: a 24-hour countdown in fast time. Collect pizza and energy drinks while a demo builds itself, then crashes live on stage. Prize: a plastic trophy (a real trophy item).
+  5. **Open-Space Focus**: hold 60 s of uninterrupted work while "got a minute?" colleagues, loud phone calls and a birthday cake approach. A defend-in-place variant of the Teambuilding stealth rules.
+
+#### Task 5.2: Short quest chains (rotating on the calendar)
+- **Agent**: general-purpose (sonnet)
+- **Files**: content/game.ron, small dialogue additions
+- **Depends on**: 5.1 calendar board
+- **Acceptance**: quest-chain tests, each chain about 3-5 minutes
+- **Chains**:
+  1. **Expense Report**: a 3-euro coffee needs 4 approvals, a scan of a receipt you don't have, and a "business value" justification.
+  2. **Exit Interview**: a colleague who resigned speaks honestly for the first time in 5 years. The best lines in the game.
+  3. **Mandatory Training**: click through 40 phishing slides; at the end IT sends you a phishing mail and Security falls for it.
+  4. **Return to Office**: you commute in and everyone sits on a Teams call with headphones, talking to each other through cameras.
+  5. **Town Hall**: the CEO announces a "record quarter" and "cost optimisation" in the same sentence. The Q&A has 200 questions; one pre-approved question is answered.
+
+#### Task 5.3: Background systems (optional, last, clutter-gated)
+- **Agent**: general-purpose (sonnet)
+- **Depends on**: 5.1, 5.2 and a clutter review of the HUD at that point
+- **Acceptance**: no new permanent HUD element unless it replaces one; otherwise skip
+- **Systems**:
+  1. **Jira tickets as loot**: corpses drop "Blocker", "Won't Fix" and "Duplicate" tickets that turn in for Kudos. Reuses the junk/loot UI, so it adds no clutter. Most likely to ship.
+  2. **Calendar invites as debuffs**: NPCs throw meeting invites at you; declining costs reputation. Reuses the aura row. Ship only if readable.
+  3. **Burnout meter (MUST SHIP, user favourite)**
+     - Grows with meetings, minigames, deaths, night crunch and long play sessions.
+     - At high burnout the character slows, yawns and mutters lines, sometimes hits "reply all" on chat, and the hair-loss stages advance faster.
+     - Coffee, a holiday (logging off for a while, measured by the real clock), Friday afternoon, or the rubber duck pet heal it.
+     - Office props also heal it, reusing the existing interactive props. Each has a short cooldown so it can't be spammed:
+       - table football: a quick mini-round
+       - ping-pong table
+       - bean bag nap
+       - the vending machine
+       - the rooftop or "quiet room"
+       - petting the office dog, if one exists
+     - Killing management also lowers it: every manager, director, HR or marketing lead, CEO, and world-boss board member defeated takes a chunk off. Bosses take more. Each kill shows a small floating "-5% burnout" in green, with a satirical line in the combat log ("Therapeutic.").
+     - It must not add clutter. Show it as a thin third strip under the player frame's mana bar, or as a tint and pip on the portrait. No separate window.
+     - Tooltip: "Burnout 72%. Have you tried a wellness webinar?"
+     - Ship it earlier than the rest of 5.3, together with E1.
+
 ## Out of scope
 - New level cap (11-20) and new base classes.
 - Crafting (explicitly not wanted).

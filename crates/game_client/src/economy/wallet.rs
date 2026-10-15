@@ -6,6 +6,7 @@ use super::goods::SP_GOLD;
 use crate::combat::{SimReady, SimView};
 use crate::copy::{KUDOS_FLAVOUR, kudos, thousands};
 use crate::hud::{DIM, PANEL_EDGE, label, panel_bg, set_text};
+use crate::touch::TouchMode;
 use bevy::prelude::*;
 
 const FLOAT_SECS: f32 = 1.8;
@@ -13,6 +14,9 @@ const FLOAT_RISE: f32 = 34.0;
 /// The wallet sits on the dock's row, left of the chat/log/dps buttons.
 const WALLET_BOTTOM: f32 = 15.0;
 const WALLET_RIGHT: f32 = 164.0;
+/// Touch: under the player frame, where the thumb cluster and the minimap leave room.
+const TOUCH_LEFT: f32 = 12.0;
+const TOUCH_TOP: f32 = 82.0;
 
 #[derive(Component)]
 struct Wallet;
@@ -21,13 +25,14 @@ struct WalletText;
 #[derive(Component)]
 struct WalletFlavour;
 #[derive(Component)]
-struct KudosFloat(f32);
+struct KudosFloat(f32, bool);
 
 pub struct WalletPlugin;
 
 impl Plugin for WalletPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_wallet)
+            .add_systems(Update, place_wallet)
             .add_systems(Update, (update_wallet, drift).chain().in_set(SimReady));
     }
 }
@@ -89,8 +94,26 @@ fn spawn_wallet(mut commands: Commands) {
     ));
 }
 
+fn place_wallet(touch: Res<TouchMode>, mut wallet: Single<&mut Node, With<Wallet>>) {
+    if !touch.is_changed() {
+        return;
+    }
+    if touch.active {
+        wallet.left = px(TOUCH_LEFT);
+        wallet.right = Val::Auto;
+        wallet.top = px(TOUCH_TOP);
+        wallet.bottom = Val::Auto;
+    } else {
+        wallet.left = Val::Auto;
+        wallet.right = px(WALLET_RIGHT);
+        wallet.top = Val::Auto;
+        wallet.bottom = px(WALLET_BOTTOM);
+    }
+}
+
 fn update_wallet(
     mut commands: Commands,
+    touch: Res<TouchMode>,
     sim: SimView,
     wallet: Single<(Entity, &Interaction), With<Wallet>>,
     mut text: Single<&mut Text, With<WalletText>>,
@@ -111,16 +134,27 @@ fn update_wallet(
     if let Some(prev) = *last
         && sp > prev
     {
-        commands.spawn((
-            KudosFloat(0.0),
-            label(format!("+{}", kudos(sp - prev)), 16.0),
-            TextColor(SP_GOLD),
+        // On touch the wallet hangs from the top, so the float rises by shrinking `top`.
+        let node = if touch.active {
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(TOUCH_LEFT + 4.0),
+                top: px(TOUCH_TOP + 22.0),
+                ..default()
+            }
+        } else {
             Node {
                 position_type: PositionType::Absolute,
                 right: px(WALLET_RIGHT + 4.0),
                 bottom: px(WALLET_BOTTOM + 22.0),
                 ..default()
-            },
+            }
+        };
+        commands.spawn((
+            KudosFloat(0.0, touch.active),
+            label(format!("+{}", kudos(sp - prev)), 16.0),
+            TextColor(SP_GOLD),
+            node,
             GlobalZIndex(70),
         ));
         commands.entity(entity).insert(BorderColor::all(SP_GOLD));
@@ -143,7 +177,11 @@ fn drift(
     for (e, mut f, mut node, mut color) in &mut floats {
         f.0 += time.delta_secs();
         let t = (f.0 / FLOAT_SECS).min(1.0);
-        node.bottom = px(WALLET_BOTTOM + 22.0 + FLOAT_RISE * t);
+        if f.1 {
+            node.top = px(TOUCH_TOP + 22.0 - FLOAT_RISE * t);
+        } else {
+            node.bottom = px(WALLET_BOTTOM + 22.0 + FLOAT_RISE * t);
+        }
         color.0 = SP_GOLD.with_alpha(1.0 - t * t);
         if t >= 1.0 {
             commands.entity(e).despawn();

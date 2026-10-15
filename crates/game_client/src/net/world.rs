@@ -156,6 +156,7 @@ fn smooth_interval(old: f64, measured: f64) -> f64 {
 fn objective_need(o: &Objective) -> u32 {
     match o {
         Objective::Kill(_, n) | Objective::Loot(_, n) => *n,
+        Objective::Wait { secs, .. } => *secs,
         Objective::Talk(_) | Objective::ClearZone(_) => 1,
     }
 }
@@ -1015,6 +1016,9 @@ impl NetWorld {
             Unlock::ZoneCleared(z) => self.cleared.contains(z),
             Unlock::BossKilled(k) => self.bosses_killed.contains(k),
             Unlock::QuestDone(q) => self.quests.completed.contains(q),
+            Unlock::QuestStarted(q) => {
+                self.quests.completed.contains(q) || self.quests.active.iter().any(|a| a.id == *q)
+            }
         }
     }
 

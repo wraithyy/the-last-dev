@@ -506,7 +506,6 @@ fn spot_for(sim: &CombatSim, p: EntityId, t: &Tutorial, touch: bool) -> Option<S
     };
     match t.current()? {
         Step::Accept | Step::Loot | Step::Handoff if touch => Some(Spot::Touch(Action::Interact)),
-        Step::AutoAttack if touch => Some(Spot::Touch(Action::AutoAttack)),
         Step::AutoAttack => Some(Spot::AutoAttack),
         Step::Spell1 => Some(Spot::Slot(0)),
         Step::Spell2 => Some(Spot::Slot(1)),

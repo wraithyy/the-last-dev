@@ -1077,6 +1077,87 @@ static TABLE: &[(&str, UnitVisual)] = &[
             ],
         ),
     ),
+    // ---- Body Leasing easter egg: the vendor's account manager and the client's grey office
+    (
+        "bl_account_manager",
+        v(
+            SUIT_M,
+            1.8,
+            "Account Manager",
+            "<Your Utilisation Is Our Margin>",
+            &[
+                paint("Black", 0.12, 0.14, 0.2),
+                paint("Shirt", 0.92, 0.92, 0.94),
+                paint("Skin", 0.9, 0.72, 0.6),
+            ],
+        ),
+    ),
+    (
+        "client_receptionist",
+        v(
+            CASUAL_F,
+            1.68,
+            "Receptionist",
+            "<Visitor Badges Pending>",
+            &[
+                paint("Shirt", 0.62, 0.6, 0.56),
+                paint("Pants", 0.3, 0.3, 0.32),
+                paint("Hair", 0.35, 0.3, 0.25),
+            ],
+        ),
+    ),
+    (
+        "client_clerk_a",
+        v(
+            CASUAL2,
+            1.78,
+            "Analyst",
+            "<Not Your Manager>",
+            &[
+                paint("Shirt", 0.66, 0.66, 0.64),
+                paint("Pants", 0.28, 0.28, 0.3),
+                paint("Skin", 0.85, 0.66, 0.52),
+            ],
+        ),
+    ),
+    (
+        "client_clerk_b",
+        v(
+            CASUAL_M,
+            1.74,
+            "Team Lead",
+            "<Hot-Desking Since 2019>",
+            &[
+                paint("Shirt", 0.7, 0.66, 0.58),
+                paint("Pants", 0.25, 0.25, 0.27),
+                paint("Hair", 0.4, 0.4, 0.4),
+            ],
+        ),
+    ),
+    (
+        "client_clerk_c",
+        v(
+            CASUAL3,
+            1.8,
+            "Process Owner",
+            "<Please Raise a Ticket>",
+            &[],
+        ),
+    ),
+    (
+        "client_delivery_lead",
+        v(
+            SUIT_F,
+            1.72,
+            "Delivery Lead",
+            "<Camera Off>",
+            &[
+                paint("Black", 0.38, 0.38, 0.4),
+                paint("Shirt", 0.8, 0.78, 0.72),
+                paint("Skin", 0.92, 0.75, 0.62),
+            ],
+        ),
+    ),
     // ---- onboarding corner (campus)
     (
         "hr_onboarding_bot",

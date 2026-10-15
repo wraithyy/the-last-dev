@@ -602,28 +602,33 @@ fn gadgets(
     >,
     mut shades: Query<(&GadgetCooldown, &mut Node), Without<GadgetButton>>,
     touch: Res<crate::touch::TouchMode>,
+    ui: Res<crate::touch::TouchUi>,
 ) {
+    use crate::touch::{BTN, GADGET_TRAY_BOTTOM, GADGET_TRAY_RIGHT};
     let list = gadgets_of(&*sim);
-    bar.display = if list.is_empty() {
-        Display::None
-    } else {
-        Display::Flex
-    };
-    // Touch puts its own big buttons beside the action bar; the gadgets move under the
-    // player frame there.
-    let (left, margin, bottom, top) = if touch.active {
-        (px(16), Val::Px(0.0), Val::Auto, px(118))
+    // Touch folds the gadgets into the "more" tray next to sprint and ride.
+    let shown = !list.is_empty() && (!touch.active || ui.more);
+    bar.display = if shown { Display::Flex } else { Display::None };
+    let (left, right, margin, bottom) = if touch.active {
+        (
+            Val::Auto,
+            px(GADGET_TRAY_RIGHT),
+            Val::Px(0.0),
+            px(GADGET_TRAY_BOTTOM),
+        )
     } else {
         let (l, b) = crate::hud::actionbar::gadget_anchor();
-        (percent(50), Val::Px(l), px(b), Val::Auto)
+        (percent(50), Val::Auto, Val::Px(l), px(b))
     };
     let margin = UiRect::left(margin);
-    if bar.left != left || bar.bottom != bottom || bar.top != top || bar.margin != margin {
+    if bar.left != left || bar.right != right || bar.bottom != bottom || bar.margin != margin {
         bar.left = left;
+        bar.right = right;
         bar.bottom = bottom;
-        bar.top = top;
+        bar.top = Val::Auto;
         bar.margin = margin;
     }
+    let side = px(if touch.active { BTN } else { 44.0 });
     let Some(me) = sim.player() else { return };
     for (b, interaction, mut node, mut image, mut border) in &mut buttons {
         let Some(item) = list.get(b.0) else {
@@ -631,6 +636,10 @@ fn gadgets(
             continue;
         };
         node.display = Display::Flex;
+        if node.width != side {
+            node.width = side;
+            node.height = side;
+        }
         let icon = icons.get(&assets, goods::icon_of(sim.content(), item));
         if image.image != icon {
             image.image = icon;

@@ -52,11 +52,36 @@ impl Plugin for BannersPlugin {
             .add_systems(Startup, spawn_banner_ui)
             .add_systems(
                 Update,
-                (progress_events, show_banner, age_toasts)
+                (progress_events, show_banner, age_toasts, place_toasts)
                     .chain()
                     .in_set(SimReady),
             );
     }
+}
+
+/// Touch keeps the bottom-right corner for the thumb cluster: notifications stack above the
+/// action bar in the centre instead, and fade on their own.
+fn place_toasts(
+    touch: Res<crate::touch::TouchMode>,
+    mut stack: Single<&mut Node, With<ToastStack>>,
+) {
+    if !touch.is_changed() {
+        return;
+    }
+    let (left, right, margin, bottom) = if touch.active {
+        (
+            percent(50),
+            Val::Auto,
+            UiRect::left(px(-TOAST_W / 2.0)),
+            px(156),
+        )
+    } else {
+        (Val::Auto, px(16), UiRect::ZERO, px(40))
+    };
+    stack.left = left;
+    stack.right = right;
+    stack.margin = margin;
+    stack.bottom = bottom;
 }
 
 fn spawn_banner_ui(mut commands: Commands) {

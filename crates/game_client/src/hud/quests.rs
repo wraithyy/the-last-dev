@@ -80,7 +80,21 @@ pub fn objective_label(content: &Content, o: &Objective) -> String {
         Objective::Loot(item, _) => item.clone(),
         Objective::Talk(k) => format!("Talk to {}", unit_name(content, k)),
         Objective::ClearZone(z) => format!("Clear {}", zone_label(content, z)),
+        Objective::Wait { label, .. } => label.clone(),
     }
+}
+
+/// A fixed-width text bar for slow waits: "[====......] 40%".
+fn wait_bar(have: u32, need: u32) -> String {
+    const CELLS: u32 = 20;
+    let need = need.max(1);
+    let filled = (have.min(need) * CELLS / need) as usize;
+    format!(
+        "[{}{}] {}%",
+        "=".repeat(filled),
+        ".".repeat(CELLS as usize - filled),
+        have.min(need) * 100 / need
+    )
 }
 
 /// One tracker/toast line: "MeatProxies terminated 5/10", "Access Badges 2/5"; talk and clear
@@ -89,6 +103,7 @@ pub fn objective_line(content: &Content, o: &Objective, have: u32, need: u32) ->
     let what = objective_label(content, o);
     match o {
         Objective::Kill(..) | Objective::Loot(..) => format!("{what} {have}/{need}"),
+        Objective::Wait { .. } => format!("{what} {}", wait_bar(have, need)),
         Objective::Talk(_) | Objective::ClearZone(_) => what,
     }
 }
@@ -227,6 +242,7 @@ pub fn objective_units(sim: &dyn SimRead, track: &QuestTrack) -> Vec<String> {
                         add(&b.unit);
                     }
                 }
+                Objective::Wait { .. } => {}
             }
         }
     }
@@ -1260,6 +1276,8 @@ fn quest_events(
                 if let Some(o) = content
                     .quest(quest)
                     .and_then(|q| q.objectives.get(*objective))
+                    // The tracker bar shows a wait; a toast every second would only nag.
+                    && !matches!(o, Objective::Wait { .. })
                 {
                     set_text(toast_text, &progress_line(content, o, *count, *need));
                     shown.toast_age = 0.0;

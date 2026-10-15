@@ -2,6 +2,7 @@
 //! organic floor builders; the campus, data centers and lab have their own modules.
 
 use super::campus;
+use super::client;
 use super::datacenter;
 use super::kit::{Plan, Sign};
 use super::lab;
@@ -34,6 +35,7 @@ pub fn build_zone(id: &str) -> Option<FloorLayout> {
         "datacenter/2" => Some(datacenter::build(2)),
         "lab/1" => Some(lab::build(1)),
         "lab/2" => Some(lab::build(2)),
+        client::ZONE => Some(client::build()),
         _ => TOWER_ZONES
             .iter()
             .position(|z| *z == id)

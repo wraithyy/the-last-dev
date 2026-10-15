@@ -365,9 +365,9 @@ pub fn copy(t: &Tutorial, c: &Ctx) -> Option<Copy> {
                         (Window::Map, false) => format!("map ({})", c.map),
                         (Window::Sheet, false) => format!("gear ({})", c.sheet),
                         (Window::Career, false) => format!("career ({})", c.career),
-                        (Window::Map, true) => "map (N at the top)".into(),
-                        (Window::Sheet, true) => "gear".into(),
-                        (Window::Career, true) => "career (R at the top)".into(),
+                        (Window::Map, true) => "map (Menu)".into(),
+                        (Window::Sheet, true) => "gear (Menu)".into(),
+                        (Window::Career, true) => "career (Menu)".into(),
                     })
                     .collect();
                 format!("Open each once: {}.", left.join(", "))
@@ -378,7 +378,7 @@ pub fn copy(t: &Tutorial, c: &Ctx) -> Option<Copy> {
             "commute like an executive",
             pick(
                 format!("Press {} to ride an e-scooter.", c.scooter),
-                "Tap Ride to take an e-scooter.",
+                "Tap More, then Ride, to take an e-scooter.",
             ),
             "Faster than the elevator, less judgmental than the people who park them on fire exits.",
         ),

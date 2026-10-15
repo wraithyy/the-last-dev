@@ -16,6 +16,7 @@ use crate::input::Paused;
 use crate::keybinds::{Action, KeyLegend, Keybinds};
 use crate::player::Player;
 use crate::targeting::Target;
+use crate::touch::{self, TouchMode, TouchUi};
 use bevy::prelude::*;
 use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
@@ -69,6 +70,27 @@ impl UiMaterial for CooldownMaterial {
 
 #[derive(Component)]
 struct Slot(usize);
+/// The bar's frame, re-centred when the touch layout shows fewer slots.
+#[derive(Component)]
+struct BarRoot;
+/// Touch only: flips the bar between slots 1-6 and 7-0.
+#[derive(Component)]
+struct PageToggle;
+#[derive(Component)]
+struct PageLabel;
+/// Touch bar page: false shows the first `TOUCH_PAGE` slots, true the rest.
+#[derive(Resource, Default)]
+struct BarPage(bool);
+/// Slots on the first touch page; the toggle makes the other four reachable.
+const TOUCH_PAGE: usize = 6;
+/// An accent key's desktop anchor (from the screen centre and bottom); the touch layout moves
+/// the key into the thumb cluster and restores this when it ends.
+#[derive(Component)]
+struct AccentRoot {
+    action: Action,
+    left: f32,
+    bottom: f32,
+}
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
 enum Part {
     Icon,
@@ -152,8 +174,12 @@ pub struct ActionBarPlugin;
 
 impl Plugin for ActionBarPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_bar)
-            .add_systems(Update, tag_spots)
+        app.init_resource::<BarPage>()
+            .add_systems(Startup, spawn_bar)
+            .add_systems(
+                Update,
+                (page_press, touch_bar, touch_accents, tag_spots).chain(),
+            )
             .add_systems(
                 Update,
                 (
@@ -288,6 +314,7 @@ fn spawn_bar(mut commands: Commands, mut materials: ResMut<Assets<CooldownMateri
     let height = bar_height();
     commands
         .spawn((
+            BarRoot,
             Node {
                 position_type: PositionType::Absolute,
                 bottom: px(BAR_BOTTOM),
@@ -415,6 +442,23 @@ fn spawn_bar(mut commands: Commands, mut materials: ResMut<Assets<CooldownMateri
                     });
                 });
             }
+            bar.spawn((
+                PageToggle,
+                Button,
+                Node {
+                    width: px(touch::SLOT_W),
+                    height: px(touch::SLOT_H),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(px(2)),
+                    border_radius: BorderRadius::all(px(8)),
+                    display: Display::None,
+                    ..default()
+                },
+                BorderColor::all(KEY_RIM),
+                BackgroundColor(KEY_TOP),
+                children![(PageLabel, label("", 16.0), TextColor(ACCENT))],
+            ));
         });
 
     spawn_accents(&mut commands);
@@ -604,19 +648,26 @@ fn accent_key<R: Bundle, B: Bundle, I: Bundle, G: Bundle, F: Bundle>(
 ) -> Entity {
     let (ring_m, button_m, icon_m, glow_m, gauge_m) = markers;
     commands
-        .spawn(Node {
-            position_type: PositionType::Absolute,
-            bottom: px(bottom),
-            left: percent(50),
-            margin: UiRect::left(px(left)),
-            width: px(ATTACK_PLATE),
-            height: px(bar_height()),
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-            row_gap: px(4),
-            ..default()
-        })
+        .spawn((
+            AccentRoot {
+                action: look.action,
+                left,
+                bottom,
+            },
+            Node {
+                position_type: PositionType::Absolute,
+                bottom: px(bottom),
+                left: percent(50),
+                margin: UiRect::left(px(left)),
+                width: px(ATTACK_PLATE),
+                height: px(bar_height()),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                row_gap: px(4),
+                ..default()
+            },
+        ))
         .with_children(|root| {
             root.spawn((
                 ring_m,
@@ -705,6 +756,111 @@ fn accent_key<R: Bundle, B: Bundle, I: Bundle, G: Bundle, F: Bundle>(
         })
         .id()
 }
+
+fn page_press(
+    toggle: Single<&Interaction, (With<PageToggle>, Changed<Interaction>)>,
+    mut page: ResMut<BarPage>,
+) {
+    if **toggle == Interaction::Pressed {
+        page.0 = !page.0;
+    }
+}
+
+/// Touch: bigger keycaps, only one page of them, and a toggle for the rest. Every slot stays
+/// reachable (and its number key keeps working); desktop gets its original geometry back.
+fn touch_bar(
+    touch: Res<TouchMode>,
+    page: Res<BarPage>,
+    mut bar: Single<&mut Node, (With<BarRoot>, Without<Slot>, Without<PageToggle>)>,
+    mut toggle: Single<&mut Node, (With<PageToggle>, Without<Slot>, Without<BarRoot>)>,
+    mut label_text: Single<&mut Text, With<PageLabel>>,
+    mut slots: Query<(&Slot, &mut Node), (Without<BarRoot>, Without<PageToggle>)>,
+) {
+    if !touch.is_changed() && !page.is_changed() {
+        return;
+    }
+    let (first, end) = if page.0 {
+        (TOUCH_PAGE, KEY_LABELS.len())
+    } else {
+        (0, TOUCH_PAGE)
+    };
+    for (Slot(i), mut node) in &mut slots {
+        let (show, w, h) = if touch.active {
+            ((first..end).contains(i), touch::SLOT_W, touch::SLOT_H)
+        } else {
+            (true, ACTION_SLOT, KEY_H)
+        };
+        node.display = if show { Display::Flex } else { Display::None };
+        node.width = px(w);
+        node.height = px(h);
+    }
+    toggle.display = if touch.active {
+        Display::Flex
+    } else {
+        Display::None
+    };
+    set_text(&mut label_text, if page.0 { "1-6" } else { "7-0" });
+    let width = if touch.active {
+        let n = (end - first + 1) as f32;
+        n * touch::SLOT_W + (n - 1.0) * ACTION_GAP + 2.0 * BAR_PAD + 4.0
+    } else {
+        bar_width()
+    };
+    bar.margin = UiRect::left(px(-width / 2.0));
+}
+
+/// Touch: the accent keys are the thumb cluster. Auto attack becomes the big primary key, coffee
+/// sits in the arc, sprint and ride wait in the "more" tray, revive goes beside the bar.
+fn touch_accents(
+    touch: Res<TouchMode>,
+    ui: Res<TouchUi>,
+    mut roots: Query<(&AccentRoot, &mut Node, &mut UiTransform)>,
+) {
+    if !touch.is_changed() && !ui.is_changed() {
+        return;
+    }
+    for (root, mut node, mut transform) in &mut roots {
+        if !touch.active {
+            node.left = percent(50);
+            node.right = Val::Auto;
+            node.margin = UiRect::left(px(root.left));
+            node.bottom = px(root.bottom);
+            if node.display == Display::None {
+                node.display = Display::Flex;
+            }
+            transform.scale = Vec2::ONE;
+            continue;
+        }
+        // Centre of the keycap plate; it sits 5 px above the root's centre (plate + gauge overflow).
+        let (centre, scale, from_left) = match root.action {
+            Action::AutoAttack => (touch::primary(), touch::PRIMARY_SCALE, false),
+            Action::Coffee => (touch::arc(180.0), 1.0, false),
+            Action::Sprint => (touch::tray(0), 1.0, false),
+            Action::Scooter => (touch::tray(1), 1.0, false),
+            _ => (Vec2::new(REZ_TOUCH.x, REZ_TOUCH.y), 1.0, true),
+        };
+        let side = px(centre.x - ATTACK_PLATE / 2.0);
+        (node.left, node.right) = if from_left {
+            (side, Val::Auto)
+        } else {
+            (Val::Auto, side)
+        };
+        node.margin = UiRect::ZERO;
+        node.bottom = px(centre.y - bar_height() / 2.0 - 5.0);
+        transform.scale = Vec2::splat(scale);
+        // Revive manages its own visibility (group only).
+        if matches!(root.action, Action::Sprint | Action::Scooter) {
+            node.display = if ui.more {
+                Display::Flex
+            } else {
+                Display::None
+            };
+        }
+    }
+}
+
+/// Revive key on touch: left of the action bar, clear of the stick ring (centre from bottom-left).
+const REZ_TOUCH: Vec2 = Vec2::new(236.0, 60.0);
 
 fn click_slots(
     paused: Res<Paused>,

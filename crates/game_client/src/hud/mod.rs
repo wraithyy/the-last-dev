@@ -16,6 +16,9 @@ mod minimap;
 pub(crate) mod quests;
 mod trophies;
 
+/// The minimap's width, so the touch layout can park its buttons beside it.
+pub const MINIMAP_WIDTH: f32 = minimap::WIDTH;
+
 use crate::combat::{SimReady, SimView};
 use crate::input::Paused;
 use crate::keybinds::{Action, Keybinds};

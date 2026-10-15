@@ -177,6 +177,11 @@ fn links(sim: &Sim, zone: &str) -> Vec<(String, bool)> {
 fn every_zone_has_an_ungated_way_back_to_the_campus() {
     let sim = t(1).sim;
     for z in &sim.content().zones {
+        // The Body Leasing office has no enemies and opens its only door with its last ticket;
+        // that chain can always be finished, so nobody is stranded.
+        if z.packs.is_empty() && z.boss.is_none() {
+            continue;
+        }
         let mut seen = vec![z.id.clone()];
         let mut i = 0;
         while i < seen.len() {
@@ -219,6 +224,7 @@ fn load_zone_spawns_the_campus_and_reports_its_links() {
             ("tower/1".to_string(), true),
             ("datacenter/1".to_string(), false),
             ("lab/1".to_string(), false),
+            ("client/1".to_string(), false),
         ]
     );
     assert!(t.sim.zone_links("nowhere").is_empty());
@@ -1287,4 +1293,135 @@ fn an_item_an_active_quest_wants_cannot_be_discarded() {
             reason: combat_core::ItemError::Protected
         }
     )));
+}
+
+// ---- Body Leasing easter egg ----
+
+/// Runs `secs` sim seconds.
+fn wait_secs(t: &mut T, secs: u64) {
+    t.run(ms_to_ticks(1000) * secs);
+}
+
+fn counts(t: &T, quest: &str) -> Vec<u32> {
+    t.sim
+        .quests()
+        .active
+        .iter()
+        .find(|q| q.id == quest)
+        .map_or_else(Vec::new, |q| q.counts.clone())
+}
+
+#[test]
+fn body_leasing_chain_runs_from_the_account_manager_to_the_title() {
+    let mut t = t(1);
+    t.load("campus");
+    let am = t.id_of("bl_account_manager");
+    // Closed until the allocation ticket is taken, and reachable from the campus only then.
+    assert_eq!(
+        links(&t.sim, "campus").last(),
+        Some(&("client/1".to_string(), false))
+    );
+    let at = t.sim.unit(am).map(|u| u.pos).unwrap_or_default();
+    t.move_to(Vec3::new(at.x, 0.0, at.z + 2.0), 0.0);
+    t.accept("bl_allocation");
+    assert_eq!(t.sim.quest_status("bl_allocation"), QuestStatus::Active);
+    assert!(t.has(|e| matches!(e, Event::Unlocked { zone } if zone == "client/1")));
+    assert_eq!(
+        links(&t.sim, "campus").last(),
+        Some(&("client/1".to_string(), true))
+    );
+
+    t.load("client/1");
+    // Nothing to fight: the zone has only friendly units.
+    assert!(t.sim.units().all(|u| !u.hostile));
+    t.talk_to("client_receptionist");
+    assert_eq!(t.sim.quest_status("bl_allocation"), QuestStatus::Ready);
+    t.turn_in("bl_allocation");
+    assert_eq!(
+        t.sim.quest_status("bl_access_rights"),
+        QuestStatus::Available
+    );
+
+    // The wait is slow on purpose: 75 s, one second per count, then ready.
+    t.accept("bl_access_rights");
+    wait_secs(&mut t, 74);
+    assert_eq!(t.sim.quest_status("bl_access_rights"), QuestStatus::Active);
+    assert!(counts(&t, "bl_access_rights")[0] >= 73);
+    wait_secs(&mut t, 2);
+    assert_eq!(t.sim.quest_status("bl_access_rights"), QuestStatus::Ready);
+    t.turn_in("bl_access_rights");
+
+    // Muted meeting: accepted at the reception, closed by talking to the lead.
+    t.talk_to("client_receptionist");
+    t.accept("bl_meeting");
+    t.talk_to("client_delivery_lead");
+    assert_eq!(t.sim.quest_status("bl_meeting"), QuestStatus::Ready);
+    t.talk_to("client_receptionist");
+    t.turn_in("bl_meeting");
+
+    // The only way out is gated by the timesheet.
+    assert_eq!(links(&t.sim, "client/1"), [("campus".to_string(), false)]);
+    t.talk_to("client_receptionist");
+    t.accept("bl_timesheet");
+    wait_secs(&mut t, 21);
+    assert_eq!(t.sim.quest_status("bl_timesheet"), QuestStatus::Ready);
+    assert_eq!(links(&t.sim, "client/1"), [("campus".to_string(), false)]);
+    t.turn_in("bl_timesheet");
+    assert_eq!(t.sim.quest_status("bl_timesheet"), QuestStatus::Done);
+    assert_eq!(links(&t.sim, "client/1"), [("campus".to_string(), true)]);
+
+    // The reward: the achievement and its title.
+    assert!(t.has(|e| matches!(e, Event::Achievement { key, .. } if key == "billable")));
+    let me = t
+        .sim
+        .unit(t.p)
+        .map(|u| (u.title.clone(), u.achievements.clone()));
+    let (title, achievements) = me.unwrap_or_default();
+    assert_eq!(title, "billable");
+    assert!(achievements.iter().any(|a| a == "billable"));
+    let def = t
+        .sim
+        .content()
+        .world
+        .achievements
+        .iter()
+        .find(|a| a.key == "billable");
+    assert_eq!(def.map(|a| a.title.as_str()), Some("External Resource"));
+    assert_eq!(
+        def.map(|a| a.text.as_str()),
+        Some("Nothing happened. You billed it anyway.")
+    );
+}
+
+#[test]
+fn body_leasing_waits_only_count_inside_the_client_office() {
+    let mut t = t(1);
+    t.debug_to_access_rights();
+    wait_secs(&mut t, 5);
+    let in_zone = counts(&t, "bl_access_rights")[0];
+    assert!(in_zone >= 4, "the bar moved {in_zone}");
+    t.load("campus");
+    wait_secs(&mut t, 10);
+    assert_eq!(counts(&t, "bl_access_rights")[0], in_zone);
+}
+
+#[test]
+fn body_leasing_quests_cannot_be_skipped() {
+    let mut t = t(1);
+    t.load("client/1");
+    t.talk_to("client_receptionist");
+    // No allocation ticket, no access rights, and the later tickets stay locked behind the chain.
+    for q in ["bl_access_rights", "bl_meeting", "bl_timesheet"] {
+        assert_eq!(t.sim.quest_status(q), QuestStatus::Locked, "{q}");
+    }
+}
+
+impl T {
+    /// Loads the office with the allocation ticket done and the access-rights ticket accepted.
+    fn debug_to_access_rights(&mut self) {
+        self.load("client/1");
+        assert!(self.sim.debug_set_quest("bl_allocation", QuestStatus::Done));
+        self.talk_to("client_receptionist");
+        self.accept("bl_access_rights");
+    }
 }

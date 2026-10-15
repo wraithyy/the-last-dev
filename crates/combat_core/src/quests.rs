@@ -173,6 +173,7 @@ impl Sim {
                 },
             );
         }
+        self.check_unlocks();
     }
 
     /// `choice` indexes `Content::quest_gear_choices` for the player's role (clamped); a gear
@@ -214,7 +215,28 @@ impl Sim {
         }
         self.grant_xp(pi, self.content.quest_xp(&def));
         self.quest_sp(pi, def.reward.xp, def.reward.sp);
+        // A quest can carry a title: achievements keyed `quest:<id>` unlock on its turn-in.
+        let key = format!("quest:{id}");
+        self.check_achievements(
+            pid,
+            |t| matches!(t, crate::world::Trigger::Event(k) if *k == key),
+        );
         self.check_unlocks();
+    }
+
+    /// Once a second: every living player in a zone counts a `Wait` objective of that zone.
+    pub(crate) fn quest_waits(&mut self) {
+        let Some(zone) = self.zone.clone() else {
+            return;
+        };
+        for pid in self.players.clone() {
+            if self.unit(pid).is_some_and(|u| u.alive) {
+                self.quest_credit(
+                    pid,
+                    |o| matches!(o, Objective::Wait { zone: z, .. } if *z == zone),
+                );
+            }
+        }
     }
 
     /// Counts a kill (own or shared) of unit `key` for `pid`'s retro credit, then the quests.
@@ -401,7 +423,7 @@ impl Content {
                 .filter(|z| z.friendly.iter().any(|f| f.unit == *k))
                 .map(|z| z.id.as_str())
                 .collect(),
-            Objective::ClearZone(z) => vec![z.as_str()],
+            Objective::ClearZone(z) | Objective::Wait { zone: z, .. } => vec![z.as_str()],
         }
     }
 }

@@ -837,6 +837,8 @@ pub enum Unlock {
     /// The unit key of a zone boss; only its death as a zone boss counts.
     BossKilled(String),
     QuestDone(String),
+    /// The quest is accepted or already done; opens a door the quest itself sends you through.
+    QuestStarted(String),
 }
 
 /// An exit of a zone: the client's trigger anchor (`door:<zone>`, `elevator_exit`) and where it leads.
@@ -875,12 +877,20 @@ pub enum Objective {
     /// Talk to a friendly unit with this key.
     Talk(String),
     ClearZone(String),
+    /// Be alive in `zone` for `secs` seconds (counts one per second). `label` names what is
+    /// pending, for the tracker's progress bar.
+    Wait {
+        zone: String,
+        label: String,
+        secs: u32,
+    },
 }
 
 impl Objective {
     pub fn need(&self) -> u32 {
         match self {
             Objective::Kill(_, n) | Objective::Loot(_, n) => *n,
+            Objective::Wait { secs, .. } => *secs,
             Objective::Talk(_) | Objective::ClearZone(_) => 1,
         }
     }
@@ -1420,7 +1430,7 @@ impl Content {
                 .zones
                 .iter()
                 .any(|z| z.boss.as_ref().is_some_and(|b| b.unit == *k)),
-            Unlock::QuestDone(q) => self.quest(q).is_some(),
+            Unlock::QuestDone(q) | Unlock::QuestStarted(q) => self.quest(q).is_some(),
         };
         if ok {
             Ok(())
@@ -1455,6 +1465,9 @@ impl Content {
                     Objective::Loot(it, _) => self.item(it).is_some(),
                     Objective::Talk(k) => self.unit_def(k).is_some_and(|u| !u.hostile),
                     Objective::ClearZone(z) => self.zone(z).is_some_and(|z| z.boss.is_some()),
+                    Objective::Wait { zone, label, .. } => {
+                        self.zone(zone).is_some() && !label.is_empty()
+                    }
                 };
                 if !ok {
                     return bad(format!("quest {}: impossible objective {o:?}", q.id));

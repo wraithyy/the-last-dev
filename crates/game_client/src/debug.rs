@@ -28,7 +28,8 @@
 //! - `WOW_AUTORUN=1`: hold "forward" so animation and camera can be checked without input.
 //! - `WOW_METER_MODE=0|1|2`, `WOW_METER_SCOPE=overall`: initial `~/metrics` mode and scope (open it with `WOW_KEYS=t:KeyK`).
 //! - `WOW_TOUCH=1`: start in the touch layout (native only; the web build detects a coarse pointer);
-//!   `WOW_TOUCH_PANEL=chat|log` also expands that log panel.
+//!   `WOW_TOUCH_PANEL=chat|log` also expands that log panel, `WOW_TOUCH_UI=menu|more` opens the
+//!   menu drawer or the sprint/ride/gadget tray.
 //! - `WOW_KEYS=t:Key,t:Key:hold,t:yaw=<rad>`: scripted input for two-client co-op shots. At `t`
 //!   seconds a key (`KeyW`, `Digit6`, `F2`, `Tab`, ...) is tapped, or held for `hold` seconds,
 //!   or the player turns to `yaw`. Goes through the real input paths (online too).
@@ -337,6 +338,7 @@ fn key_code(name: &str) -> Option<KeyCode> {
         "Tab" => KeyCode::Tab,
         "Escape" => KeyCode::Escape,
         "Space" => KeyCode::Space,
+        "Enter" => KeyCode::Enter,
         "F1" => KeyCode::F1,
         "F2" => KeyCode::F2,
         "F3" => KeyCode::F3,

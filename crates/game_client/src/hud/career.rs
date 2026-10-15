@@ -90,6 +90,7 @@ impl Plugin for CareerPlugin {
                     click_cards,
                     promotion_watch,
                     promotion_log,
+                    hide_dock_on_touch,
                 )
                     .chain()
                     .in_set(SimReady),
@@ -514,6 +515,21 @@ fn click_cards(
     }
     if review.iter().any(|i| *i == Interaction::Pressed) {
         pending.0.push(Command::ResetTalents);
+    }
+}
+
+/// The touch menu has a Career entry, and the dock label would sit in the top row's way.
+fn hide_dock_on_touch(
+    touch: Res<crate::touch::TouchMode>,
+    mut dock: Single<&mut Node, With<DockButton>>,
+) {
+    let want = if touch.active {
+        Display::None
+    } else {
+        Display::Flex
+    };
+    if dock.display != want {
+        dock.display = want;
     }
 }
 

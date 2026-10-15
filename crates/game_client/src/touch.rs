@@ -6,7 +6,7 @@
 use crate::arena::Colliders;
 use crate::camera::OrbitCamera;
 use crate::config::CAM_ORBIT_SENS;
-use crate::hud::{ACCENT, KEY_RIM, KEY_TOP, KeyHint, label};
+use crate::hud::{ACCENT, KEY_RIM, KEY_TOP, KeyHint, PANEL_EDGE, label, panel_bg};
 use crate::input::{Paused, PlayerInput, collect_input};
 use crate::keybinds::{Action, Keybinds};
 use crate::targeting::{Target, pick_unit};
@@ -41,6 +41,65 @@ pub struct TouchMode {
     pub mobile: bool,
 }
 
+/// Which touch overlays are open: the menu drawer and the "more" tray (sprint, ride, gadgets).
+#[derive(Resource, Default)]
+pub struct TouchUi {
+    pub menu: bool,
+    pub more: bool,
+}
+
+// Touch HUD geometry in HUD px. Everything on the right is measured from the bottom-right corner
+// and sized for the smallest supported canvas (~1000 x 500 HUD px, i.e. an 844x390 phone): the
+// stick owns x < 230 on the left, the action bar x 272..728, the thumb cluster the rest.
+/// Side of an arc or tray button. 64 HUD px stays above 44 physical px down to a 0.69 HUD scale.
+pub const BTN: f32 = 64.0;
+/// The primary (auto attack) key is the accent key scaled up around its centre.
+pub const PRIMARY_SCALE: f32 = 1.4;
+const PRIMARY: Vec2 = Vec2::new(72.0, 78.0);
+/// Far enough that four buttons 30 degrees apart do not touch.
+const ARC_RADIUS: f32 = 139.0;
+/// Where the "more" tray starts, above the action bar and left of the arc.
+const TRAY_RIGHT: f32 = 256.0;
+const TRAY_BOTTOM: f32 = 156.0;
+const TRAY_GAP: f32 = 8.0;
+/// Action bar slots on touch; 58 HUD px is 45 physical px at the smallest scale.
+pub const SLOT_W: f32 = 58.0;
+pub const SLOT_H: f32 = 62.0;
+/// Top row left of the minimap: menu, then the log toggle.
+const TOP_ROW: f32 = 8.0;
+const TOP_BTN_H: f32 = 58.0;
+const MENU_W: f32 = 62.0;
+const MENU_RIGHT: f32 = 12.0 + crate::hud::MINIMAP_WIDTH + 8.0;
+pub const LOG_RIGHT: f32 = MENU_RIGHT + MENU_W + 8.0;
+pub const LOG_TOP: f32 = TOP_ROW;
+pub const LOG_SIZE: f32 = TOP_BTN_H;
+
+/// Centre of the primary button, from the bottom-right corner.
+pub fn primary() -> Vec2 {
+    PRIMARY
+}
+
+/// Centre of an arc slot around the primary: 180 degrees is left of it, 90 straight above.
+pub fn arc(deg: f32) -> Vec2 {
+    let a = deg.to_radians();
+    Vec2::new(
+        PRIMARY.x - ARC_RADIUS * a.cos(),
+        PRIMARY.y + ARC_RADIUS * a.sin(),
+    )
+}
+
+/// Centre of tray slot `i` (0 is nearest the arc), from the bottom-right corner.
+pub fn tray(i: usize) -> Vec2 {
+    Vec2::new(
+        TRAY_RIGHT + BTN / 2.0 + i as f32 * (BTN + TRAY_GAP),
+        TRAY_BOTTOM + BTN / 2.0,
+    )
+}
+
+/// `right` of the gadget bar when it sits after the two accent keys in the tray.
+pub const GADGET_TRAY_RIGHT: f32 = TRAY_RIGHT + 2.0 * (BTN + TRAY_GAP);
+pub const GADGET_TRAY_BOTTOM: f32 = TRAY_BOTTOM;
+
 enum Role {
     Stick,
     Look {
@@ -69,7 +128,21 @@ enum TouchButton {
     /// Esc, which is not rebindable.
     Key(KeyCode),
     Jump,
+    /// Opens or closes the menu drawer.
+    Menu,
+    /// Opens or closes the tray with sprint, ride and gadgets.
+    More,
+    /// The scrim behind the drawer: a tap outside closes it.
+    Dismiss,
 }
+
+/// A drawer entry: pressing it also closes the drawer.
+#[derive(Component)]
+struct MenuItem;
+
+/// The drawer's scrim, shown only while `TouchUi::menu` is set.
+#[derive(Component)]
+struct MenuRoot;
 
 #[derive(Component)]
 struct TouchHud;
@@ -89,6 +162,18 @@ impl Plugin for TouchPlugin {
             mobile: is_mobile(),
         })
         .init_resource::<TouchState>()
+        // QA hook: `WOW_TOUCH_UI=menu|more` starts with the drawer or the tray open.
+        .insert_resource(match std::env::var("WOW_TOUCH_UI").as_deref() {
+            Ok("menu") => TouchUi {
+                menu: true,
+                more: false,
+            },
+            Ok("more") => TouchUi {
+                menu: false,
+                more: true,
+            },
+            _ => TouchUi::default(),
+        })
         .add_systems(Startup, spawn_hud)
         .add_systems(
             PreUpdate,
@@ -98,7 +183,10 @@ impl Plugin for TouchPlugin {
                 .after(UiSystems::Focus)
                 .after(collect_input),
         )
-        .add_systems(Update, (detect_touch, apply_mode, draw_stick, tag_spots));
+        .add_systems(
+            Update,
+            (detect_touch, apply_mode, show_menu, draw_stick, tag_spots),
+        );
     }
 }
 
@@ -129,11 +217,17 @@ pub fn initial_resolution() -> bevy::window::WindowResolution {
 /// Onboarding highlight anchors on the touch buttons it points at.
 fn tag_spots(mut commands: Commands, buttons: Query<(Entity, &TouchButton), Added<TouchButton>>) {
     for (e, b) in &buttons {
-        if let TouchButton::Act(a) = b {
-            commands
-                .entity(e)
-                .insert(crate::onboarding::Spot::Touch(*a));
-        }
+        // The drawer and the tray hide the buttons a tutorial step points at, so the step
+        // highlights the button that opens them.
+        let spot = match b {
+            TouchButton::Act(a) => *a,
+            TouchButton::Menu => Action::Map,
+            TouchButton::More => Action::Scooter,
+            _ => continue,
+        };
+        commands
+            .entity(e)
+            .insert(crate::onboarding::Spot::Touch(spot));
     }
 }
 
@@ -261,16 +355,20 @@ fn gestures(
 }
 
 fn press_buttons(
-    buttons: Query<(&TouchButton, &Interaction), Changed<Interaction>>,
+    buttons: Query<(&TouchButton, &Interaction, Has<MenuItem>), Changed<Interaction>>,
     paused: Res<Paused>,
     binds: Res<Keybinds>,
     mut keys: ResMut<ButtonInput<KeyCode>>,
     mut input: ResMut<PlayerInput>,
     mut st: ResMut<TouchState>,
+    mut ui: ResMut<TouchUi>,
 ) {
-    for (button, interaction) in &buttons {
+    for (button, interaction, in_menu) in &buttons {
         if *interaction != Interaction::Pressed {
             continue;
+        }
+        if in_menu {
+            ui.menu = false;
         }
         match button {
             // Esc must work while paused (it resumes); movement must not.
@@ -285,6 +383,16 @@ fn press_buttons(
                 keys.press(*k);
                 st.release.push(*k);
             }
+            // One overlay at a time: the tray and the drawer would stack on the same thumb.
+            TouchButton::Menu => {
+                ui.menu = !ui.menu;
+                ui.more = false;
+            }
+            TouchButton::More => {
+                ui.more = !ui.more;
+                ui.menu = false;
+            }
+            TouchButton::Dismiss => ui.menu = false,
         }
     }
 }
@@ -329,62 +437,81 @@ fn spawn_hud(mut commands: Commands) {
             )],
         )
     };
-    // Right thumb cluster, above the action bar.
+    // Thumb cluster: auto attack, coffee and sprint/ride/gadgets are accent keys that
+    // `hud::actionbar` places around `primary()`; the rest of the arc is built here.
+    for (text, tb, c) in [
+        ("Jump", TouchButton::Jump, arc(150.0)),
+        ("F", TouchButton::Act(Action::Interact), arc(120.0)),
+        ("More", TouchButton::More, arc(90.0)),
+    ] {
+        let (tb, btn, mut node, border, bg, kids) = button(text, tb, BTN, BTN);
+        node.position_type = PositionType::Absolute;
+        node.right = px(c.x - BTN / 2.0);
+        node.bottom = px(c.y - BTN / 2.0);
+        node.display = Display::None;
+        commands.spawn((TouchHud, tb, btn, node, border, bg, kids));
+    }
+    // Menu and log toggle sit left of the minimap; the toggle lives in `hud::logs`.
+    let (tb, btn, mut node, border, bg, kids) =
+        button("Menu", TouchButton::Menu, MENU_W, TOP_BTN_H);
+    node.position_type = PositionType::Absolute;
+    node.right = px(MENU_RIGHT);
+    node.top = px(TOP_ROW);
+    node.display = Display::None;
+    // Above the pause overlay, so the drawer's Pause entry can still resume.
+    commands.spawn((TouchHud, tb, btn, node, border, bg, kids, GlobalZIndex(55)));
+
+    // Drawer: a dimmed scrim (tap outside closes) around a card with the rarely used windows.
     commands
         .spawn((
-            TouchHud,
+            MenuRoot,
+            TouchButton::Dismiss,
+            Button,
             Node {
                 position_type: PositionType::Absolute,
-                right: px(14),
-                bottom: px(116),
-                width: px(190),
-                flex_direction: FlexDirection::Row,
-                flex_wrap: FlexWrap::Wrap,
-                justify_content: JustifyContent::FlexEnd,
-                column_gap: px(8),
-                row_gap: px(8),
-                display: Display::None,
-                ..default()
-            },
-        ))
-        .with_children(|p| {
-            for (t, k) in [
-                ("T", Action::AutoAttack),
-                ("C", Action::Coffee),
-                ("F", Action::Interact),
-                ("Run", Action::Sprint),
-                ("Ride", Action::Scooter),
-            ] {
-                p.spawn(button(t, TouchButton::Act(k), 56.0, 56.0));
-            }
-            p.spawn(button("Jump", TouchButton::Jump, 120.0, 56.0));
-        });
-    // Window shortcuts along the top centre; the container itself ignores touches.
-    commands
-        .spawn((
-            TouchHud,
-            Node {
-                position_type: PositionType::Absolute,
-                top: px(6),
-                left: px(0),
-                right: px(0),
+                width: percent(100),
+                height: percent(100),
                 justify_content: JustifyContent::Center,
-                column_gap: px(8),
+                align_items: AlignItems::Center,
                 display: Display::None,
                 ..default()
             },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.55)),
+            GlobalZIndex(56),
         ))
-        .with_children(|p| {
-            for (t, k) in [
-                ("J", TouchButton::Act(Action::QuestLog)),
-                ("N", TouchButton::Act(Action::Map)),
-                ("B", TouchButton::Act(Action::Trophies)),
-                ("R", TouchButton::Act(Action::Career)),
-                ("M", TouchButton::Act(Action::Mute)),
-                ("Esc", TouchButton::Key(KeyCode::Escape)),
-            ] {
-                p.spawn(button(t, k, 52.0, 40.0));
-            }
+        .with_children(|scrim| {
+            scrim
+                .spawn((
+                    // A button without behaviour, so taps on the card's padding do not dismiss.
+                    Button,
+                    Node {
+                        width: px(4.0 * 112.0 + 3.0 * 8.0 + 36.0),
+                        padding: UiRect::all(px(14)),
+                        flex_direction: FlexDirection::Row,
+                        flex_wrap: FlexWrap::Wrap,
+                        column_gap: px(8),
+                        row_gap: px(8),
+                        border: UiRect::all(px(2)),
+                        border_radius: BorderRadius::all(px(12)),
+                        ..default()
+                    },
+                    BorderColor::all(PANEL_EDGE),
+                    panel_bg(),
+                ))
+                .with_children(|card| {
+                    for (t, k) in [
+                        ("Quests", TouchButton::Act(Action::QuestLog)),
+                        ("Map", TouchButton::Act(Action::Map)),
+                        ("Trophies", TouchButton::Act(Action::Trophies)),
+                        ("Career", TouchButton::Act(Action::Career)),
+                        ("Gear", TouchButton::Act(Action::CharacterSheet)),
+                        ("Pets", TouchButton::Act(Action::Pets)),
+                        ("Sound", TouchButton::Act(Action::Mute)),
+                        ("Pause", TouchButton::Key(KeyCode::Escape)),
+                    ] {
+                        card.spawn((MenuItem, button(t, k, 112.0, 58.0)));
+                    }
+                });
         });
 }
 
@@ -409,6 +536,17 @@ fn apply_mode(
         } else {
             Display::Flex
         };
+    }
+}
+
+fn show_menu(mode: Res<TouchMode>, ui: Res<TouchUi>, mut root: Single<&mut Node, With<MenuRoot>>) {
+    let want = if mode.active && ui.menu {
+        Display::Flex
+    } else {
+        Display::None
+    };
+    if root.display != want {
+        root.display = want;
     }
 }
 
@@ -447,4 +585,46 @@ fn draw_stick(
     } else {
         thumb.display = Display::None;
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn gap(a: Vec2, b: Vec2, ra: f32, rb: f32) -> f32 {
+        a.distance(b) - ra - rb
+    }
+
+    #[test]
+    fn thumb_cluster_buttons_do_not_touch() {
+        let half = BTN / 2.0;
+        let arc: Vec<Vec2> = [180.0, 150.0, 120.0, 90.0].map(arc).to_vec();
+        for (i, a) in arc.iter().enumerate() {
+            let primary = PRIMARY_SCALE * BTN / 2.0;
+            assert!(
+                gap(*a, PRIMARY, half, primary) > 0.0,
+                "arc {i} hits primary"
+            );
+            for b in &arc[i + 1..] {
+                assert!(gap(*a, *b, half, half) > 0.0, "arc buttons overlap");
+            }
+            assert!(
+                a.x - half >= 0.0 && a.y - half >= 0.0,
+                "arc leaves the screen"
+            );
+        }
+    }
+
+    #[test]
+    fn tray_clears_the_arc_and_the_action_bar() {
+        let half = BTN / 2.0;
+        for i in 0..2 {
+            for deg in [180.0, 150.0, 120.0, 90.0] {
+                assert!(gap(tray(i), arc(deg), half, half) > 0.0);
+            }
+        }
+    }
+
+    // Bar top is 20 + 62 + 16 + 4 above the bottom edge; checked at compile time.
+    const _: () = assert!(TRAY_BOTTOM > 102.0);
 }

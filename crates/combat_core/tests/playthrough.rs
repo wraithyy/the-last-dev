@@ -865,11 +865,16 @@ impl Bot {
 
 /// Several seeds so the verdict does not hinge on one lucky crit/miss/loot stream. Every zone
 /// with packs, at its max level; zones without a boss only need to be survived.
+/// Zones with nothing to fight (the Body Leasing office) have no run to play.
+fn has_combat(z: &combat_core::ZoneDef) -> bool {
+    !z.packs.is_empty() || z.boss.is_some()
+}
+
 #[test]
 fn every_zone_is_cleared_at_its_max_level() {
     let mut failures = Vec::new();
     let mut lowest: Vec<(String, u32)> = Vec::new();
-    for z in content().zones {
+    for z in content().zones.into_iter().filter(has_combat) {
         let mut low = 100;
         for seed in [7, 42, 1234] {
             let max = z.level_range.1;
@@ -949,7 +954,10 @@ fn clear_zones(class: &'static str, zones: &[&str]) -> (Vec<String>, Vec<(String
 #[test]
 fn other_classes_clear_every_zone() {
     let zones: Vec<String> = std::env::var("WOW_CLASS_ZONES").map_or_else(
-        |_| content().zones.into_iter().map(|z| z.id).collect(),
+        |_| {
+            let all = content().zones;
+            all.into_iter().filter(has_combat).map(|z| z.id).collect()
+        },
         |v| v.split(',').map(String::from).collect(),
     );
     let zones: Vec<&str> = zones.iter().map(String::as_str).collect();
@@ -1300,7 +1308,13 @@ fn every_class_clears_the_campaign_equipping_drops() {
             let (lines, me, done) = campaign(class, seed);
             println!("{class} seed {seed}: {lines:?}, {done} quests closed");
             // One pass, no farming or backtracking: most quests still close on the way.
-            let total = content().quests.len();
+            // Quests of zones without a fight cannot close on a combat run.
+            let c = content();
+            let total = c
+                .quests
+                .iter()
+                .filter(|q| c.zone(&q.giver.zone).is_some_and(has_combat))
+                .count();
             assert!(
                 done * 5 >= total * 3,
                 "{class} seed {seed}: only {done}/{total} quests closed on the way"

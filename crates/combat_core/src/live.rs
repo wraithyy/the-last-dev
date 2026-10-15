@@ -377,6 +377,7 @@ impl Sim {
         if !self.now.is_multiple_of(ticks(1000)) {
             return;
         }
+        self.quest_waits();
         self.tasks_second();
         if self.live.clock.is_none() {
             return;

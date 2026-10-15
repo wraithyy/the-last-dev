@@ -349,6 +349,15 @@ pub enum Sign {
     ToLab2,
     ToLab1,
     LabRules,
+    // client office (Body Leasing)
+    ClientName,
+    BadgePending,
+    ClientQuiet,
+    ClientRoom,
+    ClientPrinter,
+    ClientHotDesk,
+    ClientStatus,
+    ClientTimesheet,
 }
 
 #[derive(Clone, Debug)]
@@ -950,6 +959,7 @@ impl Plan {
 pub fn sign_canvas(sign: Sign) -> (u32, u32) {
     match sign {
         Sign::WhiteboardA | Sign::WhiteboardB | Sign::WhiteboardC => (192, 128),
+        Sign::ClientName => (256, 96),
         Sign::Billboard | Sign::InnovationNeon => (256, 96),
         _ => (192, 96),
     }

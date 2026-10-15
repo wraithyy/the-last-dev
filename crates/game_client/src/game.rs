@@ -165,6 +165,10 @@ pub fn lock_reason(content: &Content, requires: Option<&Unlock>) -> String {
             "Requires: close the ticket \"{}\"",
             content.quest(q).map_or(q.as_str(), |d| d.name.as_str())
         ),
+        Some(Unlock::QuestStarted(q)) => format!(
+            "Requires: accept the ticket \"{}\"",
+            content.quest(q).map_or(q.as_str(), |d| d.name.as_str())
+        ),
         None => "The badge reader is thinking.".into(),
     }
 }
@@ -468,6 +472,8 @@ fn unlock_subtitle(id: &str) -> &'static str {
         "lab/1" => {
             "With the CEO gone, the AGI Prototype is in charge. It is behind the Innovation Lab."
         }
+        "client/1" => "Your vendor has allocated you. The client has not been told.",
+        "campus" => "The door that said 'Badge pending' has nothing more to add.",
         _ => "Access granted. The access system is as surprised as you are.",
     }
 }
@@ -597,8 +603,9 @@ fn zone_events(
                     flow.victory_in = Some(VICTORY_DELAY_SECS);
                 }
             }
-            // Tower floors announce their elevator with the floor clear.
-            Event::Unlocked { zone } if !zone.starts_with("tower/") => {
+            // Tower floors announce their elevator with the floor clear; the way back to campus
+            // (the client office exit) is not news.
+            Event::Unlocked { zone } if !zone.starts_with("tower/") && zone != "campus" => {
                 banners.write(Banner {
                     title: format!("New zone unlocked: {}", building_name(content, zone)),
                     subtitle: unlock_subtitle(zone).into(),

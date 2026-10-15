@@ -328,6 +328,10 @@ impl Sim {
                 .quest_logs
                 .values()
                 .any(|l| l.completed.iter().any(|c| c == q)),
+            Unlock::QuestStarted(q) => self
+                .quest_logs
+                .values()
+                .any(|l| l.completed.iter().any(|c| c == q) || l.active.iter().any(|a| a.id == *q)),
         }
     }
 

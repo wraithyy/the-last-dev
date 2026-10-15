@@ -5,6 +5,7 @@
 //! cast side by side on a bare stage instead.
 
 mod campus;
+mod client;
 mod datacenter;
 #[cfg(test)]
 mod export;

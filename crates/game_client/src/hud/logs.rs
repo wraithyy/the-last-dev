@@ -11,7 +11,7 @@ use crate::config::CAM_ZOOM_PIXELS_PER_LINE;
 use crate::input::{Paused, TextFocus};
 use crate::keybinds::Action;
 use crate::net::{load_hud, save_hud};
-use crate::touch::TouchMode;
+use crate::touch::{self, TouchMode, TouchUi};
 use bevy::input::InputSystems;
 use bevy::input::mouse::{AccumulatedMouseScroll, MouseScrollUnit};
 use bevy::prelude::*;
@@ -41,10 +41,9 @@ const DOCK_BOTTOM: f32 = 17.0;
 const COMBAT_BOTTOM: f32 = 38.0;
 const COMBAT_H: f32 = 20.0 + 2.0 * PAD_Y + COMBAT_ROWS as f32 * COMBAT_ROW_H + 2.0;
 const METER_GAP: f32 = 8.0;
-/// Touch layout: the panel floats above the tap strip, between the stick and the button cluster.
-const TOUCH_STRIP_BOTTOM: f32 = 100.0;
-const TOUCH_STRIP_H: f32 = 24.0;
-const TOUCH_PANEL_BOTTOM: f32 = TOUCH_STRIP_BOTTOM + TOUCH_STRIP_H + 4.0;
+/// Touch layout: the open panel floats above the action bar and the player cast bar, between the
+/// stick and the button cluster; the toggle that cycles it sits beside the menu button.
+const TOUCH_PANEL_BOTTOM: f32 = 156.0;
 
 /// Idle seconds before the chat starts to fade, and the seconds the fade takes.
 const FADE_DELAY: f32 = 6.0;
@@ -198,13 +197,6 @@ impl LogBuf {
     pub fn back(&self) -> usize {
         self.back
     }
-
-    /// Newest row as plain text, for the collapsed touch strip.
-    pub fn last_line(&self) -> Option<String> {
-        self.rows
-            .back()
-            .map(|r| format!("{}{}", r.head, r.body.trim_start()))
-    }
 }
 
 /// Greedy word wrap into rows of at most `cols` characters. The first row also carries `head`;
@@ -350,12 +342,22 @@ impl HudWindows {
 struct TouchPanel(Option<Win>);
 
 impl TouchPanel {
-    /// Tap cycle: collapsed, chat, combat log, collapsed.
+    /// Tap cycle: collapsed, chat, combat log, meter, collapsed.
     fn next(self) -> Option<Win> {
         match self.0 {
             None => Some(Win::Chat),
             Some(Win::Chat) => Some(Win::Combat),
-            Some(_) => None,
+            Some(Win::Combat) => Some(Win::Meter),
+            Some(Win::Meter) => None,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self.0 {
+            None => "Log",
+            Some(Win::Chat) => "Chat",
+            Some(Win::Combat) => "Fight",
+            Some(Win::Meter) => "DPS",
         }
     }
 }
@@ -614,27 +616,20 @@ fn spawn_strip(commands: &mut Commands) {
         Button,
         Node {
             position_type: PositionType::Absolute,
-            left: percent(50),
-            margin: UiRect::left(px(-CHAT_W / 2.0)),
-            bottom: px(TOUCH_STRIP_BOTTOM),
-            width: px(CHAT_W),
-            height: px(TOUCH_STRIP_H),
-            padding: UiRect::horizontal(px(8)),
+            right: px(touch::LOG_RIGHT),
+            top: px(touch::LOG_TOP),
+            width: px(touch::LOG_SIZE),
+            height: px(touch::LOG_SIZE),
+            justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
-            overflow: Overflow::clip(),
-            border: UiRect::all(px(1)),
-            border_radius: BorderRadius::all(px(6)),
+            border: UiRect::all(px(2)),
+            border_radius: BorderRadius::all(px(12)),
             display: Display::None,
             ..default()
         },
         BorderColor::all(KEY_RIM),
-        BackgroundColor(Color::srgba(0.03, 0.04, 0.06, 0.8)),
-        children![(
-            TouchStripText,
-            label("", 12.0),
-            TextLayout::no_wrap(),
-            TextColor(CHAT_WHITE)
-        )],
+        BackgroundColor(KEY_TOP),
+        children![(TouchStripText, label("Log", 16.0), TextColor(CHAT_WHITE))],
     ));
 }
 
@@ -673,9 +668,15 @@ fn press_toggles(
 fn press_strip(
     taps: Query<&Interaction, (With<TouchStrip>, Changed<Interaction>)>,
     mut panel: ResMut<TouchPanel>,
+    mut ui: ResMut<TouchUi>,
 ) {
     if taps.iter().any(|i| *i == Interaction::Pressed) {
-        panel.0 = panel.next();
+        // The tray shares the panel's spot, so the first tap only clears the tray.
+        if ui.more {
+            ui.more = false;
+        } else {
+            panel.0 = panel.next();
+        }
     }
 }
 
@@ -759,6 +760,7 @@ fn apply_visibility(
     windows: Res<HudWindows>,
     touch: Res<TouchMode>,
     panel: Res<TouchPanel>,
+    ui: Res<TouchUi>,
     mut roots: Query<(&Win, &mut Node), (Without<DockRoot>, Without<TouchStrip>)>,
     mut dock: Single<&mut Node, (With<DockRoot>, Without<Win>, Without<TouchStrip>)>,
     mut strip: Single<&mut Node, (With<TouchStrip>, Without<Win>, Without<DockRoot>)>,
@@ -767,7 +769,7 @@ fn apply_visibility(
     let show = |on: bool| if on { Display::Flex } else { Display::None };
     for (win, mut node) in &mut roots {
         let on = if touch.active {
-            panel.0 == Some(*win)
+            panel.0 == Some(*win) && !ui.more
         } else {
             windows.is_open(*win)
         };
@@ -810,6 +812,7 @@ fn refresh(
         Option<&mut BorderColor>,
     )>,
     touch: Res<TouchMode>,
+    panel: Res<TouchPanel>,
     mut strip: Single<&mut Text, (With<TouchStripText>, Without<LogRow>)>,
 ) {
     let hovered = bodies
@@ -863,12 +866,7 @@ fn refresh(
         }
     }
     if touch.active {
-        let line = chat
-            .0
-            .last_line()
-            .or_else(|| combat.0.last_line())
-            .unwrap_or_default();
-        super::set_text(&mut strip, &line);
+        super::set_text(&mut strip, panel.label());
     }
 }
 

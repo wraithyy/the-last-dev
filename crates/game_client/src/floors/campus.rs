@@ -45,6 +45,10 @@ const ONBOARDING: [(&str, (f32, f32)); 3] = [
 
 pub(super) const TOWER: (Vec2, Vec3) = (Vec2::new(0.0, -36.0), Vec3::new(36.0, 26.0, 22.0));
 const DATA_CENTER: (Vec2, Vec3) = (Vec2::new(54.0, -8.0), Vec3::new(24.0, 11.0, 30.0));
+/// The client annex of the Body Leasing easter egg: a small grey block east of the plaza.
+const ANNEX: (Vec2, Vec3) = (Vec2::new(32.0, -12.0), Vec3::new(12.0, 6.0, 6.0));
+/// The vendor's account manager waits between the plaza and the annex.
+const ACCOUNT_MANAGER: (f32, f32) = (25.0, -5.5);
 pub(super) const LAB: (Vec2, Vec3) = (Vec2::new(-50.0, -36.0), Vec3::new(26.0, 9.0, 22.0));
 
 fn theme() -> Theme {
@@ -86,10 +90,15 @@ pub fn build() -> FloorLayout {
             "door:lab/1",
             facade_door(&mut p, LAB, Face::PosZ, Sign::InnovationNeon),
         ),
+        (
+            "door:client/1",
+            facade_door(&mut p, ANNEX, Face::PosZ, Sign::ClientName),
+        ),
     ];
     tower_shell(&mut p);
     data_center_shell(&mut p);
     lab_shell(&mut p);
+    annex_shell(&mut p);
     parking_lot(&mut p);
     pavilion(&mut p);
     smoking_corner(&mut p);
@@ -137,6 +146,8 @@ pub fn build() -> FloorLayout {
         };
         p.anchor(name, at, yaw_towards(at, target));
     }
+    let am = v(ACCOUNT_MANAGER.0, 0.0, ACCOUNT_MANAGER.1);
+    p.anchor("npc_am", am, yaw_towards(am, doors[3].1.0));
     for (name, (x, z)) in ONBOARDING {
         let at = v(x, 0.0, z);
         p.anchor(name, at, yaw_towards(at, spawn));
@@ -387,6 +398,27 @@ fn lab_shell(p: &mut Plan) {
         6.0,
         Sign::InnovationHere,
     );
+}
+
+/// A beige-grey block with a flat roof and a strip of tinted windows: it looks like it was
+/// leased, not built.
+fn annex_shell(p: &mut Plan) {
+    building(p, ANNEX, Mat::Concrete);
+    let (c, s) = ANNEX;
+    p.boxed(
+        v(c.x, s.y + 0.15, c.y),
+        v(s.x + 0.4, 0.3, s.z + 0.4),
+        Mat::Trim,
+        false,
+    );
+    for sz in [-1.0, 1.0] {
+        p.boxed(
+            v(c.x, 3.4, c.y + sz * (s.z / 2.0 + 0.05)),
+            v(s.x - 2.0, 1.2, 0.1),
+            Mat::Facade,
+            false,
+        );
+    }
 }
 
 fn parking_lot(p: &mut Plan) {

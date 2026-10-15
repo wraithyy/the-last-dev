@@ -4270,6 +4270,115 @@
                 ],
             ),
         ),
+        // ---- Body Leasing easter egg: friendly units of the vendor and the client ----
+        (
+            key: "bl_account_manager", name: "Account Manager", title: "Your Utilisation Is Our Margin", level: 1, hostile: false,
+            max_hp: 100, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "You are allocated to a strategic client. Congratulations. It is not optional.",
+                    "Utilisation is a team sport. You are the team.",
+                    "Your rate went up. Your salary is a separate conversation.",
+                ],
+                ambient_ms: 40000,
+                ambient: [
+                    "Bench time is a state of mind. Billable.",
+                    "Margin is the only thing here that grows.",
+                ],
+            ),
+        ),
+        (
+            key: "client_receptionist", name: "Receptionist", title: "Visitor Badges Pending", level: 1, hostile: false,
+            max_hp: 100, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Who are you?",
+                    "You are not on the list. Sit anywhere. Not that desk.",
+                    "Your badge is being printed. The printer is from 2009.",
+                    "Timesheets go through me. Description: analysis. Do not elaborate.",
+                ],
+                ambient_ms: 40000,
+                ambient: [
+                    "Visitors sign in, then wait.",
+                    "Please do not touch the plant. It is under review.",
+                ],
+            ),
+        ),
+        (
+            key: "client_clerk_a", name: "Analyst", title: "Not Your Manager", level: 1, hostile: false,
+            max_hp: 100, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Who are you?",
+                    "I am not allowed to say what I do here. I am also not sure.",
+                ],
+                ambient_ms: 40000,
+                ambient: [
+                    "Mm.",
+                    "Is it Thursday?",
+                ],
+            ),
+        ),
+        (
+            key: "client_clerk_b", name: "Team Lead", title: "Hot-Desking Since 2019", level: 1, hostile: false,
+            max_hp: 100, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Are you the new external?",
+                    "Last one stayed three years. Nobody noticed when he left. Nobody noticed when he started.",
+                ],
+                ambient_ms: 40000,
+                ambient: [
+                    "This desk is free. So is that one. They are all free.",
+                    "I booked a desk. It was this desk. It is still this desk.",
+                ],
+            ),
+        ),
+        (
+            key: "client_clerk_c", name: "Process Owner", title: "Please Raise a Ticket", level: 1, hostile: false,
+            max_hp: 100, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Ask your vendor.",
+                    "That is not in my scope. Ask your vendor. They know. Probably.",
+                    "The process says I may not answer that. The process is me.",
+                ],
+                ambient_ms: 40000,
+                ambient: [
+                    "Please raise a ticket.",
+                    "I own the process. I do not run it. Nobody runs it.",
+                ],
+            ),
+        ),
+        (
+            key: "client_delivery_lead", name: "Delivery Lead", title: "Camera Off", level: 1, hostile: false,
+            max_hp: 100, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "...let us park that. Any questions? No? Great.",
+                    "Someone is on mute. ...No? Okay, moving on.",
+                    "We are aligned. On what is for the next meeting.",
+                ],
+                ambient_ms: 40000,
+                ambient: [
+                    "Can everyone see my screen? ...No? Fine.",
+                    "You are on mute.",
+                    "Let us take this offline. All of it.",
+                ],
+            ),
+        ),
         // ---- World: hidden NPCs (world.rs secrets; no ambient lines so they stay hidden) ----
         (
             key: "last_human_qa", name: "Last Human QA", title: "Manually Tested Everything", level: 5, hostile: false,
@@ -4955,11 +5064,14 @@
                 (anchor: "npc_hr", unit: "hr_onboarding_bot"),
                 (anchor: "npc_dummy", unit: "training_dummy"),
                 (anchor: "npc_colleague", unit: "burnt_out_colleague"),
+                // Body Leasing easter egg: the vendor's account manager between the plaza and the annex.
+                (anchor: "npc_am", unit: "bl_account_manager"),
             ],
             links: [
                 (anchor: "door:tower/1", to: "tower/1"),
                 (anchor: "door:datacenter/1", to: "datacenter/1", requires: Some(ZoneCleared("tower/3"))),
                 (anchor: "door:lab/1", to: "lab/1", requires: Some(BossKilled("ceo"))),
+                (anchor: "door:client/1", to: "client/1", requires: Some(QuestStarted("bl_allocation"))),
             ],
         ),
         (
@@ -5108,6 +5220,22 @@
             links: [
                 (anchor: "door:lab/1", to: "lab/1"),
                 (anchor: "door:campus", to: "campus"),
+            ],
+        ),
+        // Body Leasing easter egg: no enemies on purpose. The exit door stays on "Badge pending"
+        // until the timesheet is approved.
+        (
+            id: "client/1", name: "Very Large Insurance & Banking Group", kind: Indoor, level_range: (1, 1),
+            packs: [],
+            friendly: [
+                (anchor: "npc_1", unit: "client_receptionist"),
+                (anchor: "npc_2", unit: "client_delivery_lead"),
+                (anchor: "npc_3", unit: "client_clerk_a"),
+                (anchor: "npc_4", unit: "client_clerk_b"),
+                (anchor: "npc_5", unit: "client_clerk_c"),
+            ],
+            links: [
+                (anchor: "door:campus", to: "campus", requires: Some(QuestDone("bl_timesheet"))),
             ],
         ),
     ],
@@ -5631,6 +5759,47 @@
             done_text: "Certificate issued! You are now compliant. The AI has updated your profile to 'onboarded', your laptop to 'pending' and your manager to 'unknown'. The intern will show you the rest. He has been here two days. He is senior now.",
             objectives: [Kill("training_dummy", 1)],
             reward: (xp: 30),
+        ),
+        // ---- Body Leasing easter egg: nothing happens, and it is billable ----
+        (
+            id: "bl_allocation", name: "Allocated to a Strategic Client",
+            giver: (npc: "bl_account_manager", zone: "campus"),
+            turn_in: Some((npc: "client_receptionist", zone: "client/1")),
+            text: "Good news: you are allocated to a strategic client. Very Large Insurance & Banking Group. Nine months, extendable, which is the polite word. Utilisation is our margin, so please be utilised. Their annex is the grey block east of the plaza. Reception has been told. Probably.",
+            progress_text: "The grey annex east of the plaza: Very Large Insurance & Banking Group. Ask at reception.",
+            done_text: "Who are you? ... You are not on the list. Sit anywhere. Not that desk. Your access rights are not ready yet.",
+            objectives: [Talk("client_receptionist")],
+            reward: (xp: 20),
+        ),
+        (
+            id: "bl_access_rights", name: "Wait for Access Rights",
+            giver: (npc: "client_receptionist", zone: "client/1"),
+            requires: Some("bl_allocation"),
+            text: "Access rights go through three teams. Two are on leave, and the third is the team that went on leave. A ticket has been raised. The ticket is waiting for access to raise itself. Please wait here.",
+            progress_text: "Access rights: pending. The bar is moving. Technically.",
+            done_text: "Your access rights arrived. They are for a system that was decommissioned in March. Congratulations. This is progress.",
+            objectives: [Wait(zone: "client/1", label: "Access rights", secs: 75)],
+            reward: (xp: 20),
+        ),
+        (
+            id: "bl_meeting", name: "Attend the Status Meeting",
+            giver: (npc: "client_receptionist", zone: "client/1"),
+            requires: Some("bl_access_rights"),
+            text: "There is a status meeting in the room at the back. You were invited by mistake, which counts. Join the call. Keep your microphone muted. That is the dress code.",
+            progress_text: "The meeting room at the back: join the Delivery Lead, stay muted, then report to reception. Her camera is off.",
+            done_text: "The minutes arrived. You are listed as 'Ext.' and, below that, as 'muted'. Nobody called on you. That counts as attending.",
+            objectives: [Talk("client_delivery_lead")],
+            reward: (xp: 20),
+        ),
+        (
+            id: "bl_timesheet", name: "Fill In the Timesheet",
+            giver: (npc: "client_receptionist", zone: "client/1"),
+            requires: Some("bl_meeting"),
+            text: "Timesheets are due. Hours: eight. Description: 'analysis'. The client has never asked what was analysed, and we have never offered. Submit it and wait for approval.",
+            progress_text: "Timesheet submitted: 8h, analysis. The approver is on leave. The bar will move.",
+            done_text: "Approved: 8h, analysis. Nobody opened it. The invoice is out. The door that said 'Badge pending' now says nothing. You may go home.",
+            objectives: [Wait(zone: "client/1", label: "Timesheet approval", secs: 20)],
+            reward: (xp: 60),
         ),
     ],
     // ---- Economy: gear, Story Points, vendors (combat_core economy.rs, docs/FORMULAS.md Gear) ----
@@ -7271,6 +7440,11 @@
              text: "Woke the COBOL contractor. Payroll thanks you.",
              hint: "The PMO runs on something older than the PMO.",
              trigger: Talk("cobol_contractor"), sp: 25),
+            // Granted when the Body Leasing timesheet is closed (`quest:<id>` events, quests.rs).
+            (key: "billable", name: "Billable", title: "External Resource",
+             text: "Nothing happened. You billed it anyway.",
+             hint: "Some account managers allocate you somewhere. Bill every hour.",
+             trigger: Event("quest:bl_timesheet"), sp: 20),
             (key: "survived_reorg", name: "Survived Another Reorg", title: "Survived Another Reorg",
              text: "Eight secret achievements. You have outlasted three org charts.",
              hint: "Collect enough secrets and you outlast anything.",
