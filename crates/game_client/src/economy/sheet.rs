@@ -98,7 +98,17 @@ fn spawn_window(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
             })
             .with_children(|h| {
                 h.spawn((HeaderText, label("~/whoami", 14.0), TextColor(DIM)));
-                h.spawn((crate::social::PetsButton, Button, label("[~/pets]", 14.0)));
+                // Fixed width: a long header line used to squeeze this button onto two lines.
+                h.spawn((
+                    crate::social::PetsButton,
+                    Button,
+                    Node {
+                        flex_shrink: 0.0,
+                        margin: UiRect::horizontal(px(8)),
+                        ..default()
+                    },
+                    children![label("[~/pets Z]", 14.0)],
+                ));
                 h.spawn((SheetClose, Button, label("[x]", 14.0)));
             });
             c.spawn(Node {

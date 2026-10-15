@@ -318,6 +318,7 @@ fn key_code(name: &str) -> Option<KeyCode> {
                     'T' => KeyCode::KeyT,
                     'V' => KeyCode::KeyV,
                     'W' => KeyCode::KeyW,
+                    'Z' => KeyCode::KeyZ,
                     _ => return None,
                 }
             }

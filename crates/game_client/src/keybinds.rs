@@ -42,6 +42,8 @@ pub enum Action {
     CharacterSheet,
     /// `~/career`: the Career Ladder talent window.
     Career,
+    /// `~/pets`: the pet journal.
+    Pets,
     /// Gadget bar slot 0..3: equipped on-use items.
     Gadget(u8),
     Chat,
@@ -106,6 +108,7 @@ impl Action {
             Trophies,
             CharacterSheet,
             Career,
+            Pets,
             Chat,
             CombatLog,
             Meter,
@@ -146,6 +149,7 @@ impl Action {
             Trophies => "trophies".into(),
             CharacterSheet => "character_sheet".into(),
             Career => "career".into(),
+            Pets => "pets".into(),
             Gadget(i) => format!("gadget{i}"),
             Chat => "chat".into(),
             CombatLog => "combat_log".into(),
@@ -183,6 +187,7 @@ impl Action {
             Trophies => "trophies".into(),
             CharacterSheet => "~/whoami gear and bag".into(),
             Career => "~/career talents".into(),
+            Pets => "~/pets journal".into(),
             Gadget(i) => format!("gadget {} (on-use gear)", i + 1),
             Chat => "chat window".into(),
             CombatLog => "combat log".into(),
@@ -203,8 +208,8 @@ impl Action {
             AutoAttack | Coffee | Resurrect | Interact | Gadget(_) => Group::Combat,
             Slot(_) => Group::Bar,
             NumSlot(_) => Group::Numpad,
-            QuestLog | Map | Trophies | CharacterSheet | Career | Chat | CombatLog | Meter
-            | Emotes | Mute | MinimapZoomIn | MinimapZoomOut => Group::Windows,
+            QuestLog | Map | Trophies | CharacterSheet | Career | Pets | Chat | CombatLog
+            | Meter | Emotes | Mute | MinimapZoomIn | MinimapZoomOut => Group::Windows,
         }
     }
 
@@ -240,6 +245,8 @@ impl Action {
             CharacterSheet => KeyCode::KeyI,
             // R for Review: the performance review that decides promotions.
             Career => KeyCode::KeyR,
+            // Z for zoo: P is already the third gadget.
+            Pets => KeyCode::KeyZ,
             Gadget(i) => [KeyCode::KeyU, KeyCode::KeyO, KeyCode::KeyP][usize::from(i).min(2)],
             Chat => KeyCode::KeyH,
             CombatLog => KeyCode::KeyL,
@@ -470,8 +477,11 @@ mod tests {
     #[test]
     fn rebind_to_free_key() {
         let mut b = Keybinds::default();
-        assert_eq!(b.rebind(Action::AutoAttack, KeyCode::KeyZ), Rebind::Done);
-        assert_eq!(b.key(Action::AutoAttack), KeyCode::KeyZ);
+        assert_eq!(
+            b.rebind(Action::AutoAttack, KeyCode::NumpadDecimal),
+            Rebind::Done
+        );
+        assert_eq!(b.key(Action::AutoAttack), KeyCode::NumpadDecimal);
         assert_eq!(b.owner_of(KeyCode::KeyT), None);
     }
 
@@ -499,7 +509,7 @@ mod tests {
     #[test]
     fn round_trips_and_resets() {
         let mut b = Keybinds::default();
-        b.rebind(Action::Map, KeyCode::KeyZ);
+        b.rebind(Action::Map, KeyCode::NumpadDecimal);
         b.rebind(Action::Slot(0), KeyCode::KeyY);
         assert_eq!(Keybinds::parse(&b.serialize()), b);
         b.reset();
@@ -508,12 +518,12 @@ mod tests {
 
     #[test]
     fn parse_tolerates_garbage_and_rejects_duplicates() {
-        let b = Keybinds::parse("nonsense\nmap=KeyZ\nunknown=KeyQ\njump=NoSuchKey\n");
-        assert_eq!(b.key(Action::Map), KeyCode::KeyZ);
+        let b = Keybinds::parse("nonsense\nmap=NumpadDecimal\nunknown=KeyQ\njump=NoSuchKey\n");
+        assert_eq!(b.key(Action::Map), KeyCode::NumpadDecimal);
         assert_eq!(b.key(Action::Jump), KeyCode::Space);
         // map and quest_log on one key: the whole file is distrusted.
         assert_eq!(
-            Keybinds::parse("map=KeyZ\nquest_log=KeyZ\n"),
+            Keybinds::parse("map=NumpadDecimal\nquest_log=NumpadDecimal\n"),
             Keybinds::default()
         );
     }

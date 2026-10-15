@@ -433,7 +433,7 @@ fn update_key_hint(binds: Res<Keybinds>, mut text: Single<&mut Text, With<KeyHin
     }
     let k = |a| binds.label(a);
     let line = format!(
-        "{}{}{}{} move | RMB steer | LMB orbit | Wheel zoom | {} jump | {} target | {} auto | {}-{} cast | {} / right-click talk, loot | {} jira | {} map | {} gear | {} trophies | {} career | {} metrics | {} chat | {} log | {} mute | Esc menu",
+        "{}{}{}{} move | RMB steer | LMB orbit | Wheel zoom | {} jump | {} target | {} auto | {}-{} cast | {} / right-click talk, loot | {} jira | {} map | {} gear | {} trophies | {} career | {} pets | {} metrics | {} chat | {} log | {} mute | Esc menu",
         k(Action::Forward),
         k(Action::TurnLeft),
         k(Action::Backward),
@@ -449,6 +449,7 @@ fn update_key_hint(binds: Res<Keybinds>, mut text: Single<&mut Text, With<KeyHin
         k(Action::CharacterSheet),
         k(Action::Trophies),
         k(Action::Career),
+        k(Action::Pets),
         k(Action::Meter),
         k(Action::Chat),
         k(Action::CombatLog),

@@ -370,7 +370,8 @@ impl Default for AudioSettings {
     }
 }
 
-/// Test runs start silent: `WOW_MUTE=1` natively, `?mute=1` in the page URL on the web.
+/// Test runs start silent: `WOW_MUTE=1` natively, `?mute=1` in the page URL on the web. The web
+/// build also remembers the viewer's last choice (localStorage) and mirrors it into the URL.
 #[cfg(not(target_arch = "wasm32"))]
 fn start_muted() -> bool {
     std::env::var_os("WOW_MUTE").is_some()
@@ -378,10 +379,64 @@ fn start_muted() -> bool {
 
 #[cfg(target_arch = "wasm32")]
 fn start_muted() -> bool {
-    web_sys::window()
+    let query = web_sys::window()
         .and_then(|w| w.location().search().ok())
-        .is_some_and(|q| q.contains("mute=1"))
+        .unwrap_or_default();
+    let muted = if query.contains("mute=1") {
+        true
+    } else if query.contains("mute=0") {
+        false
+    } else {
+        web_sys::window()
+            .and_then(|w| w.local_storage().ok().flatten())
+            .and_then(|s| s.get_item(MUTE_KEY).ok().flatten())
+            .is_some_and(|v| v == "1")
+    };
+    remember_mute(muted);
+    muted
 }
+
+#[cfg(target_arch = "wasm32")]
+const MUTE_KEY: &str = "tld.muted";
+
+/// Persists the mute choice and keeps `?mute=1` in the address bar while muted, so a reload or
+/// a shared link starts the same way.
+#[cfg(target_arch = "wasm32")]
+fn remember_mute(muted: bool) {
+    let Some(w) = web_sys::window() else { return };
+    if let Ok(Some(s)) = w.local_storage() {
+        let _ = s.set_item(MUTE_KEY, if muted { "1" } else { "0" });
+    }
+    let loc = w.location();
+    let (Ok(path), Ok(search), Ok(hash)) = (loc.pathname(), loc.search(), loc.hash()) else {
+        return;
+    };
+    let mut params: Vec<&str> = search
+        .trim_start_matches('?')
+        .split('&')
+        .filter(|p| !p.is_empty() && !p.starts_with("mute="))
+        .collect();
+    if muted {
+        params.push("mute=1");
+    }
+    let query = if params.is_empty() {
+        String::new()
+    } else {
+        format!("?{}", params.join("&"))
+    };
+    if query != search
+        && let Ok(h) = w.history()
+    {
+        let _ = h.replace_state_with_url(
+            &wasm_bindgen::JsValue::NULL,
+            "",
+            Some(&format!("{path}{query}{hash}")),
+        );
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn remember_mute(_muted: bool) {}
 
 impl AudioSettings {
     /// The slider's own position, as shown in the pause panel.
@@ -548,6 +603,7 @@ fn toggle_mute(
 ) {
     if binds.just(&keys, crate::keybinds::Action::Mute) {
         settings.muted = !settings.muted;
+        remember_mute(settings.muted);
     }
 }
 
@@ -987,6 +1043,7 @@ fn audio_panel(
     }
     if mute.iter().any(|i| *i == Interaction::Pressed) {
         settings.muted = !settings.muted;
+        remember_mute(settings.muted);
     }
     for (kind, mut text) in &mut texts {
         match kind {

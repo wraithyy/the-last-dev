@@ -807,8 +807,12 @@ fn journal(
     mut root: Single<&mut Node, With<JournalRoot>>,
     list: Single<Entity, With<JournalList>>,
     mut pending: ResMut<PendingCommands>,
+    keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<crate::keybinds::Keybinds>,
+    paused: Res<crate::input::Paused>,
 ) {
-    if open_buttons.iter().any(|i| *i == Interaction::Pressed) {
+    let key = !paused.0 && binds.just(&keys, crate::keybinds::Action::Pets);
+    if key || open_buttons.iter().any(|i| *i == Interaction::Pressed) {
         state.open = !state.open;
     }
     if close.iter().any(|i| *i == Interaction::Pressed) {
