@@ -211,6 +211,10 @@ pub struct NetWorld {
     pub poses: Vec<(EntityId, net_proto::Emote)>,
     /// Legacy Mode as the server last announced it (`Event::Legacy`).
     legacy: combat_core::LegacyView,
+    /// The raid as the server last announced it (`Event::Raid`).
+    raid: combat_core::RaidView,
+    /// The room's Weekly Sprint ladder (`Event::Ladder`).
+    ladder: combat_core::LadderView,
     /// Zones cleared on Legacy floors: the server keeps them apart from the campaign's.
     legacy_cleared: BTreeSet<String>,
 }
@@ -249,6 +253,8 @@ impl NetWorld {
             item_cds: HashMap::new(),
             poses: Vec::new(),
             legacy: Default::default(),
+            raid: Default::default(),
+            ladder: Default::default(),
             legacy_cleared: BTreeSet::new(),
         };
         for p in players {
@@ -872,6 +878,8 @@ impl NetWorld {
                 self.cleared.insert(zone.clone());
             }
             Event::Legacy { view } => self.legacy = view.clone(),
+            Event::Raid { view } => self.raid = view.clone(),
+            Event::Ladder { view } => self.ladder = view.clone(),
             Event::Unlocked { zone } => {
                 self.unlocked.insert(zone.clone());
             }
@@ -1061,6 +1069,19 @@ impl NetWorld {
         }
     }
 
+    /// Like the server's `raid_link_open`: the door into the raid needs everyone at the cap.
+    fn raid_gate(&self, from: &str, to: &str) -> Option<bool> {
+        let r = &self.content.raid;
+        (r.is_raid_zone(to) && !r.is_raid_zone(from)).then(|| {
+            let cap = self.content.max_level();
+            !self.players.is_empty()
+                && self
+                    .players
+                    .iter()
+                    .all(|p| self.units.get(p).is_some_and(|u| u.level >= cap))
+        })
+    }
+
     fn remaining_ms(&self, end: u64) -> u32 {
         let ticks = end.saturating_sub(self.tick);
         u32::try_from(ticks * 1000 / u64::from(TICK_HZ)).unwrap_or(u32::MAX)
@@ -1209,10 +1230,11 @@ impl SimRead for NetWorld {
                 .map(|l| ZoneLinkView {
                     anchor: l.anchor.clone(),
                     to: l.to.clone(),
-                    unlocked: l
-                        .requires
-                        .as_ref()
-                        .is_none_or(|r| self.unlocked.contains(&l.to) || self.unlock_met(r)),
+                    unlocked: self.raid_gate(zone, &l.to).unwrap_or_else(|| {
+                        l.requires
+                            .as_ref()
+                            .is_none_or(|r| self.unlocked.contains(&l.to) || self.unlock_met(r))
+                    }),
                 })
                 .collect()
         })
@@ -1235,6 +1257,12 @@ impl SimRead for NetWorld {
     }
     fn now(&self) -> Tick {
         Tick(self.tick)
+    }
+    fn raid_view(&self) -> combat_core::RaidView {
+        self.raid.clone()
+    }
+    fn ladder_view(&self) -> combat_core::LadderView {
+        self.ladder.clone()
     }
     fn legacy_view(&self) -> combat_core::LegacyView {
         self.legacy.clone()

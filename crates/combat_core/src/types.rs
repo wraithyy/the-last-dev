@@ -208,6 +208,8 @@ pub enum Command {
         building: String,
         level: u8,
     },
+    /// Group lead: this ISO week's Weekly Sprint (building, level and affixes fixed by the week).
+    StartWeeklySprint,
     /// Daily Standup (`dailies.rs`): at the Scrum board, join today's dailies and the week's
     /// Sprint Goal.
     JoinStandup,
@@ -565,6 +567,11 @@ pub enum Event {
         unit: EntityId,
         text: String,
     },
+    /// The Weekly Sprint ladder of the room (offline: the local one); after a weekly delivery
+    /// and to a joiner.
+    Ladder {
+        view: crate::sprint::LadderView,
+    },
     /// `StartSprint` was refused (routed to the asker).
     SprintRefused {
         reason: crate::sprint::SprintError,
@@ -573,6 +580,11 @@ pub enum Event {
     /// every change, every zone load and to a joiner.
     Legacy {
         view: crate::legacy::LegacyView,
+    },
+    /// The raid: zone, difficulty, weekly lockout and tethers; on every change, every raid
+    /// zone load (and leaving the raid) and to a joiner.
+    Raid {
+        view: crate::raid::RaidView,
     },
     /// `SetLegacy` was refused (routed to the asker).
     LegacyRefused {

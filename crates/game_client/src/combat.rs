@@ -56,6 +56,10 @@ pub trait SimRead: Send + Sync {
     fn now(&self) -> Tick;
     /// Legacy Mode: the group's difficulty, the zone loaded in it and the weekly lockout.
     fn legacy_view(&self) -> combat_core::LegacyView;
+    /// The raid: zone, difficulty, weekly lockout and the tethers to draw.
+    fn raid_view(&self) -> combat_core::RaidView;
+    /// This week's Weekly Sprint ladder (the room's online, the local one offline).
+    fn ladder_view(&self) -> combat_core::LadderView;
 
     /// The action bar of `unit`'s class (keys 1..9, 0); the default bar for unknown units.
     fn bar_of(&self, unit: EntityId) -> &[SpellId] {
@@ -144,6 +148,12 @@ impl SimRead for Sim {
     }
     fn legacy_view(&self) -> combat_core::LegacyView {
         Sim::legacy_view(self)
+    }
+    fn raid_view(&self) -> combat_core::RaidView {
+        Sim::raid_view(self)
+    }
+    fn ladder_view(&self) -> combat_core::LadderView {
+        Sim::ladder_view(self)
     }
 }
 

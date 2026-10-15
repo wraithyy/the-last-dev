@@ -431,7 +431,13 @@ impl Group {
                 },
             );
         }
-        let _ = self.sim.tick();
+        let ev = self.sim.tick();
+        if std::env::var_os("WOW_RAID_LOG").is_some() {
+            let now = self.sim.now().0;
+            for e in &ev {
+                println!("{}", log_line(&self.sim, now, e));
+            }
+        }
         if self.in_boss {
             for k in 0..self.m.len() {
                 if let Some(u) = self.unit(self.m[k].id) {
@@ -1045,6 +1051,278 @@ fn three_players_clear_every_legacy_floor_and_one_does_not_trivially() {
                     s.secs, s.low, g.secs
                 ));
             }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+// ---- the raid: All-Hands Offsite ----
+
+const RAID: [&str; 4] = ["offsite/1", "offsite/2", "offsite/3", "offsite/4"];
+
+impl Group {
+    /// Every member in the best Legacy piece (ilvl 12) of each slot for its role.
+    fn gear_up_legacy(&mut self) {
+        let eco = self.sim.content().economy.clone();
+        for k in 0..self.m.len() {
+            let id = self.m[k].id;
+            let role = self.sim.class_of(id).map(|c| c.role);
+            for slot in combat_core::Slot::ALL {
+                let best = eco
+                    .gear
+                    .iter()
+                    .filter(|g| g.slot == slot && g.source == combat_core::GearSource::Legacy)
+                    .max_by_key(|g| eco.score(g, role));
+                if let Some(g) = best {
+                    self.sim.debug_equip(id, &g.name);
+                }
+            }
+        }
+    }
+
+    /// Raid play on top of `act`: a tethered member closes in on its partner first.
+    fn mind_tethers(&mut self) -> Vec<usize> {
+        let view = self.sim.raid_view();
+        let range = f32::from(view.tether_m.max(1)) - 2.0;
+        let mut busy = Vec::new();
+        for k in 0..self.m.len() {
+            let me = self.m[k].id;
+            let partner = view.tethers.iter().find_map(|&(a, b)| {
+                if a == me {
+                    Some(b)
+                } else if b == me {
+                    Some(a)
+                } else {
+                    None
+                }
+            });
+            let Some(at) = partner.and_then(|p| {
+                // Other members move in this tick too: aim at where they will be.
+                self.m
+                    .iter()
+                    .find(|m| m.id == p)
+                    .map(|m| m.pos)
+                    .or_else(|| self.unit(p).map(|u| u.pos))
+            }) else {
+                continue;
+            };
+            if self.alive(k) && combat_core::distance(at, self.m[k].pos) > range {
+                self.walk(k, at);
+                busy.push(k);
+            }
+        }
+        busy
+    }
+}
+
+struct RaidRun {
+    bosses: u32,
+    secs: u64,
+    low: u32,
+    deaths: u32,
+}
+
+/// Level-10 members (`keep` of tank, DPS, healer) in the best Legacy gear walk the four raid
+/// rooms in order on the difficulty `async_mode`, packs one by one, boss last; the dead are
+/// released and everyone rests between rooms. Stops at the first wipe.
+fn raid_run(keep: &[Role], async_mode: bool, seed: u64) -> RaidRun {
+    let mut g = Group::new(content(), "campus", 10, seed);
+    for k in (0..g.m.len()).rev() {
+        if !keep.contains(&g.m[k].role) {
+            let id = g.m[k].id;
+            assert!(g.sim.remove_player(id));
+            g.m.remove(k);
+        }
+    }
+    g.gear_up_legacy();
+    g.sim.debug_force_raid_async(Some(async_mode));
+    let start = g.sim.now().0;
+    let mut bosses = 0;
+    let mut low = 100;
+    g.in_boss = true;
+    for zone in RAID {
+        if let Err(e) = g.sim.load_zone(zone, &anchor, Vec::new()) {
+            panic!("load_zone {zone}: {e}");
+        }
+        assert_eq!(g.sim.raid_view().async_mode, async_mode);
+        for k in 0..g.m.len() {
+            if let Some(u) = g.unit(g.m[k].id) {
+                g.m[k].pos = u.pos;
+            }
+        }
+        g.rest();
+        g.boss_min_pct = 100;
+        let t0 = g.sim.now().0;
+        let (_, cleared, _) = g.raid_clear(zone);
+        low = low.min(g.boss_min_pct);
+        println!(
+            "  {zone}: cleared {cleared} in {} s, low {}%, most dead {}",
+            (g.sim.now().0 - t0) / 30,
+            g.boss_min_pct,
+            g.deaths
+        );
+        if !cleared {
+            break;
+        }
+        bosses += 1;
+        let dead: Vec<usize> = (0..g.m.len()).filter(|&k| !g.alive(k)).collect();
+        for k in dead {
+            let id = g.m[k].id;
+            g.sim.apply_as(id, Command::RespawnPlayer);
+        }
+        g.tick();
+    }
+    RaidRun {
+        bosses,
+        secs: (g.sim.now().0 - start) / 30,
+        low,
+        deaths: g.deaths,
+    }
+}
+
+impl Group {
+    fn raid_step(&mut self) {
+        let busy = self.mind_tethers();
+        let focus = self.raid_focus();
+        for k in 0..self.m.len() {
+            if busy.contains(&k) || !self.alive(k) {
+                continue;
+            }
+            if self.unit(self.m[k].id).is_some_and(|u| u.stunned) || self.dodge(k) {
+                continue;
+            }
+            let Some(t) = focus.clone() else { continue };
+            let (far, near) = match self.m[k].role {
+                Role::Tank => (4.0, 2.5),
+                _ => (26.0, 20.0),
+            };
+            let d = combat_core::distance(t.pos, self.m[k].pos);
+            if d > far {
+                let p = self.m[k].pos;
+                let f = (d - near) / d;
+                self.walk(
+                    k,
+                    Vec3::new(p.x + (t.pos.x - p.x) * f, 0.0, p.z + (t.pos.z - p.z) * f),
+                );
+                continue;
+            }
+            match self.m[k].role {
+                Role::Tank => self.tank(k, &t),
+                Role::Dps => self.dps(k, &t),
+                Role::Healer => self.heal(k, &t),
+            }
+        }
+        self.tick();
+    }
+
+    /// `focus`, except that a shielded Synergy Twin is never the target while its partner is
+    /// open (linked HP: hitting the open one is the whole fight).
+    fn raid_focus(&self) -> Option<UnitState> {
+        let f = self.focus()?;
+        if !f.auras.iter().any(|a| a.key == "synergy_shield") {
+            return Some(f);
+        }
+        self.enemies()
+            .into_iter()
+            .find(|u| u.boss && !u.auras.iter().any(|a| a.key == "synergy_shield"))
+            .or(Some(f))
+    }
+
+    fn raid_fight(&mut self) {
+        let start = self.sim.now().0;
+        while self.sim.now().0 - start < 120 || self.in_combat() {
+            if self.wiped || self.sim.now().0 > MAX_TICKS * 3 {
+                return;
+            }
+            self.raid_step();
+        }
+    }
+
+    fn raid_pull(&mut self, at: Vec3) {
+        self.front = at;
+        let solo = self.m.len() == 1;
+        for k in 0..self.m.len() {
+            let back = match self.m[k].role {
+                Role::Tank => 4.0,
+                _ if solo => 5.0,
+                _ => 22.0,
+            };
+            self.m[k].pos = Vec3::new(at.x + k as f32 * 1.5, 0.0, at.z + back);
+        }
+        self.tick();
+        self.raid_fight();
+    }
+
+    /// `clear` with the raid's step: packs, then the boss; cleared = the room's boss died.
+    fn raid_clear(&mut self, zone: &str) -> (u32, bool, u32) {
+        let packs = self.sim.content().zone(zone).map_or(0, |z| z.packs.len());
+        for n in 1..=packs {
+            if let Some((at, _)) = anchor(&format!("pack_{n}")) {
+                self.raid_pull(at);
+                if self.wiped {
+                    return (0, false, self.deaths);
+                }
+                self.rest();
+            }
+        }
+        if let Some((at, _)) = anchor("boss") {
+            self.raid_pull(at);
+        }
+        let boss = self
+            .sim
+            .content()
+            .zone(zone)
+            .and_then(|z| z.boss.as_ref())
+            .map(|b| b.unit.clone())
+            .unwrap_or_default();
+        let dead = self.sim.raid_locked(&boss, self.sim.raid_async());
+        (self.boss_min_pct, dead && !self.wiped, self.deaths)
+    }
+}
+
+/// The E3 balance gate (docs/FORMULAS.md, Raid): three level-10 bots in Legacy gear clear all
+/// four encounters on Normal; one bot clears Async Attendance; one bot on Normal either fails or
+/// only scrapes through (below 25% HP at some point).
+#[test]
+fn the_raid_takes_a_group_and_async_attendance_takes_one() {
+    let mut failures = Vec::new();
+    let trio = [Role::Tank, Role::Dps, Role::Healer];
+    for seed in [7u64, 42, 1234] {
+        let g = raid_run(&trio, false, seed);
+        let a = raid_run(&[Role::Dps], true, seed);
+        let s = raid_run(&[Role::Dps], false, seed);
+        println!(
+            "Raid seed {seed}: trio Normal {}/4 bosses in {} s (low {}%, most dead {}); solo Async {}/4 in {} s (low {}%, died {}); solo Normal {}/4 in {} s (low {}%, died {})",
+            g.bosses,
+            g.secs,
+            g.low,
+            g.deaths,
+            a.bosses,
+            a.secs,
+            a.low,
+            a.deaths,
+            s.bosses,
+            s.secs,
+            s.low,
+            s.deaths
+        );
+        if g.bosses < 4 {
+            failures.push(format!(
+                "seed {seed}: the trio stopped after {} bosses",
+                g.bosses
+            ));
+        }
+        if a.bosses < 4 {
+            failures.push(format!(
+                "seed {seed}: solo Async stopped after {} bosses",
+                a.bosses
+            ));
+        }
+        if s.bosses == 4 && s.low >= 25 {
+            failures.push(format!(
+                "seed {seed}: solo Normal cleared it at {}% lowest",
+                s.low
+            ));
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));

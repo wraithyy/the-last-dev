@@ -70,6 +70,12 @@ pub struct SaveData {
     /// bosses whose bonus loot was taken in it.
     pub legacy_week: u32,
     pub legacy_locks: Vec<String>,
+    /// Raid lockout (optional keys; older saves have none): the ISO week and the encounters
+    /// killed in it (`async:`-prefixed for Async Attendance).
+    pub raid_week: u32,
+    pub raid_locks: Vec<String>,
+    /// The local Weekly Sprint ladder (optional key; older saves have none).
+    pub ladder: crate::sprint::LadderView,
 }
 
 fn list(v: &str) -> Vec<String> {
@@ -168,6 +174,22 @@ impl SaveData {
                 self.legacy_locks.join("|")
             ));
         }
+        if !self.raid_locks.is_empty() {
+            out.push_str(&format!(
+                "raid_locks={}*{}\n",
+                self.raid_week,
+                self.raid_locks.join("|")
+            ));
+        }
+        if !self.ladder.entries.is_empty() {
+            let rows: Vec<String> = self
+                .ladder
+                .entries
+                .iter()
+                .map(|e| format!("{}~{}~{}", e.time_ms, e.deaths, e.crew.join("+")))
+                .collect();
+            out.push_str(&format!("ladder={}*{}\n", self.ladder.week, rows.join("|")));
+        }
         if self.onboarding_pending {
             out.push_str("onboarding=pending\n");
         }
@@ -256,6 +278,35 @@ impl SaveData {
                 "pet" => s.pet = v.chars().take(crate::world::WORLD_KEY_MAX).collect(),
                 "duel_streak" => s.duel_streak = v.parse().unwrap_or(0),
                 "respecs" => s.respecs = v.parse().unwrap_or(0),
+                "ladder" => {
+                    let (w, rows) = v.split_once('*').unwrap_or(("0", ""));
+                    s.ladder.week = w.parse().unwrap_or(0);
+                    s.ladder.entries = list(rows)
+                        .iter()
+                        .filter_map(|r| {
+                            let mut f = r.splitn(3, '~');
+                            let time_ms = f.next()?.parse().ok()?;
+                            let deaths = f.next()?.parse().ok()?;
+                            let crew = f
+                                .next()
+                                .unwrap_or("")
+                                .split('+')
+                                .filter(|c| !c.is_empty())
+                                .map(str::to_string)
+                                .collect();
+                            Some(crate::sprint::LadderEntry {
+                                time_ms,
+                                deaths,
+                                crew,
+                            })
+                        })
+                        .collect();
+                }
+                "raid_locks" => {
+                    let (w, b) = v.split_once('*').unwrap_or(("0", ""));
+                    s.raid_week = w.parse().unwrap_or(0);
+                    s.raid_locks = list(b);
+                }
                 "legacy_locks" => {
                     let (w, b) = v.split_once('*').unwrap_or(("0", ""));
                     s.legacy_week = w.parse().unwrap_or(0);
@@ -393,6 +444,9 @@ impl Sim {
                 .collect(),
             legacy_week: self.legacy_lockout().0,
             legacy_locks: self.legacy_lockout().1,
+            raid_week: self.raid_lockout().0,
+            raid_locks: self.raid_lockout().1,
+            ladder: self.ladder_saved(),
         })
     }
 
@@ -499,6 +553,8 @@ impl Sim {
             save.sprint_records.clone(),
         );
         self.set_legacy_lockout(save.legacy_week, &save.legacy_locks);
+        self.set_raid_lockout(save.raid_week, &save.raid_locks);
+        self.set_ladder(save.ladder.week, save.ladder.entries.clone());
         let class = self.class_at(i).map(|c| c.key.clone()).unwrap_or_default();
         self.units[i].state.talents = self.content.talents.sanitize(&class, &save.talents, level);
         let title = Some(&save.title)

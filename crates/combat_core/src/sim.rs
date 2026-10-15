@@ -208,6 +208,8 @@ pub struct Sim {
     pub(crate) burnout: crate::burnout::BurnoutRt,
     /// Legacy Mode difficulty, the parked world and the weekly lockout (`legacy.rs`).
     pub(crate) legacy: crate::legacy::LegacyState,
+    /// Raid difficulty, weekly lockout, tethers and the twins (`raid.rs`).
+    pub(crate) raid: crate::raid::RaidState,
 }
 
 impl Sim {
@@ -240,6 +242,7 @@ impl Sim {
             duels: Default::default(),
             burnout: crate::burnout::BurnoutRt::new(seed),
             legacy: Default::default(),
+            raid: Default::default(),
         }
     }
 
@@ -287,6 +290,8 @@ impl Sim {
         self.grow_packs();
         self.live_on_join(id);
         self.legacy_on_join(id);
+        self.raid_on_join(id);
+        self.ladder_on_join(id);
         self.burnout_on_join(id);
         id
     }
@@ -543,6 +548,7 @@ impl Sim {
             | Command::PickTalent { .. }
             | Command::ResetTalents
             | Command::StartSprint { .. }
+            | Command::StartWeeklySprint
             | Command::SetLegacy { .. }
             | Command::JoinStandup
             | Command::ClaimSprintGoal { .. }
@@ -676,6 +682,7 @@ impl Sim {
         self.update_combat_flags();
         self.update_world();
         self.update_sprint();
+        self.update_raid();
         self.update_live();
         self.update_duels();
         self.update_burnout();
@@ -752,6 +759,7 @@ impl Sim {
             Command::PickTalent { row, choice } => self.pick_talent(actor, row, choice),
             Command::ResetTalents => self.reset_talents(actor),
             Command::StartSprint { building, level } => self.start_sprint(actor, &building, level),
+            Command::StartWeeklySprint => self.start_weekly_sprint(actor),
             Command::SetLegacy { on } => self.set_legacy(actor, on),
             Command::JoinStandup => self.join_standup(actor),
             Command::ClaimSprintGoal { choice } => self.claim_sprint_goal(actor, choice),
@@ -808,6 +816,7 @@ impl Sim {
             | Command::PickTalent { .. }
             | Command::ResetTalents
             | Command::StartSprint { .. }
+            | Command::StartWeeklySprint
             | Command::SetLegacy { .. }
             | Command::JoinStandup
             | Command::ClaimSprintGoal { .. }
@@ -1614,6 +1623,7 @@ impl Sim {
         }
         let hp = self.units[ti].state.hp.saturating_sub(dealt);
         self.units[ti].state.hp = hp;
+        self.raid_link_hp(ti);
         if self.content.units[self.units[ti].def].ai.is_some() {
             // Threat counts the full hit, absorbed or not.
             self.add_threat(ti, source, amount.max(1));

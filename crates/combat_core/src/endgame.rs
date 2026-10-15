@@ -253,6 +253,7 @@ impl Sim {
     /// variant pay reputation only on their Legacy floors; a Legacy boss also sets the lockout.
     pub(crate) fn endgame_on_kill(&mut self, ti: usize, killer: Option<crate::EntityId>) {
         self.legacy_on_kill(ti);
+        self.raid_on_kill(ti, killer);
         if !self.units[ti].state.hostile || self.sprint_active() {
             return;
         }
@@ -267,8 +268,11 @@ impl Sim {
             .as_deref()
             .filter(|z| legacy || self.content.legacy.zone(z).is_none())
             .and_then(|z| self.content.endgame.department_of_zone(z));
+        let raid_boss = self.raid_boss_rep(ti);
         let g = &self.content.endgame.rep_gains;
-        let amount = if world_boss {
+        let amount = if let Some(r) = raid_boss {
+            r
+        } else if world_boss {
             g.world_boss
         } else if boss {
             g.boss
@@ -283,7 +287,7 @@ impl Sim {
             if summoned || self.units[p].state.level < cap {
                 continue;
             }
-            if world_boss {
+            if world_boss || raid_boss.is_some() {
                 for d in 0..self.content.endgame.departments.len() {
                     self.gain_rep(p, d, amount);
                 }

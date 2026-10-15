@@ -97,6 +97,7 @@ struct Mats {
     gold: Handle<StandardMaterial>,
     beam: Handle<StandardMaterial>,
     speed: Handle<StandardMaterial>,
+    bubble: Handle<StandardMaterial>,
     cage: [Handle<StandardMaterial>; 3],
 }
 
@@ -145,6 +146,7 @@ fn setup_fx(
         gold: g(Color::srgba(1.0, 0.85, 0.25, 0.95)),
         beam: g(Color::srgba(1.0, 1.0, 0.9, 0.35)),
         speed: g(Color::srgba(1.0, 1.0, 1.0, 0.2)),
+        bubble: g(Color::srgba(1.0, 0.82, 0.3, 0.2)),
         cage,
         stone: mats.add(solid(Color::srgb(0.45, 0.47, 0.5))),
         duck: mats.add(solid(Color::srgb(1.0, 0.85, 0.1))),
@@ -1393,6 +1395,26 @@ pub fn attach_unit_fx(c: &mut Kids, fx: &Fx, id: EntityId, head: f32, is_player:
             base: 1.0,
             pulse: 0.0,
         });
+    });
+
+    // Synergy Twins: the aligned (shielded) twin sits in a gold bubble; hit the other one.
+    c.spawn((
+        AuraFx {
+            id,
+            key: "synergy_shield",
+        },
+        Transform::from_xyz(0.0, head * 0.5, 0.0),
+        Visibility::Hidden,
+    ))
+    .with_children(|s| {
+        part(
+            s,
+            &fx.sphere,
+            &fx.m.bubble,
+            Vec3::ZERO,
+            Quat::IDENTITY,
+            Vec3::new(head * 0.7, head * 0.75, head * 0.7),
+        );
     });
 
     if !is_player {

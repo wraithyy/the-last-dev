@@ -225,6 +225,7 @@ fn load_zone_spawns_the_campus_and_reports_its_links() {
             ("datacenter/1".to_string(), false),
             ("lab/1".to_string(), false),
             ("client/1".to_string(), false),
+            ("offsite/1".to_string(), false),
         ]
     );
     assert!(t.sim.zone_links("nowhere").is_empty());
@@ -780,8 +781,9 @@ fn every_quest_is_given_where_its_work_happens() {
             );
         }
     }
-    // Every zone with packs has local work, and each zone's givers stand in it.
-    for z in &c.zones {
+    // Every zone with packs has local work, and each zone's givers stand in it. The raid is
+    // weekly endgame content above the cap: its work is the lockout, not tickets.
+    for z in c.zones.iter().filter(|z| !c.raid.is_raid_zone(&z.id)) {
         let n = c
             .quests
             .iter()
@@ -1317,19 +1319,13 @@ fn body_leasing_chain_runs_from_the_account_manager_to_the_title() {
     t.load("campus");
     let am = t.id_of("bl_account_manager");
     // Closed until the allocation ticket is taken, and reachable from the campus only then.
-    assert_eq!(
-        links(&t.sim, "campus").last(),
-        Some(&("client/1".to_string(), false))
-    );
+    assert!(links(&t.sim, "campus").contains(&("client/1".to_string(), false)));
     let at = t.sim.unit(am).map(|u| u.pos).unwrap_or_default();
     t.move_to(Vec3::new(at.x, 0.0, at.z + 2.0), 0.0);
     t.accept("bl_allocation");
     assert_eq!(t.sim.quest_status("bl_allocation"), QuestStatus::Active);
     assert!(t.has(|e| matches!(e, Event::Unlocked { zone } if zone == "client/1")));
-    assert_eq!(
-        links(&t.sim, "campus").last(),
-        Some(&("client/1".to_string(), true))
-    );
+    assert!(links(&t.sim, "campus").contains(&("client/1".to_string(), true)));
 
     t.load("client/1");
     // Nothing to fight: the zone has only friendly units.

@@ -98,6 +98,7 @@ impl Sim {
         // May swap the campaign world back in (leaving a sprint), so it goes before any lookup.
         self.sprint_on_load(id);
         self.legacy_on_load(id);
+        self.raid_on_load(id);
         let state = self.world.zones.get(id);
         let recent = state
             .and_then(|s| s.left_at)
@@ -145,7 +146,10 @@ impl Sim {
         if let Some(b) = &z.boss {
             let (at, yaw) = anchor(&b.anchor)?;
             let def = self.def_index(&b.unit)?;
-            if !self.world.cleared.contains(id) {
+            let spawns = self
+                .raid_boss_spawns(id, &b.unit)
+                .unwrap_or_else(|| !self.world.cleared.contains(id));
+            if spawns {
                 plan.push(Planned {
                     def,
                     pos: at,
@@ -222,6 +226,7 @@ impl Sim {
         }
         self.grow_packs();
         self.sprint_after_load();
+        self.raid_after_load();
         if let Some((pos, yaw)) = graveyard {
             self.set_respawn_point(pos, yaw);
         }
@@ -310,6 +315,7 @@ impl Sim {
                     to: l.to.clone(),
                     unlocked: self
                         .sprint_link_open(&l.to)
+                        .or_else(|| self.raid_link_open(id, &l.to))
                         .unwrap_or_else(|| l.requires.as_ref().is_none_or(|r| self.unlock_met(r))),
                 })
                 .collect()

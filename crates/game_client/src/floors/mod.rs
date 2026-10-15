@@ -13,6 +13,7 @@ mod kit;
 mod lab;
 mod layout;
 mod office;
+mod offsite;
 mod props;
 mod shape;
 #[cfg(test)]

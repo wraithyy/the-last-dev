@@ -496,6 +496,34 @@ fn build_piece(
                     None,
                 ));
             }
+            14 => {
+                // Raid: the offsite bucket hat. Soft crown, drooping brim all round, the event
+                // logo band in white so the livestream catches it from any angle.
+                out.push((
+                    cyl.clone(),
+                    main.clone(),
+                    at(0.0, 0.8, 0.0, Vec3::new(1.14, 0.3, 1.14)),
+                    None,
+                ));
+                out.push((
+                    sphere.clone(),
+                    main.clone(),
+                    at(0.0, 0.95, 0.0, Vec3::new(1.12, 0.2, 1.12)),
+                    None,
+                ));
+                out.push((
+                    cone,
+                    main,
+                    at(0.0, 0.66, 0.0, Vec3::new(1.5, 0.3, 1.5)),
+                    None,
+                ));
+                out.push((
+                    cyl,
+                    white,
+                    at(0.0, 0.72, 0.0, Vec3::new(1.16, 0.06, 1.16)),
+                    None,
+                ));
+            }
             8 => {
                 // Hard hat: dome, wide brim, ridge and a headlamp.
                 out.push((
@@ -833,6 +861,61 @@ fn build_piece(
                             None,
                         ));
                     }
+                }
+                9 => {
+                    // Raid: the offsite fleece vest over the hoodie. Puffed front panels either
+                    // side of a zip, a back panel, a stand-up collar and the event logo.
+                    let vest = a.mat(materials, (c.0 * 0.45, c.1 * 0.45, c.2 * 0.45), glow);
+                    // Quilting: thin lighter seams across the puffed panels.
+                    let seam = a.mat(materials, (c.0 * 0.7, c.1 * 0.7, c.2 * 0.7), glow);
+                    for side in [-1.0f32, 1.0] {
+                        out.push((
+                            cube.clone(),
+                            vest.clone(),
+                            at(side * 0.165, 0.0, 0.3, Vec3::new(0.32, 0.68, 0.06)),
+                            None,
+                        ));
+                        for y in [0.2f32, 0.04, -0.12, -0.28] {
+                            out.push((
+                                cube.clone(),
+                                seam.clone(),
+                                at(side * 0.165, y, 0.335, Vec3::new(0.31, 0.02, 0.01)),
+                                None,
+                            ));
+                        }
+                        // Side panels under the arms, so it reads as a vest from any angle.
+                        out.push((
+                            cube.clone(),
+                            vest.clone(),
+                            at(side * 0.3, -0.02, 0.0, Vec3::new(0.05, 0.6, 0.6)),
+                            None,
+                        ));
+                    }
+                    out.push((
+                        cube.clone(),
+                        vest.clone(),
+                        at(0.0, 0.0, -0.3, Vec3::new(0.64, 0.68, 0.06)),
+                        None,
+                    ));
+                    out.push((
+                        torus,
+                        vest,
+                        at(0.0, 0.34, 0.0, Vec3::new(0.4, 0.5, 0.34)),
+                        None,
+                    ));
+                    let zip = a.mat(materials, (0.8, 0.8, 0.84), glow);
+                    out.push((
+                        cube.clone(),
+                        zip,
+                        at(0.0, 0.02, 0.335, Vec3::new(0.02, 0.6, 0.01)),
+                        None,
+                    ));
+                    out.push((
+                        cube,
+                        white,
+                        at(0.17, 0.2, 0.36, Vec3::new(0.09, 0.05, 0.01)),
+                        None,
+                    ));
                 }
                 8 => {
                     // Legacy: a monk's robe. Rope belt with a knot and hanging ends, a deep hood.
@@ -1342,6 +1425,37 @@ fn build_piece(
                         at(0.0, -0.07, 0.345, Vec3::new(0.18, 0.1, 0.01)),
                         None,
                     ));
+                    return out;
+                }
+                8 => {
+                    // Raid: the all-hands badge with a stack of ribbons hanging off it (speaker,
+                    // staff, team), in the set colour and two loud neighbours.
+                    out.push((
+                        cube.clone(),
+                        white.clone(),
+                        at(0.0, 0.02, 0.32, Vec3::new(0.22, 0.2, 0.02)),
+                        None,
+                    ));
+                    out.push((
+                        cube.clone(),
+                        main.clone(),
+                        at(0.0, 0.08, 0.335, Vec3::new(0.18, 0.05, 0.01)),
+                        None,
+                    ));
+                    let ribbons = [c, (1.0, 0.8, 0.2), (0.95, 0.3, 0.35)];
+                    for (k, col) in ribbons.into_iter().enumerate() {
+                        out.push((
+                            cube.clone(),
+                            a.mat(materials, col, glow),
+                            at(
+                                -0.06 + k as f32 * 0.06,
+                                -0.17 - (k % 2) as f32 * 0.02,
+                                0.325,
+                                Vec3::new(0.05, 0.16, 0.012),
+                            ),
+                            None,
+                        ));
+                    }
                     return out;
                 }
                 6 => {

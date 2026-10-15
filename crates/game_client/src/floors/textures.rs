@@ -150,7 +150,10 @@ fn unlit(tex: Tex) -> bool {
                 | Sign::TempWarning
                 | Sign::Printing
                 | Sign::AgiArena
-                | Sign::Shrine,
+                | Sign::Shrine
+                | Sign::KeynoteScreen
+                | Sign::FamilyBanner
+                | Sign::OffsiteBar,
         ) | Tex::DaysCounter
             | Tex::CloseDeals
             | Tex::ChatbotFace
@@ -910,6 +913,90 @@ fn sign_spec(s: Sign) -> SignSpec {
             [204, 200, 188],
             [70, 70, 76],
             [130, 130, 134],
+        ),
+        Sign::OffsiteWelcome => sp(
+            &["WELCOME TO THE", "ALL-HANDS OFFSITE"],
+            [128, 30, 48],
+            [250, 240, 220],
+            [250, 205, 90],
+        ),
+        Sign::OffsiteAgenda => sp(
+            &[
+                "AGENDA",
+                "09:00 ICEBREAKER",
+                "11:00 ALIGNMENT",
+                "14:00 KEYNOTE",
+                "19:00 FAMILY DINNER",
+            ],
+            [244, 238, 224],
+            [60, 40, 36],
+            [150, 40, 50],
+        ),
+        Sign::OffsiteNameTags => sp(
+            &["HELLO MY NAME IS", "ASK ME ABOUT ALIGNMENT"],
+            [250, 250, 250],
+            [200, 40, 50],
+            [40, 50, 90],
+        ),
+        Sign::OffsiteShuttle => sp(
+            &["ALL-HANDS OFFSITE", "NOW BOARDING"],
+            [250, 244, 230],
+            [128, 30, 48],
+            [30, 120, 150],
+        ),
+        Sign::OffsiteBar => sp(
+            &["OPEN BAR", "2 TOKENS EACH"],
+            [14, 8, 20],
+            [255, 190, 90],
+            [255, 90, 190],
+        ),
+        Sign::BreakoutRoom => sp(
+            &["BREAKOUT ROOM", "PLEASE ALIGN"],
+            [236, 240, 244],
+            [40, 50, 70],
+            [40, 150, 130],
+        ),
+        Sign::KeynoteScreen => sp(
+            &["KEYNOTE", "FUTURE OF WORK", "SLIDE 1 OF 412"],
+            [4, 14, 24],
+            [120, 245, 255],
+            [255, 120, 230],
+        ),
+        Sign::FamilyBanner => sp(
+            &["WE ARE A FAMILY", "NOBODY LEAVES EARLY"],
+            [24, 10, 40],
+            [255, 225, 160],
+            [255, 110, 150],
+        ),
+        Sign::FamilyTable => sp(
+            &["FAMILY TABLE", "SEATS ASSIGNED"],
+            [250, 244, 230],
+            [90, 30, 40],
+            [180, 140, 40],
+        ),
+        Sign::ToLobby => sp(
+            &["BACK TO THE", "LOBBY"],
+            [244, 238, 224],
+            [60, 40, 36],
+            [150, 40, 50],
+        ),
+        Sign::ToBreakout => sp(
+            &["BREAKOUT ROOMS", "MANDATORY FUN"],
+            [236, 240, 244],
+            [40, 50, 70],
+            [40, 150, 130],
+        ),
+        Sign::ToTerrace => sp(
+            &["THE TERRACE", "LAKE VIEW"],
+            [30, 70, 90],
+            [235, 245, 250],
+            [250, 215, 120],
+        ),
+        Sign::ToBallroom => sp(
+            &["GRAND BALLROOM", "FAMILY ONLY"],
+            [24, 10, 40],
+            [255, 225, 160],
+            [255, 110, 150],
         ),
         Sign::LabRules => sp(
             &["COMPUTE IS OUR MOST", "VALUABLE EMPLOYEE"],

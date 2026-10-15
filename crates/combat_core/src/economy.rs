@@ -237,6 +237,8 @@ pub enum GearSource {
     Sprint,
     /// Only Legacy Mode floors drop it (`legacy.rs`), whatever its item level.
     Legacy,
+    /// Only raid bosses drop it (`raid.rs`): the raid tier sets.
+    Raid,
 }
 
 /// How the piece looks on the character: a tint and a model variant per slot.
@@ -495,11 +497,17 @@ impl Economy {
         self.gear.iter().find(|g| g.name == name)
     }
 
-    /// The highest tier outside Legacy Mode: the Sprint chest's.
+    /// The highest tier outside Legacy Mode and the raid (their drops and named pieces sit
+    /// above it): the Sprint chest's.
     pub fn campaign_top_tier(&self) -> u8 {
         self.gear
             .iter()
-            .filter(|g| g.source != GearSource::Legacy)
+            .filter(|g| {
+                matches!(
+                    g.source,
+                    GearSource::World | GearSource::Vendor | GearSource::Sprint
+                )
+            })
             .map(GearDef::tier)
             .max()
             .unwrap_or(1)
@@ -1624,8 +1632,12 @@ impl Sim {
         let elite = eco.elites.contains(&d.key);
         let boss = d.boss;
         // Legacy floors drop the Legacy tier; their boss pieces are the weekly-locked bonus.
-        let legacy = self.legacy.fx.is_some();
-        let rolls = match (legacy, boss) {
+        // Raid trash drops the Legacy tier too; raid bosses drop raid pieces (`raid.rs`).
+        let legacy_floor = self.legacy.fx.is_some();
+        let legacy = legacy_floor || self.in_raid();
+        let raid = self.raid_loot(mob);
+        let rolls = match (legacy_floor, boss) {
+            _ if raid.is_some() => raid.map_or(0, |r| r.0),
             (true, true) if self.legacy_locked(&d.key) => 0,
             (true, true) => self.content.legacy.boss_items.max(1),
             _ => 1,
@@ -1650,6 +1662,7 @@ impl Sim {
         } else {
             eco.trash_gear_pct
         };
+        let gear_pct = raid.map_or(gear_pct, |r| r.1);
         let gear_pct = (gear_pct * loot_mult * scale / 100).min(100);
         let tier = u.state.level.div_ceil(2).max(1);
         for _ in 0..rolls {
@@ -1678,12 +1691,14 @@ impl Sim {
                 eco.gear
                     .iter()
                     .filter(|g| {
-                        (if legacy {
-                            g.source == GearSource::Legacy
+                        // Raid pieces come in one rarity: any rolled rarity takes them.
+                        (if raid.is_some() {
+                            g.source == GearSource::Raid
+                        } else if legacy {
+                            g.source == GearSource::Legacy && g.rarity == r
                         } else {
-                            g.source == GearSource::World && g.tier() == tier
-                        }) && g.rarity == r
-                            && (!own_only || g.role.is_none() || g.role == role)
+                            g.source == GearSource::World && g.tier() == tier && g.rarity == r
+                        }) && (!own_only || g.role.is_none() || g.role == role)
                     })
                     .collect()
             };
@@ -1707,12 +1722,14 @@ impl Sim {
             .iter()
             .filter(|g| matches!(&g.source, GearSource::Boss(k) if *k == d.key))
             .collect();
-        let named_pct = if boss {
+        let named_pct = if let Some(r) = raid {
+            r.2
+        } else if boss {
             eco.legendary_pct
         } else {
             eco.named_pct * scale / 100
         };
-        if !legacy && !named.is_empty() && rng.chance_pct(named_pct) {
+        if !legacy_floor && !named.is_empty() && rng.chance_pct(named_pct) {
             let own: Vec<&&GearDef> = named.iter().filter(|g| g.role == role).collect();
             let k = if own.is_empty() {
                 named[rng.below(named.len() as u32) as usize]

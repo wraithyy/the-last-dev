@@ -7,6 +7,7 @@ use super::datacenter;
 use super::kit::{Plan, Sign};
 use super::lab;
 use super::layout::{FloorLayout, TOWER_ZONES, build_floor, yaw_towards};
+use super::offsite;
 use super::themes::{pt, route_point_near, v};
 use crate::collision::aabb;
 use bevy::prelude::*;
@@ -14,7 +15,7 @@ use combat_core::Aabb;
 
 /// Every zone id of the contract, in a stable order.
 #[allow(dead_code)] // contract surface; the tests iterate it
-pub const ZONE_IDS: [&str; 10] = [
+pub const ZONE_IDS: [&str; 14] = [
     "campus",
     "tower/1",
     "tower/2",
@@ -25,6 +26,10 @@ pub const ZONE_IDS: [&str; 10] = [
     "datacenter/2",
     "lab/1",
     "lab/2",
+    "offsite/1",
+    "offsite/2",
+    "offsite/3",
+    "offsite/4",
 ];
 
 /// Pure and deterministic: the same id always yields the same layout. `None` for unknown ids.
@@ -35,6 +40,10 @@ pub fn build_zone(id: &str) -> Option<FloorLayout> {
         "datacenter/2" => Some(datacenter::build(2)),
         "lab/1" => Some(lab::build(1)),
         "lab/2" => Some(lab::build(2)),
+        "offsite/1" => Some(offsite::build(1)),
+        "offsite/2" => Some(offsite::build(2)),
+        "offsite/3" => Some(offsite::build(3)),
+        "offsite/4" => Some(offsite::build(4)),
         client::ZONE => Some(client::build()),
         _ => TOWER_ZONES
             .iter()
@@ -133,16 +142,28 @@ mod tests {
         let packs = match id {
             "campus" => 8,
             "datacenter/1" | "datacenter/2" | "lab/1" | "lab/2" => 5,
+            "offsite/1" | "offsite/2" => 4,
+            "offsite/3" | "offsite/4" => 3,
             _ => 6,
         };
         r.extend((1..=packs).map(|i| format!("pack_{i}")));
         if id != "campus" {
             r.push("boss".into());
         }
-        let npcs = if id == "campus" { 6 } else { 1 };
+        // Only the offsite lobby has a friendly NPC in content; the other raid rooms have none.
+        let npcs = match id {
+            "campus" => 6,
+            "offsite/2" | "offsite/3" | "offsite/4" => 0,
+            _ => 1,
+        };
         r.extend((1..=npcs).map(|i| format!("npc_{i}")));
         let doors: &[&str] = match id {
-            "campus" => &["door:tower/1", "door:datacenter/1", "door:lab/1"],
+            "campus" => &[
+                "door:tower/1",
+                "door:datacenter/1",
+                "door:lab/1",
+                "door:offsite/1",
+            ],
             "tower/1" | "tower/2" | "tower/3" | "tower/4" => {
                 &["door:campus", "elevator", "elevator_exit"]
             }
@@ -150,6 +171,10 @@ mod tests {
             "datacenter/2" => &["door:datacenter/1", "door:campus"],
             "lab/1" => &["door:campus", "door:lab/2"],
             "lab/2" => &["door:lab/1", "door:campus"],
+            "offsite/1" => &["door:campus", "door:offsite/2"],
+            "offsite/2" => &["door:offsite/1", "door:offsite/3"],
+            "offsite/3" => &["door:offsite/2", "door:offsite/4"],
+            "offsite/4" => &["door:offsite/3", "door:campus"],
             _ => &["elevator", "elevator_exit"],
         };
         r.extend(doors.iter().map(|d| (*d).to_string()));
@@ -318,7 +343,16 @@ mod tests {
 
     #[test]
     fn indoor_zones_walk_to_the_boss_and_the_next_door() {
-        for id in ["datacenter/1", "datacenter/2", "lab/1", "lab/2"] {
+        for id in [
+            "datacenter/1",
+            "datacenter/2",
+            "lab/1",
+            "lab/2",
+            "offsite/1",
+            "offsite/2",
+            "offsite/3",
+            "offsite/4",
+        ] {
             let l = zone(id);
             let g = Grid::from(&l, pos(&l, "player_spawn"));
             assert!(g.at(pos(&l, "boss")).is_finite(), "{id}: boss unreachable");

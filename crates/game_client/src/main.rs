@@ -29,6 +29,7 @@ mod office;
 mod onboarding;
 mod player;
 mod presentation;
+mod raid;
 mod rigs;
 mod seat;
 mod settings;
@@ -122,6 +123,7 @@ fn main() {
         .add_plugins(social::SocialPlugin)
         .add_plugins(live::LivePlugin)
         .add_plugins(legacy::LegacyPlugin)
+        .add_plugins(raid::RaidPlugin)
         .run();
 }
 

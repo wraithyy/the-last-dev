@@ -377,3 +377,73 @@ Measured (`tests/coop.rs`, level-10 bots in the best tier-5 World Rares, packs p
 | lab/2 | 159-184 | 0-43% | 1 | died 3/3 | - |
 
 Time alone does not separate solo from group: without the group HP bonus a surviving lone DPS is only 1.2-1.5x slower, so the gate is survival.
+
+## Raid: All-Hands Offsite
+
+All in `content/game.ron` under `raid` (`raid.rs`); bosses, trash and spells are ordinary content.
+
+```
+entrance      = campus shuttle stop (door:offsite/1); open while every member is at level 10
+                (server and client both check it; Sim::zone_links)
+rooms         = offsite/1 Lobby (Icebreaker Facilitator) -> offsite/2 Breakout Rooms (Synergy
+                Twins) -> offsite/3 Terrace (Keynote Speaker) -> offsite/4 Grand Ballroom (The
+                Founder); a room's next door opens once its boss died (BossKilled, for good)
+difficulty    = Normal with >= normal_min_players (3) members at the raid zone load, else Async
+                Attendance; Async enemy HP x40%, damage x55% on top of everything else
+levels        = trash authored at 11, bosses at 12 (no further level scaling); group scaling as
+                usual (+55% HP, +30% damage per extra member, bosses +20% more)
+boss loot     = Normal: boss_items (2) raid pieces per member (ilvl 14 Epic, own role 70%) and
+                the boss's Legendary at legendary_pct (25%); Async: one piece at 50%, Legendary
+                12%; the second twin and adds drop nothing; trash rolls the Legacy tier
+lockout       = per encounter and difficulty ("async:" prefix), ISO week like Legacy Mode; a
+                locked boss does not spawn until Monday 00:00 UTC; per room online, per save
+                offline (raid_locks=<iso week>*<key>|<key>)
+reputation    = boss: boss_rep (120) with every department, 60 on Async; raid trash: HR (5)
+burnout       = the five raid boss units are management: boss_kill relief (150 per mille)
+achievements  = Event("raid:<boss>") on any difficulty, Event("raid:normal|async:<boss>")
+```
+
+Mechanics:
+
+```
+Pair Up        = Effect::PairUp: players within the spell range shuffled into pairs (an odd one
+(Icebreaker)     with the boss); 12 s, range 8 m; a stretched pair takes base 55 (x the
+                 caster's damage scaling) each second, both members; every 30 s
+Synergy Twins  = linked HP (a hit on one sets the other to the same HP fraction; one death kills
+                 both); the shielded twin takes -80% damage; every 18 s in combat they swap
+                 places and the shield; Leverage never moves (chase speed 0)
+Next Slide     = 9 parallel lanes 34 x 4.5 m, 300 ms apart (a sweep), one inner lane left out at
+(Keynote)        random (TelegraphDef::gap); 190 per lane hit; every 20 s, 13 s below 50%;
+                 Live Product Demo: 3 s must-interrupt, 300 to everyone within 45 m
+We Are a Family= at 66% and every 40 s after: the Founder's Nephew and the Co-Founder's Spouse
+(Founder)        (500 HP each before scaling) start a 15 s uninterruptible Mandatory Family
+                 Dinner, 2600 to everyone within 70 m (a wipe); killing one cancels its cast,
+                 a stun only restarts it (3 s later);
+                 33%: Founder Mode (+25% damage) and Golden Parachute circles
+enrage         = Running Over Time (+100% damage, +30% haste) after 5 min (Founder 6 min)
+```
+
+Raid tier: 16 set pieces (four role sets of four: Offsite Logistics, On-Site Support, Keynote Track, Team Spirit) and four Legendaries, all ilvl 14: budget `quality * 112%` (Epic 145, Legendary 179, keyboard x1.25), perks inside the Epic/Legendary caps (tests/items.rs). Not sold, not in the Sprint chest (`campaign_top_tier` counts World, Vendor and Sprint gear only). Three new looks: the fleece vest (hoodie style 9), the ribbon badge (lanyard 8) and the bucket hat (headgear 14).
+
+Measured (`tests/coop.rs`, `the_raid_takes_a_group_and_async_attendance_takes_one`: level-10 bots in the best Legacy piece per slot, packs one by one, boss last, the dead released and everyone rested between rooms, seeds 7/42/1234):
+
+| run | Lobby | Breakout | Terrace | Ballroom | whole raid |
+|---|---|---|---|---|---|
+| trio, Normal | 189-203 s, low 29-69% | 187-266 s, low 35-45% | 180-205 s, low 41-77% | 277-285 s, low 41-68% | 4/4 bosses, 894-934 s, nobody died |
+| solo DPS, Async | 158-167 s, low 44-49% | 143-207 s, low 37-44% | 145-156 s, low 43-50% | 166-175 s, low 42-44% | 4/4 bosses, 642-696 s, nobody died |
+| solo DPS, Normal | 296-310 s, low 29-37% | 327-349 s, low 20-32% | 275-303 s, low 17-39% | died (family dinner) | 3/4, wipes at the Founder |
+
+The gate: the trio clears every seed, the lone DPS clears Async Attendance every seed, and the lone DPS never clears Normal (it would also fail if it scraped through above 25% HP).
+
+## Weekly Sprint ladder
+
+```
+week          = ISO week of the sim clock (live::week_index; the server's online)
+weekly sprint = building = buildings[rng(week seed) % n], level = sprint.weekly_level (7),
+                affixes = affixes_for(week seed, level) (three slots at +7), stages drawn from
+                the week seed: every group plays the same run all week
+ladder        = delivered weekly runs of the week, fastest first (ties: fewer deaths), top 10;
+                crew labels "Name (Class)" (server names online, class alone offline)
+storage       = offline: the save's ladder key (ladder=<week>*<ms>~<deaths>~<crew+crew>|...);
+                online: the room's sim (per-room board), sent to joiners; a new week empties it
+```

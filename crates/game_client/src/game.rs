@@ -460,6 +460,10 @@ fn zone_tagline(id: &str) -> &'static str {
         "datacenter/2" => "The cooling budget was reallocated to a keynote about cooling.",
         "lab/1" => "Demo Day. Everything works, as long as nobody touches it.",
         "lab/2" => "Definitely not sentient. Please stop asking it how it feels.",
+        "offsite/1" => "Please wear your lanyard. The lanyard is also wearing you.",
+        "offsite/2" => "Today's breakout topic: aligning on what we are aligning on.",
+        "offsite/3" => "A lake view, an open bar and a keynote about the open bar.",
+        "offsite/4" => "We are a family. Families do not log off at six.",
         _ => "A new quarter begins. Same OKRs.",
     }
 }
@@ -471,6 +475,9 @@ fn unlock_subtitle(id: &str) -> &'static str {
         }
         "lab/1" => {
             "With the CEO gone, the AGI Prototype is in charge. It is behind the Innovation Lab."
+        }
+        "offsite/1" => {
+            "The shuttle finally came. It was full of lanyards, and it only goes to the offsite."
         }
         "client/1" => "Your vendor has allocated you. The client has not been told.",
         "campus" => "The door that said 'Badge pending' has nothing more to add.",

@@ -20,6 +20,7 @@ mod nav;
 pub mod pets;
 mod progression;
 mod quests;
+pub mod raid;
 mod rng;
 mod save;
 mod sim;
@@ -56,12 +57,13 @@ pub use live::WorldBossState;
 pub use pets::{PetDef, PetDrop, duck_tip};
 pub use progression::GROUP_SHARE_RANGE_M;
 pub use quests::{ActiveQuest, GIVER_REACH_SLACK_M, QuestLog, QuestStatus};
+pub use raid::{RaidDef, RaidView, TwinsDef};
 pub use save::{SAVE_VERSION, SaveData};
 pub use sim::{MAX_PLAYERS, Sim};
 pub use sprint::{
-    Affix, AffixDef, MeterLine, RewardLine, SprintBuilding, SprintDef, SprintError, SprintPreview,
-    SprintRecord, SprintResult, SprintStatus, SprintSummary, affixes_for,
-    preview as sprint_preview, retro_lines,
+    Affix, AffixDef, LadderEntry, LadderView, MeterLine, RewardLine, SprintBuilding, SprintDef,
+    SprintError, SprintPreview, SprintRecord, SprintResult, SprintStatus, SprintSummary,
+    WeeklySprint, affixes_for, preview as sprint_preview, retro_lines, weekly_sprint,
 };
 pub use talents::{
     ClassTalents, TALENT_CHOICES, TALENT_ROWS, TalentDef, TalentPicks, TalentRow, Talents,

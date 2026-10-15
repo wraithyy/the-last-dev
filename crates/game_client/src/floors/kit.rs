@@ -358,6 +358,20 @@ pub enum Sign {
     ClientHotDesk,
     ClientStatus,
     ClientTimesheet,
+    // all-hands offsite (raid)
+    OffsiteWelcome,
+    OffsiteAgenda,
+    OffsiteNameTags,
+    OffsiteShuttle,
+    OffsiteBar,
+    BreakoutRoom,
+    KeynoteScreen,
+    FamilyBanner,
+    FamilyTable,
+    ToLobby,
+    ToBreakout,
+    ToTerrace,
+    ToBallroom,
 }
 
 #[derive(Clone, Debug)]
@@ -961,6 +975,8 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
         Sign::WhiteboardA | Sign::WhiteboardB | Sign::WhiteboardC => (192, 128),
         Sign::ClientName => (256, 96),
         Sign::Billboard | Sign::InnovationNeon => (256, 96),
+        Sign::OffsiteWelcome | Sign::OffsiteShuttle | Sign::FamilyBanner => (256, 96),
+        Sign::OffsiteAgenda | Sign::KeynoteScreen => (256, 128),
         _ => (192, 96),
     }
 }

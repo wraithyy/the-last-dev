@@ -94,6 +94,7 @@ pub fn build() -> FloorLayout {
             "door:client/1",
             facade_door(&mut p, ANNEX, Face::PosZ, Sign::ClientName),
         ),
+        ("door:offsite/1", shuttle_stop(&mut p)),
     ];
     tower_shell(&mut p);
     data_center_shell(&mut p);
@@ -836,9 +837,89 @@ fn ambient_props(p: &mut Plan) {
     );
     p.sign(v(15.0, 1.4, -14.4), 0.0, 1.6, Sign::BikeRack);
     p.block(v(14.75, 0.5, -14.0), v(2.0, 1.0, 0.4));
-    // Shuttle stop that nobody has seen a shuttle at.
+    // Old stop sign by the arrival spot; the shuttle itself is parked south of the plaza.
     p.boxed(v(-16.0, 1.2, 21.0), v(0.15, 2.4, 0.15), Mat::Metal, false);
     p.sign(v(-16.0, 2.7, 21.1), 0.0, 1.6, Sign::ShuttleBus);
+}
+
+/// The All-Hands Offsite shuttle: a shelter, a parked coach in offsite livery and a tall pylon
+/// that reads from the arrival spot. Returns the door anchor in front of the coach's boarding door.
+fn shuttle_stop(p: &mut Plan) -> (Vec3, f32) {
+    const COACH_Z: f32 = 37.0;
+    let side = COACH_Z - 1.3;
+    p.boxed(v(7.0, 0.03, 34.5), v(15.0, 0.06, 9.0), Mat::Concrete, false);
+    p.boxed(v(7.0, 0.07, 33.2), v(2.4, 0.03, 4.6), Mat::Red, false);
+    // Coach: one collider for the body, wheels and glazing are decoration.
+    p.boxed(
+        v(7.0, 1.55, COACH_Z),
+        v(11.0, 2.2, 2.6),
+        Mat::CarWhite,
+        true,
+    );
+    p.boxed(v(7.0, 0.7, COACH_Z), v(11.04, 0.7, 2.64), Mat::Red, false);
+    p.boxed(
+        v(7.0, 1.12, COACH_Z),
+        v(11.06, 0.08, 2.66),
+        Mat::Gold,
+        false,
+    );
+    p.boxed(
+        v(7.0, 2.72, COACH_Z),
+        v(10.8, 0.2, 2.4),
+        Mat::CarWhite,
+        false,
+    );
+    for dz in [-1.31, 1.31] {
+        p.boxed(
+            v(5.0, 2.15, COACH_Z + dz),
+            v(8.0, 0.8, 0.04),
+            Mat::Window,
+            false,
+        );
+    }
+    p.boxed(
+        v(12.52, 1.95, COACH_Z),
+        v(0.04, 1.2, 2.2),
+        Mat::Window,
+        false,
+    );
+    p.boxed(
+        v(7.0, 1.2, side - 0.03),
+        v(1.5, 2.2, 0.06),
+        Mat::Dark,
+        false,
+    );
+    p.boxed(
+        v(7.0, 1.15, side - 0.07),
+        v(1.2, 2.0, 0.04),
+        Mat::Glass,
+        false,
+    );
+    p.boxed(
+        v(7.0, 2.35, side - 0.07),
+        v(1.2, 0.08, 0.04),
+        Mat::LedGreen,
+        false,
+    );
+    for (x, dz) in [(3.4, -1.3), (3.4, 1.3), (10.6, -1.3), (10.6, 1.3)] {
+        p.boxed(v(x, 0.5, COACH_Z + dz), v(1.0, 1.0, 0.3), Mat::Tire, false);
+    }
+    p.sign(v(10.4, 1.6, side - 0.04), PI, 3.4, Sign::OffsiteShuttle);
+    p.sign(v(5.0, 1.6, COACH_Z + 1.34), 0.0, 3.4, Sign::OffsiteShuttle);
+    // Shelter on the pavement side: roof, glass back, bench and the (accurate) timetable.
+    for (x, z) in [(-1.3, 31.8), (3.3, 31.8), (-1.3, 34.0), (3.3, 34.0)] {
+        p.boxed(v(x, 1.3, z), v(0.12, 2.6, 0.12), Mat::Metal, false);
+    }
+    p.boxed(v(1.0, 2.68, 32.9), v(5.2, 0.12, 2.6), Mat::Dark, false);
+    p.boxed(v(1.0, 1.3, 31.76), v(4.6, 2.4, 0.04), Mat::Glass, false);
+    p.boxed(v(1.0, 0.5, 32.4), v(2.4, 0.1, 0.5), Mat::Wood, true);
+    p.sign(v(-0.4, 1.5, 31.8), 0.0, 1.6, Sign::ShuttleBus);
+    // Pylon visible across the lawn.
+    p.boxed(v(13.8, 3.0, 33.5), v(0.25, 6.0, 0.25), Mat::Metal, false);
+    p.block(v(13.8, 1.5, 33.5), v(0.5, 3.0, 0.5));
+    p.sign(v(13.8, 5.4, 33.62), 0.0, 4.2, Sign::OffsiteShuttle);
+    p.sign(v(13.8, 5.4, 33.38), PI, 4.2, Sign::OffsiteShuttle);
+    (v(7.0, 0.0, side - 1.8), 0.0)
 }
 
 /// Kick scooter: deck, stem, bars and two wheels; low enough to step over.

@@ -113,6 +113,49 @@ impl LegacyView {
     }
 }
 
+/// A weekly lockout: the keys taken in ISO week `week`. A new week empties it on the next
+/// insert; readers pass the current week, so a stale set reads as empty. Legacy Mode locks floor
+/// bosses with it, the raid (`raid.rs`) its encounters.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Lockout {
+    week: u32,
+    keys: BTreeSet<String>,
+}
+
+impl Lockout {
+    pub(crate) fn contains(&self, week: u32, key: &str) -> bool {
+        self.week == week && self.keys.contains(key)
+    }
+
+    /// The keys locked in `week` (empty once the reset passed).
+    pub(crate) fn list(&self, week: u32) -> Vec<String> {
+        if self.week == week {
+            self.keys.iter().cloned().collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// True when `key` was not locked yet this week.
+    pub(crate) fn insert(&mut self, week: u32, key: String) -> bool {
+        if self.week != week {
+            self.week = week;
+            self.keys.clear();
+        }
+        self.keys.insert(key)
+    }
+
+    /// For the save: (week, keys).
+    pub(crate) fn saved(&self) -> (u32, Vec<String>) {
+        (self.week, self.keys.iter().cloned().collect())
+    }
+
+    pub(crate) fn restore(&mut self, week: u32, keys: impl IntoIterator<Item = String>) {
+        self.week = week;
+        self.keys = keys.into_iter().collect();
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct LegacyState {
     /// The group's difficulty for the next zone load.
@@ -123,8 +166,7 @@ pub(crate) struct LegacyState {
     pct: (u32, u32),
     /// The world not in play: the Legacy one on Normal floors, the campaign's on Legacy ones.
     pub(crate) parked: World,
-    week: u32,
-    locked: BTreeSet<String>,
+    lock: Lockout,
     /// The load in progress touches Legacy Mode (switched on, or entering or leaving a floor),
     /// so clients need the new view; plain Normal loads stay quiet.
     announce: bool,
@@ -141,17 +183,13 @@ impl Sim {
         self.legacy.fx.as_ref().and(self.zone.as_deref())
     }
 
-    fn legacy_week(&self) -> u32 {
+    pub(crate) fn legacy_week(&self) -> u32 {
         week_index(self.unix_s())
     }
 
     pub fn legacy_view(&self) -> LegacyView {
         let week = self.legacy_week();
-        let locked = if self.legacy.week == week {
-            self.legacy.locked.iter().cloned().collect()
-        } else {
-            Vec::new()
-        };
+        let locked = self.legacy.lock.list(week);
         LegacyView {
             on: self.legacy.on,
             zone: self.legacy_zone().unwrap_or_default().to_string(),
@@ -162,7 +200,7 @@ impl Sim {
 
     /// True while floor boss `boss` gives this room no bonus loot until the weekly reset.
     pub fn legacy_locked(&self, boss: &str) -> bool {
-        self.legacy.week == self.legacy_week() && self.legacy.locked.contains(boss)
+        self.legacy.lock.contains(self.legacy_week(), boss)
     }
 
     fn legacy_broadcast(&mut self) {
@@ -179,7 +217,7 @@ impl Sim {
         }
     }
 
-    fn everyone_capped(&self) -> bool {
+    pub(crate) fn everyone_capped(&self) -> bool {
         let cap = self.content.max_level();
         !self.players.is_empty()
             && self
@@ -249,12 +287,13 @@ impl Sim {
         }
     }
 
-    /// Extra enemy (HP %, damage %) of the Legacy floor; 100/100 elsewhere.
+    /// Extra enemy (HP %, damage %) of the Legacy floor or the raid's Async Attendance;
+    /// 100/100 elsewhere.
     pub(crate) fn legacy_mob_pct(&self) -> (u32, u32) {
         if self.legacy.fx.is_some() {
             self.legacy.pct
         } else {
-            (100, 100)
+            self.raid_mob_pct()
         }
     }
 
@@ -265,22 +304,15 @@ impl Sim {
             return;
         }
         let week = self.legacy_week();
-        if self.legacy.week != week {
-            self.legacy.week = week;
-            self.legacy.locked.clear();
-        }
         let key = self.units[ti].state.key.clone();
-        if self.legacy.locked.insert(key) {
+        if self.legacy.lock.insert(week, key) {
             self.legacy_broadcast();
         }
     }
 
     /// The room's lockout for the save: (ISO week, floor bosses).
     pub(crate) fn legacy_lockout(&self) -> (u32, Vec<String>) {
-        (
-            self.legacy.week,
-            self.legacy.locked.iter().cloned().collect(),
-        )
+        self.legacy.lock.saved()
     }
 
     /// Restores a saved lockout; unknown bosses are dropped, an old week is simply stale.
@@ -293,9 +325,8 @@ impl Sim {
                     .is_some_and(|x| x.unit == *b)
             })
         };
-        let locked: BTreeSet<String> = bosses.iter().filter(|b| known(b)).cloned().collect();
-        self.legacy.week = week;
-        self.legacy.locked = locked;
+        let locked: Vec<String> = bosses.iter().filter(|b| known(b)).cloned().collect();
+        self.legacy.lock.restore(week, locked);
         self.legacy_broadcast();
     }
 

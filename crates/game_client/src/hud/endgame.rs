@@ -1,6 +1,6 @@
 //! `~/endgame` (` by default): Promotion rank and its progress, the six department standings,
-//! Legacy Mode with this week's boss lockouts (one chip per Legacy floor boss) and the weekly
-//! Sprint seed. The weekly ladder belongs to a later wave, so that row says what is coming.
+//! this week's lockouts (one chip per Legacy floor boss and per raid encounter) and the Weekly
+//! Sprint (building, level, affixes and the ladder's best time).
 //! Opened by its key, the Esc menu entry or the touch Menu drawer.
 //! QA: `WOW_ENDGAME=1` opens it; `WOW_CAREER_DEMO` (see `qa_career`) sets the numbers once.
 
@@ -17,8 +17,8 @@ use combat_core::DEPARTMENTS;
 
 const GOLD: Color = Color::srgb(1.0, 0.82, 0.3);
 const OPEN: Color = Color::srgb(0.45, 0.95, 0.55);
-/// Lockout chips spawned up front; content has one per Legacy floor boss.
-const LOCK_SLOTS: usize = 12;
+/// Lockout chips spawned up front: one per Legacy floor boss, then one per raid encounter.
+const LOCK_SLOTS: usize = 16;
 const REP_BLUE: Color = Color::srgb(0.35, 0.7, 0.95);
 const WIDTH: f32 = 600.0;
 const NAME_W: f32 = 96.0;
@@ -40,6 +40,7 @@ enum Line {
     RankXp,
     Blurb,
     Lockouts,
+    Raid,
     Seed,
 }
 #[derive(Component)]
@@ -206,6 +207,7 @@ fn spawn_ui(mut commands: Commands) {
                 },
             ));
             w.spawn((Line::Lockouts, label("", 11.0), TextColor(DIM)));
+            w.spawn((Line::Raid, label("", 11.0), TextColor(crate::raid::RAID)));
             w.spawn(Node {
                 flex_wrap: FlexWrap::Wrap,
                 column_gap: px(5),
@@ -231,7 +233,7 @@ fn spawn_ui(mut commands: Commands) {
                 }
             });
             w.spawn((
-                section("WEEKLY SPRINT SEED"),
+                section("WEEKLY SPRINT"),
                 Node {
                     margin: UiRect::top(px(4)),
                     ..default()
@@ -420,22 +422,48 @@ fn update_window(
     };
     let unix = crate::live::unix_now(&*sim, &offline, net.is_some(), &live).map(|u| u as u64);
     let seed = match unix {
-        Some(t) => format!(
-            "Week {} resets in {}. A fixed weekly seed, affixes and a ladder for Sprint runs arrive in a later update; for now every week is as random as the roadmap.",
-            combat_core::live::week_index(t),
-            crate::live::duration(combat_core::live::secs_to_week_reset(t))
-        ),
+        Some(t) => weekly_line(content, &sim.ladder_view(), t),
         None => "The weekly seed waits for the office clock.".to_string(),
     };
     // Legacy Mode: one chip per floor boss, green while its bonus loot is still open this week.
     let view = sim.legacy_view();
     let week = unix.map(combat_core::live::week_index);
     let locked = week.map_or(&[][..], |w| view.locked_in(w));
-    let bosses: Vec<(String, bool)> = eg_bosses(content)
+    let mut bosses: Vec<(String, bool, bool)> = eg_bosses(content)
         .into_iter()
-        .map(|(key, name)| (name, locked.contains(&key)))
+        .map(|(key, name)| (name, locked.contains(&key), false))
         .collect();
     let taken = bosses.iter().filter(|b| b.1).count();
+    let legacy_n = bosses.len();
+    // The raid: chips for the difficulty this group size would get.
+    let raid = sim.raid_view();
+    let async_mode = sim.players().len() < usize::from(content.raid.normal_min_players);
+    let raid_locked = week.map_or(&[][..], |w| raid.locked_in(w));
+    for key in content.raid.bosses(content) {
+        let name = content
+            .unit_def(&key)
+            .map_or_else(|| key.clone(), |d| d.name.clone());
+        let lock = combat_core::raid::lock_key(&key, async_mode);
+        bosses.push((name, raid_locked.contains(&lock), true));
+    }
+    let raid_done = bosses[legacy_n..].iter().filter(|b| b.1).count();
+    let raid_line = if u.level < cap {
+        format!(
+            "{} opens at level {cap}: the shuttle stop on campus.",
+            content.raid.name
+        )
+    } else {
+        let mode = if async_mode {
+            "Async Attendance (fewer than three of you)"
+        } else {
+            "Full Programme"
+        };
+        format!(
+            "{}: {mode}, {raid_done}/{} sessions attended this week.",
+            content.raid.name,
+            bosses.len() - legacy_n
+        )
+    };
     let lockouts = if u.level < cap {
         format!(
             "Legacy Mode opens at level {cap}: every floor again with one affix, Legacy loot and reputation; boss bonus loot once a week."
@@ -455,18 +483,16 @@ fn update_window(
                 crate::live::duration(combat_core::live::secs_to_week_reset(t))
             )
         });
-        format!(
-            "{mode}{here} Boss bonus loot taken {taken}/{}{reset}.",
-            bosses.len()
-        )
+        format!("{mode}{here} Boss bonus loot taken {taken}/{legacy_n}{reset}.")
     };
     for (LockChip(k), mut text, mut color, mut border, mut node) in &mut chips {
         let want = match bosses.get(*k) {
-            Some((name, done)) => {
-                let (s, c) = if *done {
-                    (format!("{name}: taken"), DIM.with_alpha(0.7))
-                } else {
-                    (format!("{name}: open"), OPEN)
+            Some((name, done, raid)) => {
+                let (s, c) = match (*done, *raid) {
+                    (true, false) => (format!("{name}: taken"), DIM.with_alpha(0.7)),
+                    (false, false) => (format!("{name}: open"), OPEN),
+                    (true, true) => (format!("{name}: attended"), DIM.with_alpha(0.7)),
+                    (false, true) => (format!("{name}: open"), crate::raid::RAID),
                 };
                 set_text(&mut text, &s);
                 color.0 = c;
@@ -488,6 +514,7 @@ fn update_window(
             Line::RankXp => xp.clone(),
             Line::Blurb => blurb.clone(),
             Line::Lockouts => lockouts.clone(),
+            Line::Raid => raid_line.clone(),
             Line::Seed => seed.clone(),
         };
         set_text(&mut text, &s);
@@ -538,6 +565,45 @@ fn update_window(
     }
 }
 
+/// The Weekly Sprint row: this week's building, level and affixes, and the ladder's best.
+fn weekly_line(
+    content: &combat_core::Content,
+    ladder: &combat_core::LadderView,
+    unix: u64,
+) -> String {
+    let week = combat_core::live::week_index(unix);
+    let reset = crate::live::duration(combat_core::live::secs_to_week_reset(unix));
+    let Some(w) = combat_core::weekly_sprint(&content.sprint, week) else {
+        return format!("Week {week} resets in {reset}. No Weekly Sprint in this build.");
+    };
+    let affixes: Vec<&str> = w
+        .affixes
+        .iter()
+        .filter_map(|k| content.sprint.affix(k).map(|a| a.name.as_str()))
+        .collect();
+    let best = ladder
+        .entries
+        .first()
+        .filter(|_| ladder.week == week)
+        .map_or_else(
+            || "Ladder empty: plan it at the Sprint board.".to_string(),
+            |e| {
+                format!(
+                    "Ladder best {}:{:02} ({}).",
+                    e.time_ms / 60_000,
+                    e.time_ms / 1000 % 60,
+                    e.crew.join(", ")
+                )
+            },
+        );
+    format!(
+        "Week {week}: {} at +{} with {}. Resets in {reset}. {best}",
+        w.name,
+        w.level,
+        affixes.join(", ")
+    )
+}
+
 /// Legacy floor bosses in content order: (unit key, display name).
 fn eg_bosses(content: &combat_core::Content) -> Vec<(String, String)> {
     content
@@ -552,4 +618,38 @@ fn eg_bosses(content: &combat_core::Content) -> Vec<(String, String)> {
             (b.unit.clone(), name)
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_weekly_row_names_the_sprint_and_the_ladder_best() {
+        let Ok(sim) = crate::combat::new_sim() else {
+            panic!("embedded content invalid");
+        };
+        let c = sim.content();
+        let unix = 1_792_022_400;
+        let week = combat_core::live::week_index(unix);
+        let Some(w) = combat_core::weekly_sprint(&c.sprint, week) else {
+            panic!("no weekly sprint");
+        };
+        let empty = weekly_line(c, &combat_core::LadderView::default(), unix);
+        assert!(
+            empty.contains(&w.name) && empty.contains("Ladder empty"),
+            "{empty}"
+        );
+        let ladder = combat_core::LadderView {
+            week,
+            entries: vec![combat_core::LadderEntry {
+                time_ms: 754_000,
+                deaths: 1,
+                crew: vec!["Ada (Fullstack Engineer)".into()],
+            }],
+        };
+        let best = weekly_line(c, &ladder, unix);
+        assert!(best.contains("12:34") && best.contains("Ada"), "{best}");
+        assert!(eg_bosses(c).len() + c.raid.bosses(c).len() <= LOCK_SLOTS);
+    }
 }

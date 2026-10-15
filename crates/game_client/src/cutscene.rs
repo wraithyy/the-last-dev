@@ -1,6 +1,7 @@
 //! Short in-engine cutscenes after the campaign bosses (letterbox bars, a slow camera move to the
 //! fallen boss, two to four subtitled lines) and the epilogue after the AGI reveal, which ends in
-//! the credits roll. They are presentation only: the sim keeps running (online the server never
+//! the credits roll. The raid has its own: an intro on the first walk into the offsite lobby, one
+//! per boss, and the closing remarks right after the Founder's. They are presentation only: the sim keeps running (online the server never
 //! waits), Esc, a tap or the skip button ends one, and sprint runs never play them.
 //!
 //! QA hook: `WOW_CUTSCENE=<boss key>@<secs>` plays that boss's scene at that time (at the player);
@@ -36,6 +37,11 @@ const fn l(who: &'static str, text: &'static str) -> Line {
 }
 
 pub const EPILOGUE: &str = "agi_prototype";
+/// Raid scenes that no death starts: the intro (first raid zone entered) and the closing remarks
+/// (after the final boss's scene).
+pub const RAID_INTRO: &str = "offsite_intro";
+pub const RAID_END: &str = "offsite_end";
+const RAID_FINAL_BOSS: &str = "the_founder";
 
 pub const SCENES: &[Scene] = &[
     Scene {
@@ -196,6 +202,116 @@ pub const SCENES: &[Scene] = &[
             ),
         ],
     },
+    // ---- the raid: All-Hands Offsite ----
+    Scene {
+        boss: RAID_INTRO,
+        title: "All-Hands Offsite: day one, 08:00",
+        lines: &[
+            l(
+                "Offsite Concierge",
+                "Welcome to the Lakeside Resort! Your company booked all of it. Including the lake.",
+            ),
+            l(
+                "You",
+                "The office is fifteen minutes away. Why are we here?",
+            ),
+            l(
+                "Offsite Concierge",
+                "Leadership felt the office was 'too close to the work'. Lanyards are on the left.",
+            ),
+            l(
+                "Icebreaker Facilitator",
+                "EVERYONE TO THE LOBBY! Name tags on! Today we CONNECT, whether you like it or not!",
+            ),
+        ],
+    },
+    Scene {
+        boss: "icebreaker_facilitator",
+        title: "postmortem: the Lobby",
+        lines: &[
+            l(
+                "Icebreaker Facilitator",
+                "My fun fact... is that I have never been to an offsite... as a guest.",
+            ),
+            l(
+                "Offsite Concierge",
+                "The breakout rooms are through there. Bring your own marker. Ours have all been dry since 2019.",
+            ),
+            l("You", "Every marker in this building is dry, isn't it."),
+        ],
+    },
+    Scene {
+        boss: "synergy_alignment",
+        title: "postmortem: the Breakout Rooms",
+        lines: &[
+            l(
+                "Synergy Twin: Leverage",
+                "We were never two people. We were one headcount, split for the org chart.",
+            ),
+            l("Synergy Twin: Alignment", "Agreed."),
+            l(
+                "Synergy Twin: Leverage",
+                "...That's the first time you agreed with me without booking a meeting first.",
+            ),
+            l(
+                "You",
+                "On to the terrace. Someone is projecting slides onto the lake.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "keynote_speaker",
+        title: "postmortem: the Terrace",
+        lines: &[
+            l(
+                "Keynote Speaker",
+                "Slide 212: 'Thank you.' Slide 213: 'Questions?' Slide 214: 'No questions. Great.'",
+            ),
+            l("You", "Was any of that real?"),
+            l(
+                "Keynote Speaker",
+                "The real speaker is on a yacht. He sends his regards and an NDA.",
+            ),
+            l(
+                "Keynote Speaker",
+                "The Founder is in the ballroom. He prepared 'a few words'. There are no few words.",
+            ),
+        ],
+    },
+    Scene {
+        boss: RAID_FINAL_BOSS,
+        title: "postmortem: the Grand Ballroom",
+        lines: &[
+            l(
+                "The Founder",
+                "I gave you ping-pong. I gave you a mission. I gave you this vest.",
+            ),
+            l("You", "You never gave anyone a vest."),
+            l(
+                "The Founder",
+                "The vest is mine. The mission is yours. The equity is... complicated.",
+            ),
+            l(
+                "The Founder",
+                "We were a family. Families don't need raises.",
+            ),
+        ],
+    },
+    Scene {
+        boss: RAID_END,
+        title: "All-Hands Offsite: closing remarks",
+        lines: &[
+            l(
+                "Offsite Concierge",
+                "Thank you for attending! Please rate the offsite from 'Transformative' to 'Very Transformative'.",
+            ),
+            l("You", "Is there a 'let me go home' option?"),
+            l(
+                "Offsite Concierge",
+                "That option is reserved for next week's offsite. Same programme. Lanyards are non-refundable.",
+            ),
+        ],
+    },
 ];
 
 /// The credits roll after the epilogue; `#` lines are headings.
@@ -237,6 +353,22 @@ const BAR_PCT: f32 = 11.0;
 
 pub fn scene_for(boss: &str) -> Option<usize> {
     SCENES.iter().position(|s| s.boss == boss)
+}
+
+/// The raid intro plays the first time this session the group walks into `first` (the first
+/// raid zone); `zone` is the raid zone just loaded.
+pub fn raid_intro(zone: &str, first: Option<&str>, seen: &[usize]) -> Option<usize> {
+    if first != Some(zone) {
+        return None;
+    }
+    scene_for(RAID_INTRO).filter(|i| !seen.contains(i))
+}
+
+/// The scene that follows scene `i` straight away (the raid's closing remarks).
+pub fn follow_up(i: usize) -> Option<usize> {
+    (SCENES.get(i)?.boss == RAID_FINAL_BOSS)
+        .then(|| scene_for(RAID_END))
+        .flatten()
 }
 
 /// Which scene a death starts: a campaign milestone in a campaign run, never a sprint stage,
@@ -299,6 +431,8 @@ pub struct Cinema {
     credits: Option<f32>,
     epilogue_done: bool,
     seen: Vec<usize>,
+    /// The raid intro waits for the player's arrival position (the zone just loaded).
+    intro_pending: Option<usize>,
 }
 
 impl Cinema {
@@ -418,6 +552,14 @@ fn triggers(
     mut cinema: ResMut<Cinema>,
 ) {
     for CombatEvent(ev) in events.read() {
+        if let Event::Raid { view } = ev {
+            let first = sim.content().raid.zones.first().map(String::as_str);
+            if let Some(i) = raid_intro(&view.zone, first, &cinema.seen) {
+                cinema.seen.push(i);
+                cinema.intro_pending = Some(i);
+            }
+            continue;
+        }
         let Event::Death { unit, .. } = ev else {
             continue;
         };
@@ -442,6 +584,11 @@ fn triggers(
 
 fn advance(time: Res<Time>, mut cinema: ResMut<Cinema>, player: Single<&Transform, With<Player>>) {
     let dt = time.delta_secs();
+    if let Some(i) = cinema.intro_pending.take() {
+        // Filmed just ahead of the arrival so the group stays in frame.
+        let fwd = player.rotation * Vec3::NEG_Z * 1.5;
+        cinema.queued = Some((i, 1.2, player.translation + fwd, None));
+    }
     if let Some((i, left, focus, front)) = cinema.queued.as_mut() {
         *left -= dt;
         if *left <= 0.0 {
@@ -472,9 +619,12 @@ fn advance(time: Res<Time>, mut cinema: ResMut<Cinema>, player: Single<&Transfor
         }
     }
     if let Some(i) = ended {
-        cinema.playing = None;
+        let focus = cinema.playing.take().map(|p| p.focus);
         if SCENES[i].boss == EPILOGUE {
             cinema.credits = Some(0.0);
+        }
+        if let (Some(next), Some(focus)) = (follow_up(i), focus) {
+            cinema.queued = Some((next, 0.0, focus, None));
         }
     }
     if let Some(t) = cinema.credits.as_mut() {
@@ -787,13 +937,54 @@ mod tests {
         let Ok(sim) = crate::combat::new_sim() else {
             panic!("embedded content invalid");
         };
-        for s in SCENES {
+        for s in SCENES
+            .iter()
+            .filter(|s| ![RAID_INTRO, RAID_END].contains(&s.boss))
+        {
             assert!(
                 sim.content().unit_def(s.boss).is_some(),
                 "{} is unknown",
                 s.boss
             );
         }
+    }
+
+    #[test]
+    fn the_raid_has_an_intro_a_scene_per_boss_and_closing_remarks() {
+        let Ok(sim) = crate::combat::new_sim() else {
+            panic!("embedded content invalid");
+        };
+        let c = sim.content();
+        let bosses = c.raid.bosses(c);
+        assert_eq!(bosses.len(), 4);
+        for b in bosses
+            .iter()
+            .map(String::as_str)
+            .chain([RAID_INTRO, RAID_END])
+        {
+            let Some(i) = scene_for(b) else {
+                panic!("{b} has no scene");
+            };
+            let s = &SCENES[i];
+            assert!((2..=4).contains(&s.lines.len()), "{b}");
+            let secs = scene_secs(s);
+            assert!((10.0..=22.0).contains(&secs), "{b}: {secs}");
+        }
+        let first = c.raid.zones.first().map(String::as_str);
+        let intro = raid_intro("offsite/1", first, &[]);
+        assert_eq!(intro, scene_for(RAID_INTRO));
+        assert_eq!(raid_intro("offsite/2", first, &[]), None, "only the lobby");
+        let seen: Vec<usize> = intro.into_iter().collect();
+        assert_eq!(
+            raid_intro("offsite/1", first, &seen),
+            None,
+            "once per session"
+        );
+        let founder = scene_for(RAID_FINAL_BOSS).unwrap_or(usize::MAX);
+        assert_eq!(follow_up(founder), scene_for(RAID_END));
+        assert_eq!(follow_up(0), None);
+        // The twin that is not the zone boss stays quiet: one scene per encounter.
+        assert_eq!(trigger("synergy_leverage", false, &[]), None);
     }
 
     #[test]

@@ -7,7 +7,9 @@
 //! QA hooks: `WOW_SPRINT_UI=<level>` opens the planner at start on that level; `WOW_SPRINT=<building>:<level>`
 //! starts a run two seconds in (offline, needs the unlock, e.g. `WOW_LEVEL=10`);
 //! `WOW_SPRINT_END=<secs>` delivers the running sprint at that time (review screen shots);
-//! `WOW_SPRINT_BOARD=<secs>` opens the planner (with its leaderboard) at that time.
+//! `WOW_SPRINT_BOARD=<secs>` opens the planner (with its leaderboard) at that time;
+//! `WOW_SPRINT_WEEKLY=1` with `WOW_SPRINT_UI` opens it on the Weekly Sprint tab. The weekly tab
+//! sends `Command::StartWeeklySprint` and shows the week's ladder (`Event::Ladder`).
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
@@ -59,6 +61,8 @@ struct Review {
 struct Planner {
     building: usize,
     level: u8,
+    /// The Weekly Sprint tab is selected instead of a building.
+    weekly: bool,
     dirty: bool,
 }
 
@@ -67,9 +71,15 @@ impl Default for Planner {
         Planner {
             building: 0,
             level: 1,
+            weekly: false,
             dirty: true,
         }
     }
+}
+
+/// The current ISO week as the sim (offline) or the server's views (online) know it.
+pub fn current_week(sim: &SimView) -> u32 {
+    sim.legacy_view().week.max(sim.raid_view().week)
 }
 
 #[derive(Component)]
@@ -79,6 +89,7 @@ struct PlannerBody;
 #[derive(Component, Clone, Copy)]
 enum PlannerButton {
     Building(usize),
+    Weekly,
     Less,
     More,
     Start,
@@ -570,6 +581,7 @@ fn planner_input(
         if let Some(level) = qa.filter(|_| qa_level.is_none()) {
             *qa_level = Some(level);
             planner.level = level;
+            planner.weekly = std::env::var_os("WOW_SPRINT_WEEKLY").is_some();
         }
     }
     for (i, b) in &buttons {
@@ -578,7 +590,9 @@ fn planner_input(
         }
         planner.dirty = true;
         match *b {
+            PlannerButton::Weekly => planner.weekly = true,
             PlannerButton::Building(k) => {
+                planner.weekly = false;
                 planner.building = k.min(def.buildings.len() - 1);
                 let key = def.buildings[planner.building].key.clone();
                 planner.level = recommended(&sim, &offline, net.is_some(), &hud, &key);
@@ -586,6 +600,10 @@ fn planner_input(
             PlannerButton::Less => planner.level = planner.level.saturating_sub(1).max(1),
             PlannerButton::More => planner.level = (planner.level + 1).min(def.max_level.max(1)),
             PlannerButton::Close => windows.planner = false,
+            PlannerButton::Start if planner.weekly => {
+                pending.0.push(Command::StartWeeklySprint);
+                windows.planner = false;
+            }
             PlannerButton::Start => {
                 pending.0.push(Command::StartSprint {
                     building: def.buildings[planner.building].key.clone(),
@@ -658,6 +676,33 @@ fn spawn_board(c: &mut ChildSpawnerCommands, rows: &[SprintRecord]) {
                     r.level,
                     mmss(r.time_ms),
                     class_name(&r.class)
+                ),
+                13.0,
+            ),
+            TextColor(if k == 0 { GOLD } else { Color::WHITE }),
+        ));
+    }
+}
+
+fn spawn_ladder(c: &mut ChildSpawnerCommands, view: &combat_core::LadderView) {
+    if view.entries.is_empty() {
+        c.spawn((
+            label(
+                "  Nobody delivered this week's sprint yet. First to ship sets the bar.",
+                12.0,
+            ),
+            TextColor(DIM),
+        ));
+    }
+    for (k, e) in view.entries.iter().take(LEADERBOARD_ROWS).enumerate() {
+        c.spawn((
+            label(
+                format!(
+                    "  {}. {:>6}  {} dead   {}",
+                    k + 1,
+                    mmss(e.time_ms),
+                    e.deaths,
+                    e.crew.join(", ")
                 ),
                 13.0,
             ),
@@ -746,11 +791,19 @@ fn rebuild_planner(
     let seed = net
         .as_deref()
         .map_or_else(|| offline.0.session_seed(), |n| n.seed);
-    let Some(p): Option<SprintPreview> =
-        combat_core::sprint_preview(def, seed, &b.key, planner.level)
+    let week = current_week(&sim);
+    let weekly = combat_core::weekly_sprint(def, week).filter(|_| planner.weekly);
+    let (bkey, level, seed) = match &weekly {
+        Some(w) => (w.building.clone(), w.level, seed),
+        None => (b.key.clone(), planner.level, seed),
+    };
+    let Some(mut p): Option<SprintPreview> = combat_core::sprint_preview(def, seed, &bkey, level)
     else {
         return;
     };
+    if let Some(w) = &weekly {
+        p.affixes.clone_from(&w.affixes);
+    }
     let rec = recommended(&sim, &offline, net.is_some(), &hud, &b.key);
     let me = sim.player();
     let unit = me.and_then(|m| sim.unit(m));
@@ -771,6 +824,8 @@ fn rebuild_planner(
         None
     };
     let rows = board(&records_for(&sim, &offline, net.as_deref(), &hud), &b.key);
+    // The weekly building, not the tab under the cursor, decides the stage line.
+    let b = def.building(&bkey).unwrap_or(b);
     let stages = if b.pick as usize == b.zones.len() {
         format!("{} zones", b.zones.len())
     } else {
@@ -798,11 +853,34 @@ fn rebuild_planner(
                 r.spawn(button(
                     PlannerButton::Building(k),
                     bd.name.clone(),
-                    k == planner.building,
+                    k == planner.building && weekly.is_none(),
                 ));
             }
+            if def.weekly_level > 0 {
+                r.spawn(button(PlannerButton::Weekly, "Weekly", weekly.is_some()));
+            }
         });
-        c.spawn(row()).with_children(|r| {
+        if let Some(w) = &weekly {
+            c.spawn((
+                label(
+                    format!(
+                        "Weekly Sprint, week {}: {} at +{}. Same building, floors and affixes for everyone until Monday.",
+                        w.week, w.name, w.level
+                    ),
+                    13.0,
+                ),
+                TextColor(GOLD),
+            ));
+        }
+        c.spawn(Node {
+            display: if weekly.is_some() {
+                Display::None
+            } else {
+                Display::Flex
+            },
+            ..row()
+        })
+        .with_children(|r| {
             r.spawn((label("story points", 13.0), TextColor(DIM)));
             r.spawn(button(PlannerButton::Less, "-", false));
             r.spawn((label(format!("+{}", planner.level), 22.0), TextColor(GOLD)));
@@ -825,7 +903,17 @@ fn rebuild_planner(
             ),
             TextColor(Color::WHITE),
         ));
-        c.spawn((label("this week's affixes", 13.0), TextColor(ACCENT)));
+        c.spawn((
+            label(
+                if weekly.is_some() {
+                    "the week's fixed affixes"
+                } else {
+                    "this week's affixes"
+                },
+                13.0,
+            ),
+            TextColor(ACCENT),
+        ));
         if p.affixes.is_empty() {
             c.spawn((
                 label(
@@ -844,7 +932,7 @@ fn rebuild_planner(
         let next: Vec<String> = def
             .affix_levels
             .iter()
-            .filter(|l| **l > planner.level)
+            .filter(|l| **l > level && weekly.is_none())
             .map(|l| format!("+{l}"))
             .collect();
         if !next.is_empty() {
@@ -853,22 +941,46 @@ fn rebuild_planner(
                 TextColor(DIM),
             ));
         }
-        c.spawn((
-            label(format!("leaderboard: {}", b.name), 13.0),
-            TextColor(ACCENT),
-        ));
-        spawn_board(c, &rows);
+        if weekly.is_some() {
+            let online = net.is_some();
+            c.spawn((
+                label(
+                    if online {
+                        "weekly ladder: this room"
+                    } else {
+                        "weekly ladder: this machine"
+                    },
+                    13.0,
+                ),
+                TextColor(ACCENT),
+            ));
+            spawn_ladder(c, &sim.ladder_view());
+        } else {
+            c.spawn((
+                label(format!("leaderboard: {}", b.name), 13.0),
+                TextColor(ACCENT),
+            ));
+            spawn_board(c, &rows);
+        }
         match blocker {
             Some(why) => {
                 c.spawn((label(why, 13.0), TextColor(BAD)));
             }
             None => {
                 c.spawn(row()).with_children(|r| {
-                    r.spawn(button(PlannerButton::Start, "> commit to sprint", true));
-                    r.spawn((
-                        label("Beat par: +1..+3 levels. Miss it: carried over (-1).", 12.0),
-                        TextColor(DIM),
-                    ));
+                    let (go, rule) = if weekly.is_some() {
+                        (
+                            "> commit to the Weekly Sprint",
+                            "Delivered runs go on the ladder, fastest first.",
+                        )
+                    } else {
+                        (
+                            "> commit to sprint",
+                            "Beat par: +1..+3 levels. Miss it: carried over (-1).",
+                        )
+                    };
+                    r.spawn(button(PlannerButton::Start, go, true));
+                    r.spawn((label(rule, 12.0), TextColor(DIM)));
                 });
             }
         }

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 16;
+pub const PROTOCOL_VERSION: u16 = 17;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -656,7 +656,7 @@ pub fn is_player_command(cmd: &Command) -> bool {
         Command::JoinStandup | Command::ClaimSprintGoal { .. } | Command::GoHome => true,
         Command::SummonPet { pet } => pet.len() <= combat_core::world::WORLD_KEY_MAX,
         Command::DuelRequest { .. } | Command::DuelRespond { .. } => true,
-        Command::SetLegacy { .. } => true,
+        Command::SetLegacy { .. } | Command::StartWeeklySprint => true,
     }
 }
 
@@ -933,6 +933,18 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
         Event::Legacy { view } => {
             names(&view.locked)?;
             names(std::slice::from_ref(&view.zone))
+        }
+        Event::Raid { view } => {
+            names(&view.locked)?;
+            list(view.tethers.len())?;
+            names(std::slice::from_ref(&view.zone))
+        }
+        Event::Ladder { view } => {
+            list(view.entries.len())?;
+            for e in &view.entries {
+                names(&e.crew)?;
+            }
+            Ok(())
         }
         _ => Ok(()),
     }
@@ -1806,6 +1818,59 @@ mod tests {
             }],
         };
         assert_eq!(roundtrip(&bad_burnout), Err(ProtoError::BadNumber));
+    }
+
+    #[test]
+    fn the_raid_and_the_weekly_ladder_cross_the_wire_and_are_capped() {
+        use combat_core::{LadderEntry, LadderView, RaidView};
+        let raid = RaidView {
+            zone: "offsite/2".into(),
+            async_mode: true,
+            week: 2_960,
+            locked: vec!["async:icebreaker_facilitator".into()],
+            tethers: vec![(4, 7), (9, 12)],
+            tether_m: 8,
+        };
+        let ladder = LadderView {
+            week: 2_960,
+            entries: vec![LadderEntry {
+                time_ms: 754_000,
+                deaths: 2,
+                crew: vec!["Ada (Fullstack Engineer)".into(), "Backend Engineer".into()],
+            }],
+        };
+        let msg = ServerMsg::Events {
+            tick: 41,
+            events: vec![
+                Event::Raid { view: raid.clone() },
+                Event::Ladder {
+                    view: ladder.clone(),
+                },
+            ],
+        };
+        assert_eq!(roundtrip(&msg), Ok(msg.clone()));
+        let cmd = ClientMsg::Cmd(Command::StartWeeklySprint);
+        assert_eq!(roundtrip(&cmd), Ok(cmd.clone()));
+        let mut many_ties = raid.clone();
+        many_ties.tethers = vec![(1, 2); MAX_LIST_LEN + 1];
+        let mut long_lock = raid;
+        long_lock.locked = vec!["x".repeat(MAX_ITEM_NAME_BYTES + 1)];
+        let mut crowd = ladder.clone();
+        crowd.entries = vec![LadderEntry::default(); MAX_LIST_LEN + 1];
+        let mut long_name = ladder;
+        long_name.entries[0].crew = vec!["y".repeat(MAX_ITEM_NAME_BYTES + 1)];
+        for e in [
+            Event::Raid { view: many_ties },
+            Event::Raid { view: long_lock },
+            Event::Ladder { view: crowd },
+            Event::Ladder { view: long_name },
+        ] {
+            let bad = ServerMsg::Events {
+                tick: 41,
+                events: vec![e],
+            };
+            assert_eq!(roundtrip(&bad), Err(ProtoError::TooMany));
+        }
     }
 
     #[test]

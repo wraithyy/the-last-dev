@@ -104,6 +104,9 @@ pub struct SprintDef {
     /// end chest pays the rest.
     #[serde(default = "full_pct")]
     pub kill_loot_pct: u32,
+    /// The Weekly Sprint's level (its affixes follow from it); 0 turns the ladder off.
+    #[serde(default)]
+    pub weekly_level: u8,
 }
 
 fn full_pct() -> u32 {
@@ -301,6 +304,69 @@ impl SprintError {
     }
 }
 
+/// Entries kept on a weekly ladder.
+pub const LADDER_SIZE: usize = 10;
+/// Longest player name and crew label (name and class) kept on the ladder.
+pub const LADDER_NAME_MAX: usize = 20;
+pub const LADDER_LABEL_MAX: usize = 48;
+
+/// This ISO week's Weekly Sprint: the same building, level, stages and affixes for everyone.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WeeklySprint {
+    pub week: u32,
+    pub building: String,
+    pub name: String,
+    pub level: u8,
+    pub affixes: Vec<String>,
+    pub par_ms: u32,
+}
+
+/// One delivered Weekly Sprint on the ladder.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LadderEntry {
+    pub time_ms: u32,
+    pub deaths: u16,
+    /// "Name (Class)" per member, or the class alone when the host knows no names.
+    pub crew: Vec<String>,
+}
+
+/// The week's ladder, fastest first (local offline, the room's online).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LadderView {
+    pub week: u32,
+    pub entries: Vec<LadderEntry>,
+}
+
+fn week_seed(week: u32) -> u64 {
+    0x7EE4_1700_0000 ^ u64::from(week).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+}
+
+/// The Weekly Sprint of ISO week `week`; `None` without buildings or a weekly level.
+pub fn weekly_sprint(def: &SprintDef, week: u32) -> Option<WeeklySprint> {
+    if def.weekly_level == 0 || def.buildings.is_empty() {
+        return None;
+    }
+    let seed = week_seed(week);
+    let b = &def.buildings[Rng::new(seed).below(def.buildings.len() as u32) as usize];
+    let level = def.weekly_level.min(def.max_level.max(1));
+    Some(WeeklySprint {
+        week,
+        building: b.key.clone(),
+        name: b.name.clone(),
+        level,
+        affixes: affixes_for(def, seed, level),
+        par_ms: par_ms(def, b, level),
+    })
+}
+
+/// Ladder text field: no separators of the save format, at most `max` characters.
+fn ladder_label(s: &str, max: usize) -> String {
+    s.chars()
+        .filter(|c| !matches!(c, '|' | '~' | '+' | '*' | '\n'))
+        .take(max)
+        .collect()
+}
+
 /// What the planning board shows for a building and level.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SprintPreview {
@@ -492,6 +558,8 @@ impl Fx {
 }
 
 pub(crate) struct Run {
+    /// The ISO week of a Weekly Sprint; `None` for a normal run.
+    weekly: Option<u32>,
     building: String,
     level: u8,
     fx: Fx,
@@ -525,6 +593,10 @@ pub(crate) struct SprintState {
     splitting: bool,
     /// How the last run ended: result, time and upgrade.
     last: Option<(SprintResult, u32, i8)>,
+    /// This week's Weekly Sprint ladder.
+    ladder: LadderView,
+    /// Crew labels the host gave group members (`Sim::set_ladder_name`).
+    names: BTreeMap<EntityId, String>,
 }
 
 impl Sim {
@@ -735,6 +807,25 @@ impl Sim {
     // ---- start ----
 
     pub(crate) fn start_sprint(&mut self, actor: EntityId, building: &str, level: u8) {
+        self.start_run(actor, building, level, None);
+    }
+
+    /// `Command::StartWeeklySprint`: this week's building, level, stages and affixes.
+    pub(crate) fn start_weekly_sprint(&mut self, actor: EntityId) {
+        let week = self.legacy_week();
+        let Some(w) = weekly_sprint(self.sprint_def(), week) else {
+            self.emit_to(
+                actor,
+                Event::SprintRefused {
+                    reason: SprintError::UnknownBuilding,
+                },
+            );
+            return;
+        };
+        self.start_run(actor, &w.building, w.level, Some(week));
+    }
+
+    fn start_run(&mut self, actor: EntityId, building: &str, level: u8, weekly: Option<u32>) {
         if let Err(e) = self.check_start(actor, building, level) {
             self.emit_to(actor, Event::SprintRefused { reason: e });
             return;
@@ -744,7 +835,11 @@ impl Sim {
             return;
         };
         self.sprint.runs += 1;
-        let mut rng = Rng::new(self.seed ^ 0x5B21_7000_0000 ^ self.sprint.runs.rotate_left(17));
+        // A weekly run draws its stages and affixes from the week, so every group gets the same.
+        let mut rng = match weekly {
+            Some(w) => Rng::new(week_seed(w) ^ 0x57A6_E500),
+            None => Rng::new(self.seed ^ 0x5B21_7000_0000 ^ self.sprint.runs.rotate_left(17)),
+        };
         // Draw `pick` stages, keeping the building's order (floors still go up).
         let mut idx: Vec<usize> = (0..b.zones.len()).collect();
         while idx.len() > usize::from(b.pick) {
@@ -761,7 +856,10 @@ impl Sim {
             .iter()
             .filter(|z| self.content.zone(z).is_some_and(|d| d.boss.is_some()))
             .count() as u8;
-        let affix_keys = affixes_for(def, self.seed, level);
+        let affix_keys = match weekly {
+            Some(w) => affixes_for(def, week_seed(w), level),
+            None => affixes_for(def, self.seed, level),
+        };
         let need = (u64::from(trash) * u64::from(def.forces_need_pct)).div_ceil(100) as u32;
         let par = par_ms(def, &b, level);
         let delay = ticks(def.travel_delay_ms);
@@ -772,6 +870,7 @@ impl Sim {
             .extend(self.content.zones.iter().map(|z| z.id.clone()));
         let campaign = std::mem::replace(&mut self.world, fresh);
         let run = Run {
+            weekly,
             building: b.key.clone(),
             level,
             fx: Fx::new(affix_keys, rng),
@@ -1545,6 +1644,7 @@ impl Sim {
         let next = next_level(&def, result, r.level, upgrade);
         let building = r.building.clone();
         let level = r.level;
+        let weekly = r.weekly;
         let meter_raw = r.meter.clone();
         let players = self.players.clone();
         let mut meter = Vec::new();
@@ -1587,6 +1687,20 @@ impl Sim {
             }
         }
         meter.sort_by_key(|m| std::cmp::Reverse(m.damage + m.healing));
+        if let Some(week) = weekly.filter(|_| result == SprintResult::Delivered) {
+            let crew = meter
+                .iter()
+                .map(|m| self.crew_label(m.unit, &m.class))
+                .collect();
+            self.ladder_add(
+                week,
+                LadderEntry {
+                    time_ms: time,
+                    deaths: status.deaths,
+                    crew,
+                },
+            );
+        }
         self.sprint.last = Some((result, time, upgrade));
         if let Some(r) = self.sprint.run.as_mut() {
             r.ended = true;
@@ -1611,6 +1725,100 @@ impl Sim {
             },
         });
         self.burnout_on_sprint_end();
+    }
+
+    fn crew_label(&self, unit: EntityId, class: &str) -> String {
+        let class = self
+            .content
+            .class(class)
+            .map_or(class.to_string(), |c| c.name.clone());
+        match self.sprint.names.get(&unit) {
+            Some(n) => ladder_label(&format!("{n} ({class})"), LADDER_LABEL_MAX),
+            None => ladder_label(&class, LADDER_LABEL_MAX),
+        }
+    }
+
+    /// A delivered weekly run joins the ladder of its week (an older week's ladder is dropped).
+    fn ladder_add(&mut self, week: u32, entry: LadderEntry) {
+        let l = &mut self.sprint.ladder;
+        if l.week != week {
+            l.week = week;
+            l.entries.clear();
+        }
+        l.entries.push(entry);
+        l.entries.sort_by_key(|e| (e.time_ms, e.deaths));
+        l.entries.truncate(LADDER_SIZE);
+        let view = self.ladder_view();
+        self.events.push(Event::Ladder { view });
+    }
+
+    /// This week's Weekly Sprint, by the sim's clock.
+    pub fn weekly_sprint(&self) -> Option<WeeklySprint> {
+        weekly_sprint(self.sprint_def(), self.legacy_week())
+    }
+
+    /// The ladder of the current week (empty once the week turned).
+    pub fn ladder_view(&self) -> LadderView {
+        let week = self.legacy_week();
+        let l = &self.sprint.ladder;
+        LadderView {
+            week,
+            entries: if l.week == week {
+                l.entries.clone()
+            } else {
+                Vec::new()
+            },
+        }
+    }
+
+    /// The host's label for a member on the ladder (online: the player name).
+    pub fn set_ladder_name(&mut self, player: EntityId, name: &str) {
+        self.sprint
+            .names
+            .insert(player, ladder_label(name, LADDER_NAME_MAX));
+    }
+
+    /// A joining member sees the room's ladder.
+    pub(crate) fn ladder_on_join(&mut self, player: EntityId) {
+        let view = self.ladder_view();
+        if !view.entries.is_empty() {
+            self.emit_to(player, Event::Ladder { view });
+        }
+    }
+
+    /// Restores the saved local ladder (bounded, sorted).
+    pub(crate) fn set_ladder(&mut self, week: u32, mut entries: Vec<LadderEntry>) {
+        for e in &mut entries {
+            e.crew.truncate(crate::sim::MAX_PLAYERS);
+            for c in &mut e.crew {
+                *c = ladder_label(c, LADDER_LABEL_MAX);
+            }
+        }
+        entries.sort_by_key(|e| (e.time_ms, e.deaths));
+        entries.truncate(LADDER_SIZE);
+        self.sprint.ladder = LadderView { week, entries };
+    }
+
+    /// The local ladder for the save.
+    pub(crate) fn ladder_saved(&self) -> LadderView {
+        self.sprint.ladder.clone()
+    }
+
+    /// Debug/QA: puts entries on this week's ladder (screenshots).
+    pub fn debug_ladder_add(&mut self, time_ms: u32, deaths: u16, crew: &[&str]) {
+        let week = self.legacy_week();
+        let crew = crew
+            .iter()
+            .map(|c| ladder_label(c, LADDER_LABEL_MAX))
+            .collect();
+        self.ladder_add(
+            week,
+            LadderEntry {
+                time_ms,
+                deaths,
+                crew,
+            },
+        );
     }
 
     /// The end-of-sprint chest for one player: Story Points and top-tier gear whose rarity

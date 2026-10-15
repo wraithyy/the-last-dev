@@ -4,7 +4,7 @@
 
 mod common;
 
-use combat_core::{Command, Content, GearSource, Goods, Rarity, Sim, Vec3};
+use combat_core::{Command, Content, Goods, Rarity, Sim, Vec3};
 use common::content;
 
 const CAMPAIGN: [&str; 10] = [
@@ -174,8 +174,9 @@ fn epics_are_steep_and_vendors_gate_by_level() {
         .min()
         .unwrap_or(0);
     assert!(epic >= 3 * rare_price(&c, 4), "epic {epic}");
-    // Legacy pieces sit above the cap and are never sold (tests/items.rs: drops only).
-    for g in eco.gear.iter().filter(|g| g.source != GearSource::Legacy) {
+    // Legacy and raid pieces sit above the cap and are never sold (tests/items.rs: drops only).
+    let top = eco.campaign_top_tier();
+    for g in eco.gear.iter().filter(|g| g.tier() <= top) {
         assert!(
             g.required_level() >= 1 && g.required_level() <= c.max_level(),
             "{}",

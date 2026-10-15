@@ -290,6 +290,7 @@ impl RoomState {
             self.sim.set_respawn_point(g, gy);
         }
         let name = sanitize_name(raw_name, self.joins);
+        self.sim.set_ladder_name(eid, &name);
         let info = PlayerInfo {
             id: eid,
             name: name.clone(),
@@ -859,6 +860,49 @@ mod tests {
                 .any(|v| v.on && v.locked == ["vibe_coder".to_string()]),
             "{late:?}"
         );
+    }
+
+    fn raid_views(out: &[(Audience, Bytes)], to: PlayerId) -> Vec<combat_core::RaidView> {
+        msgs(out, to)
+            .into_iter()
+            .flat_map(|m| match m {
+                ServerMsg::Events { events, .. } => events,
+                _ => Vec::new(),
+            })
+            .filter_map(|e| match e {
+                Event::Raid { view } => Some(view),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The room owns the raid: its weekly lockout outlives the members who earned it, a late
+    /// joiner learns it, and the Weekly Sprint ladder is the room's board under player names.
+    #[tokio::test(start_paused = true)]
+    async fn the_raid_lockout_and_the_weekly_ladder_belong_to_the_room() {
+        let mut s = room();
+        s.on_join(0, "Lead", "backend");
+        s.tick();
+        s.sim
+            .debug_set_raid_lockout(&["async:icebreaker_facilitator".to_string()]);
+        s.sim
+            .debug_ladder_add(600_000, 1, &["Lead (Backend Engineer)"]);
+        s.on_leave(0);
+        s.on_join(1, "Late", "devops");
+        let out = s.tick();
+        let late = raid_views(&out, 1);
+        assert!(
+            late.iter()
+                .any(|v| v.locked == ["async:icebreaker_facilitator".to_string()]),
+            "{late:?}"
+        );
+        let ladder = msgs(&out, 1).into_iter().any(|m| match m {
+            ServerMsg::Events { events, .. } => events
+                .iter()
+                .any(|e| matches!(e, Event::Ladder { view } if view.entries.len() == 1)),
+            _ => false,
+        });
+        assert!(ladder, "the room's board reaches the joiner");
     }
 
     #[tokio::test(start_paused = true)]

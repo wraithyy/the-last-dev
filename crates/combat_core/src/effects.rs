@@ -129,7 +129,7 @@ impl Sim {
     }
 
     /// Amount from base + spell power, scaled by the caster's level.
-    fn power(&self, ci: usize, base: u32, coefficient_pct: u32) -> u64 {
+    pub(crate) fn power(&self, ci: usize, base: u32, coefficient_pct: u32) -> u64 {
         let u = &self.units[ci];
         // Gear power (tenths of a percent); zero for everyone but geared players.
         (u64::from(base) + u64::from(u.sp) * u64::from(coefficient_pct) / 100)
@@ -335,6 +335,26 @@ impl Sim {
                 },
                 _,
             ) => self.summon(ci, unit, *count, *max_alive),
+            (
+                Effect::PairUp {
+                    aura,
+                    duration_ms,
+                    max_m,
+                    base,
+                },
+                _,
+            ) => {
+                let amount = self.power(ci, *base, 0).min(u64::from(u32::MAX)) as u32;
+                self.raid_pair_up(
+                    ci,
+                    spell.id,
+                    spell.range_m,
+                    aura,
+                    *duration_ms,
+                    *max_m,
+                    amount,
+                );
+            }
             (Effect::ResetAllyThreat { radius_m }, _) => {
                 let side = self.units[ci].state.hostile;
                 let center = self.units[ci].state.pos;

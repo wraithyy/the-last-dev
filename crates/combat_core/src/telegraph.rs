@@ -190,7 +190,11 @@ impl Sim {
                 _ => base,
             };
             let n = def.count.max(1);
+            let gap = (def.gap && n >= 3).then(|| 1 + self.rng.below(u32::from(n) - 2) as u8);
             for k in 0..n {
+                if Some(k) == gap {
+                    continue;
+                }
                 let off = (f32::from(k) - f32::from(n - 1) / 2.0) * def.step_m;
                 let pos = Vec3::new(origin.x + side.x * off, origin.y, origin.z + side.z * off);
                 let delay = def.delay_ms + u32::from(k) * def.step_ms;

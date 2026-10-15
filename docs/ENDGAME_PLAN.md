@@ -131,6 +131,14 @@ play that reuses existing zones and systems, works solo and in co-op, and stays 
 - **Acceptance**: weekly seed determinism test, leaderboard persistence
 - **Prompt seed**: Add a fixed weekly Sprint seed with its own leaderboard.
 
+#### Status (2026-10-16): E3 (3.1, 3.2, 3.3) is built; 3.1b VibeCon comes next
+- 3.1: `raid` in game.ron, `combat_core/src/raid.rs`, `floors/offsite.rs`. Four rooms behind the campus shuttle stop, difficulty by group size at each raid load (Normal 3+, Async Attendance below), weekly lockout per encounter and difficulty reusing the Legacy `Lockout`, a locked boss does not spawn. New engine pieces: `Effect::PairUp` (tethers), linked-HP twins with a shield swap, `TelegraphDef::gap` (blank slide). Raid tier at ilvl 14 (16 set pieces, 4 Legendaries, three new looks), six achievements/titles, reputation with every department, burnout relief.
+- 3.2: intro, one scene per boss and closing remarks in `cutscene.rs`.
+- 3.3: `Command::StartWeeklySprint`, `weekly_sprint(def, week)`, ladder in the planner's Weekly tab and the `~/endgame` row; local ladder in the save, per-room board online.
+- Protocol 17: `Command::StartWeeklySprint`, `Event::Raid` (zone, async, week, locked, tethers), `Event::Ladder`. Save keys (optional): `raid_locks`, `ladder`.
+- Balance: `the_raid_takes_a_group_and_async_attendance_takes_one` (coop.rs); numbers in FORMULAS.md, Raid.
+- Clutter: no new HUD element; the difficulty uses the banner slot, tethers are a cord in the world, the shield a bubble, lockouts are chips in `~/endgame`.
+
 ### Wave E4: Teambuilding minigame
 
 #### Task 4.1: Stealth minigame "Mandatory Fun: Teambuilding"

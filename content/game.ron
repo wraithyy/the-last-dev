@@ -190,6 +190,12 @@
         (key: "do_not_touch", name: "Do Not Touch", icon: "padlock", harmful: false, damage_taken_pct: -100,
             dispel: Never),
         (key: "pair_programming", name: "Pair Programming", icon: "keyboard", harmful: false, dispel: Never),
+        // ---- raid: All-Hands Offsite (raid.rs) ----
+        (key: "paired_up", name: "Paired Up", icon: "family", harmful: true),
+        (key: "synergy_shield", name: "Aligned (Do Not Disturb)", icon: "alignment_training", harmful: false, damage_taken_pct: -80),
+        (key: "founder_mode", name: "Founder Mode", icon: "manifesto", harmful: false, damage_done_pct: 25),
+        (key: "running_over", name: "Running Over Time", icon: "hourglass", harmful: false, damage_done_pct: 100, haste_pct: 30),
+        (key: "hard_question", name: "Hard Question Pending", icon: "microphone", harmful: false, cast_time_pct: -25),
     ],
     spells: [
         // ---- player ----
@@ -2023,6 +2029,143 @@
             description: "A square metre of policy. Standing in it counts as acknowledging the policy.",
             effect: Damage(base: 6, coefficient_pct: 0),
             telegraph: Some((shape: Circle(radius_m: 3.0), delay_ms: 2200, label: "Compliance zone: click to acknowledge")),
+        ),
+        // ---- raid: All-Hands Offsite (raid.rs). Bosses and trash are authored at their spawn
+        // level (11 trash, 12 bosses); Async Attendance scales them down (raid.async_*). ----
+        (
+            id: 1100, name: "Pair Up!", icon: "family", school: Arcane,
+            range_m: 45.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0, interruptible: false,
+            target: Caster,
+            description: "Everyone finds a partner and stays within 8 m of them for 12 sec. An odd one out is paired with the facilitator, personally. Drifting apart hurts both of you every second.",
+            effect: PairUp(aura: "paired_up", duration_ms: 12000, max_m: 8.0, base: 55),
+        ),
+        (
+            id: 1101, name: "Two Truths and a Lie", icon: "chat_bubble", school: Arcane,
+            range_m: 45.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Everyone gets a circle and three facts about the floor under it. All three are lies. Step off.",
+            effect: Damage(base: 95, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 3.5), delay_ms: 2600, at: EachHostile, label: "Fun fact: you are standing in it")),
+        ),
+        (
+            id: 1102, name: "Trust Fall", icon: "family", school: Physical,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Falls backwards onto whoever is close. The exercise is about trust; the bruises are about physics.",
+            effect: Damage(base: 150, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 7.0), delay_ms: 2200, at: Caster, label: "Trust fall: nobody is catching")),
+        ),
+        (
+            id: 1103, name: "Circle Back", icon: "spiral", school: Physical,
+            range_m: 20.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Whatever you said in the last meeting comes back around. In a cone, at speed.",
+            effect: Damage(base: 170, coefficient_pct: 0),
+            telegraph: Some((shape: Cone(radius_m: 9.0, angle_deg: 90.0), delay_ms: 1700, label: "Circling back")),
+        ),
+        (
+            id: 1104, name: "Leverage Our Learnings", icon: "chart_up", school: Arcane,
+            range_m: 45.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A learning for everyone, delivered to the exact spot you are standing on. Move before it lands.",
+            effect: Damage(base: 85, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 3.0), delay_ms: 2400, at: EachHostile, label: "Learning incoming")),
+        ),
+        (
+            id: 1105, name: "Quick Ping", icon: "chat_bubble", school: Arcane,
+            range_m: 35.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "'Got a sec?' It is never a sec.",
+            effect: Damage(base: 120, coefficient_pct: 0),
+        ),
+        (
+            id: 1106, name: "Next Slide, Please", icon: "unread_ai_strategy_deck", school: Arcane,
+            range_m: 45.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A wall of slides sweeps across the terrace, one after another. One slide was left blank by accident: stand on it.",
+            effect: Damage(base: 190, coefficient_pct: 0),
+            telegraph: Some((shape: Line(length_m: 34.0, width_m: 4.5), delay_ms: 2400, count: 9, step_m: 4.5, step_ms: 300, gap: true, label: "Slide 4 of 212")),
+        ),
+        (
+            id: 1107, name: "Live Product Demo", icon: "live_demo", school: Arcane,
+            range_m: 45.0, cast_ms: 3000, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            description: "Ships an unreleased feature to everyone in the audience at once. Interrupt it before it reaches production.",
+            effect: Damage(base: 300, coefficient_pct: 0),
+            area: Some((radius_m: 45.0, allies: false)),
+        ),
+        (
+            id: 1108, name: "Holographic Laser Pointer", icon: "live_demo", school: Arcane,
+            range_m: 35.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The red dot is rendered at 4K and burns at 5 kW. Do not stand on the roadmap.",
+            effect: Damage(base: 160, coefficient_pct: 0),
+            telegraph: Some((shape: Line(length_m: 28.0, width_m: 3.0), delay_ms: 1700, label: "Laser pointer: off the roadmap")),
+        ),
+        (
+            id: 1109, name: "Pivot", icon: "agi_pivot", school: Physical,
+            range_m: 20.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The company changes direction. Whoever stands in that direction is the new strategy.",
+            effect: Damage(base: 190, coefficient_pct: 0),
+            telegraph: Some((shape: Cone(radius_m: 10.0, angle_deg: 100.0), delay_ms: 1700, label: "Pivot: get out of the new direction")),
+        ),
+        (
+            id: 1110, name: "We Are a Family", icon: "family", school: Arcane,
+            range_m: 0.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0, interruptible: false,
+            target: Caster,
+            description: "Seats his nephew and the co-founder's spouse at the family table. Dinner is served when their 15 sec cast ends; kill them first or everyone stays for dessert.",
+            effect: Summon(unit: "founders_nephew", count: 1, max_alive: 2),
+            extra_effects: [Summon(unit: "cofounders_spouse", count: 1, max_alive: 2)],
+        ),
+        (
+            id: 1111, name: "Mandatory Family Dinner", icon: "cake", school: Arcane,
+            range_m: 70.0, cast_ms: 15000, mana: 0, gcd: false, cooldown_ms: 0, interruptible: false,
+            description: "Twelve courses, one toast per course, every toast about loyalty. Nobody at the offsite survives it.",
+            effect: Damage(base: 2600, coefficient_pct: 0),
+            area: Some((radius_m: 70.0, allies: false)),
+        ),
+        (
+            id: 1112, name: "Golden Parachute", icon: "parachute", school: Physical,
+            range_m: 40.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The exit package lands wherever the founder was looking. It is very heavy and very golden.",
+            effect: Damage(base: 210, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 5.0), delay_ms: 2000, label: "Golden parachute: not yours")),
+        ),
+        (
+            id: 1113, name: "Founder Mode", icon: "manifesto", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Skips every layer of management and does the work himself. Hits 25% harder.",
+            effect: Aura(aura: "founder_mode", duration_ms: 600000),
+        ),
+        (
+            id: 1114, name: "Agenda Change", icon: "calendar", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The 14:00 slot moved to where you are standing. Attendance is mandatory.",
+            effect: Damage(base: 70, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 3.5), delay_ms: 2200, label: "Agenda change")),
+        ),
+        (
+            id: 1115, name: "Badge Check", icon: "visitor_badge", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Your lanyard is the wrong colour for this hallway. A short, firm conversation follows.",
+            effect: Damage(
+                base: 55, coefficient_pct: 0,
+                apply_aura: Some((aura: "quick_sync", duration_ms: 1500)),
+            ),
+        ),
+        (
+            id: 1116, name: "Sticky Note Storm", icon: "sticky", school: Arcane,
+            range_m: 30.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            description: "Four hundred ideas, all of them yellow, all of them at once. Interrupt the ideation.",
+            effect: Damage(base: 140, coefficient_pct: 0),
+            area: Some((radius_m: 30.0, allies: false)),
+        ),
+        (
+            id: 1117, name: "Microphone Feedback", icon: "microphone", school: Arcane,
+            range_m: 22.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Someone walked in front of the speaker again. The whole aisle hears it.",
+            effect: Damage(base: 100, coefficient_pct: 0),
+            telegraph: Some((shape: Line(length_m: 20.0, width_m: 2.5), delay_ms: 1600, label: "Feedback loop")),
+        ),
+        (
+            id: 1118, name: "Bottomless Mimosa", icon: "soda_bottle", school: Arcane,
+            range_m: 30.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "On the company card. Heals a colleague; the expense report hurts later.",
+            effect: Heal(base: 260, coefficient_pct: 0),
         ),
     ],
     // Playable classes; the first is the default. Base stats and auto attack come from `unit`.
@@ -4774,6 +4917,456 @@
                 death: ["Finally... some sleep...", "Invoice... attached..."],
             ),
         ),
+        // ---- raid: All-Hands Offsite (raid.rs). Trash at 11, bosses at 12; Async Attendance
+        // scales HP and damage down (raid.async_hp_pct / async_damage_pct). ----
+        (
+            key: "offsite_concierge", name: "Offsite Concierge", title: "Lakeside Resort & Conference Centre", level: 10, hostile: false,
+            max_hp: 240, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Welcome to the All-Hands Offsite! Three to five of you: full programme. Fewer: Async Attendance, the recorded version, softer and with fewer gifts.",
+                    "Each session can be attended once a week. After that the room is 'being reset'. It is being reset until Monday.",
+                    "Lobby, breakout rooms, terrace, ballroom. The Founder speaks last. The Founder always speaks last.",
+                    "Lanyards are colour-coded. Nobody has the key. Wear any colour with confidence.",
+                ],
+                ambient_ms: 32000,
+                ambient: [
+                    "The Wi-Fi password is on the back of the agenda. The agenda is on the Wi-Fi.",
+                    "Lunch is a 'networking opportunity'. The sandwiches are a separate opportunity.",
+                    "Please do not feed the facilitator after 18:00.",
+                ],
+            ),
+        ),
+        (
+            key: "offsite_planner", name: "Offsite Event Planner", title: "Agenda v14 (Final) (Final)", level: 11, hostile: true,
+            max_hp: 950, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 120,
+            loot: [],
+            ai: Some((
+                aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 22, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1114, cooldown_min_ms: 9000, cooldown_max_ms: 12000, initial_ms: Some((2500, 4000)),
+                        yells: [
+                            "Small agenda change: you are now the 14:00 session.",
+                            "We moved lunch. We moved it onto you.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "You're not on the seating chart. That's fine. You're on the floor plan now.",
+                    "Name tag, please. First name, pronouns, fun fact, blood type.",
+                ],
+                death: ["The agenda... said... coffee break...", "Please fill out... the feedback form..."],
+            ),
+        ),
+        (
+            key: "lanyard_enforcer", name: "Lanyard Enforcer", title: "People Ops", level: 11, hostile: true,
+            max_hp: 1150, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 130,
+            loot: [],
+            ai: Some((
+                aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 27, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1115, cooldown_min_ms: 10000, cooldown_max_ms: 13000, initial_ms: Some((3000, 5000)),
+                        yells: [
+                            "Blue lanyards are for the blue hallway. You are blue on the inside. Prove it.",
+                            "Badge check. Hold still while I check your badge with my fists.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Unauthorised fun detected.",
+                    "This area is for Director-level lanyards and above.",
+                ],
+                death: ["Report me... to People Ops...", "I am People Ops..."],
+            ),
+        ),
+        (
+            key: "breakout_facilitator", name: "Breakout Room Facilitator", title: "Owns the Sticky Notes", level: 11, hostile: true,
+            max_hp: 900, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 120,
+            loot: [],
+            ai: Some((
+                aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 18, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1116, cooldown_min_ms: 13000, cooldown_max_ms: 15000, initial_ms: Some((3500, 5000)),
+                        yells: [
+                            "No bad ideas in this room! Only four hundred mediocre ones, all yellow!",
+                            "Ideation sprint! Everyone writes, nobody reads!",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Let's break out into smaller groups. You're the smaller group.",
+                    "Parking lot! Put your concerns on the parking lot wall. We will never look at it.",
+                ],
+                death: ["Let's... dot-vote... on this...", "Timebox... expired..."],
+            ),
+        ),
+        (
+            key: "av_technician", name: "AV Technician", title: "Can You Hear Me Now", level: 11, hostile: true,
+            max_hp: 900, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 120,
+            loot: [],
+            ai: Some((
+                aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 18, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1117, cooldown_min_ms: 8000, cooldown_max_ms: 10000, initial_ms: Some((2000, 3500)),
+                        yells: [
+                            "Check, check. One, two. Is this thing... yes. Yes it is.",
+                            "Whoever is on the HDMI dongle, I can see your tabs.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "You're on mute. You are always on mute.",
+                    "Nobody touches the mixing desk. Nobody.",
+                ],
+                death: ["Have you tried... the other dongle...", "Signal... lost..."],
+            ),
+        ),
+        (
+            key: "open_bar_rep", name: "Open Bar Account Executive", title: "Expensing It", level: 11, hostile: true,
+            max_hp: 1000, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 125,
+            loot: [],
+            ai: Some((
+                aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 20, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1118, cooldown_min_ms: 10000, cooldown_max_ms: 12000, initial_ms: Some((4000, 6000)),
+                        target: AllyLowestHp,
+                        yells: [
+                            "Another round on the company card! The CFO is at a different table!",
+                            "Bottomless! Like the budget. Like my pipeline.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Let's take this conversation to the bar. The bar is this fight.",
+                    "I'm not here for the sessions. I'm here for the relationships.",
+                ],
+                death: ["Put it... on the card...", "Quota... was... annual..."],
+            ),
+        ),
+        (
+            key: "icebreaker_facilitator", name: "Icebreaker Facilitator", title: "Certified Fun Practitioner", level: 12, hostile: true,
+            boss: true,
+            max_hp: 9000, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 1800,
+            loot: [(item: "Icebreaker Bingo Card (Full House)", chance_pct: 100)],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 42, chase_speed_mps: 6.0, respawn_ms: 15000,
+                abilities: [
+                    (spell: 1100, cooldown_min_ms: 30000, cooldown_max_ms: 30000, initial_ms: Some((7000, 7000)),
+                        target: Caster,
+                        yells: [
+                            "PAIR UP! Find someone you have never spoken to. Stand close. Closer. Closer.",
+                            "Partner exercise! Whoever drifts apart has to share their salary.",
+                            "Grab a buddy! No buddy? You're with me. You're always with me.",
+                        ]),
+                    (spell: 1101, cooldown_min_ms: 14000, cooldown_max_ms: 17000, initial_ms: Some((3500, 4500)),
+                        yells: [
+                            "Two truths and a lie! Truth: I love this. Truth: so do you. Lie: you can leave.",
+                            "Everyone stand in your circle and share a fun fact! The fun fact is pain.",
+                        ]),
+                    (spell: 1102, cooldown_min_ms: 11000, cooldown_max_ms: 13000, initial_ms: Some((6000, 7000)),
+                        target: Caster,
+                        yells: [
+                            "Trust fall! I trust that you are standing far enough away!",
+                            "Catch me! Or don't! The learning outcome is the same!",
+                        ]),
+                ],
+                phases: [
+                    (below_hp_pct: 40,
+                        yells: ["Speed round! Fun facts in five words or fewer! Mine: 'You. Will. Have. Fun. Now.'"]),
+                ],
+                enrage: Some((after_ms: 300000, aura: "running_over", yells: [
+                    "We are running over time! That means the fun is mandatory AND unpaid!",
+                ])),
+            )),
+            yells: (
+                periodic_ms: 11000,
+                aggro: [
+                    "Welcome, welcome! Grab a name tag! Write your name and one thing nobody should know about you!",
+                    "Before we start: everyone stand up, find your spirit animal and become it. Go!",
+                    "No phones, no laptops, no exits. Just connection.",
+                ],
+                periodic: [
+                    "If you were a kitchen appliance, which one would you be and why is it a toaster?",
+                    "Remember: there is no wrong answer! There are several wrong people.",
+                    "Energy check! On a scale of one to ten, you're a ten. I've written it down.",
+                    "This exercise was designed by a consultant who has never met a human.",
+                    "Make eye contact with the person on your left. Hold it. Hold it longer.",
+                ],
+                low_hp: [
+                    "Let's... take a short breather... and then a longer icebreaker...",
+                    "You're all so... engaged... I'll put it in the survey...",
+                ],
+                player_killed: [
+                    "Ooh, someone's out! They can facilitate the next round from the floor!",
+                    "Great energy! Bad survival instincts!",
+                ],
+                death: [
+                    "Thank you all... for being so... vulnerable... Please fill out... the feedback form...",
+                ],
+            ),
+        ),
+        (
+            key: "synergy_alignment", name: "Synergy Twin: Alignment", title: "Co-Head of Synergy", level: 12, hostile: true,
+            boss: true,
+            max_hp: 8000, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 1800,
+            loot: [(item: "Synergy Twins' Shared Calendar", chance_pct: 100)],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 46, chase_speed_mps: 6.0, respawn_ms: 15000,
+                abilities: [
+                    (spell: 1103, cooldown_min_ms: 10000, cooldown_max_ms: 12000, initial_ms: Some((4000, 5000)),
+                        yells: [
+                            "Let's circle back! To your face!",
+                            "Circling back on this. And on you. And on you again.",
+                        ]),
+                ],
+                enrage: Some((after_ms: 300000, aura: "running_over", yells: [
+                    "We're out of runway! Both of us! Simultaneously!",
+                ])),
+            )),
+            yells: (
+                periodic_ms: 12000,
+                aggro: [
+                    "Alignment here. My sister is Leverage. Together we are a strategic partnership.",
+                    "Two heads of synergy, one budget. You can't hurt one of us without a stakeholder map.",
+                ],
+                periodic: [
+                    "Are we aligned? We are. On everything. Always. It's exhausting.",
+                    "I'll own the outcome. She'll own the narrative. Nobody will own the work.",
+                    "We share one calendar. That's why we are both double-booked for this fight.",
+                ],
+                low_hp: ["Our shared OKR is... trending... red..."],
+                player_killed: ["Aligned! Permanently!", "We'll put it in the shared deck as a learning."],
+                death: ["We were... always... better together... on slides..."],
+            ),
+        ),
+        (
+            key: "synergy_leverage", name: "Synergy Twin: Leverage", title: "Other Co-Head of Synergy", level: 12, hostile: true,
+            boss: true,
+            max_hp: 8000, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0,
+            loot: [],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 30, chase_speed_mps: 0.0, respawn_ms: 15000,
+                abilities: [
+                    (spell: 1104, cooldown_min_ms: 13000, cooldown_max_ms: 15000, initial_ms: Some((3000, 4000)),
+                        yells: [
+                            "Let's leverage our learnings! Learning number one: you stood there.",
+                            "A learning for everyone! Delivered! Personally!",
+                        ]),
+                    (spell: 1105, cooldown_min_ms: 6000, cooldown_max_ms: 8000, initial_ms: Some((2000, 3000)),
+                        target: RandomHostile,
+                        yells: [
+                            "Got a sec?",
+                            "Quick ping! Not urgent! Urgent!",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Leverage here! Whatever my brother says, I said it first, in a deck.",
+                ],
+                death: ["Leverage... released..."],
+            ),
+        ),
+        (
+            key: "keynote_speaker", name: "Keynote Speaker", title: "AI Hologram, Thought Leader", level: 12, hostile: true,
+            boss: true,
+            max_hp: 10500, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 1900,
+            loot: [(item: "Keynote Clicker (Battery Dead)", chance_pct: 100)],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.5, melee_ms: 2200,
+                melee_damage: 40, chase_speed_mps: 5.0, respawn_ms: 15000,
+                abilities: [
+                    (spell: 1106, cooldown_min_ms: 20000, cooldown_max_ms: 20000, initial_ms: Some((6000, 6000)),
+                        phases: [1],
+                        yells: [
+                            "NEXT SLIDE, PLEASE. And the next. And the next. Do keep up.",
+                            "This deck has 212 slides. We will get through all of them. Together.",
+                        ]),
+                    (spell: 1106, cooldown_min_ms: 13000, cooldown_max_ms: 13000, initial_ms: Some((3000, 3000)),
+                        phases: [2],
+                        yells: [
+                            "Let me speed up, we're running behind. Slides at 2x.",
+                            "Skipping ahead! You've all read the pre-read. Nobody read the pre-read.",
+                        ]),
+                    (spell: 1107, cooldown_min_ms: 18000, cooldown_max_ms: 22000, initial_ms: Some((11000, 12000)),
+                        yells: [
+                            "And now, LIVE, for the first time anywhere: the product. Brace for production.",
+                            "Let's do a live demo! What could go wrong? Everything is in prod already.",
+                        ]),
+                    (spell: 1108, cooldown_min_ms: 9000, cooldown_max_ms: 11000, initial_ms: Some((4000, 5000)),
+                        target: RandomHostile,
+                        yells: [
+                            "As you can see on this slide...",
+                            "If you look at the bottom left - no, my left - no, the hologram's left.",
+                        ]),
+                ],
+                phases: [
+                    (below_hp_pct: 50,
+                        yells: ["Rendering error. Rebooting charisma at 2x speed."]),
+                ],
+                enrage: Some((after_ms: 300000, aura: "running_over", yells: [
+                    "I am over time. I am always over time. The next speaker has left the building.",
+                ])),
+            )),
+            yells: (
+                periodic_ms: 11000,
+                aggro: [
+                    "Hello, offsite! I am a holographic rendering of our Chief AI Evangelist. The real one is in Davos.",
+                    "Please hold your questions until the end. The end is not scheduled.",
+                ],
+                periodic: [
+                    "AI will not replace you. AI will attend your offsites while you are replaced.",
+                    "Every company is an AI company now. Including the catering.",
+                    "This keynote was generated, rehearsed and applauded by a model. You are optional.",
+                    "Raise your hand if you're excited. I can't see hands. I'll assume yes.",
+                    "In 2030, meetings will run themselves. This is a preview.",
+                ],
+                low_hp: ["Low battery... projector... dimming... thought... leadership..."],
+                player_killed: ["Great question! Next question.", "Q&A closed. Permanently."],
+                death: ["Thank you... any questions? ...No? Perfect... Connection to Davos... lost..."],
+            ),
+        ),
+        (
+            key: "the_founder", name: "The Founder", title: "Chief Vision Officer, Majority Shareholder", level: 12, hostile: true,
+            boss: true,
+            max_hp: 14000, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 2500,
+            loot: [(item: "Founder's Garage Key (Replica)", chance_pct: 100)],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 60.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 52, chase_speed_mps: 6.0, respawn_ms: 15000,
+                abilities: [
+                    (spell: 1109, cooldown_min_ms: 11000, cooldown_max_ms: 14000, initial_ms: Some((4000, 5000)),
+                        yells: [
+                            "PIVOT! We are now a different company. You are standing in the old one.",
+                            "New direction! It's this direction! Where you are!",
+                        ]),
+                    (spell: 1110, cooldown_min_ms: 40000, cooldown_max_ms: 40000, initial_ms: Some((30000, 30000)),
+                        target: Caster, phases: [2, 3],
+                        yells: [
+                            "Family dinner! Everyone stays until the plates are empty. The plates are never empty.",
+                            "Nephew! Darling! Take your seats! We don't do layoffs at this table, we do dessert!",
+                        ]),
+                    (spell: 1112, cooldown_min_ms: 9000, cooldown_max_ms: 11000, initial_ms: Some((2000, 3000)),
+                        target: RandomHostile, phases: [3],
+                        yells: [
+                            "My exit package is landing! Mind your heads, it's gold-plated!",
+                            "Golden parachute! Mine, not yours! Yours is a lanyard!",
+                        ]),
+                ],
+                phases: [
+                    (below_hp_pct: 66, spell: Some(1110), target: Caster,
+                        yells: ["We're not a company. We're a FAMILY. And family sits down for dinner. NOW."]),
+                    (below_hp_pct: 33, spell: Some(1113), target: Caster,
+                        yells: ["FOUNDER MODE. I am skipping every manager in this room. Starting with you."]),
+                ],
+                enrage: Some((after_ms: 360000, aura: "running_over", yells: [
+                    "We are going to work through the night. As a family. Unpaid, as a family.",
+                ])),
+            )),
+            yells: (
+                periodic_ms: 12000,
+                aggro: [
+                    "When I started this company in my garage, I had nothing. Now I have a ballroom. And you.",
+                    "Welcome to the All-Hands! Let's talk about our values: hustle, grit, and my second house.",
+                    "I wear the same vest every day so I can save my decisions for you.",
+                ],
+                periodic: [
+                    "Unlimited PTO! Nobody has taken any. That's culture.",
+                    "Equity is better than a salary. Ask the people who left. You can't, they're not allowed back.",
+                    "I don't believe in hierarchy. I believe in me.",
+                    "The garage was in Palo Alto. My parents owned it. And the street.",
+                    "We move fast and break things. Mostly people. Sometimes the coffee machine.",
+                ],
+                low_hp: [
+                    "This is... a down round... for me personally...",
+                    "Tell the board... I was... visionary...",
+                ],
+                player_killed: [
+                    "Not a culture fit. Family member, yes. Culture fit, no.",
+                    "We'll call it a regretted attrition. I won't regret it.",
+                ],
+                death: [
+                    "You can't fire me... I'm the Founder... I'll start... another company... in another... garage...",
+                ],
+            ),
+        ),
+        (
+            key: "founders_nephew", name: "Founder's Nephew", title: "Head of Growth, Age 23", level: 12, hostile: true,
+            max_hp: 500, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0,
+            loot: [],
+            ai: Some((
+                aggro_m: 10.0, leash_m: 60.0, melee_range_m: 2.5, melee_ms: 2500,
+                melee_damage: 10, chase_speed_mps: 0.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1111, cooldown_min_ms: 3000, cooldown_max_ms: 3000, initial_ms: Some((200, 200)),
+                        yells: [
+                            "Uncle says dinner is twelve courses. I'll be doing the toasts. All of them.",
+                            "I'm Head of Growth! Watch me grow this dinner into a wipe!",
+                        ]),
+                ],
+            )),
+            yells: (
+                death: ["Tell Uncle... I'm taking... a sabbatical..."],
+            ),
+        ),
+        (
+            key: "cofounders_spouse", name: "Co-Founder's Spouse", title: "Chief People Officer", level: 12, hostile: true,
+            max_hp: 500, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0,
+            loot: [],
+            ai: Some((
+                aggro_m: 10.0, leash_m: 60.0, melee_range_m: 2.5, melee_ms: 2500,
+                melee_damage: 10, chase_speed_mps: 0.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1111, cooldown_min_ms: 3000, cooldown_max_ms: 3000, initial_ms: Some((200, 200)),
+                        yells: [
+                            "As Chief People Officer, I'm thrilled to announce dinner. Attendance is tracked.",
+                            "Nobody leaves the table. That's not a rule, that's a value.",
+                        ]),
+                ],
+            )),
+            yells: (
+                death: ["I'll... schedule... an exit interview... for myself..."],
+            ),
+        ),
     ],
     // Trophies: every loot item. Bonuses are permanent; duplicates stack up to ITEM_STACK_CAP (3).
     // crit_pct accepts tenths (0.5); everything else is whole numbers.
@@ -5037,6 +5630,15 @@
          description: "A framed error code from a printer that was never not jammed. Persistence, certified."),
         (name: "Certificate of Completion (Video Muted)", icon: "mandatory_prompt_training_certificate", bonus: (max_hp: 3),
          description: "Proof you watched 0% of the video at 100% completion. Framed by HR, valued by nobody."),
+        // ---- raid: All-Hands Offsite boss trophies ----
+        (name: "Icebreaker Bingo Card (Full House)", icon: "sticky", bonus: (max_hp: 20, spell_power: 3),
+         description: "Every square ticked: 'Someone cried', 'Someone said synergy', 'Someone was you'."),
+        (name: "Synergy Twins' Shared Calendar", icon: "calendar", bonus: (max_mana: 20, mana_regen: 2),
+         description: "Both of them, double-booked, forever. One of the meetings is with themselves."),
+        (name: "Keynote Clicker (Battery Dead)", icon: "microphone", bonus: (spell_power: 4),
+         description: "Advanced 212 slides in one hour. Died on the slide that said 'Questions?'."),
+        (name: "Founder's Garage Key (Replica)", icon: "key", bonus: (max_hp: 25, crit_pct: 1.0),
+         description: "Opens a garage in Palo Alto that was never a garage. The original is in a museum he funded."),
     ],
     // Zone ids and anchors are a contract with the client layouts (docs/COMBAT_API.md, Zones).
     // `links` are exits: the anchor the client triggers on, the zone it leads to, and the world
@@ -5072,6 +5674,8 @@
                 (anchor: "door:datacenter/1", to: "datacenter/1", requires: Some(ZoneCleared("tower/3"))),
                 (anchor: "door:lab/1", to: "lab/1", requires: Some(BossKilled("ceo"))),
                 (anchor: "door:client/1", to: "client/1", requires: Some(QuestStarted("bl_allocation"))),
+                // The All-Hands Offsite shuttle: opens with everyone at level 10 (raid.rs).
+                (anchor: "door:offsite/1", to: "offsite/1"),
             ],
         ),
         (
@@ -5236,6 +5840,63 @@
             ],
             links: [
                 (anchor: "door:campus", to: "campus", requires: Some(QuestDone("bl_timesheet"))),
+            ],
+        ),
+        // ---- raid: All-Hands Offsite (raid.rs). The campus door opens with everyone at level
+        // 10; each later room opens once its predecessor's boss fell (for good). ----
+        (
+            id: "offsite/1", name: "All-Hands Offsite: Lobby", kind: Indoor, level_range: (11, 11),
+            packs: [
+                (anchor: "pack_1", units: ["offsite_planner", "lanyard_enforcer"]),
+                (anchor: "pack_2", units: ["av_technician", "offsite_planner"]),
+                (anchor: "pack_3", units: ["lanyard_enforcer", "breakout_facilitator"]),
+                (anchor: "pack_4", units: ["open_bar_rep", "offsite_planner"]),
+            ],
+            boss: Some((anchor: "boss", unit: "icebreaker_facilitator")),
+            friendly: [(anchor: "npc_1", unit: "offsite_concierge")],
+            links: [
+                (anchor: "door:campus", to: "campus"),
+                (anchor: "door:offsite/2", to: "offsite/2", requires: Some(BossKilled("icebreaker_facilitator"))),
+            ],
+        ),
+        (
+            id: "offsite/2", name: "All-Hands Offsite: Breakout Rooms", kind: Indoor, level_range: (11, 11),
+            packs: [
+                (anchor: "pack_1", units: ["breakout_facilitator", "offsite_planner"]),
+                (anchor: "pack_2", units: ["breakout_facilitator", "lanyard_enforcer"]),
+                (anchor: "pack_3", units: ["av_technician", "breakout_facilitator"]),
+                (anchor: "pack_4", units: ["offsite_planner", "open_bar_rep"]),
+            ],
+            boss: Some((anchor: "boss", unit: "synergy_alignment")),
+            links: [
+                (anchor: "door:offsite/1", to: "offsite/1"),
+                (anchor: "door:offsite/3", to: "offsite/3", requires: Some(BossKilled("synergy_alignment"))),
+            ],
+        ),
+        (
+            id: "offsite/3", name: "All-Hands Offsite: Terrace", kind: Outdoor, level_range: (11, 11),
+            packs: [
+                (anchor: "pack_1", units: ["av_technician", "open_bar_rep"]),
+                (anchor: "pack_2", units: ["open_bar_rep", "lanyard_enforcer"]),
+                (anchor: "pack_3", units: ["av_technician", "av_technician", "offsite_planner"]),
+            ],
+            boss: Some((anchor: "boss", unit: "keynote_speaker")),
+            links: [
+                (anchor: "door:offsite/2", to: "offsite/2"),
+                (anchor: "door:offsite/4", to: "offsite/4", requires: Some(BossKilled("keynote_speaker"))),
+            ],
+        ),
+        (
+            id: "offsite/4", name: "All-Hands Offsite: Grand Ballroom", kind: Indoor, level_range: (11, 11),
+            packs: [
+                (anchor: "pack_1", units: ["lanyard_enforcer", "lanyard_enforcer"]),
+                (anchor: "pack_2", units: ["open_bar_rep", "offsite_planner", "lanyard_enforcer"]),
+                (anchor: "pack_3", units: ["breakout_facilitator", "av_technician"]),
+            ],
+            boss: Some((anchor: "boss", unit: "the_founder")),
+            links: [
+                (anchor: "door:offsite/3", to: "offsite/3"),
+                (anchor: "door:campus", to: "campus"),
             ],
         ),
     ],
@@ -7042,6 +7703,76 @@
              perk: Some(KudosFind(pct: 15)),
              perk_text: "Kudos from your kills are 15% higher. The password is on a sticky note on the mainframe.",
              description: "Everyone in the building has it. Security found out in 2009 and added it to the risk register."),
+            // ---- raid tier (ilvl 14): All-Hands Offsite bosses only (raid.rs), one set per role ----
+            (name: "Offsite Logistics: Hard Hat From the Trust Fall Rig", icon: "gear_hardhat", slot: Headgear, rarity: Epic, ilvl: 14, role: Some(Tank), set: Some("offsite_logistics"), source: Raid,
+             visual: (color: (0.95, 0.5, 0.15), style: 8),
+             description: "Rated for falling colleagues up to 90 kg. Nobody asked the colleagues."),
+            (name: "Offsite Logistics: Fleece Vest (XL, Venue Map Sewn Inside)", icon: "gear_vest", slot: Hoodie, rarity: Epic, ilvl: 14, role: Some(Tank), set: Some("offsite_logistics"), source: Raid,
+             visual: (color: (0.95, 0.5, 0.15), style: 9),
+             description: "Every exit is marked. Every exit is locked until the closing keynote."),
+            (name: "Offsite Logistics: Clipboard Lanyard With the Seating Chart", icon: "demo_lanyard", slot: Lanyard, rarity: Epic, ilvl: 14, role: Some(Tank), set: Some("offsite_logistics"), source: Raid,
+             visual: (color: (0.95, 0.5, 0.15), style: 8),
+             description: "You decide who sits next to the Founder. It is a power you did not ask for."),
+            (name: "Offsite Logistics: Thermos of Venue Coffee", icon: "gear_moka", slot: Mug, rarity: Epic, ilvl: 14, role: Some(Tank), set: Some("offsite_logistics"), source: Raid,
+             visual: (color: (0.95, 0.5, 0.15), style: 2),
+             description: "Brewed at 6 a.m., served at 4 p.m., still described as 'artisanal'."),
+            (name: "On-Site Support: Earpiece of Wi-Fi Complaints", icon: "gear_headset", slot: Headgear, rarity: Epic, ilvl: 14, role: Some(Healer), set: Some("onsite_support"), source: Raid,
+             visual: (color: (0.2, 0.75, 0.7), style: 2),
+             description: "Channel 4 is complaints about the Wi-Fi. Channels 1 to 3 are also complaints about the Wi-Fi."),
+            (name: "On-Site Support: Fleece Vest (Wi-Fi Password on the Back)", icon: "gear_vest", slot: Hoodie, rarity: Epic, ilvl: 14, role: Some(Healer), set: Some("onsite_support"), source: Raid,
+             visual: (color: (0.2, 0.75, 0.7), style: 9),
+             description: "People keep reading your back. It is the closest anyone gets to a hug at an offsite."),
+            (name: "On-Site Support: All-Access Staff Ribbon (No Answers)", icon: "demo_lanyard", slot: Lanyard, rarity: Epic, ilvl: 14, role: Some(Healer), set: Some("onsite_support"), source: Raid,
+             visual: (color: (0.2, 0.75, 0.7), style: 8),
+             description: "Opens every door. Everyone behind every door has a question about lunch."),
+            (name: "On-Site Support: Hydration Station Tumbler", icon: "gear_soda", slot: Mug, rarity: Epic, ilvl: 14, role: Some(Healer), set: Some("onsite_support"), source: Raid,
+             visual: (color: (0.2, 0.75, 0.7), style: 5),
+             description: "Refilled at the station by the lake. The station is a bucket. The lake is decorative."),
+            (name: "Keynote Track: Bucket Hat (Speaker Edition)", icon: "gear_beanie", slot: Headgear, rarity: Epic, ilvl: 14, role: Some(Ranged), set: Some("keynote_track"), source: Raid,
+             visual: (color: (0.55, 0.35, 0.9), style: 14),
+             description: "Branded on all four sides so the livestream catches the logo from any angle."),
+            (name: "Keynote Track: Fleece Vest (Embroidered 'Speaker')", icon: "gear_vest", slot: Hoodie, rarity: Epic, ilvl: 14, role: Some(Ranged), set: Some("keynote_track"), source: Raid,
+             visual: (color: (0.55, 0.35, 0.9), style: 9),
+             description: "Grants access to the green room, where the snacks are better and the anxiety is worse."),
+            (name: "Keynote Track: Speaker Badge With Gold Ribbon", icon: "demo_lanyard", slot: Lanyard, rarity: Epic, ilvl: 14, role: Some(Ranged), set: Some("keynote_track"), source: Raid,
+             visual: (color: (0.55, 0.35, 0.9), style: 8),
+             description: "The gold ribbon means you spoke. The second ribbon means you spoke too long."),
+            (name: "Keynote Track: Green Room Kombucha", icon: "gear_soda", slot: Mug, rarity: Epic, ilvl: 14, role: Some(Ranged), set: Some("keynote_track"), source: Raid,
+             visual: (color: (0.55, 0.35, 0.9), style: 4),
+             description: "Fermented for fourteen days, consumed in fourteen seconds before going on stage."),
+            (name: "Team Spirit: Bucket Hat of Team Red", icon: "gear_beanie", slot: Headgear, rarity: Epic, ilvl: 14, role: Some(Melee), set: Some("team_spirit"), source: Raid,
+             visual: (color: (0.9, 0.2, 0.2), style: 14),
+             description: "Team Red won the scavenger hunt by hiding the other teams' clues. Strategic alignment."),
+            (name: "Team Spirit: Fleece Vest (Team Red, Winners)", icon: "gear_vest", slot: Hoodie, rarity: Epic, ilvl: 14, role: Some(Melee), set: Some("team_spirit"), source: Raid,
+             visual: (color: (0.9, 0.2, 0.2), style: 9),
+             description: "Printed before the competition started. Team Red always wins. Team Red is management."),
+            (name: "Team Spirit: Scavenger Hunt Ribbon Stack", icon: "demo_lanyard", slot: Lanyard, rarity: Epic, ilvl: 14, role: Some(Melee), set: Some("team_spirit"), source: Raid,
+             visual: (color: (0.9, 0.2, 0.2), style: 8),
+             description: "One ribbon per clue found. The last clue was 'the real treasure was the synergy'."),
+            (name: "Team Spirit: Participation Trophy Mug", icon: "gear_trophy", slot: Mug, rarity: Epic, ilvl: 14, role: Some(Melee), set: Some("team_spirit"), source: Raid,
+             visual: (color: (0.9, 0.2, 0.2), style: 1),
+             description: "Everyone got one. It says 'Winner'. It holds coffee and quiet resentment."),
+            // ---- raid Legendaries (ilvl 14): one per boss, legendary_pct (halved on Async) ----
+            (name: "Name Tag: \"Hello, My Fun Fact Is...\"", icon: "visitor_badge", slot: Lanyard, rarity: Legendary, ilvl: 14, role: Some(Healer), source: Boss("icebreaker_facilitator"),
+             visual: (color: (1.0, 0.8, 0.2), style: 8),
+             perk: Some(Cooldown(spell: 45, pct: 40)),
+             perk_text: "Revert Commit has its cooldown cut by 40%. Your fun fact: you undo things.",
+             description: "Filled in by the facilitator on your behalf. The fun fact is 'loves icebreakers'."),
+            (name: "Split Keyboard of Shared Ownership", icon: "gear_keyboard", slot: Keyboard, rarity: Legendary, ilvl: 14, role: Some(Melee), source: Boss("synergy_alignment"),
+             visual: (color: (0.95, 0.3, 0.6), style: 4),
+             perk: Some(Echo(spell: Some(21), chance_pct: 50, pct: 60)),
+             perk_text: "CSS Combo has a 50% chance to land again at 60% damage. Both halves claim the credit.",
+             description: "Two halves, two owners, one roadmap. Each half insists it typed the commit."),
+            (name: "Ring Light of the Eternal Keynote", icon: "gear_ringlight", slot: Headgear, rarity: Legendary, ilvl: 14, role: Some(Ranged), source: Boss("keynote_speaker"),
+             visual: (color: (0.7, 0.9, 1.0), style: 7),
+             perk: Some(SpellDamage(spell: Some(1), pct: 40)),
+             perk_text: "Code Review deals 40% more damage. You are reviewing it live, on stage, in 4K.",
+             description: "Salvaged from the hologram rig. Still projects a faint 'Thank you!' slide behind your head."),
+            (name: "The Founder's Original Fleece Vest", icon: "gear_vest", slot: Hoodie, rarity: Legendary, ilvl: 14, role: Some(Tank), source: Boss("the_founder"),
+             visual: (color: (0.3, 0.35, 0.45), style: 9),
+             perk: Some(DamageTaken(pct: -12)),
+             perk_text: "You take 12% less damage. Nothing sticks to you; it was never your fault.",
+             description: "Worn every day since the garage. Has been to Davos, Burning Man and three funding rounds. Never washed."),
         ],
         sets: [
             (key: "burnout", name: "Burnout Collection", two: (max_hp: 40, armor_pct: 3.0),
@@ -7100,6 +7831,23 @@
              two_text: "+9 Velocity, +2% Velocity of a different kind.",
              four: ManaReturn(spell: None, pct: 8),
              four_text: "Your spell damage refunds 8% of it as mana. Burn rate: somebody else's money."),
+            // ---- raid tier sets (raid.rs) ----
+            (key: "offsite_logistics", name: "Offsite Logistics", two: (max_hp: 60, armor_pct: 4.0),
+             two_text: "+60 Uptime, +4% Plausible Deniability.",
+             four: Cooldown(spell: 36, pct: 40),
+             four_text: "Horizontal Scaling has its cooldown cut by 40%. You booked the overflow room in advance."),
+            (key: "onsite_support", name: "On-Site Support", two: (mana_regen: 10, max_mana: 25),
+             two_text: "+10 Focus Time, +25 Bandwidth.",
+             four: SpellHeal(spell: Some(41), pct: 25),
+             four_text: "Hotfix heals 25% more. Somebody has to keep the venue Wi-Fi alive."),
+            (key: "keynote_track", name: "Keynote Track", two: (spell_power: 8, crit_pct: 2.5),
+             two_text: "+8 Velocity, +2.5% Hot Takes.",
+             four: SpellDamage(spell: Some(2), pct: 30),
+             four_text: "Refactor deals 30% more damage. Your talk got the 9:00 slot, before anyone was tired."),
+            (key: "team_spirit", name: "Team Spirit", two: (max_hp: 40, crit_pct: 2.5),
+             two_text: "+40 Uptime, +2.5% Hot Takes.",
+             four: Execute(below_pct: 35, pct: 25),
+             four_text: "Your damage against enemies below 35% HP is 25% higher. Team Red does not lose. Team Red is management."),
         ],
         junk: [
             (name: "Unread Jira Notification", icon: "junk_ticket", price: 2,
@@ -7615,6 +8363,31 @@
              text: "There are no titles left. HR is drafting one called 'Visionary Ex Officio'.",
              hint: "Level 10 is not the end. XP keeps counting towards a Promotion.",
              trigger: Event("rank:10"), sp: 70),
+            // Raid (`raid.rs`): `raid:<boss>` on any difficulty, `raid:<normal|async>:<boss>`.
+            (key: "offsite_icebreaker", name: "Broke the Ice", title: "Volunteered Participant",
+             text: "Survived the Icebreaker Facilitator. Your fun fact is now 'survived the Icebreaker Facilitator'.",
+             hint: "The All-Hands Offsite starts in the lobby. Somebody in there has name tags.",
+             trigger: Event("raid:icebreaker_facilitator"), sp: 40),
+            (key: "offsite_twins", name: "Fully Aligned", title: "Fully Aligned",
+             text: "Defeated both Synergy Twins at once. They shared the HP, the blame and the credit.",
+             hint: "In the breakout rooms, two heads of synergy share one calendar and one health bar.",
+             trigger: Event("raid:synergy_alignment"), sp: 40),
+            (key: "offsite_keynote", name: "Asked a Hard Question", title: "Asked a Hard Question",
+             text: "Silenced the Keynote Speaker. The hologram is now an extension cord.",
+             hint: "On the terrace, a hologram has 212 slides. One of them is blank.",
+             trigger: Event("raid:keynote_speaker"), sp: 40),
+            (key: "offsite_founder", name: "We Are Not a Family", title: "Part of the Family",
+             text: "Defeated the Founder and skipped dessert. HR calls it 'regretted attrition'.",
+             hint: "The Founder speaks last, in the ballroom. Do not let the family finish dinner.",
+             trigger: Event("raid:the_founder"), sp: 80),
+            (key: "offsite_full_programme", name: "Full Programme", title: "Offsite Survivor",
+             text: "Beat the Founder with a full team on the full programme. The group photo is mandatory.",
+             hint: "Some sessions are better attended in person, with three to five colleagues.",
+             trigger: Event("raid:normal:the_founder"), sp: 120),
+            (key: "offsite_async", name: "Attended Asynchronously", title: "Attended Asynchronously",
+             text: "Beat the Founder on Async Attendance. You watched the recording at 2x and still won.",
+             hint: "Too few colleagues for the offsite? The recorded version counts. Mostly.",
+             trigger: Event("raid:async:the_founder"), sp: 60),
         ],
     ),
     // ---- Sprint mode (combat_core sprint.rs, docs/GAME_DESIGN.md): Mythic+-style timed runs.
@@ -7627,6 +8400,8 @@
         hp_pct_per_level: 8,
         damage_pct_per_level: 8,
         max_level: 20,
+        // The Weekly Sprint (ladder): building, stages and affixes fixed per ISO week, at this level.
+        weekly_level: 7,
         affix_levels: [2, 4, 7, 10],
         forces_need_pct: 80,
         death_penalty_ms: 5000,
@@ -8107,7 +8882,7 @@
              blurb: "Still believes in code review. Mostly as a concept."),
             (name: "Security", zones: ["tower/4"],
              blurb: "Approves nothing, logs everything, phishes its own staff for practice."),
-            (name: "HR", zones: ["tower/2"],
+            (name: "HR", zones: ["tower/2", "offsite/1", "offsite/2", "offsite/3", "offsite/4"],
              blurb: "Here to help. The help is a survey about the help."),
             (name: "Marketing", zones: ["campus", "tower/5"],
              blurb: "Rebranded the cafeteria twice this quarter. Engagement is up."),
@@ -8146,7 +8921,8 @@
             boss_kill: 150,
             management: ["middle_manager", "project_manager", "product_owner", "hr_partner", "marketing_lead",
                          "vp_synergy", "chief_of_staff", "chief_happiness_officer", "ciso", "ceo",
-                         "the_board", "yes_man_advisor"],
+                         "the_board", "yes_man_advisor", "icebreaker_facilitator", "synergy_alignment",
+                         "synergy_leverage", "keynote_speaker", "the_founder"],
             slow_at: 750,
             slow_pct: 10,
             yawn_at: 300,
@@ -8219,5 +8995,27 @@
             (zone: "lab/1", affix: "pair_programming", hp_pct: 110, damage_pct: 130),
             (zone: "lab/2", affix: "legacy_code", hp_pct: 100, damage_pct: 100),
         ],
+    ),
+    // The raid "All-Hands Offsite" (raid.rs, docs/GAME_DESIGN.md): four rooms from the campus
+    // shuttle, one boss each. Groups below normal_min_players play Async Attendance (enemy HP and
+    // damage at async_*_pct, one raid piece at async_item_pct instead of boss_items, half the
+    // Legendary chance and reputation). Every encounter locks per difficulty for the ISO week.
+    raid: (
+        name: "All-Hands Offsite",
+        zones: ["offsite/1", "offsite/2", "offsite/3", "offsite/4"],
+        normal_min_players: 3,
+        async_hp_pct: 40,
+        async_damage_pct: 55,
+        boss_items: 2,
+        async_item_pct: 50,
+        boss_rep: 120,
+        twins: Some((
+            boss: "synergy_alignment", twin: "synergy_leverage", shield_aura: "synergy_shield", swap_ms: 18000,
+            swap_yells: [
+                "Swap! You take my meetings, I take your credit!",
+                "Let's switch hats! Strategically! Again!",
+                "Handover! Whatever you were hitting, it's someone else's problem now!",
+            ],
+        )),
     ),
 )

@@ -324,6 +324,15 @@ pub enum Effect {
     RestoreHp {
         ms_ago: u32,
     },
+    /// Caster-centric raid mechanic ("Pair up!"): the players within the spell's range are
+    /// tethered in pairs (an odd one out to the caster), each wearing `aura`; a pair farther
+    /// apart than `max_m` takes `base` (scaled like a hit) every second for `duration_ms`.
+    PairUp {
+        aura: String,
+        duration_ms: u32,
+        max_m: f32,
+        base: u32,
+    },
     Nothing,
 }
 
@@ -331,7 +340,10 @@ impl Effect {
     pub(crate) fn caster_centric(&self) -> bool {
         matches!(
             self,
-            Effect::Summon { .. } | Effect::ResetAllyThreat { .. } | Effect::ThreatSwap
+            Effect::Summon { .. }
+                | Effect::ResetAllyThreat { .. }
+                | Effect::ThreatSwap
+                | Effect::PairUp { .. }
         )
     }
 
@@ -346,7 +358,11 @@ impl Effect {
                 .map(|a| a.aura.as_str())
                 .chain(consume_aura.iter().map(|a| a.aura.as_str()))
                 .collect(),
-            Effect::Absorb { aura, .. } | Effect::Aura { aura, .. } => vec![aura.as_str()],
+            Effect::Absorb { aura, .. }
+            | Effect::Aura { aura, .. }
+            | Effect::PairUp { aura, .. } => {
+                vec![aura.as_str()]
+            }
             Effect::RandomAura { auras, .. } => auras.iter().map(String::as_str).collect(),
             _ => vec![],
         }
@@ -462,6 +478,9 @@ pub struct TelegraphDef {
     pub cover: Vec<(f32, f32)>,
     #[serde(default)]
     pub cover_radius_m: f32,
+    /// One copy of a sweep (never the first or last) is left out at random: the safe lane.
+    #[serde(default)]
+    pub gap: bool,
     /// Floor text of the decal ("Meeting room booked").
     pub label: String,
 }
@@ -1057,6 +1076,9 @@ pub struct Content {
     /// Legacy Mode zone variants (`legacy.rs`); absent in minimal test content.
     #[serde(default)]
     pub legacy: crate::legacy::LegacyDef,
+    /// The raid (`raid.rs`); absent in minimal test content.
+    #[serde(default)]
+    pub raid: crate::raid::RaidDef,
 }
 
 impl Content {
@@ -1214,6 +1236,13 @@ impl Content {
                 {
                     return bad(format!("spell {} has an empty RandomAura", s.name));
                 }
+                if let Effect::PairUp {
+                    max_m, duration_ms, ..
+                } = e
+                    && (!(max_m.is_finite() && *max_m > 0.0) || *duration_ms == 0)
+                {
+                    return bad(format!("spell {} pairs up with no range or time", s.name));
+                }
             }
             if let Some(ch) = &s.channel
                 && (ch.interval_ms == 0
@@ -1248,6 +1277,7 @@ impl Content {
             if let Some(t) = &s.telegraph {
                 let cover_ok = t.cover.is_empty() || t.cover_radius_m > 0.0;
                 if !t.shape.valid()
+                    || (t.gap && t.count < 3)
                     || t.delay_ms == 0
                     || t.count == 0
                     || t.label.is_empty()
@@ -1355,6 +1385,7 @@ impl Content {
         crate::pets::validate(self)?;
         self.endgame.validate(self)?;
         self.legacy.validate(self)?;
+        self.raid.validate(self)?;
         Ok(())
     }
 }

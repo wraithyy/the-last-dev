@@ -865,9 +865,10 @@ impl Bot {
 
 /// Several seeds so the verdict does not hinge on one lucky crit/miss/loot stream. Every zone
 /// with packs, at its max level; zones without a boss only need to be survived.
-/// Zones with nothing to fight (the Body Leasing office) have no run to play.
+/// Zones with nothing to fight (the Body Leasing office) have no run to play; the raid is
+/// group content above the cap with its own gate (tests/coop.rs).
 fn has_combat(z: &combat_core::ZoneDef) -> bool {
-    !z.packs.is_empty() || z.boss.is_some()
+    (!z.packs.is_empty() || z.boss.is_some()) && !content().raid.is_raid_zone(&z.id)
 }
 
 #[test]
