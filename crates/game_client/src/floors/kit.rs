@@ -193,6 +193,8 @@ pub enum Mat {
     LedBlue,
     LightPanel,
     Glass,
+    /// Milky translucent band on glass walls and low partitions.
+    Frosted,
     Gold,
     Dark,
     Metal,
@@ -502,7 +504,7 @@ pub enum Piece {
         inset: f32,
     },
     /// Wall-top strip, only seen from above (debug overview).
-    Cap { segs: Vec<Seg> },
+    Cap { segs: Vec<Seg>, y: f32 },
     /// Round primitive, visual only (trees, wheels, domes, fans).
     Prim {
         kind: PrimKind,
@@ -519,6 +521,8 @@ pub enum PrimKind {
     Cylinder,
     Sphere,
     Cone,
+    /// Flat two-sided triangle in the XY plane, point down: `size.x` wide, `size.y` tall.
+    Pennant,
 }
 
 /// Direction a wall-mounted item faces (into the room).
@@ -575,10 +579,17 @@ pub struct Plan {
     pub props: Vec<(&'static str, Vec3)>,
     /// Every place to sit, registered by the props that offer one.
     pub seats: Vec<SeatSpot>,
+    /// Wall and ceiling height for big halls; 0 keeps the standard `H`.
+    pub ceiling: f32,
     frame: Vec<(Vec3, f32)>,
 }
 
 impl Plan {
+    /// Height of this plan's ceiling.
+    pub fn top(&self) -> f32 {
+        if self.ceiling > 0.0 { self.ceiling } else { H }
+    }
+
     fn to_world(&self, mut p: Vec3) -> Vec3 {
         for (o, yaw) in self.frame.iter().rev() {
             p = *o + Quat::from_rotation_y(*yaw) * p;
@@ -777,6 +788,7 @@ impl Plan {
     /// outline is final; the `*_near` helpers below snap decor to these walls.
     pub fn build_walls(&mut self) {
         self.walls = self.fp.walls();
+        let top = self.top();
         let mats: Vec<Mat> = self.walls.iter().fold(Vec::new(), |mut m, s| {
             if !m.contains(&s.mat) {
                 m.push(s.mat);
@@ -799,14 +811,14 @@ impl Plan {
                     inset,
                 });
             };
-            run(mat, 0.0, H, 0.0);
+            run(mat, 0.0, top, 0.0);
             if mat == Mat::Glass {
                 run(Mat::Trim, 0.0, 0.12, 0.02);
-                run(Mat::Trim, H - 0.12, H, 0.02);
+                run(Mat::Trim, top - 0.12, top, 0.02);
             } else {
                 run(Mat::Trim, 0.0, 0.2, 0.02);
                 run(Mat::Accent, 2.87, 2.93, 0.02);
-                self.pieces.push(Piece::Cap { segs });
+                self.pieces.push(Piece::Cap { segs, y: top });
             }
         }
         let mut boxes = colliders(&self.walls, COLLIDER_T);
@@ -1070,6 +1082,10 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
 pub const WALL_T: f32 = COLLIDER_T;
 pub const DOOR_H: f32 = 2.5;
 pub const H: f32 = WALL_HEIGHT;
+
+/// Ceiling of the big halls (ballroom, expo, keynote, open-plan lab): the standard 4.5 m lid
+/// pinned the orbit camera against the ceiling in rooms this wide.
+pub const HALL_H: f32 = 6.5;
 
 /// `[lo, hi]` minus the sorted gap intervals.
 fn segments(lo: f32, hi: f32, gaps: &[(f32, f32)]) -> Vec<(f32, f32)> {

@@ -175,10 +175,20 @@ pub fn foosball(p: &mut Plan, x: f32, z: f32) {
     }
 }
 
-/// A beanbag facing the middle of the zone; its top is the seat.
+/// A beanbag facing the middle of the zone; its top is the seat. Squashed spheres read as a
+/// slumped bag, while the collider stays the old box so walkable space does not change.
 pub fn beanbag(p: &mut Plan, x: f32, z: f32, mat: Mat) {
-    p.boxed(v(x, 0.2, z), v(1.1, 0.4, 1.0), mat, true);
-    p.boxed(v(x, 0.43, z - 0.05), v(0.8, 0.1, 0.7), mat, false);
+    p.block(v(x, 0.2, z), v(1.1, 0.4, 1.0));
+    p.prim(PrimKind::Sphere, v(x, 0.22, z), v(1.1, 0.5, 1.0), mat);
+    // The slumped back leans away from the middle, where the sitter faces.
+    let away = Vec2::new(x, z).try_normalize().unwrap_or(Vec2::Y);
+    p.prim(
+        PrimKind::Sphere,
+        v(x + away.x * 0.3, 0.38, z + away.y * 0.3),
+        v(0.8, 0.5, 0.6),
+        mat,
+    );
+    p.prim(PrimKind::Sphere, v(x, 0.4, z), v(0.7, 0.18, 0.62), mat);
     let face = super::layout::yaw_towards(v(x, 0.0, z), Vec3::ZERO);
     p.seat(v(x, seat::SEAT_TOP, z), face - PI, 0.5);
 }

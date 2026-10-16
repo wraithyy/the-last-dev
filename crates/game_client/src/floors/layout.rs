@@ -76,6 +76,8 @@ pub struct FloorLayout {
     pub props: Vec<(&'static str, Vec3)>,
     /// Every place to sit (see `crate::seat`).
     pub seats: Vec<crate::seat::SeatSpot>,
+    /// Wall and ceiling height; big halls are taller than `WALL_HEIGHT` so the camera has room.
+    pub ceiling: f32,
 }
 
 /// Zone layouts are floor layouts; the alias is the contract name.
@@ -215,6 +217,7 @@ pub fn assemble(
 ) -> FloorLayout {
     let mut plan = plan;
     super::office::place(zone, &mut plan);
+    let ceiling = plan.top();
     let Plan {
         pieces,
         anchors,
@@ -240,6 +243,7 @@ pub fn assemble(
         route,
         props,
         seats,
+        ceiling,
     }
 }
 

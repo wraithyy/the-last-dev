@@ -82,11 +82,17 @@ fn cast(p: &mut Plan, c: &Cast) {
 
 /// Ceiling light panels on an 8 m grid wherever there is open floor.
 pub(super) fn ceiling_lights(p: &mut Plan) {
+    let top = p.top();
     for xi in -7..=7 {
         for zi in -5..=5 {
             let (x, z) = (xi as f32 * 8.0, zi as f32 * 8.0);
             if p.fp.contains(pt(x, z)) {
-                p.boxed(v(x, H - 0.02, z), v(1.2, 0.04, 0.6), Mat::LightPanel, false);
+                p.boxed(
+                    v(x, top - 0.02, z),
+                    v(1.2, 0.04, 0.6),
+                    Mat::LightPanel,
+                    false,
+                );
             }
         }
     }

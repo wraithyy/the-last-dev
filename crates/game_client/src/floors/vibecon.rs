@@ -22,6 +22,9 @@ const NEON: [Mat; 4] = [Mat::NeonYellow, Mat::LedGreen, Mat::NeonCyan, Mat::Neon
 
 pub fn build(level: u8) -> FloorLayout {
     let mut p = Plan::default();
+    if matches!(level, 1 | 5) {
+        p.ceiling = HALL_H;
+    }
     let (zone, name, theme) = match level {
         1 => ("vibecon/1", "VibeCon: Expo Hall", expo(&mut p)),
         2 => ("vibecon/2", "VibeCon: Workshop Rooms", workshops(&mut p)),
@@ -332,6 +335,15 @@ fn hack_table(p: &mut Plan, x: f32, z: f32) {
     }
 }
 
+/// Row of Kenney chairs along z centred on (x, z), all facing +x (the stage or screen).
+fn seat_row(p: &mut Plan, x: f32, z: f32, len: f32) {
+    let n = (len / 0.85) as usize;
+    for k in 0..n {
+        let cz = z + (k as f32 + 0.5 - n as f32 / 2.0) * (len / n as f32);
+        p.prop(&CHAIR_MODERN, v(x, 0.0, cz), FRAC_PI_2, false);
+    }
+}
+
 /// Armchair facing `yaw` (panel seats, lounge corners).
 fn armchair(p: &mut Plan, x: f32, z: f32, yaw: f32, mat: Mat) {
     p.prop(&LOUNGE_CHAIR, v(x, 0.0, z), yaw, true);
@@ -448,14 +460,14 @@ fn expo_dress(p: &mut Plan) {
         p,
         (-16.0, -11.0),
         (30.0, -11.0),
-        3.9,
+        p.top() - 0.6,
         [Mat::NeonPink, Mat::NeonCyan, Mat::NeonYellow],
     );
     bunting(
         p,
         (-16.0, 11.0),
         (30.0, 11.0),
-        3.9,
+        p.top() - 0.6,
         [Mat::NeonYellow, Mat::NeonPink, Mat::NeonCyan],
     );
     for (x, z, tex, w, h) in [
@@ -880,13 +892,9 @@ fn workshops(p: &mut Plan) -> Theme {
     for row in 0..3 {
         let x = 9.0 + row as f32 * 3.0;
         for s in [-1.0, 1.0] {
-            p.boxed(v(x, 0.25, 11.0 * s), v(1.0, 0.5, 9.0), Mat::Fabric0, true);
-            p.boxed(
-                v(x - 0.45, 0.7, 11.0 * s),
-                v(0.15, 0.6, 9.0),
-                Mat::Dark,
-                false,
-            );
+            // The old bench is now an invisible blocker so the walkable space stays put.
+            p.block(v(x, 0.25, 11.0 * s), v(1.0, 0.5, 9.0));
+            seat_row(p, x, 11.0 * s, 9.0);
         }
     }
     p.boxed(v(36.0, 2.4, 0.0), v(0.3, 4.4, 14.0), Mat::Dark, false);
@@ -1244,8 +1252,8 @@ fn main_stage(p: &mut Plan) -> Theme {
     for (bx, bz) in [(-14.0, -12.0), (-14.0, 12.0), (2.0, -12.0), (2.0, 12.0)] {
         for row in 0..4 {
             let x = bx - 4.5 + row as f32 * 3.0;
-            p.boxed(v(x, 0.25, bz), v(0.9, 0.5, 7.0), Mat::Fabric1, true);
-            p.boxed(v(x - 0.4, 0.75, bz), v(0.12, 0.6, 7.0), Mat::Dark, false);
+            p.block(v(x, 0.25, bz), v(0.9, 0.5, 7.0));
+            seat_row(p, x, bz, 7.0);
         }
     }
     for (a, b, m) in [

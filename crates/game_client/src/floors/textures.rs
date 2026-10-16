@@ -67,6 +67,12 @@ pub fn material(mat: Mat, t: &Theme) -> StandardMaterial {
             perceptual_roughness: 0.08,
             ..default()
         },
+        Mat::Frosted => StandardMaterial {
+            base_color: Color::srgba(0.93, 0.96, 0.98, 0.78),
+            alpha_mode: AlphaMode::Blend,
+            perceptual_roughness: 0.7,
+            ..default()
+        },
         Mat::Gold => shiny(c(1.0, 0.75, 0.25), 1.0, 0.3),
         Mat::Dark => matte(c(0.06, 0.06, 0.08)),
         Mat::Metal => shiny(c(0.62, 0.64, 0.68), 0.9, 0.35),
@@ -147,6 +153,10 @@ fn unlit(tex: Tex) -> bool {
             Sign::DaysAi
                 | Sign::Billboard
                 | Sign::InnovationNeon
+                | Sign::MoveFast
+                | Sign::AgiRoom
+                | Sign::VrDemo
+                | Sign::DemoDay
                 | Sign::NocBoard
                 | Sign::AiTraining
                 | Sign::RackFire

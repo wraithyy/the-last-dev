@@ -313,7 +313,7 @@ fn openspace_dress(p: &mut Plan) {
         p,
         (-6.0, -4.0),
         (6.0, -4.0),
-        3.7,
+        p.top() - 0.6,
         [Mat::Fabric0, Mat::Fabric1, Mat::Fabric2],
     );
 }

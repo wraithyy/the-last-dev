@@ -283,7 +283,7 @@ fn load_floor(
     look.ceiling.0 = if layout.outdoor {
         60.0
     } else {
-        crate::config::CAM_MAX_HEIGHT
+        layout.ceiling - (WALL_HEIGHT - crate::config::CAM_MAX_HEIGHT)
     };
     colliders.0 = if bare {
         Vec::new()
@@ -324,7 +324,7 @@ fn load_floor(
         });
         commands.spawn((
             FloorEntity,
-            Mesh3d(meshes.add(flat_mesh(&runs, WALL_HEIGHT, false))),
+            Mesh3d(meshes.add(flat_mesh(&runs, layout.ceiling, false))),
             MeshMaterial3d(ceiling),
             NotShadowCaster,
         ));
@@ -338,6 +338,7 @@ fn load_floor(
         radius: 0.5,
         height: 1.0,
     });
+    let pennant = meshes.add(pennant_mesh());
     let mut mats: HashMap<Mat, Handle<StandardMaterial>> = HashMap::new();
     let mut texs: HashMap<Tex, Handle<StandardMaterial>> = HashMap::new();
     // The QA overview camera sits far above everything: culling would hide all the decor.
@@ -352,9 +353,12 @@ fn load_floor(
     );
     // Small, low or see-through things: no shadow, culled with distance when small.
     let finish = |e: &mut EntityCommands, size: Vec3, mat: Option<Mat>| {
-        if mat
-            .is_some_and(|m| matches!(m, Mat::Glass | Mat::LightPanel | Mat::Facade | Mat::Window))
-            || size.y < SHADOW_MIN_HEIGHT && layout.outdoor
+        if mat.is_some_and(|m| {
+            matches!(
+                m,
+                Mat::Glass | Mat::Frosted | Mat::LightPanel | Mat::Facade | Mat::Window
+            )
+        }) || size.y < SHADOW_MIN_HEIGHT && layout.outdoor
         {
             e.insert(NotShadowCaster);
         }
@@ -478,6 +482,7 @@ fn load_floor(
                     PrimKind::Cylinder => &cylinder,
                     PrimKind::Sphere => &sphere,
                     PrimKind::Cone => &cone,
+                    PrimKind::Pennant => &pennant,
                 };
                 let mut e = commands.spawn((
                     FloorEntity,
@@ -501,14 +506,14 @@ fn load_floor(
                     Mesh3d(meshes.add(strip_mesh(segs, *y0, *y1, *inset))),
                     MeshMaterial3d(get_mat(&mut mats, &mut materials, t, *mat)),
                 ));
-                if matches!(mat, Mat::Glass | Mat::Accent) {
+                if matches!(mat, Mat::Glass | Mat::Frosted | Mat::Accent) {
                     e.insert(NotShadowCaster);
                 }
             }
-            Piece::Cap { segs } => {
+            Piece::Cap { segs, y } => {
                 commands.spawn((
                     FloorEntity,
-                    Mesh3d(meshes.add(cap_mesh(segs))),
+                    Mesh3d(meshes.add(cap_mesh(segs, *y))),
                     MeshMaterial3d(get_mat(&mut mats, &mut materials, t, Mat::Trim)),
                     NotShadowCaster,
                 ));
@@ -534,6 +539,26 @@ fn mesh_from(pos: Vec<[f32; 3]>, normals: Vec<[f32; 3]>, uv: Vec<[f32; 2]>, idx:
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
     .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uv)
     .with_inserted_indices(Indices::U32(idx))
+}
+
+/// Unit triangle hanging point down, drawn on both faces (materials cull back faces).
+fn pennant_mesh() -> Mesh {
+    let tri = [[-0.5, 0.5], [0.0, -0.5], [0.5, 0.5]];
+    let (mut pos, mut normals, mut uv, mut idx) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    for (side, n) in [(0.0_f32, 1.0_f32), (3.0, -1.0)] {
+        for [x, y] in tri {
+            pos.push([x, y, 0.0]);
+            normals.push([0.0, 0.0, n]);
+            uv.push([x + 0.5, 0.5 - y]);
+        }
+        let b = side as u32;
+        idx.extend(if n > 0.0 {
+            [b, b + 1, b + 2]
+        } else {
+            [b, b + 2, b + 1]
+        });
+    }
+    mesh_from(pos, normals, uv, idx)
 }
 
 /// Horizontal quads at height `y`; UVs are world metres.
@@ -577,13 +602,13 @@ fn strip_mesh(segs: &[Seg], y0: f32, y1: f32, inset: f32) -> Mesh {
     mesh_from(pos, normals, uv, idx)
 }
 
-fn cap_mesh(segs: &[Seg]) -> Mesh {
+fn cap_mesh(segs: &[Seg], y: f32) -> Mesh {
     let (mut pos, mut uv, mut idx) = (Vec::new(), Vec::new(), Vec::new());
     for s in segs {
         let out = s.n * -shape::WALL_T;
         let b0 = pos.len() as u32;
         for p in [s.a, s.b, s.b + out, s.a + out] {
-            pos.push([p.x, WALL_HEIGHT + 0.02, p.y]);
+            pos.push([p.x, y + 0.02, p.y]);
             uv.push([p.x, p.y]);
         }
         idx.extend([0, 1, 2, 0, 2, 3].map(|i| b0 + i));

@@ -12,6 +12,9 @@ use std::f32::consts::{FRAC_PI_2, PI};
 
 pub fn build(level: u8) -> FloorLayout {
     let mut p = Plan::default();
+    if level == 1 {
+        p.ceiling = HALL_H;
+    }
     let theme = if level == 1 {
         lab1(&mut p)
     } else {
@@ -461,6 +464,37 @@ fn glass_pod(p: &mut Plan, x0: f32, x1: f32, z0: f32, z1: f32) {
     ] {
         p.boxed(v(x, 1.5, z), v(0.12, 3.0, 0.12), Mat::Metal, false);
     }
+    // Glass alone vanishes against the white hall: a frosted privacy band with metal rails and
+    // mullions gives every wall a readable outline.
+    let frame = |p: &mut Plan, cx: f32, cz: f32, along_x: bool, len: f32| {
+        let (sx, sz) = if along_x { (len, 0.1) } else { (0.1, len) };
+        p.boxed(v(cx, 1.25, cz), v(sx, 0.7, sz), Mat::Frosted, false);
+        for y in [0.9, 1.6] {
+            p.boxed(
+                v(cx, y, cz),
+                v(sx + 0.02, 0.06, sz + 0.02),
+                Mat::Metal,
+                false,
+            );
+        }
+        let n = (len / 1.6).round().max(1.0) as usize;
+        for k in 1..n {
+            let t = k as f32 / n as f32 - 0.5;
+            let (mx, mz) = if along_x {
+                (cx + t * len, cz)
+            } else {
+                (cx, cz + t * len)
+            };
+            p.boxed(v(mx, 1.45, mz), v(0.07, 2.9, 0.07), Mat::Metal, false);
+        }
+    };
+    for z in [z0, z1] {
+        frame(p, (x0 + x1) / 2.0, z, true, x1 - x0);
+    }
+    frame(p, x1, zc, false, z1 - z0);
+    for (a, b) in [(z0, zc - 0.8), (zc + 0.8, z1)] {
+        frame(p, x0, (a + b) / 2.0, false, b - a);
+    }
     p.boxed(v(x0, 2.72, zc), v(0.1, 0.3, 1.7), Mat::Metal, false);
     // The sign stands on two poles above the door.
     for dz in [-0.8, 0.8] {
@@ -677,6 +711,77 @@ fn audience(p: &mut Plan, x: f32, z0: f32, step: f32) {
     }
 }
 
+/// Flat area rug: a coloured field with a lighter border, below the runner's 0.02 so it never
+/// fights it.
+fn area_rug(p: &mut Plan, x: f32, z: f32, w: f32, d: f32, field: Mat, border: Mat) {
+    p.slab(v(x, 0.005, z), 0.0, v(w, 0.01, d), border);
+    p.slab(v(x, 0.006, z), 0.0, v(w - 0.5, 0.01, d - 0.5), field);
+}
+
+/// Low frosted partition marking a work zone; `yaw` is 0 (along x) or a quarter turn. Only the
+/// white base is solid, the frosted panel above is for show.
+fn partition(p: &mut Plan, x: f32, z: f32, len: f32, yaw: f32) {
+    p.framed(v(x, 0.0, z), yaw, |p| {
+        p.boxed(v(0.0, 0.4, 0.0), v(len, 0.8, 0.1), Mat::White, true);
+        p.boxed(
+            v(0.0, 1.05, 0.0),
+            v(len - 0.1, 0.5, 0.05),
+            Mat::Frosted,
+            false,
+        );
+        p.boxed(v(0.0, 1.33, 0.0), v(len, 0.05, 0.12), Mat::Metal, false);
+        for sx in [-1.0, 1.0] {
+            p.boxed(
+                v(sx * (len / 2.0 - 0.05), 0.67, 0.0),
+                v(0.1, 1.34, 0.14),
+                Mat::Metal,
+                false,
+            );
+        }
+    });
+}
+
+/// Concrete planter trough with a row of bushes, `yaw` 0 or a quarter turn.
+fn planter(p: &mut Plan, x: f32, z: f32, len: f32, yaw: f32) {
+    p.framed(v(x, 0.0, z), yaw, |p| {
+        p.boxed(v(0.0, 0.3, 0.0), v(len, 0.6, 0.7), Mat::Concrete, true);
+        p.boxed(v(0.0, 0.61, 0.0), v(len - 0.1, 0.02, 0.6), Mat::Dark, false);
+        let n = (len / 0.55).ceil() as usize;
+        for k in 0..n {
+            let t = (k as f32 + 0.5) / n as f32 - 0.5;
+            p.prim(
+                PrimKind::Sphere,
+                v(t * (len - 0.4), 0.95 + jit(k + 2) * 0.2, jit(k) * 0.12),
+                v(0.62, 0.7 + jit(k + 4) * 0.2, 0.6),
+                if k % 2 == 0 { Mat::Plant } else { Mat::Leaf },
+            );
+        }
+    });
+}
+
+/// Pendant lamp on a cable from the ceiling: conical shade over a glowing disc.
+fn pendant(p: &mut Plan, x: f32, z: f32, y: f32) {
+    let top = p.top();
+    p.boxed(
+        v(x, (top + y) / 2.0, z),
+        v(0.03, top - y, 0.03),
+        Mat::Dark,
+        false,
+    );
+    p.prim(
+        PrimKind::Cone,
+        v(x, y + 0.15, z),
+        v(0.85, 0.3, 0.85),
+        Mat::White,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(x, y - 0.005, z),
+        v(0.7, 0.03, 0.7),
+        Mat::LightPanel,
+    );
+}
+
 fn lab1_dressing(p: &mut Plan) {
     // A navy runner with cyan edges from the lobby to the demo stage, like the tower's hub.
     runner(
@@ -800,6 +905,49 @@ fn lab1_dressing(p: &mut Plan) {
     p.sign_near(50.0, 0.0, 3.0, 4.0, Sign::DemoDay);
     audience(p, 29.5, -10.0, 1.5);
     audience(p, 29.5, 6.0, 1.5);
+    lab1_zoning(p);
+}
+
+/// Breaks the white hall into zones: area rugs, low partitions at the desk islands, planters
+/// and pendant lamps. Everything stays clear of the runner lane, the packs and the doors.
+fn lab1_zoning(p: &mut Plan) {
+    // Desk islands: blue rugs; lounges: warm rugs; kombucha bar: a yellow strip.
+    for (x, z) in [(-31.0, -20.4), (-32.0, 19.3), (-6.0, 18.4), (3.0, -19.9)] {
+        area_rug(p, x, z, 8.6, 5.2, Mat::Fabric1, Mat::White);
+    }
+    for z in [-9.75, 9.75] {
+        area_rug(p, -12.0, z, 8.0, 5.6, Mat::Fabric0, Mat::White);
+    }
+    area_rug(p, 2.9, 21.4, 6.4, 2.6, Mat::Fabric2, Mat::White);
+    // Partitions on the hall side of each island, each capped by a planter.
+    for (x, z, len) in [
+        (-31.0, -17.9, 6.0),
+        (-32.0, 16.6, 6.0),
+        (-6.5, 15.7, 5.5),
+        (3.3, -16.9, 6.0),
+    ] {
+        partition(p, x, z, len, 0.0);
+        for sx in [-1.0, 1.0] {
+            planter(p, x + sx * (len / 2.0 + 0.8), z, 1.4, 0.0);
+        }
+    }
+    for z in [-15.5, 15.5] {
+        planter(p, -12.0, z, 3.0, 0.0);
+    }
+    // Pendants over every zone.
+    for (x, z) in [
+        (-31.0, -20.4),
+        (-32.0, 19.3),
+        (-6.0, 18.4),
+        (3.0, -19.9),
+        (-12.0, -9.75),
+        (-12.0, 9.75),
+        (2.9, 21.4),
+        (6.0, -6.0),
+        (-29.0, 0.3),
+    ] {
+        pendant(p, x, z, 3.4);
+    }
 }
 
 /// The dark sanctum: wall glow, cable trays, cooling pylons, a truss ring over the arena and
@@ -858,6 +1006,78 @@ fn lab2_dressing(p: &mut Plan) {
             );
         }
         p.block(v(x, 1.0, z), v(0.6, 2.0, 0.6));
+    }
+    // Hub dressing: a lit floor emblem on the route (flat, never a blocker), overhead trays
+    // tying the pylons together, and status racks and NOC screens along the rim.
+    p.prim(
+        PrimKind::Cylinder,
+        v(-22.0, 0.012, 0.0),
+        v(8.0, 0.02, 8.0),
+        Mat::Dark,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(-22.0, 0.016, 0.0),
+        v(7.4, 0.02, 7.4),
+        Mat::NeonCyan,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(-22.0, 0.02, 0.0),
+        v(7.2, 0.02, 7.2),
+        Mat::Dark,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(-22.0, 0.024, 0.0),
+        v(3.0, 0.02, 3.0),
+        Mat::NeonPink,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(-22.0, 0.028, 0.0),
+        v(2.7, 0.02, 2.7),
+        Mat::Dark,
+    );
+    for z in [-10.0, 10.0] {
+        p.boxed(v(-22.0, 4.05, z), v(16.0, 0.12, 0.5), Mat::Dark, false);
+        p.boxed(v(-22.0, 3.97, z), v(16.0, 0.03, 0.08), Mat::Cable, false);
+    }
+    for x in [-30.0, -14.0] {
+        p.boxed(v(x, 4.05, 0.0), v(0.5, 0.12, 20.0), Mat::Dark, false);
+    }
+    for (x, z, tex) in [
+        (-22.0, -14.5, Tex::NocGraph),
+        (-22.0, 14.5, Tex::NocAlerts),
+        (-30.0, 13.5, Tex::NocRegions),
+    ] {
+        p.poster_near(x, z, 2.2, Vec2::new(3.0, 1.6), tex);
+    }
+    for (x, z) in [(-17.0, -14.0), (-27.0, -14.0), (-17.0, 14.0), (-27.0, 14.0)] {
+        if let Some((at, n)) = p.wall_near(x, z) {
+            let yaw = n.x.atan2(n.y);
+            let c = at + n * 0.45;
+            p.framed(v(c.x, 0.0, c.y), yaw, |p| {
+                p.boxed(v(0.0, 1.2, 0.0), v(1.0, 2.4, 0.7), Mat::Rack, false);
+                p.boxed(v(0.0, 1.2, 0.36), v(0.8, 2.1, 0.03), Mat::Monolith, false);
+                for (k, led) in [
+                    Mat::BlinkGreenA,
+                    Mat::BlinkRed,
+                    Mat::BlinkBlue,
+                    Mat::BlinkGreenB,
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    p.boxed(
+                        v(0.36, 0.5 + k as f32 * 0.45, 0.38),
+                        v(0.05, 0.05, 0.02),
+                        led,
+                        false,
+                    );
+                }
+            });
+        }
     }
     // Chevrons on the floor point towards the arena.
     for x in [-6.0, -2.0, 2.0] {

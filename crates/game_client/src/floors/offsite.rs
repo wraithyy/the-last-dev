@@ -14,6 +14,9 @@ use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 pub fn build(level: u8) -> FloorLayout {
     let mut p = Plan::default();
+    if matches!(level, 1 | 4) {
+        p.ceiling = HALL_H;
+    }
     let (zone, name, outdoor, theme) = match level {
         1 => (
             "offsite/1",
@@ -129,12 +132,14 @@ pub(super) fn wall_band(p: &mut Plan, mat: Mat, y0: f32, y1: f32, inset: f32) {
 pub(super) fn wall_dress(p: &mut Plan, dado: Mat, rail: Mat, crown: Mat) {
     wall_band(p, dado, 0.2, 1.05, 0.04);
     wall_band(p, rail, 1.05, 1.13, 0.06);
-    wall_band(p, crown, H - 0.32, H, 0.06);
+    let top = p.top();
+    wall_band(p, crown, top - 0.32, top, 0.06);
 }
 
 /// Glowing cove strip under the crown: cheap mood lighting that costs no real light.
 pub(super) fn cove(p: &mut Plan, mat: Mat) {
-    wall_band(p, mat, H - 0.42, H - 0.36, 0.09);
+    let top = p.top();
+    wall_band(p, mat, top - 0.42, top - 0.36, 0.09);
 }
 
 /// Flat pilaster against the nearest wall, gold base and capital.
@@ -144,10 +149,11 @@ pub(super) fn pilaster(p: &mut Plan, x: f32, z: f32, mat: Mat) {
     };
     let yaw = n.x.atan2(n.y);
     let c = at + n * 0.17;
+    let top = p.top();
     p.framed(v(c.x, 0.0, c.y), yaw, |p| {
-        p.boxed(v(0.0, H / 2.0, 0.0), v(0.7, H, 0.34), mat, false);
+        p.boxed(v(0.0, top / 2.0, 0.0), v(0.7, top, 0.34), mat, false);
         p.boxed(v(0.0, 0.18, 0.04), v(0.9, 0.36, 0.42), Mat::Gold, false);
-        p.boxed(v(0.0, H - 0.4, 0.04), v(0.9, 0.3, 0.42), Mat::Gold, false);
+        p.boxed(v(0.0, top - 0.4, 0.04), v(0.9, 0.3, 0.42), Mat::Gold, false);
     });
 }
 
@@ -182,19 +188,43 @@ pub(super) fn round_patch(p: &mut Plan, x: f32, z: f32, dia: f32, mat: Mat) {
     p.prim(PrimKind::Cylinder, v(x, 0.005, z), v(dia, 0.01, dia), mat);
 }
 
-/// Bunting between two points: alternating flags on a sagging line.
+/// Bunting between two points: a visible string sagging between ceiling hooks, with small
+/// pennants hanging off it. `y` is the string height at the hooks.
 pub(super) fn bunting(p: &mut Plan, a: (f32, f32), b: (f32, f32), y: f32, flags: [Mat; 3]) {
     let (dx, dz) = (b.0 - a.0, b.1 - a.1);
     let len = (dx * dx + dz * dz).sqrt();
-    let n = (len / 0.7) as usize;
     let yaw = (-dz).atan2(dx);
-    for k in 0..=n {
-        let t = k as f32 / n.max(1) as f32;
-        let sag = 0.5 * (t * PI).sin();
+    let sag_at = |t: f32| 0.35 * (t * PI).sin();
+    // Short level segments approximate the curve (slabs cannot pitch); the slope stays tiny.
+    let segs = ((len / 0.4) as usize).max(1);
+    for k in 0..segs {
+        let t = (k as f32 + 0.5) / segs as f32;
         p.slab(
-            v(a.0 + dx * t, y - sag - 0.14, a.1 + dz * t),
+            v(a.0 + dx * t, y - sag_at(t), a.1 + dz * t),
             yaw,
-            v(0.26, 0.2, 0.02),
+            v(len / segs as f32 + 0.02, 0.03, 0.03),
+            Mat::Dark,
+        );
+    }
+    let top = p.top();
+    // Hooks reach the ceiling when the string hangs under one; outdoors it ties to a pole.
+    let (lo, hi) = if y >= top - 0.7 { (y, top) } else { (0.0, y) };
+    for (x, z) in [a, b] {
+        p.boxed(
+            v(x, (lo + hi) / 2.0, z),
+            v(0.04, hi - lo, 0.04),
+            Mat::Dark,
+            false,
+        );
+    }
+    let n = ((len / 0.7) as usize).max(1);
+    for k in 0..=n {
+        let t = k as f32 / n as f32;
+        p.prim_yawed(
+            PrimKind::Pennant,
+            v(a.0 + dx * t, y - sag_at(t) - 0.22, a.1 + dz * t),
+            v(0.3, 0.42, 1.0),
+            yaw,
             flags[k % 3],
         );
     }
@@ -230,13 +260,14 @@ pub(super) fn balloons(p: &mut Plan, x: f32, z: f32, mats: [Mat; 3]) {
 /// Dark crossbeams under the ceiling, only where the footprint holds them, so a flat tile lid
 /// reads as an architectural ceiling. Visual only.
 pub(super) fn beams(p: &mut Plan, x0: f32, x1: f32, z0: f32, z1: f32, step: f32, mat: Mat) {
+    let top = p.top();
     let mut x = x0;
     while x <= x1 {
         let mut z = z0;
         while z < z1 {
             let (a, b) = (pt(x, z), pt(x, z + 2.0));
             if p.fp.contains(a) && p.fp.contains(b) && p.fp.contains(pt(x, z + 1.0)) {
-                p.boxed(v(x, H - 0.16, z + 1.0), v(0.28, 0.28, 2.0), mat, false);
+                p.boxed(v(x, top - 0.16, z + 1.0), v(0.28, 0.28, 2.0), mat, false);
             }
             z += 2.0;
         }
@@ -650,14 +681,14 @@ fn lobby_dress(p: &mut Plan) {
         p,
         (-32.0, -6.0),
         (-2.0, -6.0),
-        3.7,
+        p.top() - 0.6,
         [Mat::Fabric0, Mat::Fabric1, Mat::Gold],
     );
     bunting(
         p,
         (-32.0, 6.0),
         (-2.0, 6.0),
-        3.7,
+        p.top() - 0.6,
         [Mat::Fabric1, Mat::Gold, Mat::Fabric0],
     );
     // Confetti left over from the last all-hands, round the icebreaker stage.
@@ -853,7 +884,7 @@ fn breakout_dress(p: &mut Plan) {
         p,
         (6.0, -10.0),
         (6.0, 10.0),
-        3.8,
+        p.top() - 0.6,
         [Mat::Fabric0, Mat::Fabric1, Mat::Fabric2],
     );
 }
