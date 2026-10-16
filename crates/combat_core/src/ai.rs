@@ -51,11 +51,7 @@ impl Sim {
             return;
         }
         self.units[ti].combat_since = self.now;
-        let abilities = self.content.units[self.units[ti].def]
-            .ai
-            .as_ref()
-            .map(|a| a.abilities.clone())
-            .unwrap_or_default();
+        let abilities = self.ai_of(ti).map(|a| a.abilities).unwrap_or_default();
         // First uses come after an initial delay (8-12 s for the Blast), not instantly.
         for (k, ab) in abilities.iter().enumerate() {
             let (lo, hi) = ab
@@ -119,9 +115,18 @@ impl Sim {
             if self.units[i].despawned {
                 continue;
             }
-            if let Some(ai) = self.content.units[self.units[i].def].ai.clone() {
+            if let Some(ai) = self.ai_of(i) {
                 self.ai_unit(i, &ai);
             }
+        }
+    }
+
+    /// The behaviour unit `i` runs: its content's, or its own override.
+    pub(crate) fn ai_of(&self, i: usize) -> Option<AiDef> {
+        let u = &self.units[i];
+        match &u.ai_override {
+            Some(ai) => Some((**ai).clone()),
+            None => self.content.units[u.def].ai.clone(),
         }
     }
 

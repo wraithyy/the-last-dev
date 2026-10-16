@@ -5,8 +5,8 @@
 //! reused (despawned units stay in the vector, hidden from the public views).
 
 use crate::content::{
-    AuraDef, Content, ContentError, ItemTotals, Objective, School, SpellDef, SpellId, SpellTarget,
-    YELL_KINDS, YellKind, ticks,
+    AiDef, AuraDef, Content, ContentError, ItemTotals, Objective, School, SpellDef, SpellId,
+    SpellTarget, YELL_KINDS, YellKind, ticks,
 };
 use crate::geom::{Aabb, Vec3, in_range, line_of_sight};
 use crate::nav::{Nav, NavAgent};
@@ -127,6 +127,10 @@ pub(crate) struct Unit {
     pub item_cd: BTreeMap<String, u64>,
     /// Tick of the pull (first threat entry); 0 while out of combat. Drives `AiDef::enrage`.
     pub combat_since: u64,
+    /// `combat_since` of the fight that killed the unit.
+    pub(crate) pulled_at: u64,
+    /// This unit's behaviour when it differs from its content (a Legacy floor's twist).
+    pub(crate) ai_override: Option<Box<AiDef>>,
     /// Players: in combat until this tick after an enemy that had them on its table reset.
     pub combat_lock_until: u64,
     /// `AiDef::flee`: running for the exit now, and the earliest tick of the next run.
@@ -212,6 +216,8 @@ pub struct Sim {
     pub(crate) raid: crate::raid::RaidState,
     /// The minigame outing and best medals (`minigame.rs`, `teambuilding.rs`).
     pub(crate) minigame: crate::minigame::MinigameState,
+    /// Defend waves and telegraph hits for `KillClean` (`quests.rs`).
+    pub(crate) quest_rt: crate::quests::QuestRt,
 }
 
 impl Sim {
@@ -246,6 +252,7 @@ impl Sim {
             legacy: Default::default(),
             raid: Default::default(),
             minigame: Default::default(),
+            quest_rt: Default::default(),
         }
     }
 
@@ -484,14 +491,17 @@ impl Sim {
             class: None,
             hp_hist: [0; HP_HIST_LEN],
             combat_since: 0,
+            pulled_at: 0,
             combat_lock_until: 0,
             fleeing: false,
             flee_next: 0,
             perks: Vec::new(),
             splash_pct: 100,
             item_cd: BTreeMap::new(),
+            ai_override: None,
         });
         let i = self.units.len() - 1;
+        self.legacy_twist(i);
         // Neighbouring NPCs of the same kind start at different lines, so they banter.
         self.units[i].yell_cursor[YellKind::Ambient as usize] = i;
         let level = o.level.unwrap_or(self.content.units[def].level);
@@ -1698,6 +1708,8 @@ impl Sim {
         u.moving = false;
         u.threat.clear();
         u.state.target = None;
+        // Kept past death: `KillClean` asks whether a telegraph hit since the pull.
+        u.pulled_at = u.combat_since;
         u.combat_since = 0;
         u.fleeing = false;
         self.events.push(Event::Death { unit: id, killer });

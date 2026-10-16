@@ -53,12 +53,17 @@ const ACCOUNT_MANAGER: (f32, f32) = (25.0, -5.5);
 /// the leaver at the smoking corner, Security at the tower path, the RTO lead by the bike
 /// rack and Internal Comms on the plaza. Each looks at the point after it.
 type Xz = (f32, f32);
-const CHAIN_NPCS: [(&str, Xz, Xz); 5] = [
+const CHAIN_NPCS: [(&str, Xz, Xz); 8] = [
     ("npc_expense", (-25.5, 8.0), (-12.0, 8.0)),
     ("npc_exit", (43.5, 23.0), (46.0, 26.0)),
     ("npc_security", (-4.5, -18.5), (0.0, -10.0)),
     ("npc_rto", (11.5, -12.0), (0.0, 2.0)),
     ("npc_comms", (4.5, -7.0), (0.0, 2.0)),
+    // Prod Incident: prod itself stands on the lawn west of the tower, its on-call beside it.
+    ("npc_prod", (-28.0, -9.0), (-20.0, -4.0)),
+    ("npc_oncall", (-24.0, -6.5), (-28.0, -9.0)),
+    // Flaky Tests: QA by the car park, where the delivery robots do their rounds.
+    ("npc_qa", (-34.0, 27.0), (-45.0, 41.0)),
 ];
 pub(super) const LAB: (Vec2, Vec3) = (Vec2::new(-50.0, -36.0), Vec3::new(26.0, 9.0, 22.0));
 

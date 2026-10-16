@@ -45,6 +45,9 @@ pub fn is_elite(key: &str) -> bool {
             | "chief_of_staff"
             | "shadow_it_server"
             | "hype_cycle_analyst"
+            | "jira_automation"
+            | "backup_job"
+            | "hard_deadline"
     )
 }
 

@@ -493,6 +493,10 @@ pub struct TelegraphDef {
     /// One copy of a sweep (never the first or last) is left out at random: the safe lane.
     #[serde(default)]
     pub gap: bool,
+    /// The copies march out from the caster along the facing instead of lining up across it:
+    /// copy `k` lands `(k + 1) * step_m` ahead, `k * step_ms` after the first (a creeping trail).
+    #[serde(default)]
+    pub march: bool,
     /// Floor text of the decal ("Meeting room booked").
     pub label: String,
 }
@@ -897,6 +901,10 @@ pub struct ZoneDef {
     /// Facilities allows e-scooters here (campus, data center halls).
     #[serde(default)]
     pub scooters: bool,
+    /// Optional named rares off the main path: spawned once per load where the layout has the
+    /// anchor (skipped otherwise), never respawn, and do not count towards a clear.
+    #[serde(default)]
+    pub rares: Vec<ZoneSpawn>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -915,13 +923,26 @@ pub enum Objective {
         label: String,
         secs: u32,
     },
+    /// Keep the friendly `unit` (a zone spawn) alive for `secs` seconds while standing within
+    /// `DEFEND_RANGE_M` of it; meanwhile a `wave` unit spawns next to it every `every_ms` and goes
+    /// for it. Its death resets the count and puts it back on its feet (`quests.rs`).
+    Defend {
+        unit: String,
+        wave: String,
+        every_ms: u32,
+        label: String,
+        secs: u32,
+    },
+    /// Like `Kill`, but a kill only counts if no ground telegraph hit the player since that unit
+    /// was pulled.
+    KillClean(String, u32),
 }
 
 impl Objective {
     pub fn need(&self) -> u32 {
         match self {
-            Objective::Kill(_, n) | Objective::Loot(_, n) => *n,
-            Objective::Wait { secs, .. } => *secs,
+            Objective::Kill(_, n) | Objective::Loot(_, n) | Objective::KillClean(_, n) => *n,
+            Objective::Wait { secs, .. } | Objective::Defend { secs, .. } => *secs,
             Objective::Talk(_) | Objective::ClearZone(_) => 1,
         }
     }
@@ -1485,11 +1506,21 @@ impl Content {
                 .iter()
                 .flat_map(|p| p.units.iter())
                 .chain(z.boss.iter().map(|b| &b.unit))
-                .chain(z.friendly.iter().map(|s| &s.unit));
+                .chain(z.friendly.iter().map(|s| &s.unit))
+                .chain(z.rares.iter().map(|s| &s.unit));
             for k in keys {
                 if self.unit_def(k).is_none() || self.class_of_unit(k).is_some() {
                     return bad(format!("zone {} spawns invalid unit {k}", z.id));
                 }
+            }
+            if let Some(r) = z.rares.iter().find(|r| {
+                self.unit_def(&r.unit)
+                    .is_none_or(|u| !u.hostile || u.ai.is_none())
+            }) {
+                return bad(format!(
+                    "zone {}: rare {} needs a hostile with ai",
+                    z.id, r.unit
+                ));
             }
             for l in &z.links {
                 if self.zone(&l.to).is_none() {
@@ -1541,7 +1572,27 @@ impl Content {
             }
             for o in &q.objectives {
                 let ok = match o {
-                    Objective::Kill(k, _) => self.unit_def(k).is_some_and(|u| u.hostile),
+                    Objective::Kill(k, _) | Objective::KillClean(k, _) => {
+                        self.unit_def(k).is_some_and(|u| u.hostile)
+                    }
+                    Objective::Defend {
+                        unit,
+                        wave,
+                        every_ms,
+                        label,
+                        ..
+                    } => {
+                        let guarded = self
+                            .zone(&q.giver.zone)
+                            .is_some_and(|z| z.friendly.iter().any(|f| f.unit == *unit));
+                        guarded
+                            && self.unit_def(unit).is_some_and(|u| !u.hostile)
+                            && self
+                                .unit_def(wave)
+                                .is_some_and(|u| u.hostile && u.ai.is_some())
+                            && *every_ms >= 1000
+                            && !label.is_empty()
+                    }
                     Objective::Loot(it, _) => self.item(it).is_some(),
                     Objective::Talk(k) => self.unit_def(k).is_some_and(|u| !u.hostile),
                     Objective::ClearZone(z) => self.zone(z).is_some_and(|z| z.boss.is_some()),

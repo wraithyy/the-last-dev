@@ -6,7 +6,7 @@
 //! boss hands out its bonus pieces once per ISO week per room (the lockout; saved offline).
 //! Content: `legacy` in `game.ron`; numbers in docs/FORMULAS.md.
 
-use crate::content::{Content, ContentError};
+use crate::content::{AiAbility, Content, ContentError, SpellId};
 use crate::live::week_index;
 use crate::rng::Rng;
 use crate::sim::Sim;
@@ -28,6 +28,20 @@ pub struct LegacyZone {
     pub hp_pct: u32,
     #[serde(default = "full_pct")]
     pub damage_pct: u32,
+    /// The floor's one behaviour change on Legacy, beyond the numbers.
+    #[serde(default)]
+    pub twist: Option<LegacyTwist>,
+}
+
+/// What a Legacy floor does differently: legacy code keeps its old habits and grows new ones.
+#[derive(Clone, Debug, Deserialize)]
+pub enum LegacyTwist {
+    /// Every trash unit of the floor (pack members and rares, not adds) also uses this ability.
+    TrashAbility(AiAbility),
+    /// The floor boss also uses this ability.
+    BossAbility(AiAbility),
+    /// The floor boss casts the second spell wherever its content says the first.
+    BossSwap(SpellId, SpellId),
 }
 
 fn full_pct() -> u32 {
@@ -70,6 +84,26 @@ impl LegacyDef {
             }
             if z.hp_pct == 0 || z.damage_pct == 0 {
                 return bad(format!("zone {}: zero hp or damage percent", z.zone));
+            }
+            let boss = c
+                .zone(&z.zone)
+                .and_then(|d| d.boss.as_ref())
+                .and_then(|b| c.unit_def(&b.unit))
+                .and_then(|u| u.ai.as_ref());
+            let ok = match &z.twist {
+                None => true,
+                Some(LegacyTwist::TrashAbility(a)) => c.spell(a.spell).is_some(),
+                Some(LegacyTwist::BossAbility(a)) => boss.is_some() && c.spell(a.spell).is_some(),
+                Some(LegacyTwist::BossSwap(from, to)) => {
+                    c.spell(*to).is_some()
+                        && boss.is_some_and(|ai| ai.abilities.iter().any(|a| a.spell == *from))
+                }
+            };
+            if !ok {
+                return bad(format!(
+                    "zone {}: twist needs known spells and a boss",
+                    z.zone
+                ));
             }
         }
         Ok(())
@@ -276,6 +310,40 @@ impl Sim {
         if std::mem::take(&mut self.legacy.announce) {
             self.legacy_broadcast();
         }
+    }
+
+    /// Called for every spawn: on a Legacy floor, its trash and boss take the floor's twist.
+    pub(crate) fn legacy_twist(&mut self, i: usize) {
+        let Some(twist) = self
+            .legacy
+            .fx
+            .as_ref()
+            .and(self.zone.as_deref())
+            .and_then(|z| self.content.legacy.zone(z))
+            .and_then(|z| z.twist.clone())
+        else {
+            return;
+        };
+        let u = &self.units[i];
+        let (boss, trash) = (u.floor_boss, u.zone_slot.is_some() && !u.floor_boss);
+        let Some(mut ai) = self.content.units[u.def].ai.clone() else {
+            return;
+        };
+        match twist {
+            LegacyTwist::TrashAbility(a) if trash => ai.abilities.push(a),
+            LegacyTwist::BossAbility(a) if boss => ai.abilities.push(a),
+            LegacyTwist::BossSwap(from, to) if boss => {
+                for a in ai.abilities.iter_mut().filter(|a| a.spell == from) {
+                    a.spell = to;
+                }
+            }
+            _ => return,
+        }
+        let n = ai.abilities.len();
+        let u = &mut self.units[i];
+        u.ability_next.resize(n, 0);
+        u.ability_yell_cursor.resize(n, 0);
+        u.ai_override = Some(Box::new(ai));
     }
 
     /// Floor bosses spawn at the Legacy boss level on a Legacy floor.

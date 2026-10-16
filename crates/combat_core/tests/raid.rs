@@ -28,6 +28,8 @@ fn anchors(name: &str) -> Option<(Vec3, f32)> {
             at(60.0, 60.0)
         }
         n if n.starts_with("prop:") => at(1.0, 0.0),
+        // Optional rares stay out of these scenarios.
+        n if n.starts_with("rare_") => None,
         _ => at(0.0, 0.0),
     }
 }

@@ -3,12 +3,20 @@
 //! kill quest accepted after the work was done is ready at once (retro credit), like a cleared
 //! zone or carried items.
 
-use crate::content::{Content, Objective, QuestDef, QuestGiver, Role};
+use crate::content::{Content, Objective, QuestDef, QuestGiver, Role, ticks};
 use crate::geom::in_range;
 use crate::sim::Sim;
 use crate::targeting::EntityId;
 use crate::types::{Event, ItemError};
 use std::collections::BTreeMap;
+
+/// A `Defend` second counts while the player stands this close to the defended unit.
+pub const DEFEND_RANGE_M: f32 = 25.0;
+/// At most this many wave units of one `Defend` objective are alive at once.
+const DEFEND_MAX_WAVES: usize = 3;
+/// Wave units open on the defended unit with this much threat, so a stray hit does not peel
+/// them off it at once; taunts and real damage still do.
+const DEFEND_WAVE_THREAT: u32 = 200;
 
 /// Quest commands are accepted a little past talk range, so a dialog the client keeps open (it closes
 /// only when the player walks this far away) never submits a command the sim would reject silently.
@@ -29,6 +37,15 @@ pub struct QuestLog {
     pub completed: Vec<String>,
     /// Own and shared kills per unit key over the run (retro credit); sim side only.
     pub kills: BTreeMap<String, u32>,
+}
+
+/// Runtime of the objectives that watch the world rather than count events.
+#[derive(Default)]
+pub(crate) struct QuestRt {
+    /// Last tick a ground telegraph landed on each player (`KillClean`).
+    pub(crate) telegraph_hit: BTreeMap<EntityId, u64>,
+    /// Next wave tick per defended unit key (`Defend`).
+    next_wave: BTreeMap<String, u64>,
 }
 
 static EMPTY_LOG: QuestLog = QuestLog {
@@ -248,6 +265,191 @@ impl Sim {
                 );
             }
         }
+        self.quest_defends();
+    }
+
+    /// `Defend` objectives, once a second: waves spawn while someone guards, guarding players
+    /// count, and a fallen defended unit resets everyone's count and stands up again.
+    fn quest_defends(&mut self) {
+        let mut wanted: Vec<(String, String, u32)> = Vec::new();
+        for pid in &self.players {
+            for q in &self.quests_of(*pid).active {
+                let Some(def) = self.content.quest(&q.id) else {
+                    continue;
+                };
+                for (o, c) in def.objectives.iter().zip(&q.counts) {
+                    if let Objective::Defend {
+                        unit,
+                        wave,
+                        every_ms,
+                        secs,
+                        ..
+                    } = o
+                        && c < secs
+                        && !wanted.iter().any(|w| w.0 == *unit)
+                    {
+                        wanted.push((unit.clone(), wave.clone(), *every_ms));
+                    }
+                }
+            }
+        }
+        self.quest_rt
+            .next_wave
+            .retain(|k, _| wanted.iter().any(|w| w.0 == *k));
+        for (unit, wave, every_ms) in wanted {
+            let Some(gi) = self
+                .units
+                .iter()
+                .position(|u| !u.despawned && !u.state.hostile && u.state.key == unit)
+            else {
+                continue;
+            };
+            if !self.units[gi].state.alive {
+                self.defend_reset(gi, &unit, &wave);
+                continue;
+            }
+            let at = self.units[gi].state.pos;
+            let guards: Vec<EntityId> = self
+                .players
+                .iter()
+                .copied()
+                .filter(|p| {
+                    self.unit(*p)
+                        .is_some_and(|u| u.alive && in_range(u.pos, at, DEFEND_RANGE_M))
+                })
+                .collect();
+            if guards.is_empty() {
+                continue;
+            }
+            let next = *self
+                .quest_rt
+                .next_wave
+                .entry(unit.clone())
+                .or_insert(self.now);
+            let alive = self
+                .units
+                .iter()
+                .filter(|u| !u.despawned && u.state.alive && u.state.key == wave)
+                .count();
+            if next <= self.now && alive < DEFEND_MAX_WAVES {
+                self.quest_rt
+                    .next_wave
+                    .insert(unit.clone(), self.now + ticks(every_ms));
+                self.defend_wave(gi, &wave);
+            }
+            for p in guards {
+                self.quest_credit(
+                    p,
+                    |o| matches!(o, Objective::Defend { unit: u, .. } if *u == unit),
+                );
+            }
+        }
+    }
+
+    /// One wave unit a few metres off the defended unit, already going for it. It counts as the
+    /// defended unit's add, so it drops no loot or Kudos and leaves when that unit falls.
+    fn defend_wave(&mut self, gi: usize, wave: &str) {
+        let Ok(def) = self.def_index(wave) else {
+            return;
+        };
+        let at = self.units[gi].state.pos;
+        let k = self.rng.range_inclusive(0, 7) as f32;
+        let a = k * std::f32::consts::TAU / 8.0;
+        let pos = crate::geom::Vec3::new(at.x + 6.0 * a.cos(), at.y, at.z + 6.0 * a.sin());
+        let id = self.spawn(
+            def,
+            pos,
+            crate::ai::yaw_toward(pos, at),
+            crate::sim::SpawnOpts {
+                level: None,
+                pack: None,
+                respawns: false,
+                summoner: Some(Self::id_of(gi)),
+                floor_boss: false,
+                zone_slot: None,
+            },
+        );
+        if let Some(wi) = self.index(id) {
+            self.add_threat(wi, Self::id_of(gi), DEFEND_WAVE_THREAT);
+            self.set_ai(wi, crate::types::AiState::Chase);
+        }
+    }
+
+    /// The defended unit fell: every guard starts over, the waves leave and it stands up again.
+    fn defend_reset(&mut self, gi: usize, unit: &str, wave: &str) {
+        for pid in self.players.clone() {
+            let Some(log) = self.quest_logs.get_mut(&pid) else {
+                continue;
+            };
+            for q in &mut log.active {
+                let Some(def) = self.content.quests.iter().find(|d| d.id == q.id) else {
+                    continue;
+                };
+                for (k, o) in def.objectives.iter().enumerate() {
+                    let hit = matches!(o, Objective::Defend { unit: u, .. } if u == unit);
+                    if let Some(c) = q.counts.get_mut(k)
+                        && hit
+                        && *c > 0
+                        && *c < o.need()
+                    {
+                        *c = 0;
+                        self.routed.push((self.events.len(), pid));
+                        self.events.push(Event::QuestProgress {
+                            quest: q.id.clone(),
+                            objective: k,
+                            count: 0,
+                            need: o.need(),
+                        });
+                    }
+                }
+            }
+        }
+        for i in 0..self.units.len() {
+            if !self.units[i].despawned && self.units[i].state.key == wave {
+                self.despawn(i);
+            }
+        }
+        let (def, pos, yaw) = (
+            self.units[gi].def,
+            self.units[gi].spawn_pos,
+            self.units[gi].spawn_yaw,
+        );
+        self.despawn(gi);
+        self.spawn(
+            def,
+            pos,
+            yaw,
+            crate::sim::SpawnOpts {
+                level: None,
+                pack: None,
+                respawns: false,
+                summoner: None,
+                floor_boss: false,
+                zone_slot: None,
+            },
+        );
+        self.quest_rt.next_wave.remove(unit);
+    }
+
+    /// A telegraph landed on `pid`: clean kills of fights already under way are off.
+    pub(crate) fn note_telegraph_hit(&mut self, pid: EntityId) {
+        if self.is_player(pid) {
+            self.quest_rt.telegraph_hit.insert(pid, self.now);
+        }
+    }
+
+    /// `KillClean` credit for a kill of the unit at `ti` that `pid` shares.
+    pub(crate) fn record_clean_kill(&mut self, pid: EntityId, ti: usize) {
+        let since = self.units[ti].pulled_at;
+        let hit = self.quest_rt.telegraph_hit.get(&pid).copied();
+        if hit.is_some_and(|t| t >= since) {
+            return;
+        }
+        let key = self.units[ti].state.key.clone();
+        self.quest_credit(
+            pid,
+            |o| matches!(o, Objective::KillClean(k, _) if *k == key),
+        );
     }
 
     /// Counts a kill (own or shared) of unit `key` for `pid`'s retro credit, then the quests.
@@ -405,6 +607,7 @@ impl Content {
                 .filter(|z| {
                     z.packs.iter().any(|p| p.units.iter().any(|u| u == key))
                         || z.boss.as_ref().is_some_and(|b| b.unit == key)
+                        || z.rares.iter().any(|r| r.unit == key)
                         // Fixed spawns can be hostile too (the campus training dummy).
                         || z.friendly.iter().any(|f| f.unit == key)
                 })
@@ -412,7 +615,13 @@ impl Content {
                 .collect::<Vec<_>>()
         };
         match o {
-            Objective::Kill(k, _) => spawns(k),
+            Objective::Kill(k, _) | Objective::KillClean(k, _) => spawns(k),
+            Objective::Defend { unit, .. } => self
+                .zones
+                .iter()
+                .filter(|z| z.friendly.iter().any(|f| f.unit == *unit))
+                .map(|z| z.id.as_str())
+                .collect(),
             Objective::Loot(it, _) => {
                 let mut out: Vec<&str> = Vec::new();
                 for u in self

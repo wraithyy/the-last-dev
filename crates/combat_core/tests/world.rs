@@ -21,6 +21,8 @@ fn anchors(name: &str) -> Option<(Vec3, f32)> {
         "prop:bike_rack" => at(-20.0, 0.0),
         "prop:scooter_1" => at(0.0, 2.0),
         n if n.starts_with("prop:") || n.starts_with("secret:") => at(30.0, 30.0),
+        // Optional rares stay out of these scenarios.
+        n if n.starts_with("rare_") => None,
         _ => at(0.0, 0.0),
     }
 }

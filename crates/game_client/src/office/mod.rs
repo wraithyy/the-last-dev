@@ -498,9 +498,14 @@ fn show_tip(
     tip.left = px(cursor.x + 18.0);
     tip.top = px(cursor.y + 18.0);
     let (action, mut extra) = lines::tooltip(def);
+    let action = if def.action.is_empty() {
+        action
+    } else {
+        def.action.as_str()
+    };
     if p.kind == PropKind::DaysSign {
         let days = ((time.elapsed_secs() - props.days_reset) / DAY_SECS).max(0.0) as u32;
-        extra = format!("Days without an AI incident: {days}");
+        extra = format!("{}: {days}", def.name);
     }
     let far = p.stand.distance(player.pos) > p.reach;
     for (line, mut text, mut color) in &mut lines_q {

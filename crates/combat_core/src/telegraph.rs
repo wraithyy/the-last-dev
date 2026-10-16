@@ -147,12 +147,14 @@ impl Sim {
         let anchors: Vec<Vec3> = match def.at {
             TelegraphAt::Caster => vec![me],
             TelegraphAt::Target => vec![target.map_or(me, |t| self.units[t].state.pos)],
+            // Fighters only: a bystander NPC of the other side never gets a mark.
             TelegraphAt::EachHostile => (0..self.units.len())
                 .filter(|&o| {
                     let u = &self.units[o];
                     u.state.alive
                         && !u.despawned
                         && u.state.hostile != hostile
+                        && (u.state.ai.is_some() || self.is_player(u.state.id))
                         && u.state.ai != Some(AiState::Evade)
                         && dist_xz(u.state.pos, me) <= spell.range_m
                 })
@@ -195,8 +197,13 @@ impl Sim {
                 if Some(k) == gap {
                     continue;
                 }
-                let off = (f32::from(k) - f32::from(n - 1) / 2.0) * def.step_m;
-                let pos = Vec3::new(origin.x + side.x * off, origin.y, origin.z + side.z * off);
+                let pos = if def.march {
+                    let (f, d) = (forward(facing), def.step_m * f32::from(k + 1));
+                    Vec3::new(me.x + f.x * d, me.y, me.z + f.z * d)
+                } else {
+                    let off = (f32::from(k) - f32::from(n - 1) / 2.0) * def.step_m;
+                    Vec3::new(origin.x + side.x * off, origin.y, origin.z + side.z * off)
+                };
                 let delay = def.delay_ms + u32::from(k) * def.step_ms;
                 let id = self.next_telegraph;
                 self.next_telegraph = self.next_telegraph.wrapping_add(1);
@@ -296,6 +303,12 @@ impl Sim {
             id: t.id,
             landed: true,
         });
+        // Standing in a stack on purpose is not getting hit.
+        if !t.split {
+            for &o in &hit {
+                self.note_telegraph_hit(Self::id_of(o));
+            }
+        }
         for e in spell.effects() {
             if e.caster_centric() {
                 self.apply_effect(ci, &spell, e, None);

@@ -81,7 +81,12 @@ pub fn objective_label(content: &Content, o: &Objective) -> String {
         Objective::Loot(item, _) => item.clone(),
         Objective::Talk(k) => format!("Talk to {}", unit_name(content, k)),
         Objective::ClearZone(z) => format!("Clear {}", zone_label(content, z)),
-        Objective::Wait { label, .. } => label.clone(),
+        Objective::KillClean(k, n) => {
+            let name = unit_name(content, k);
+            let who = if *n > 1 { plural(&name) } else { name };
+            format!("{who} terminated, no telegraph hits")
+        }
+        Objective::Wait { label, .. } | Objective::Defend { label, .. } => label.clone(),
     }
 }
 
@@ -103,8 +108,12 @@ fn wait_bar(have: u32, need: u32) -> String {
 pub fn objective_line(content: &Content, o: &Objective, have: u32, need: u32) -> String {
     let what = objective_label(content, o);
     match o {
-        Objective::Kill(..) | Objective::Loot(..) => format!("{what} {have}/{need}"),
-        Objective::Wait { .. } => format!("{what} {}", wait_bar(have, need)),
+        Objective::Kill(..) | Objective::Loot(..) | Objective::KillClean(..) => {
+            format!("{what} {have}/{need}")
+        }
+        Objective::Wait { .. } | Objective::Defend { .. } => {
+            format!("{what} {}", wait_bar(have, need))
+        }
         Objective::Talk(_) | Objective::ClearZone(_) => what,
     }
 }
@@ -233,7 +242,11 @@ pub fn objective_units(sim: &dyn SimRead, track: &QuestTrack) -> Vec<String> {
                 continue;
             }
             match o {
-                Objective::Kill(u, _) | Objective::Talk(u) => add(u),
+                Objective::Kill(u, _) | Objective::Talk(u) | Objective::KillClean(u, _) => add(u),
+                Objective::Defend { unit, wave, .. } => {
+                    add(unit);
+                    add(wave);
+                }
                 Objective::Loot(it, _) => {
                     for u in content
                         .units
@@ -1318,7 +1331,7 @@ fn quest_events(
                     .quest(quest)
                     .and_then(|q| q.objectives.get(*objective))
                     // The tracker bar shows a wait; a toast every second would only nag.
-                    && !matches!(o, Objective::Wait { .. })
+                    && !matches!(o, Objective::Wait { .. } | Objective::Defend { .. })
                 {
                     set_text(toast_text, &progress_line(content, o, *count, *need));
                     shown.toast_age = 0.0;

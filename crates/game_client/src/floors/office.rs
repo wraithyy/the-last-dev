@@ -6,7 +6,7 @@
 
 use super::kit::*;
 use super::themes::v;
-use std::f32::consts::PI;
+use std::f32::consts::{FRAC_PI_2, PI};
 
 /// Prop center (x, y, z) and the stand spot (x, z) in front of it.
 fn spot(p: &mut Plan, anchor: &'static str, center: (f32, f32, f32), stand: (f32, f32)) {
@@ -47,15 +47,27 @@ pub const CAMPUS_SCOOTERS: [(&str, f32, f32); 4] = [
 pub fn place(zone: &str, p: &mut Plan) {
     match zone {
         "campus" => campus(p),
-        "tower/1" => open_space(p),
+        "tower/1" => {
+            open_space(p);
+            // `ZoneDef::rares`: the automation rule nobody owns, in the quiet north-west room.
+            rare(p, -20.0, -19.5, (-12.0, -23.0));
+        }
         "tower/2" => meeting_rooms(p),
+        "tower/3" => sales_floor(p),
         "tower/4" => pmo(p),
+        "tower/5" => penthouse(p),
         "datacenter/1" => {
             spot(p, "prop:vending_hall_a", (-43.0, 1.0, -9.8), (-43.0, -8.2));
             secret_seated(p, "secret:cable_sysadmin", -16.0, 37.0, (-8.0, 31.0));
+            hall_a(p);
         }
         // The dark corner of the lobby, flickering.
-        "datacenter/2" => secret(p, "secret:deprecated_ghost", -41.8, 7.6, (-48.0, 0.0)),
+        "datacenter/2" => {
+            secret(p, "secret:deprecated_ghost", -41.8, 7.6, (-48.0, 0.0));
+            hall_b(p);
+            // The backup job blocks the corridor to the cooling room, facing the hall.
+            rare(p, -10.0, -22.0, (-10.0, -10.0));
+        }
         "lab/1" => {
             spot(p, "prop:whiteboard_lab", (-24.0, 1.9, 23.9), (-24.0, 21.6));
             spot(p, "prop:foosball_lab", (6.0, 0.9, -6.0), (6.0, -4.2));
@@ -64,6 +76,103 @@ pub fn place(zone: &str, p: &mut Plan) {
         }
         _ => {}
     }
+}
+
+/// Anchor `rare_1` of an optional rare (`ZoneDef::rares`), turned towards `look`.
+fn rare(p: &mut Plan, x: f32, z: f32, look: (f32, f32)) {
+    let at = v(x, 0.0, z);
+    p.anchor(
+        "rare_1",
+        at,
+        super::layout::yaw_towards(at, v(look.0, 0.0, look.1)),
+    );
+}
+
+/// A coffee machine on a side table; customers stand on its -X side.
+fn coffee_station(p: &mut Plan, anchor: &'static str, x: f32, z: f32) {
+    p.prop(&SIDE_TABLE, v(x, 0.0, z), FRAC_PI_2, true);
+    p.prop(
+        &COFFEE_MACHINE,
+        v(x, SIDE_TABLE.size[1] * FURNITURE_SCALE, z),
+        0.0,
+        false,
+    );
+    spot(p, anchor, (x, 0.9, z), (x - 1.3, z));
+}
+
+/// A whiteboard on legs facing +Z, like the meeting rooms' stand-up board; users stand 1.6 m
+/// in front.
+fn whiteboard(p: &mut Plan, anchor: &'static str, x: f32, z: f32, sign: Sign) {
+    p.boxed(v(x, 1.5, z), v(2.0, 1.36, 0.05), Mat::Board, false);
+    p.sign(v(x, 1.5, z + 0.04), 0.0, 1.9, sign);
+    for dx in [-0.9, 0.9] {
+        p.boxed(
+            v(x + dx, 0.7, z - 0.05),
+            v(0.06, 1.4, 0.06),
+            Mat::Metal,
+            true,
+        );
+    }
+    spot(p, anchor, (x, 1.45, z), (x, z + 1.6));
+}
+
+/// A speaker on a post with one big button, like the open space's elevator music.
+fn speaker_post(p: &mut Plan, anchor: &'static str, x: f32, z: f32) {
+    p.boxed(v(x, 0.6, z), v(0.12, 1.2, 0.12), Mat::Metal, true);
+    p.boxed(v(x, 1.35, z), v(0.36, 0.42, 0.22), Mat::Dark, false);
+    p.boxed(
+        v(x + 0.12, 1.3, z),
+        v(0.04, 0.16, 0.16),
+        Mat::NeonPink,
+        false,
+    );
+    spot(p, anchor, (x, 1.3, z), (x + 1.3, z));
+}
+
+/// A "days without" sign on two posts, readable from +Z; users stand 1.6 m in front.
+fn days_post(p: &mut Plan, anchor: &'static str, x: f32, z: f32) {
+    for dx in [-1.2, 1.2] {
+        p.boxed(v(x + dx, 1.1, z), v(0.1, 2.2, 0.1), Mat::Metal, true);
+    }
+    p.sign(v(x, 2.0, z + 0.06), 0.0, 2.6, Sign::DaysAi);
+    spot(p, anchor, (x, 2.0, z), (x, z + 1.6));
+}
+
+/// Sales & Marketing: the deal gong by the arrival, an espresso machine and the forecast board.
+fn sales_floor(p: &mut Plan) {
+    // The gong itself is part of the floor's dressing (`themes::decor3`).
+    spot(p, "prop:gong_sales", (9.0, 1.45, -18.0), (9.0, -16.6));
+    coffee_station(p, "prop:coffee_sales", 31.8, -22.5);
+    whiteboard(p, "prop:whiteboard_pipeline", 4.0, -24.3, Sign::WhiteboardB);
+}
+
+/// The C-level penthouse: a gold espresso bar and a printer in the alcoves, and the pivot sign.
+fn penthouse(p: &mut Plan) {
+    coffee_station(p, "prop:coffee_exec", -25.8, 26.5);
+    super::props::printer(p, -6.0, 29.6, Face::NegZ);
+    spot(
+        p,
+        "prop:printer_board_deck",
+        (-6.0, 0.8, 29.6),
+        (-6.0, 28.1),
+    );
+    days_post(p, "prop:days_sign_exec", -24.0, -12.0);
+}
+
+/// Data Center Hall A: a label printer in the lobby and a thermal-event counter in the aisle.
+fn hall_a(p: &mut Plan) {
+    super::props::printer(p, -41.8, 9.2, Face::NegZ);
+    spot(p, "prop:printer_hall_a", (-41.8, 0.8, 9.2), (-41.8, 7.7));
+    days_post(p, "prop:days_sign_hall_a", -8.0, -5.6);
+}
+
+/// Data Center Hall B: vending by the campus door, the incident bridge's hold music and the
+/// incident timeline.
+fn hall_b(p: &mut Plan) {
+    super::props::vending(p, -52.5, -8.6, Face::PosZ);
+    spot(p, "prop:vending_hall_b", (-52.5, 1.0, -8.6), (-52.5, -7.0));
+    speaker_post(p, "prop:bridge_line_hall_b", -28.5, -5.5);
+    whiteboard(p, "prop:whiteboard_hall_b", 4.0, -5.6, Sign::WhiteboardC);
 }
 
 fn campus(p: &mut Plan) {
@@ -110,13 +219,15 @@ fn campus(p: &mut Plan) {
 
 /// Where the night shift (`live.night`, anchors `night_<n>`) waits on the campus: the edges of
 /// the lawn, away from the arrival and the graveyard.
-pub const NIGHT_SPOTS: [(&str, f32, f32); 6] = [
+pub const NIGHT_SPOTS: [(&str, f32, f32); 7] = [
     ("night_1", -30.0, -21.0),
     ("night_2", 38.0, 32.0),
     ("night_3", -55.0, -3.0),
     ("night_4", 33.0, -25.0),
     ("night_5", 6.0, 29.0),
     ("night_6", 52.0, 13.0),
+    // The Hard Deadline, the night's mini-elite, alone on the far west lawn by the car park.
+    ("night_7", -58.0, 31.0),
 ];
 
 /// The live world on the campus: the Daily Standup board with its Scrum Master Bot on the
@@ -512,7 +623,7 @@ mod tests {
     }
 
     /// Every prop of the content sits in its zone's layout, at a stand spot a player can reach,
-    /// and every hidden NPC has its anchor.
+    /// and every hidden NPC and optional rare has its anchor.
     #[test]
     fn content_props_and_secrets_have_reachable_spots() {
         let c = match combat_core::Content::from_ron(include_str!("../../../../content/game.ron")) {
@@ -539,6 +650,12 @@ mod tests {
                         .iter()
                         .filter(|s| s.zone == zone)
                         .map(|s| s.anchor.clone()),
+                )
+                // Rares skip a missing anchor in the sim, so the layout must not miss one.
+                .chain(
+                    c.zone(zone)
+                        .into_iter()
+                        .flat_map(|z| z.rares.iter().map(|r| r.anchor.clone())),
                 );
             for name in wanted {
                 match l.anchor(&name) {

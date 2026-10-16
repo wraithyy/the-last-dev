@@ -155,8 +155,8 @@ fn smooth_interval(old: f64, measured: f64) -> f64 {
 
 fn objective_need(o: &Objective) -> u32 {
     match o {
-        Objective::Kill(_, n) | Objective::Loot(_, n) => *n,
-        Objective::Wait { secs, .. } => *secs,
+        Objective::Kill(_, n) | Objective::Loot(_, n) | Objective::KillClean(_, n) => *n,
+        Objective::Wait { secs, .. } | Objective::Defend { secs, .. } => *secs,
         Objective::Talk(_) | Objective::ClearZone(_) => 1,
     }
 }

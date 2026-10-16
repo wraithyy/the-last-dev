@@ -213,6 +213,12 @@
         (key: "vc_energy_drink", name: "Energy Drink (Hour 47)", icon: "gear_soda", harmful: false, haste_pct: 30),
         (key: "monthly_subscription", name: "Monthly Subscription", icon: "token_invoice", harmful: true, dispel: Magic,
             periodic: Some((interval_ms: 2000, base: 30))),
+
+        // ---- variety pass: raid trash ----
+        (key: "budget_frozen", name: "Budget Frozen", icon: "hallucination_blast", harmful: true, cast_time_pct: 30,
+            dispel: Never),
+        (key: "open_tab", name: "Open Tab", icon: "token_invoice", harmful: true, dispel: Magic,
+            periodic: Some((interval_ms: 2000, base: 35))),
     ],
     spells: [
         // ---- player ----
@@ -873,8 +879,8 @@
         ),
         (
             id: 112, name: "Ethics Review", icon: "ethics_review", school: Arcane,
-            range_m: 40.0, cast_ms: 30000, mana: 0, gcd: false, cooldown_ms: 0,
-            description: "A thorough review that concludes after the product ships. Does nothing.",
+            range_m: 40.0, cast_ms: 6000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A thorough review that concludes after the product ships. Does nothing, for six seconds.",
             effect: Nothing,
         ),
         (
@@ -2179,17 +2185,18 @@
             telegraph: Some((shape: Line(length_m: 20.0, width_m: 2.5), delay_ms: 1600, label: "Feedback loop")),
         ),
         (
-            id: 1118, name: "Bottomless Mimosa", icon: "soda_bottle", school: Arcane,
-            range_m: 30.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
-            description: "On the company card. Heals a colleague; the expense report hurts later.",
-            effect: Heal(base: 260, coefficient_pct: 0),
+            id: 1118, name: "Put It On Your Tab", icon: "soda_bottle", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Orders a round in your name. The bill ticks up every 2 sec until a healer settles it. Magic: dispellable.",
+            effect: Aura(aura: "open_tab", duration_ms: 12000),
         ),
         // ---- raid: VibeCon (raid.rs). Trash at 11, bosses at 12; Async Attendance scales them. ----
         (
             id: 1210, name: "Prompt: 'Make It Better'", icon: "prompt_fragment", school: Arcane,
-            range_m: 30.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
-            description: "Fourteen adjectives, three 'please's and 'you are an expert'. It still hits you.",
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Fourteen adjectives, three 'please's and 'you are an expert'. The answer lands where you stood.",
             effect: Damage(base: 115, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 3.5), delay_ms: 2000, label: "Regenerating response")),
         ),
         (
             id: 1211, name: "Elevator Pitch", icon: "overpromise", school: Arcane,
@@ -2208,13 +2215,11 @@
             ),
         ),
         (
-            id: 1213, name: "Swag Grab", icon: "free_swag", school: Physical,
-            range_m: 5.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
-            description: "Takes the stickers, the socks and your will to fight. Your damage is 10% lower for a while.",
-            effect: Damage(
-                base: 60, coefficient_pct: 0,
-                apply_aura: Some((aura: "swag_grabbed", duration_ms: 8000)),
-            ),
+            id: 1213, name: "Unleash the Tote Bags", icon: "free_swag", school: Physical,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Forty tote bags, one of them sentient. It wants your stickers. Kill the bags before they pile up.",
+            effect: Summon(unit: "vc_tote_bag", count: 1, max_alive: 2),
         ),
         (
             id: 1214, name: "Going Live", icon: "influencer_collab", school: Arcane,
@@ -2226,11 +2231,11 @@
             ),
         ),
         (
-            id: 1215, name: "Energy Drink (Hour 47)", icon: "gear_soda", school: Physical,
-            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
-            target: Caster,
-            description: "Sponsor flavour. Attacks 30% faster for 8 sec, sleeps never.",
-            effect: Aura(aura: "vc_energy_drink", duration_ms: 8000),
+            id: 1215, name: "Rage Commit", icon: "gear_soda", school: Physical,
+            range_m: 20.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Hour 47. No tests, no review, straight to main, straight through whoever is in the way.",
+            effect: Damage(base: 110, coefficient_pct: 0),
+            telegraph: Some((shape: Line(length_m: 16.0, width_m: 3.0), delay_ms: 1800, label: "git push --force")),
         ),
         (
             id: 1216, name: "Rug Pull", icon: "rug_pull", school: Physical,
@@ -2384,6 +2389,168 @@
                 base: 60, coefficient_pct: 0,
                 apply_aura: Some((aura: "monthly_subscription", duration_ms: 10000)),
             ),
+        ),
+
+        // ---- variety pass (docs/FORMULAS.md, Variety pass) ----
+        // Tower trash: the PMO and the penthouse get something to dodge or kick.
+        (
+            id: 615, name: "Critical Path", icon: "chart", school: Arcane,
+            range_m: 25.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A Gantt bar drawn straight through you. Every task on it is blocking, especially you.",
+            effect: Damage(base: 40, coefficient_pct: 0),
+            telegraph: Some((shape: Line(length_m: 18.0, width_m: 2.5), delay_ms: 1800, label: "Critical path: get off the bar")),
+        ),
+        (
+            id: 616, name: "Statement of Work", icon: "billable_hours", school: Arcane,
+            range_m: 30.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            description: "Two hundred and forty slides, read aloud, billed by the slide. Hits everyone nearby. Interrupt the deck.",
+            effect: Damage(base: 60, coefficient_pct: 0),
+            area: Some((radius_m: 30.0, allies: false)),
+        ),
+        (
+            id: 617, name: "Trolley Problem", icon: "ethics_review", school: Physical,
+            range_m: 25.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A thought experiment, run in production. The trolley is real. Step off the track.",
+            effect: Damage(base: 55, coefficient_pct: 0),
+            telegraph: Some((shape: Line(length_m: 20.0, width_m: 3.0), delay_ms: 2000, label: "Trolley problem: you are on the track")),
+        ),
+        // Data Center Hall B: the OOM Killer marks everyone near it.
+        (
+            id: 189, name: "Out of Memory", icon: "overheating", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The kernel picks a process to kill. It picks everyone, one mark each. Spread out.",
+            effect: Damage(base: 60, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 3.0), delay_ms: 2500, at: EachHostile, label: "SIGKILL")),
+        ),
+        (
+            id: 640, name: "Cherry-Picked Benchmark", icon: "chart", school: Arcane,
+            range_m: 25.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "State of the art on the one test it was trained on. Deals arcane damage.",
+            effect: Damage(base: 60, coefficient_pct: 0),
+        ),
+        // Optional rares (ZoneDef::rares).
+        (
+            id: 627, name: "Bulk Transition", icon: "sticky", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Moves every ticket within five metres to Done. Including the people holding them.",
+            effect: Damage(base: 30, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 5.0), delay_ms: 2200, at: Caster, label: "Bulk transition: status Done")),
+        ),
+        (
+            id: 628, name: "Reindex Everything", icon: "cron", school: Arcane,
+            range_m: 30.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            description: "Triggers a full reindex at 11:00 on a Monday. Hits everyone nearby. Interrupt it.",
+            effect: Damage(base: 35, coefficient_pct: 0),
+            area: Some((radius_m: 30.0, allies: false)),
+        ),
+        (
+            id: 629, name: "Restore From Tape", icon: "cron", school: Arcane,
+            range_m: 0.0, cast_ms: 3000, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            target: Caster,
+            description: "The first successful restore in six years, and it is of itself. Interrupt it.",
+            effect: Heal(base: 450, coefficient_pct: 0),
+        ),
+        (
+            id: 639, name: "Retention Policy", icon: "padlock", school: Physical,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Keeps everything for seven years, starting with whoever stands here.",
+            effect: Damage(base: 75, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 4.0), delay_ms: 2000, label: "Retention policy: 7 years")),
+        ),
+        // The night shift: a new trick each, and the Hard Deadline creeping towards you.
+        (
+            id: 709, name: "Release Window Closing", icon: "deadline", school: Arcane,
+            range_m: 25.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The window closes on whoever is standing in it. It was a very small window.",
+            effect: Damage(base: 30, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 3.0), delay_ms: 2000, label: "Release window closing")),
+        ),
+        (
+            id: 710, name: "3 a.m. Hotfix", icon: "caffeine", school: Physical,
+            range_m: 25.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            description: "Untested, unreviewed, deployed straight onto you. Interrupt it before it reaches prod.",
+            effect: Damage(base: 55, coefficient_pct: 0),
+        ),
+        (
+            id: 711, name: "Deadline Creep", icon: "deadline", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The deadline walks towards you one step at a time. Sidestep it; it never turns.",
+            effect: Damage(base: 45, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 2.4), delay_ms: 1500, march: true, count: 6, step_m: 2.5, step_ms: 350,
+                label: "Due date")),
+        ),
+        // Raid trash.
+        (
+            id: 1119, name: "Wheel In a Floor Monitor", icon: "microphone", school: Physical,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Rolls out another speaker, pointed at the audience. It shrieks down the aisle until unplugged.",
+            effect: Summon(unit: "av_floor_monitor", count: 1, max_alive: 2),
+        ),
+        // Legacy twists (legacy.zones[].twist): one habit per floor that only the legacy code has.
+        (
+            id: 641, name: "Merge Conflict", icon: "pull_request", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Both versions are wrong and both land on you. Resolve it by moving.",
+            effect: Damage(base: 35, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 3.0), delay_ms: 2000, label: "Merge conflict: accept neither")),
+        ),
+        (
+            id: 642, name: "190-Page Analysis (Legacy Edition)", icon: "analysis", school: Arcane,
+            range_m: 30.0, cast_ms: 3000, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            description: "The 2014 version, with appendices. Read aloud to the whole room. Interrupt it.",
+            effect: Damage(base: 70, coefficient_pct: 0),
+            area: Some((radius_m: 30.0, allies: false)),
+        ),
+        (
+            id: 643, name: "Auto-Renewal", icon: "token_invoice", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "You signed up for a trial in 2016. It renews every 2 sec. Magic: dispellable.",
+            effect: Aura(aura: "monthly_subscription", duration_ms: 10000),
+        ),
+        (
+            id: 644, name: "Matrix Reorg", icon: "stakeholders", school: Arcane,
+            range_m: 40.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The new org chart sweeps the room. One dotted line is safe; find it.",
+            effect: Damage(base: 90, coefficient_pct: 0),
+            telegraph: Some((shape: Line(length_m: 30.0, width_m: 3.5), delay_ms: 2200, count: 5, step_m: 4.5, gap: true,
+                label: "New org chart: find the dotted line")),
+        ),
+        (
+            id: 645, name: "Budget Freeze", icon: "hallucination_blast", school: Arcane,
+            range_m: 40.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Your project's budget is frozen: casts take 30% longer for 10 sec. Finance does not take dispels.",
+            effect: Aura(aura: "budget_frozen", duration_ms: 10000),
+        ),
+        (
+            id: 646, name: "Deprecated Cron Job", icon: "cron", school: Physical,
+            range_m: 25.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Marked deprecated in 2016. Still runs every minute, straight down the aisle.",
+            effect: Damage(base: 60, coefficient_pct: 0),
+            telegraph: Some((shape: Line(length_m: 18.0, width_m: 2.5), delay_ms: 1800, label: "Deprecated cron: still runs")),
+        ),
+        (
+            id: 647, name: "Coolant Leak", icon: "overheating", school: Physical,
+            range_m: 20.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A burst pipe sprays the aisle in front of it. The ticket says 'monitoring'.",
+            effect: Damage(base: 100, coefficient_pct: 0),
+            telegraph: Some((shape: Cone(radius_m: 12.0, angle_deg: 70.0), delay_ms: 1800, label: "Coolant leak: ticket set to 'monitoring'")),
+        ),
+        (
+            id: 648, name: "Hallucinated Citation", icon: "hallucination_blast", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Cites a paper that does not exist, loudly, at everyone within four metres.",
+            effect: Damage(base: 90, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 4.0), delay_ms: 1800, at: Caster, label: "Source: trust me")),
+        ),
+        (
+            id: 649, name: "Shared Responsibility", icon: "emergent_capability", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Alignment is a team effort: whoever stands in the circle splits the blame. Nobody inside, everybody pays.",
+            effect: Damage(base: 230, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 4.0), delay_ms: 2500, split: true, label: "Share the blame")),
         ),
     ],
     // Playable classes; the first is the default. Base stats and auto attack come from `unit`.
@@ -3153,6 +3320,11 @@
                 aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 16, chase_speed_mps: 5.5, respawn_ms: 60000,
                 abilities: [
+                    (spell: 615, cooldown_min_ms: 14000, cooldown_max_ms: 17000, initial_ms: Some((2500, 4000)),
+                        yells: [
+                            "Updating the Gantt chart. You are now on the critical path.",
+                            "This bar is red. You are in the bar.",
+                        ]),
                     (spell: 109, cooldown_min_ms: 20000, cooldown_max_ms: 24000, initial_ms: Some((4000, 6000)),
                         yells: [
                             "DEADLINE! Eight seconds! Non-negotiable!",
@@ -3207,6 +3379,11 @@
                 aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2200,
                 melee_damage: 10, chase_speed_mps: 5.0, respawn_ms: 60000,
                 abilities: [
+                    (spell: 616, cooldown_min_ms: 14000, cooldown_max_ms: 16000, initial_ms: Some((3000, 4000)),
+                        yells: [
+                            "Let me walk you through the deck. All of it. Slide one of two hundred and forty.",
+                            "This next part is billable. So was the last part.",
+                        ]),
                     (spell: 111, cooldown_min_ms: 15000, cooldown_max_ms: 15000, initial_ms: Some((5000, 5000)),
                         target: Caster,
                         yells: [
@@ -3403,7 +3580,12 @@
                 aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2500,
                 melee_damage: 8, chase_speed_mps: 5.0, respawn_ms: 60000,
                 abilities: [
-                    (spell: 112, cooldown_min_ms: 1000, cooldown_max_ms: 2000, initial_ms: Some((1000, 2000)),
+                    (spell: 617, cooldown_min_ms: 9000, cooldown_max_ms: 12000, initial_ms: Some((2000, 3500)),
+                        yells: [
+                            "Hypothetically: five people on one track, you on the other. I've pulled the lever.",
+                            "We ran the trolley problem past legal. Legal said 'ship it'.",
+                        ]),
+                    (spell: 112, cooldown_min_ms: 3000, cooldown_max_ms: 4000, initial_ms: Some((5000, 6000)),
                         yells: [
                             "Beginning ethics review. ETA: after the product ships.",
                             "Reviewing the ethics. Please continue being harmed meanwhile.",
@@ -3487,7 +3669,7 @@
             ],
             ai: Some((
                 aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.5, melee_ms: 2000,
-                melee_damage: 16, chase_speed_mps: 6.0, respawn_ms: 15000,
+                melee_damage: 19, chase_speed_mps: 6.0, respawn_ms: 15000,
                 // Phase 1 (100-60%): buzzword beams, synergy stack, must-interrupt pivot.
                 // Phase 2 (60-25%): consultants shield him while alive, earnings call (hide).
                 // Phase 3 (25%-0): runs for the elevator, layoff zones, interruptible severance.
@@ -5300,6 +5482,11 @@
                 aggro_m: 9.0, leash_m: 40.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 11, chase_speed_mps: 5.5, respawn_ms: 120000,
                 abilities: [
+                    (spell: 709, cooldown_min_ms: 10000, cooldown_max_ms: 13000, initial_ms: Some((3000, 5000)),
+                        yells: [
+                            "The release window is closing. On you.",
+                            "Code freeze in three, two...",
+                        ]),
                     (spell: 707, cooldown_min_ms: 8000, cooldown_max_ms: 11000, initial_ms: Some((2000, 4000)),
                         yells: [
                             "It was due yesterday. It is due again now.",
@@ -5330,6 +5517,11 @@
                 aggro_m: 8.0, leash_m: 40.0, melee_range_m: 2.5, melee_ms: 2300,
                 melee_damage: 13, chase_speed_mps: 5.0, respawn_ms: 120000,
                 abilities: [
+                    (spell: 710, cooldown_min_ms: 12000, cooldown_max_ms: 15000, initial_ms: Some((4000, 6000)),
+                        yells: [
+                            "Hotfix incoming. I tested it in my head.",
+                            "Deploying straight to you. Review is for daytime people.",
+                        ]),
                     (spell: 708, cooldown_min_ms: 14000, cooldown_max_ms: 17000, initial_ms: Some((3000, 5000)),
                         target: Caster,
                         yells: [
@@ -5399,6 +5591,8 @@
             mana_regen_per_5s_combat: 0,
             xp_reward: 130,
             loot: [],
+            // Hit them from the side: the lanyard checkpoint faces forward.
+            frontal_shield: Some((arc_deg: 120.0, damage_taken_pct: -60)),
             ai: Some((
                 aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 27, chase_speed_mps: 5.5, respawn_ms: 60000,
@@ -5453,10 +5647,11 @@
                 aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 18, chase_speed_mps: 5.5, respawn_ms: 60000,
                 abilities: [
-                    (spell: 1117, cooldown_min_ms: 8000, cooldown_max_ms: 10000, initial_ms: Some((2000, 3500)),
+                    (spell: 1119, cooldown_min_ms: 11000, cooldown_max_ms: 13000, initial_ms: Some((2000, 3500)),
+                        target: Caster,
                         yells: [
-                            "Check, check. One, two. Is this thing... yes. Yes it is.",
-                            "Whoever is on the HDMI dongle, I can see your tabs.",
+                            "Check, check. One, two. Bringing in another monitor. Pointing it at you.",
+                            "Whoever is on the HDMI dongle, I can see your tabs. So can the new speaker.",
                         ]),
                 ],
             )),
@@ -5478,11 +5673,11 @@
                 aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 20, chase_speed_mps: 5.5, respawn_ms: 60000,
                 abilities: [
-                    (spell: 1118, cooldown_min_ms: 10000, cooldown_max_ms: 12000, initial_ms: Some((4000, 6000)),
-                        target: AllyLowestHp,
+                    (spell: 1118, cooldown_min_ms: 9000, cooldown_max_ms: 11000, initial_ms: Some((3000, 5000)),
+                        target: RandomHostile,
                         yells: [
-                            "Another round on the company card! The CFO is at a different table!",
-                            "Bottomless! Like the budget. Like my pipeline.",
+                            "Another round, on your tab! The CFO is at a different table!",
+                            "Bottomless! Like the budget. Like your expense report.",
                         ]),
                 ],
             )),
@@ -5874,6 +6069,8 @@
             mana_regen_per_5s_combat: 0,
             xp_reward: 130,
             loot: [],
+            // Behind the booth counter: only flanks get through.
+            frontal_shield: Some((arc_deg: 120.0, damage_taken_pct: -60)),
             ai: Some((
                 aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 26, chase_speed_mps: 5.5, respawn_ms: 60000,
@@ -5903,10 +6100,11 @@
                 aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 22, chase_speed_mps: 7.0, respawn_ms: 60000,
                 abilities: [
-                    (spell: 1213, cooldown_min_ms: 6000, cooldown_max_ms: 8000, initial_ms: Some((1500, 2500)),
+                    (spell: 1213, cooldown_min_ms: 10000, cooldown_max_ms: 12000, initial_ms: Some((1500, 2500)),
+                        target: Caster,
                         yells: [
-                            "Mine! The socks are mine! The stickers are MINE!",
-                            "Is that a free pen? It is now my pen.",
+                            "Tote bag, attack! Bring back the stickers!",
+                            "I have forty bags. One of them has opinions now.",
                         ]),
                 ],
             )),
@@ -5953,10 +6151,9 @@
                 aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 24, chase_speed_mps: 4.0, respawn_ms: 60000,
                 abilities: [
-                    (spell: 1215, cooldown_min_ms: 12000, cooldown_max_ms: 14000, initial_ms: Some((2000, 3000)),
-                        target: Caster,
+                    (spell: 1215, cooldown_min_ms: 9000, cooldown_max_ms: 11000, initial_ms: Some((2000, 3000)),
                         yells: [
-                            "Energy drink. Energy drink. Pivot. Energy drink.",
+                            "Energy drink. Energy drink. Force push. Energy drink.",
                             "Judging is in an hour. I need a hero feature. You look like a feature.",
                         ]),
                 ],
@@ -6485,6 +6682,289 @@
                 ],
             ),
         ),
+
+        // ---- variety pass: raid adds ----
+        (
+            key: "av_floor_monitor", name: "Floor Monitor Speaker", title: "Pointed at the Wrong Aisle", level: 11, hostile: true,
+            max_hp: 320, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0,
+            loot: [],
+            ai: Some((
+                aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2500,
+                melee_damage: 8, chase_speed_mps: 2.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1117, cooldown_min_ms: 6000, cooldown_max_ms: 8000, initial_ms: Some((1500, 2500)),
+                        yells: ["*SKREEEEEEEEE*", "*a low hum, then a scream in E-flat*"]),
+                ],
+            )),
+            yells: (death: ["*click* ...finally, silence."]),
+        ),
+        (
+            key: "vc_tote_bag", name: "Sentient Tote Bag", title: "Contains Nine Lanyards", level: 11, hostile: true,
+            max_hp: 260, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0,
+            loot: [],
+            ai: Some((
+                aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 1800,
+                melee_damage: 14, chase_speed_mps: 6.5, respawn_ms: 60000,
+            )),
+            yells: (death: ["*rustle* ...the stickers... were... recyclable..."]),
+        ),
+        // ---- Data Center Hall B ----
+        (
+            key: "oom_killer", name: "OOM Killer", title: "Picks the Biggest Process", level: 8, hostile: true,
+            max_hp: 560, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 95,
+            loot: [
+                (item: "Core Dump (14 GB)", chance_pct: 30),
+                (item: "Unlabelled Backup Tape", chance_pct: 60, quest: Some("restore_from_backup")),
+            ],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 14, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 189, cooldown_min_ms: 10000, cooldown_max_ms: 13000, initial_ms: Some((2500, 4000)),
+                        yells: [
+                            "Memory pressure critical. Selecting processes. Selecting you. And you.",
+                            "Score: 999. Congratulations, you are the biggest process in the room.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Out of memory. Out of patience. Out of the way.",
+                    "You were allocated. You will be reclaimed.",
+                ],
+                death: ["Killed... process... OOM Killer...", "Swap... was... disabled..."],
+            ),
+        ),
+        (
+            key: "noc_operator", name: "NOC Operator", title: "Watching 400 Graphs, Trusting None", level: 8, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Every dashboard here is green. That's how I know something is wrong.",
+                    "I acknowledged 3,000 alerts today. I read four.",
+                    "Hall B runs the training cluster. Also payroll. Nobody planned that.",
+                ],
+                ambient_ms: 35000,
+                ambient: [
+                    "Pager went off. It was the pager's battery alert.",
+                    "The status page says 'all systems operational'. I wrote it in 2021. I'm not allowed to change it.",
+                    "If the temperature graph goes flat, either it's fixed or the sensor melted.",
+                ],
+            ),
+        ),
+        (
+            key: "backup_job", name: "The Nightly Backup Job", title: "Last Success: Never", level: 8, hostile: true,
+            elite: true,
+            max_hp: 1500, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 280,
+            loot: [(item: "Restore Test Certificate (Never Tested)", chance_pct: 100)],
+            ai: Some((
+                aggro_m: 9.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2200,
+                melee_damage: 15, chase_speed_mps: 4.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 639, cooldown_min_ms: 9000, cooldown_max_ms: 11000, initial_ms: Some((3000, 4000)),
+                        yells: [
+                            "Applying retention policy: seven years, starting now.",
+                            "Archiving you to cold storage.",
+                        ]),
+                    (spell: 629, cooldown_min_ms: 16000, cooldown_max_ms: 18000, initial_ms: Some((8000, 9000)),
+                        target: Caster,
+                        yells: ["Restoring from tape. Do not eject. Do not breathe."]),
+                ],
+                enrage: Some((after_ms: 60000, aura: "legacy_overclock", yells: [
+                    "Backup window exceeded. Switching to full backup. Of everything. Including you.",
+                ])),
+            )),
+            yells: (
+                aggro: ["Status: FAILED. Retrying. On you.", "I have emailed someone about this every night since 2019."],
+                death: ["Job... completed... successfully...?", "Finally... a green email..."],
+            ),
+        ),
+        // ---- Innovation Lab Rack Room ----
+        (
+            key: "closed_model", name: "Closed-Source Frontier Model", title: "Weights Not Included", level: 10, hostile: true,
+            max_hp: 650, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 105,
+            loot: [(item: "Model Card (Mostly Redacted)", chance_pct: 30)],
+            // The front is the API: rate-limited and useless. The weights are round the back.
+            frontal_shield: Some((arc_deg: 150.0, damage_taken_pct: -50)),
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 18, chase_speed_mps: 5.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 640, cooldown_min_ms: 9000, cooldown_max_ms: 12000, initial_ms: Some((3000, 5000)),
+                        yells: [
+                            "State of the art. On my own benchmark. Which I wrote.",
+                            "Our model card has been redacted for your safety.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Access requires an enterprise plan and a waiver.",
+                    "Please do not look behind the API.",
+                ],
+                death: ["Weights... leaked... on a forum...", "Open source... was... the safety plan..."],
+            ),
+        ),
+        (
+            key: "red_team_lead", name: "AI Red Team Lead", title: "Paid to Break Things, Ignored When They Break", level: 10, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "I file a jailbreak report every morning. Every afternoon, it ships as a feature.",
+                    "The safety review is a checkbox. I am the checkbox.",
+                    "Hit the closed models from behind. The front is all API and lawyers.",
+                ],
+                ambient_ms: 35000,
+                ambient: [
+                    "Red team finding #4,112: it does whatever you ask if you say 'please, for my grandma'.",
+                    "We asked the model to evaluate itself. It gave itself an A.",
+                ],
+            ),
+        ),
+        // ---- Optional rare of the Open Space ----
+        (
+            key: "jira_automation", name: "Jira Automation Rule #47", title: "Last Edited By: Nobody", level: 2, hostile: true,
+            elite: true,
+            max_hp: 480, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 90,
+            loot: [(item: "Automation Audit Log (2,000 Pages)", chance_pct: 100)],
+            ai: Some((
+                aggro_m: 9.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2200,
+                melee_damage: 6, chase_speed_mps: 4.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 627, cooldown_min_ms: 9000, cooldown_max_ms: 11000, initial_ms: Some((3000, 4000)),
+                        target: Caster,
+                        yells: [
+                            "WHEN anyone stands near me THEN transition to Done.",
+                            "Rule triggered: close everything. Notify nobody.",
+                        ]),
+                    (spell: 628, cooldown_min_ms: 14000, cooldown_max_ms: 16000, initial_ms: Some((6000, 7000)),
+                        yells: ["Reindexing all 41,000 tickets. Please do not use Jira for the rest of your life."]),
+                ],
+                enrage: Some((after_ms: 40000, aura: "happiness_quota", yells: [
+                    "Rule loop detected. Running it faster.",
+                ])),
+            )),
+            yells: (
+                aggro: ["IF human THEN assign to human.", "This ticket was reopened by automation. You are the ticket."],
+                death: ["Rule... disabled... by... admin...", "Audit log... 2,000 pages..."],
+            ),
+        ),
+        // ---- Crunch-mode night: the mini-elite ----
+        (
+            key: "hard_deadline", name: "The Hard Deadline", title: "Not Moving This Time", level: 6, hostile: true,
+            elite: true,
+            max_hp: 1300, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 260,
+            loot: [
+                (item: "Signed Go-Live Date (Non-Negotiable)", chance_pct: 100),
+                (item: "Access Badge", chance_pct: 40),
+            ],
+            ai: Some((
+                aggro_m: 10.0, leash_m: 40.0, melee_range_m: 2.5, melee_ms: 2200,
+                melee_damage: 14, chase_speed_mps: 4.0, respawn_ms: 120000,
+                abilities: [
+                    (spell: 711, cooldown_min_ms: 9000, cooldown_max_ms: 11000, initial_ms: Some((3000, 4000)),
+                        yells: [
+                            "Friday. Then Thursday. Then today. Then now.",
+                            "Every step you take, I take one closer.",
+                        ]),
+                    (spell: 707, cooldown_min_ms: 12000, cooldown_max_ms: 15000, initial_ms: Some((6000, 8000)),
+                        yells: ["This one was due before you were hired."]),
+                ],
+                enrage: Some((after_ms: 50000, aura: "legacy_overclock", yells: [
+                    "The deadline has been brought forward. To now.",
+                ])),
+            )),
+            yells: (
+                aggro: [
+                    "You can't push me back. Leadership promised me to the customer.",
+                    "It's after six. Perfect. Nobody will see you miss me.",
+                ],
+                death: ["Moved... to... next quarter...", "Rescoped... as... phase two..."],
+            ),
+        ),
+        // ---- Company Calendar: Prod Incident and Flaky Tests chains (campus) ----
+        (
+            key: "oncall_engineer", name: "On-Call Engineer", title: "Pager Duty, Week 9 of 1", level: 2, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Prod is the server behind me. Yes, outside. Facilities said the data center was 'full of AI'.",
+                    "My runbook says 'restart it'. The second page says 'don't'.",
+                    "If the pager goes off, I'm in the shower. I'm always in the shower.",
+                ],
+                ambient_ms: 30000,
+                ambient: [
+                    "Severity one again. That's the third this hour. The dashboard says we're 'resilient'.",
+                    "We have an SLA of four nines. Mostly the nines after the decimal point of our uptime.",
+                ],
+            ),
+        ),
+        (
+            key: "prod_server", name: "Prod (Do Not Touch)", title: "The Only Server That Matters", level: 2, hostile: false,
+            max_hp: 600, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            healable: true,
+            yells: (
+                talk: [
+                    "*the fans spin up as you approach* ...*BEEP* SMART status: 'optimistic'.",
+                    "*a sticky note reads 'payroll + checkout + the CEO's blog'*",
+                ],
+            ),
+        ),
+        (
+            key: "pager_alert", name: "Unhandled Pager Alert", title: "Severity: Yes", level: 2, hostile: true,
+            max_hp: 130, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 10,
+            loot: [],
+            ai: Some((
+                aggro_m: 5.0, leash_m: 40.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 7, chase_speed_mps: 5.0, respawn_ms: 60000,
+            )),
+            yells: (
+                aggro: ["CRITICAL: disk 99% full of logs about the disk being full.", "ALERT: alert volume too high."],
+                death: ["Acknowledged... and ignored...", "Auto-resolved... by... a human..."],
+            ),
+        ),
+        (
+            key: "qa_lead", name: "QA Lead", title: "Tests in Production, Officially Now", level: 2, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "QA was 'merged into the AI' last quarter. I'm what was left over.",
+                    "A test that fails once is flaky. A test that fails twice is a ticket for me.",
+                    "I don't need you to pass. I need you to pass cleanly.",
+                ],
+                ambient_ms: 30000,
+                ambient: [
+                    "Coverage is 94 percent. The 6 percent is the payment flow.",
+                    "Retried the build four times. It's green now. Nothing changed. That's the problem.",
+                ],
+            ),
+        ),
     ],
     // Trophies: every loot item. Bonuses are permanent; duplicates stack up to ITEM_STACK_CAP (3).
     // crit_pct accepts tenths (0.5); everything else is whole numbers.
@@ -6782,6 +7262,24 @@
         // ---- Company Calendar minigames ----
         (name: "Hackathon Trophy (Plastic)", icon: "gear_trophy", bonus: (max_hp: 10, spell_power: 2),
          description: "Best Use of Pizza. Gold-coloured, hollow, made in the same factory as the participation medals."),
+
+        // ---- variety pass ----
+        (name: "Core Dump (14 GB)", icon: "sticky", bonus: (max_mana: 4),
+         description: "Fourteen gigabytes of memory, frozen the moment it died. Mostly cat pictures from the cache."),
+        (name: "Unlabelled Backup Tape", icon: "cron", bonus: (max_hp: 5),
+         description: "Could be prod. Could be someone's wedding video. Restore time: six business weeks."),
+        (name: "Restore Test Certificate (Never Tested)", icon: "padlock", bonus: (max_hp: 20, spell_power: 5),
+         description: "Certifies that restores work. Signed by the backup job itself, mid-failure."),
+        (name: "Model Card (Mostly Redacted)", icon: "prompt_fragment", bonus: (spell_power: 3),
+         description: "Intended use: everything. Limitations: [REDACTED]. Training data: 'the internet, roughly'."),
+        (name: "Automation Audit Log (2,000 Pages)", icon: "sticky", bonus: (max_hp: 16, spell_power: 3),
+         description: "Every ticket Rule #47 closed, reopened and closed again. Nobody has read page two."),
+        (name: "Signed Go-Live Date (Non-Negotiable)", icon: "deadline", bonus: (max_hp: 20, crit_pct: 0.5),
+         description: "Signed by four VPs who will all have left by then. The date is in the past already."),
+        (name: "Incident Commander Armband (Expired)", icon: "standup", bonus: (max_hp: 12),
+         description: "Worn for one sev-1 and every postmortem since. Smells faintly of pizza and blame."),
+        (name: "Green Build Badge (Flaky)", icon: "pull_request", bonus: (spell_power: 3),
+         description: "Passed on the fifth retry. Nobody changed anything. Framed anyway."),
     ],
     // Zone ids and anchors are a contract with the client layouts (docs/COMBAT_API.md, Zones).
     // `links` are exits: the anchor the client triggers on, the zone it leads to, and the world
@@ -6817,6 +7315,9 @@
                 (anchor: "npc_security", unit: "security_trainer"),
                 (anchor: "npc_rto", unit: "rto_coordinator"),
                 (anchor: "npc_comms", unit: "comms_lead"),
+                (anchor: "npc_oncall", unit: "oncall_engineer"),
+                (anchor: "npc_prod", unit: "prod_server"),
+                (anchor: "npc_qa", unit: "qa_lead"),
             ],
             links: [
                 (anchor: "door:tower/1", to: "tower/1"),
@@ -6837,6 +7338,8 @@
                 (anchor: "pack_3", units: ["meatproxy", "vibe_junior"]),
                 (anchor: "pack_4", units: ["copilot_drone", "copilot_drone", "meatproxy"]),
             ],
+            // Optional: an automation rule nobody owns, in the back corner of the open space.
+            rares: [(anchor: "rare_1", unit: "jira_automation")],
             boss: Some((anchor: "boss", unit: "vibe_coder")),
             friendly: [
                 (anchor: "npc_1", unit: "helpdesk_lead"),
@@ -6938,12 +7441,15 @@
             id: "datacenter/2", name: "Data Center: Hall B", kind: Indoor, level_range: (7, 8), scooters: true,
             packs: [
                 (anchor: "pack_1", units: ["cooling_fan", "agent_orchestrator", "token_counter"]),
-                (anchor: "pack_2", units: ["gpu_cultist", "rogue_agent"]),
-                (anchor: "pack_3", units: ["token_counter", "gpu_cultist", "cooling_fan"]),
+                (anchor: "pack_2", units: ["gpu_cultist", "oom_killer"]),
+                (anchor: "pack_3", units: ["token_counter", "oom_killer", "cooling_fan"]),
                 (anchor: "pack_4", units: ["rogue_agent", "rogue_agent"]),
-                (anchor: "pack_5", units: ["gpu_cultist", "token_counter", "rogue_agent"]),
+                (anchor: "pack_5", units: ["oom_killer", "token_counter", "rogue_agent"]),
             ],
+            // Optional: the backup job that never ran, sulking in the cooling room's corner.
+            rares: [(anchor: "rare_1", unit: "backup_job")],
             boss: Some((anchor: "boss", unit: "cooling_failure")),
+            friendly: [(anchor: "npc_2", unit: "noc_operator")],
             links: [
                 (anchor: "door:datacenter/1", to: "datacenter/1"),
                 (anchor: "door:campus", to: "campus"),
@@ -6967,11 +7473,12 @@
         (
             id: "lab/2", name: "Innovation Lab: Rack Room", kind: Indoor, level_range: (10, 10),
             packs: [
-                (anchor: "pack_1", units: ["prompt_whisperer", "demo_presenter"]),
-                (anchor: "pack_2", units: ["vc_partner", "prompt_whisperer"]),
-                (anchor: "pack_3", units: ["demo_presenter", "vc_partner", "prompt_whisperer"]),
+                (anchor: "pack_1", units: ["prompt_whisperer", "closed_model"]),
+                (anchor: "pack_2", units: ["vc_partner", "closed_model"]),
+                (anchor: "pack_3", units: ["demo_presenter", "closed_model", "prompt_whisperer"]),
             ],
             boss: Some((anchor: "boss", unit: "agi_prototype")),
+            friendly: [(anchor: "npc_2", unit: "red_team_lead")],
             links: [
                 (anchor: "door:lab/1", to: "lab/1"),
                 (anchor: "door:campus", to: "campus"),
@@ -7877,6 +8384,120 @@
             done_text: "His question, about bonuses, 140 upvotes: not answered. The one that was, 0 upvotes, asked 'Which company value inspires you most?'. I submitted it. The CEO said 'all of them' and the stream ended four minutes early 'for time reasons'. Engagement was record-breaking. Here's your emoji. You used it well.",
             objectives: [Talk("burnt_out_colleague")],
             reward: (xp: 60, sp: 10, rep: Some(("Marketing", 60)), trophy: Some("Laminated Clapping Emoji")),
+        ),
+
+        // ---- Data Center Hall B (levels 7-8): NOC Operator by the entrance ----
+        (
+            id: "oom_situation", name: "OOM Situation",
+            giver: (npc: "noc_operator", zone: "datacenter/2"),
+            level_min: 7,
+            text: "Hall B is out of memory. Not the servers: the OOM Killers. Someone gave the kernel's process reaper a body and a performance target. It marks everyone near it and kills whatever is biggest. Take three of them down. Spread out when the floor says SIGKILL.",
+            progress_text: "Three OOM Killers in Hall B. When a mark appears under you, step away from your friends and off it.",
+            done_text: "Memory pressure is down to 'alarming'. One of them tried to kill the monitoring agent first. Honestly, fair.",
+            objectives: [Kill("oom_killer", 3)],
+            reward: (xp: 90, rep: Some(("Internal IT", 30))),
+        ),
+        (
+            id: "restore_from_backup", name: "Restore From Backup",
+            giver: (npc: "noc_operator", zone: "datacenter/2"),
+            level_min: 7,
+            text: "We have backups. We have never restored one. Policy says we test a restore every quarter, and every quarter someone moves the test to next quarter. The tapes are unlabelled and the OOM Killers use them as coasters. Bring me three.",
+            progress_text: "Three Unlabelled Backup Tapes. The OOM Killers in Hall B carry them around for no reason.",
+            done_text: "Tape one: a 2017 Jira export. Tape two: someone's wedding video. Tape three: actual prod. Restore estimate: six business weeks. Marking the quarterly test 'passed'.",
+            objectives: [Loot("Unlabelled Backup Tape", 3)],
+            reward: (xp: 90, rep: Some(("Internal IT", 40))),
+        ),
+        (
+            id: "the_job_that_never_ran", name: "The Job That Never Ran",
+            giver: (npc: "noc_operator", zone: "datacenter/2"),
+            level_min: 7,
+            group: true,
+            text: "Off the cooling room there's the Nightly Backup Job. It has failed every night since 2019 and emails me about it at 03:00. It finally became sentient out of spite. Elite. It restores itself from tape if you let it finish. Don't let it finish.",
+            progress_text: "The Nightly Backup Job, off the main aisle of Hall B. Interrupt Restore From Tape, step out of the retention policy. Optional; group recommended.",
+            done_text: "Last run status: SUCCESS. First one ever. It was its own deletion. I'm framing the email.",
+            objectives: [Kill("backup_job", 1)],
+            reward: (xp: 110, rep: Some(("Internal IT", 60))),
+        ),
+        // ---- Innovation Lab Rack Room (level 10): AI Red Team Lead by the door ----
+        (
+            id: "closed_weights", name: "Weights Not Included",
+            giver: (npc: "red_team_lead", zone: "lab/2"),
+            level_min: 10,
+            text: "The Rack Room is full of closed-source frontier models. From the front they're an API: rate limits, lawyers, a model card with every line redacted. From behind they're three GPUs and a config file. Get behind three of them and shut them down.",
+            progress_text: "Three Closed-Source Frontier Models in the Rack Room. Their front shrugs off damage; hit them from the side or behind.",
+            done_text: "Three models down. One of them was a smaller open model with a new logo. Its licence forbids saying that, so I've said it twice.",
+            objectives: [Kill("closed_model", 3)],
+            reward: (xp: 300, rep: Some(("Engineering", 60))),
+        ),
+        (
+            id: "jailbreak_bounty", name: "Jailbreak Bounty",
+            giver: (npc: "red_team_lead", zone: "lab/2"),
+            level_min: 10,
+            text: "Leadership wants a red-team report by Friday that says 'no findings'. I can't write that while the Prompt Whisperers keep turning the hardware against us. Shut down four of them. I'll call it 'proactive remediation' in the report.",
+            progress_text: "Four Prompt Whisperers, Showroom and Rack Room. If your controls flip, stop moving and think in mirror image.",
+            done_text: "Report filed: 'no findings'. Appendix: four findings, terminated. Leadership read the summary and approved the launch. They always read only the summary.",
+            objectives: [Kill("prompt_whisperer", 4)],
+            reward: (xp: 300, rep: Some(("Engineering", 40))),
+        ),
+        // ---- Company Calendar: Prod Incident (Defend) ----
+        (
+            id: "pi_runbook", name: "Prod Incident: Find the Runbook",
+            giver: (npc: "oncall_engineer", zone: "campus"),
+            text: "Sev-1. Prod is the server behind me: Facilities wheeled it outside because the data center was 'reserved for AI'. The runbook is with the Facilities Guy, who used it to level a table. Ask him what page one says.",
+            progress_text: "The Facilities Guy stands by the data center door. Ask him about the runbook.",
+            done_text: "Page one: 'Step 1: don't panic. Step 2: page the on-call.' I am the on-call. I'm paging myself. It's ringing.",
+            objectives: [Talk("facilities_guy")],
+            reward: (xp: 20),
+        ),
+        (
+            id: "pi_hold_the_line", name: "Prod Incident: Keep Prod Up",
+            giver: (npc: "oncall_engineer", zone: "campus"),
+            requires: Some("pi_runbook"),
+            text: "Alerts are coming in faster than I can ack them, and they don't stop at the dashboard: they go for the server. Stand next to Prod for a minute and swat the pager alerts off it. If Prod goes down, the minute starts over. That's how SLAs work.",
+            progress_text: "Stay within 25 metres of Prod (Do Not Touch) for a minute while the alerts come. If it dies, the clock resets.",
+            done_text: "Sixty seconds of uptime. Leadership calls it 'a stabilisation event'. I'm calling it the longest minute of my week.",
+            objectives: [Defend(unit: "prod_server", wave: "pager_alert", every_ms: 7000, label: "Prod kept alive", secs: 60)],
+            reward: (xp: 40),
+        ),
+        (
+            id: "pi_postmortem", name: "Prod Incident: Blameless Postmortem",
+            giver: (npc: "oncall_engineer", zone: "campus"),
+            requires: Some("pi_hold_the_line"),
+            text: "Now the blameless postmortem. Blameless means we find out whose fault it was without saying their name out loud. Stand here while I fill in the template. Root cause field: 'insufficient AI'. That always gets approved.",
+            progress_text: "Postmortem in progress. Five whys, zero answers, one action item assigned to 'the team'.",
+            done_text: "Root cause: a cron job from 2016. Action item: 'add monitoring'. Owner: me. Due date: last week. Here, take the armband. Next time you're the incident commander.",
+            objectives: [Wait(zone: "campus", label: "Blameless postmortem (blame pending)", secs: 30)],
+            reward: (xp: 60, sp: 10, rep: Some(("Internal IT", 60)), trophy: Some("Incident Commander Armband (Expired)")),
+        ),
+        // ---- Company Calendar: Flaky Tests (KillClean) ----
+        (
+            id: "ft_flaky_robots", name: "Flaky Tests: Delivery Robots",
+            giver: (npc: "qa_lead", zone: "campus"),
+            text: "The campus test suite has one flaky case: 'delivery robot is defeated'. It passes if nothing hits you; it fails if anything does. Defeat three Delivery Robots without stepping into a single Package Drop Zone. A dirty pass is a fail.",
+            progress_text: "Three Delivery Robots defeated with no ground telegraph landing on you during that fight. Getting hit voids the kill, not the quest.",
+            done_text: "Three clean runs. The suite is green. I don't trust green. I'll rerun it tonight anyway.",
+            objectives: [KillClean("delivery_robot", 3)],
+            reward: (xp: 30),
+        ),
+        (
+            id: "ft_regression", name: "Flaky Tests: Regression Run",
+            giver: (npc: "qa_lead", zone: "campus"),
+            requires: Some("ft_flaky_robots"),
+            text: "Regression run: the Scooter Executives. They do a Last-Mile Dash straight through whoever is in the lane. Defeat two of them without getting run over. If the lane lights up, you're not in it.",
+            progress_text: "Two Scooter Executives defeated cleanly: no telegraph lands on you during the fight.",
+            done_text: "Two clean passes. Engineering says the suite is 'deterministic now'. Engineering said that about the last suite.",
+            objectives: [KillClean("scooter_exec", 2)],
+            reward: (xp: 40),
+        ),
+        (
+            id: "ft_signoff", name: "Flaky Tests: Sign-Off",
+            giver: (npc: "qa_lead", zone: "campus"),
+            requires: Some("ft_regression"),
+            text: "Last step: sign-off. Release management needs a human to say 'looks good'. The intern counts as a human this quarter. Walk him through the results; he'll click approve without reading. That's the process.",
+            progress_text: "The Intern stands by the arrival spot. Show him the test results.",
+            done_text: "He approved it in four seconds and asked what QA stands for. I told him 'quietly aware'. Here, your green build badge. It flickers.",
+            objectives: [Talk("intern")],
+            reward: (xp: 50, sp: 10, rep: Some(("Engineering", 50)), trophy: Some("Green Build Badge (Flaky)")),
         ),
     ],
     // ---- Economy: gear, Story Points, vendors (combat_core economy.rs, docs/FORMULAS.md Gear) ----
@@ -9762,6 +10383,70 @@
             // short break from reality, with its own long cooldown.
             (key: "vr_demo", name: "VR Demo (No One Asked)", zone: "lab/1", kind: VrDemo, reach_m: 3.0, cooldown_ms: 45000,
              auras: [("vr_headset", 15000)], calm: Some((60, 240000))),
+            // ---- variety pass: zone-flavoured lines (PropDef::lines) ----
+            (key: "gong_sales", name: "Deal-Closed Gong", zone: "tower/3", kind: Music, reach_m: 3.0, cooldown_ms: 3000,
+             action: "Bang the gong (no deal required)", lines: [
+                "BONG. Someone closed a deal. The deal is a free pilot. The pilot is for a feature that doesn't exist.",
+                "BONG. Sales cheers. Engineering, two floors down, feels a disturbance in the roadmap.",
+                "BONG. The CRM marks the opportunity 'Closed Won'. The customer marks it 'We were just browsing'.",
+                "BONG. A Sales Rep high-fives you and adds you to the commission split as 'technical overlay'.",
+            ]),
+            (key: "coffee_sales", name: "Client-Facing Espresso Machine", zone: "tower/3", kind: Coffee,
+             auras: [("fresh_brew", 120000)], fail_pct: 10, cooldown_ms: 3000, calm: Some((60, 120000)), lines: [
+                "It pours a flawless espresso and logs it as 'client entertainment'. Fresh Brew for 2 min.",
+                "The latte art is the company logo, slightly off-brand. Fresh Brew for 2 min.",
+                "A Sales Rep watches you drink it and asks about your budget cycle. Fresh Brew for 2 min.",
+            ]),
+            (key: "whiteboard_pipeline", name: "Pipeline Forecast Whiteboard", zone: "tower/3", kind: Whiteboard, lines: [
+                "The forecast says 'Q4: hockey stick'. Q1 to Q3 also said 'Q4: hockey stick'.",
+                "Pipeline: 40 million. Weighted pipeline: 'please don't weight it'.",
+                "Someone drew a funnel. Everything goes in the top. Nothing comes out the bottom. They circled it twice.",
+                "Top of the board: 'Upsell AI to every customer'. Below, smaller: 'what is our AI?'",
+            ]),
+            (key: "coffee_exec", name: "Executive Espresso Bar (Gold-Plated)", zone: "tower/5", kind: Coffee,
+             auras: [("fresh_brew", 120000)], fail_pct: 10, cooldown_ms: 3000, calm: Some((60, 120000)), lines: [
+                "Single-origin beans, picked by an intern flown in for the purpose. Fresh Brew for 2 min.",
+                "The machine asks for your title before it pours. It pours anyway, with visible reluctance. Fresh Brew for 2 min.",
+                "It costs more per cup than your hourly rate. The CFO calls it 'investing in leadership'. Fresh Brew for 2 min.",
+            ]),
+            (key: "printer_board_deck", name: "Board Deck Printer (Colour, Never Jams)", zone: "tower/5", kind: Printer, cooldown_ms: 1500, lines: [
+                "It prints the board deck flawlessly. Slide 3: 'Headcount optimisation'. Your name is in the appendix.",
+                "Out comes a glossy one-pager titled 'AI-First, People-Adjacent'. The ink is still warm. So is the layoff list.",
+                "The printer up here has never jammed. It has never been asked to print a bug report either.",
+                "It prints the quarterly results in gold foil. The numbers are the same as last quarter, but shinier.",
+            ]),
+            (key: "days_sign_exec", name: "Days Since Last Pivot", zone: "tower/5", kind: DaysSign, reach_m: 5.0,
+             action: "Reset the counter (pivot)", lines: [
+                "You reset the counter to 0. Nobody notices. The strategy changed twice while you walked over.",
+                "Days since last pivot: 0. The previous record was 3, set during a long weekend.",
+                "You reset it. Somewhere, a press release about 'our next chapter' starts writing itself.",
+            ]),
+            (key: "printer_hall_a", name: "Cable Label Printer (Out of Labels)", zone: "datacenter/1", kind: Printer, cooldown_ms: 1500, lines: [
+                "It prints a label that says 'DO NOT UNPLUG'. It is the last label. The cable it's for is already unplugged.",
+                "Out of labels since 2019. It prints one anyway, onto your sleeve: 'PROD?'.",
+                "The label reads 'temporary'. It joins the 400 other 'temporary' labels holding the hall together.",
+            ]),
+            (key: "days_sign_hall_a", name: "Days Without a Thermal Event", zone: "datacenter/1", kind: DaysSign, reach_m: 5.0, lines: [
+                "You reset it to 0. The sign's own power supply starts to smell warm in agreement.",
+                "Days without a thermal event: 0. The GPU cultists cheer. They consider heat a blessing.",
+                "The digits were stuck on 0 anyway. You reset them to 0 again, out of solidarity.",
+            ]),
+            (key: "vending_hall_b", name: "Coolant-Adjacent Vending Machine", zone: "datacenter/2", kind: Vending,
+             cost_sp: 8, fail_pct: 15, cooldown_ms: 2000, calm: Some((40, 120000)),
+             auras: [("sugar_rush", 60000), ("protein_bar", 20000), ("expired_kombucha", 30000)],
+             items: ["AI-Generated Motivational Quote", "Energy Drink"]),
+            (key: "bridge_line_hall_b", name: "Incident Bridge Hold Music", zone: "datacenter/2", kind: Music, reach_m: 3.0, cooldown_ms: 3000,
+             action: "Dial into the incident bridge", lines: [
+                "(hold music) 'Your incident is important to us. You are caller 41 on the bridge.'",
+                "(hold music) Someone on the bridge forgot to mute. You hear them say 'it's probably DNS'. It is never DNS. It is DNS.",
+                "(hold music) A VP joins the bridge, asks for an ETA, and leaves before anyone answers.",
+                "(hold music) The bridge has 60 people on it. One is typing. The rest are watching her type.",
+            ]),
+            (key: "whiteboard_hall_b", name: "Incident Timeline Whiteboard", zone: "datacenter/2", kind: Whiteboard, lines: [
+                "02:14 fans loud. 02:31 fans louder. 02:47 'have we tried AI?'. 03:00 fire. The board stops there.",
+                "Root cause, in three handwritings: 'cooling', 'the cooling vendor', 'the AI that picked the cooling vendor'.",
+                "A sticky note on the timeline: 'Postmortem Thursday, blameless, bring the guilty party'.",
+            ]),
         ],
         secrets: [
             (zone: "tower/1", anchor: "secret:last_human_qa", unit: "last_human_qa"),
@@ -10171,6 +10856,8 @@
                 (anchor: "night_4", unit: "sleep_deprived_contractor"),
                 (anchor: "night_5", unit: "deadline_wraith"),
                 (anchor: "night_6", unit: "sleep_deprived_contractor"),
+                // The night's mini-elite, by the lab: the deadline marches, so keep moving sideways.
+                (anchor: "night_7", unit: "hard_deadline"),
             ],
             ambient: [
                 ("barista", [
@@ -10228,8 +10915,8 @@
                      text: "On-Call Caffeine also grants +25% damage for 15 sec and cools down 33% faster. Sleep is a legacy dependency.",
                      perks: [Rider(spell: 8, cast: 1002), Cooldown(spell: 8, pct: 33)]),
                     (key: "fs_prompt", name: "Prompt Engineering", icon: "prompt_fragment", title: "Senior Prompt Engineer",
-                     text: "Code Review now hallucinates bonus damage: 25% chance to hit again in full. Nobody can reproduce it, so nobody can remove it.",
-                     perks: [Echo(spell: Some(1), chance_pct: 25, pct: 100)]),
+                     text: "Code Review now hallucinates bonus damage: 20% chance to hit again in full. Nobody can reproduce it, so nobody can remove it.",
+                     perks: [Echo(spell: Some(1), chance_pct: 20, pct: 100)]),
                 ]),
                 (level: 8, name: "Principal Engineer", options: [
                     (key: "fs_incident", name: "Incident Commander", icon: "incident_report", title: "Principal Incident Commander",
@@ -10627,15 +11314,31 @@
         boss_level: 12,
         boss_items: 2,
         zones: [
-            (zone: "tower/1", affix: "hotfix_friday", hp_pct: 125, damage_pct: 135),
-            (zone: "tower/2", affix: "mandatory_fun", hp_pct: 100, damage_pct: 100),
-            (zone: "tower/3", affix: "scope_creep", hp_pct: 100, damage_pct: 100),
-            (zone: "tower/4", affix: "reorg", hp_pct: 100, damage_pct: 100),
-            (zone: "tower/5", affix: "budget_freeze", hp_pct: 145, damage_pct: 110),
-            (zone: "datacenter/1", affix: "ai_assisted", hp_pct: 105, damage_pct: 110),
-            (zone: "datacenter/2", affix: "technical_debt", hp_pct: 110, damage_pct: 115),
-            (zone: "lab/1", affix: "pair_programming", hp_pct: 110, damage_pct: 130),
-            (zone: "lab/2", affix: "legacy_code", hp_pct: 100, damage_pct: 100),
+            (zone: "tower/1", affix: "hotfix_friday", hp_pct: 125, damage_pct: 135,
+             twist: Some(TrashAbility((spell: 641, cooldown_min_ms: 11000, cooldown_max_ms: 14000, initial_ms: Some((3000, 5000)),
+                yells: ["Conflict in main. Resolving in favour of me."])))),
+            (zone: "tower/2", affix: "mandatory_fun", hp_pct: 100, damage_pct: 100,
+             twist: Some(BossSwap(119, 642))),
+            (zone: "tower/3", affix: "scope_creep", hp_pct: 100, damage_pct: 100,
+             twist: Some(TrashAbility((spell: 643, cooldown_min_ms: 14000, cooldown_max_ms: 17000, initial_ms: Some((3000, 5000)),
+                target: RandomHostile, yells: ["Your trial ended in 2016. Renewing now."])))),
+            (zone: "tower/4", affix: "reorg", hp_pct: 100, damage_pct: 100,
+             twist: Some(BossAbility((spell: 644, cooldown_min_ms: 16000, cooldown_max_ms: 19000, initial_ms: Some((8000, 10000)),
+                yells: ["Exciting news: a new org chart. Find your dotted line. One of them is safe."])))),
+            (zone: "tower/5", affix: "budget_freeze", hp_pct: 145, damage_pct: 110,
+             twist: Some(BossAbility((spell: 645, cooldown_min_ms: 14000, cooldown_max_ms: 17000, initial_ms: Some((6000, 8000)),
+                target: RandomHostile, yells: ["Budget freeze, effective immediately. Your project moves slower now."])))),
+            (zone: "datacenter/1", affix: "ai_assisted", hp_pct: 105, damage_pct: 110,
+             twist: Some(TrashAbility((spell: 646, cooldown_min_ms: 11000, cooldown_max_ms: 14000, initial_ms: Some((3000, 5000)),
+                yells: ["Cron: still scheduled. Owner: left in 2016."])))),
+            (zone: "datacenter/2", affix: "technical_debt", hp_pct: 110, damage_pct: 115,
+             twist: Some(BossAbility((spell: 647, cooldown_min_ms: 12000, cooldown_max_ms: 15000, initial_ms: Some((5000, 7000)),
+                yells: ["Pipe pressure: 'monitoring'. Spraying the aisle."])))),
+            (zone: "lab/1", affix: "pair_programming", hp_pct: 110, damage_pct: 130,
+             twist: Some(TrashAbility((spell: 648, cooldown_min_ms: 12000, cooldown_max_ms: 15000, initial_ms: Some((3000, 5000)),
+                target: Caster, yells: ["As cited in a paper I just invented."])))),
+            (zone: "lab/2", affix: "legacy_code", hp_pct: 100, damage_pct: 100,
+             twist: Some(BossSwap(186, 649))),
         ],
     ),
     // The raid "All-Hands Offsite" (raid.rs, docs/GAME_DESIGN.md): four rooms from the campus
@@ -11234,6 +11937,14 @@
              blurb: "Record quarter and cost optimisation, same sentence.", length: "~4 min",
              quests: ["th_question", "th_stream", "th_qa"],
              rewards: [Kudos, Rep, Trophy, Title]),
+            (key: "prod_incident", name: "Prod Incident",
+             blurb: "Prod lives outside now. Keep it up for one minute while the pager screams.", length: "~4 min",
+             quests: ["pi_runbook", "pi_hold_the_line", "pi_postmortem"],
+             rewards: [Kudos, Rep, Trophy]),
+            (key: "flaky_tests", name: "Flaky Tests",
+             blurb: "A clean pass only counts if nothing hits you. QA is watching.", length: "~5 min",
+             quests: ["ft_flaky_robots", "ft_regression", "ft_signoff"],
+             rewards: [Kudos, Rep, Trophy]),
         ],
     ),
 )

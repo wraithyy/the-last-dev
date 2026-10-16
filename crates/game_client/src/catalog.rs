@@ -1932,6 +1932,158 @@ static TABLE: &[(&str, UnitVisual)] = &[
             ],
         ),
     ),
+    // ---- variety pass ----
+    (
+        "av_floor_monitor",
+        v(
+            "prim/cooling_fan",
+            1.2,
+            "Floor Monitor Speaker",
+            "<Pointed at the Wrong Aisle>",
+            &[],
+        ),
+    ),
+    (
+        "vc_tote_bag",
+        v(
+            "prim/delivery_robot",
+            0.9,
+            "Sentient Tote Bag",
+            "<Contains Nine Lanyards>",
+            &[],
+        ),
+    ),
+    (
+        "oom_killer",
+        v(
+            WORKER,
+            1.95,
+            "OOM Killer",
+            "<Picks the Biggest Process>",
+            &[
+                glow("Shirt", 0.9, 0.15, 0.1),
+                paint("Pants", 0.1, 0.1, 0.12),
+            ],
+        ),
+    ),
+    (
+        "noc_operator",
+        v(
+            CASUAL_F,
+            1.75,
+            "NOC Operator",
+            "<Watching 400 Graphs, Trusting None>",
+            &[
+                paint("Shirt", 0.15, 0.35, 0.3),
+                paint("Hair", 0.15, 0.1, 0.08),
+            ],
+        ),
+    ),
+    (
+        "backup_job",
+        v(
+            "prim/overheated_rack",
+            2.2,
+            "The Nightly Backup Job",
+            "<Last Success: Never>",
+            &[],
+        ),
+    ),
+    (
+        "closed_model",
+        v(
+            SUIT_M,
+            2.0,
+            "Closed-Source Frontier Model",
+            "<Weights Not Included>",
+            &[
+                glow("Shirt", 0.2, 0.2, 0.25),
+                paint("Pants", 0.05, 0.05, 0.06),
+            ],
+        ),
+    ),
+    (
+        "red_team_lead",
+        v(
+            CASUAL_M,
+            1.8,
+            "AI Red Team Lead",
+            "<Paid to Break Things>",
+            &[
+                paint("Shirt", 0.75, 0.1, 0.12),
+                paint("Pants", 0.15, 0.15, 0.18),
+            ],
+        ),
+    ),
+    (
+        "jira_automation",
+        v(
+            "prim/agi_beta",
+            1.7,
+            "Jira Automation Rule #47",
+            "<Last Edited By: Nobody>",
+            &[],
+        ),
+    ),
+    (
+        "hard_deadline",
+        v(
+            SUIT_M_BALD,
+            2.2,
+            "The Hard Deadline",
+            "<Not Moving This Time>",
+            &[
+                glow("Shirt", 0.8, 0.1, 0.1),
+                paint("Pants", 0.05, 0.05, 0.05),
+            ],
+        ),
+    ),
+    (
+        "oncall_engineer",
+        v(
+            CASUAL2,
+            1.8,
+            "On-Call Engineer",
+            "<Pager Duty, Week 9 of 1>",
+            &[
+                paint("Shirt", 0.35, 0.35, 0.4),
+                paint("Pants", 0.2, 0.22, 0.3),
+            ],
+        ),
+    ),
+    (
+        "prod_server",
+        v(
+            "prim/overheated_rack",
+            1.6,
+            "Prod (Do Not Touch)",
+            "<The Only Server That Matters>",
+            &[],
+        ),
+    ),
+    (
+        "pager_alert",
+        v(
+            "prim/demo_bug",
+            1.0,
+            "Unhandled Pager Alert",
+            "<Severity: Yes>",
+            &[],
+        ),
+    ),
+    (
+        "qa_lead",
+        v(
+            CASUAL_F,
+            1.7,
+            "QA Lead",
+            "<Tests in Production, Officially Now>",
+            &[
+                paint("Shirt", 0.3, 0.75, 0.35),
+                paint("Hair", 0.6, 0.3, 0.15),
+            ],
+        ),
+    ),
 ];
 
 /// Primitive rig kind (see `rigs.rs`) of a unit key, `None` for character-model units.

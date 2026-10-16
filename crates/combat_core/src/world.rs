@@ -96,6 +96,13 @@ pub struct PropDef {
     /// prop with a short use cooldown still cannot be spammed for relief.
     #[serde(default)]
     pub calm: Option<(u16, u32)>,
+    /// Zone-flavoured chat lines for a use, picked by the roll; empty keeps the kind's own lines.
+    /// Props whose roll names a reward (vending) or a score (tables) ignore them.
+    #[serde(default)]
+    pub lines: Vec<String>,
+    /// Tooltip verb when the kind's own one does not fit (a gong is not a music button).
+    #[serde(default)]
+    pub action: String,
 }
 
 /// A friendly unit spawned at a layout anchor of one zone, outside `ZoneDef::friendly`.

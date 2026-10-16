@@ -42,6 +42,8 @@ pub struct ZoneLinkView {
 const MAX_PACK_EXTRA: usize = 4;
 /// Regular slots never reach this; extra-member slots start here.
 const EXTRA_SLOT_BASE: usize = 10_000;
+/// Slots of `ZoneDef::rares`, between the regular and the extra-member ones.
+const RARE_SLOT_BASE: usize = 9_000;
 
 /// A trash pack of the loaded zone, kept for group-size growth after the load.
 pub(crate) struct PackRt {
@@ -175,6 +177,28 @@ impl Sim {
                 boss: false,
                 slot: None,
             });
+        }
+        // Rares are optional: a layout without the anchor (or a Sprint stage) just has none.
+        // Their slots sit below the pack-growth range, so a kill stays dead like trash.
+        for (k, r) in z.rares.iter().enumerate() {
+            let slot = RARE_SLOT_BASE + k;
+            if self.sprint_active() || dead.contains(&slot) {
+                continue;
+            }
+            let Some((at, yaw)) = anchors(&r.anchor) else {
+                continue;
+            };
+            let def = self.def_index(&r.unit)?;
+            plan.push(Planned {
+                def,
+                pos: at,
+                yaw,
+                level: self.sprint_level(self.content.units[def].level),
+                pack: Some(pack_id),
+                boss: false,
+                slot: Some(slot),
+            });
+            pack_id += 1;
         }
         let graveyard = anchors("graveyard");
         let arrival = anchors("player_spawn");
@@ -394,6 +418,7 @@ impl Sim {
         for p in self.kill_sharers(killer, ti) {
             let p = Self::id_of(p);
             self.record_kill(p, &key);
+            self.record_clean_kill(p, ti);
         }
         self.check_unlocks();
     }

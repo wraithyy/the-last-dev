@@ -356,6 +356,18 @@ boss bonus    = boss_items (2) Legacy pieces per member, unless the room's locko
                 locked out: Kudos only
 lockout       = per room (server) or per save (offline), ISO week (Monday 00:00 UTC, same as the
                 weekly); set when a Legacy floor boss dies
+twist         = one behaviour change per floor (`legacy.zones[].twist`), applied at spawn to the
+                floor's pack trash and rares (TrashAbility) or its boss (BossAbility, BossSwap):
+                tower/1 trash Merge Conflict (circle 3 m, 35, 11-14 s); tower/2 boss 90-Page Analysis
+                -> 190-Page Legacy Edition (kick, 3 s cast, 70 to all within 30 m); tower/3 trash
+                Auto-Renewal (dispellable DoT, 30 per 2 s for 10 s, 14-17 s); tower/4 boss Matrix
+                Reorg (5 lines 30 x 3.5 m, 4.5 m apart, one safe lane, 90, 16-19 s); tower/5 boss
+                Budget Freeze (+30% cast time for 10 s on a random member, no dispel, 14-17 s);
+                datacenter/1 trash Deprecated Cron Job (line 18 x 2.5 m, 60, 11-14 s); datacenter/2
+                boss Coolant Leak (cone 12 m 70 deg, 100, 12-15 s); lab/1 trash Hallucinated
+                Citation (circle 4 m at the caster, 90, 12-15 s); lab/2 boss Emergent Capability ->
+                Shared Responsibility (split circle 4 m, 230 shared, 2.5 s)
+                (bases are authored-level numbers; level and Legacy scaling apply as above)
 world         = Legacy floors have their own cleared floors and open elevators (session only);
                 saves keep the campaign's
 ```
@@ -366,17 +378,78 @@ Measured (`tests/coop.rs`, level-10 bots in the best tier-5 World Rares, packs p
 
 | floor | trio time s | trio lowest HP | trio most dead | solo DPS | solo lowest HP when it survived |
 |---|---|---|---|---|---|
-| tower/1 | 109-117 | 54-57% | 0 | died 2/3 | 2% |
-| tower/2 | 207-223 | 42-50% | 0 | died 1/3 | 20%, 8% |
-| tower/3 | 298-310 | 45-54% | 0 | died 3/3 | - |
-| tower/4 | 327-416 | 39-47% | 0 | died 3/3 | - |
-| tower/5 | 250-254 | 49-63% | 0 | died 1/3 | 4%, 6% |
-| datacenter/1 | 203-207 | 55-59% | 0 | died 3/3 | - |
-| datacenter/2 | 224-239 | 47% | 0 | died 3/3 | - |
-| lab/1 | 157-171 | 67-70% | 0 | died 2/3 | 8% |
-| lab/2 | 159-184 | 0-43% | 1 | died 3/3 | - |
+| tower/1 | 101-108 | 52-64% | 0 | died 3/3 | - |
+| tower/2 | 207-224 | 42-50% | 0 | died 2/3 | 8% |
+| tower/3 | 346-364 | 21-34% | 0 | died 3/3 | - |
+| tower/4 | 322-348 | 38-42% | 0 | died 3/3 | - |
+| tower/5 | 244-262 | 35-55% | 0 | died 3/3 | - |
+| datacenter/1 | 208-215 | 54-60% | 0 | died 3/3 | - |
+| datacenter/2 | 221-253 | 47% | 0 | died 3/3 | - |
+| lab/1 | 159-205 | 65-67% | 0 | died 2/3 | 7% |
+| lab/2 | 166-175 | 2-43% | 0 | died 3/3 | - |
 
 Time alone does not separate solo from group: without the group HP bonus a surviving lone DPS is only 1.2-1.5x slower, so the gate is survival.
+
+## Variety pass: objectives, rares, trash mechanics
+
+New objectives (`quests.rs`):
+
+```
+Defend      = once a second, every living player within DEFEND_RANGE_M (25 m) of the defended
+              friendly counts +1 (need = secs); while anyone guards, a `wave` unit spawns 6 m off
+              it every `every_ms` (at most 3 alive), as its add (no loot, no Kudos) with 200 threat
+              on it. The defended unit dies: every guard's count goes back to 0 (QuestProgress 0),
+              the waves despawn and a fresh copy stands up. Done objectives stop the waves.
+KillClean   = like Kill, but a kill only counts when no non-split telegraph landed on that player
+              since the unit's pull (`Unit::pulled_at`, kept past death)
+```
+
+Company Calendar chains (side quests, outside the campaign bands): Prod Incident (Talk, Defend
+Prod 60 s with Unhandled Pager Alerts every 7 s, Wait 30 s; 20/40/60 XP, 10 Kudos, Internal IT
++60) and Flaky Tests (KillClean 3 Delivery Robots, KillClean 2 Scooter Executives, Talk; 30/40/50
+XP, 10 Kudos, Engineering +50). Each ends on a trophy.
+
+Rares (`ZoneDef::rares`, anchor `rare_<n>`): spawned on load only where the layout has the anchor,
+never in a Sprint, on zone slots 9,000+ (killed ones stay dead like trash, `TRASH_RESPAWN_MS`), never
+a zone clear. tower/1 Jira Automation Rule #47 (L2 elite, 480 HP, Bulk Transition circle 5 m 30,
+Reindex Everything kick 35, 100% trophy); datacenter/2 The Nightly Backup Job (L8 elite, 1500 HP,
+Retention Policy circle 4 m 75, Restore From Tape kick self-heal 450, enrage 60 s, 100% trophy,
+quest The Job That Never Ran).
+
+New trash:
+
+```
+datacenter/2  OOM Killer (L8, 560 HP, 14 melee): Out of Memory, a 3 m circle on every player
+              within 30 m (EachHostile: fighters only, never bystander NPCs), 60, 2.5 s, 10-13 s
+lab/2         Closed-Source Frontier Model (L10, 650 HP, 18 melee): frontal shield 150 deg -50%,
+              Cherry-Picked Benchmark 60 (2 s cast) every 9-12 s
+tower/4       Project Manager + Critical Path (line 18 x 2.5 m, 40, 14-17 s);
+              Consultant + Statement of Work (kick, 2.5 s, 60 to all within 30 m, 14-16 s)
+tower/5       AI Ethicist + Trolley Problem (line 20 x 3 m, 55, 9-12 s); Ethics Review cast
+              30 s -> 6 s (still does nothing), every 3-4 s after it
+raid          Lanyard Enforcer, Booth Staff: frontal shield 120 deg -60%; AV Technician wheels in
+              a Floor Monitor Speaker (add, 320 HP, max 2, its Microphone Feedback line is the old
+              one); Open Bar AE puts Open Tab on a random member (dispellable, 35 per 2 s, 12 s)
+              instead of healing; Swag Goblin unleashes Sentient Tote Bags (add, 260 HP, max 2,
+              10-12 s); Prompt Engineer's prompt lands as a 3.5 m circle (115, 2 s); Hackathon
+              Zombie Rage Commit (line 16 x 3 m, 110, 9-11 s) instead of its energy drink
+night         Deadline Wraith + Release Window Closing (circle 3 m, 30, 10-13 s); Sleep-Deprived
+              Contractor + 3 a.m. Hotfix (kick, 2.5 s, 55, 12-15 s); The Hard Deadline (L6 elite,
+              1,300 HP, anchor night_7, enrage 50 s) casts Deadline Creep: 6 circles of 2.4 m,
+              copy k at (k + 1) * 2.5 m along the caster's facing, landing 1.5 s + k * 0.35 s
+              (TelegraphDef::march), 45 each
+```
+
+Every raid trash type has one readable mechanic (shield, add, kick, circle, cone, line or dispel)
+and no room repeats one (`tests/variety.rs`). Props may carry their own `lines` (zone-flavoured,
+picked by the roll) and an `action` tooltip verb; vending, tables, scooters and the fire alarm keep
+their kind's lines.
+
+Number changes to keep the gates: CEO melee 16 -> 19 (the co-op tower trio's lowest tower/5 boss
+HP had drifted to 61-62%, gate < 60%; now 59%); Prompt Engineering (Fullstack, Staff row) Echo
+25% -> 20% (Fullstack build 3 had drifted to 76% of the fastest bare class, cap 80%; now 85%).
+Hall B and Rack Room quests pay XP and reputation but no extra Kudos, so the campaign's vendor
+curve stays where it was.
 
 ## Raid: All-Hands Offsite
 

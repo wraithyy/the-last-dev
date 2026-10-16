@@ -212,7 +212,9 @@ fn the_calendar_lists_every_minigame_and_chain_with_rotation_off() {
             "exit_interview",
             "mandatory_training",
             "return_to_office",
-            "town_hall"
+            "town_hall",
+            "prod_incident",
+            "flaky_tests"
         ]
     );
     for g in &c.calendar.minigames {

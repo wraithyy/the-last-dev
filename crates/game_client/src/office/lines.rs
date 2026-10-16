@@ -216,6 +216,16 @@ const COFFEE_OK: [&str; 4] = [
 /// whose outcome repeats (a successful brew) still vary their line.
 pub fn mine(def: &PropDef, outcome: u32, nth: u32, content: &Content) -> Option<String> {
     let n = outcome;
+    let own_lines = !def.lines.is_empty()
+        && !matches!(
+            def.kind,
+            PropKind::Vending | PropKind::Table | PropKind::Scooter | PropKind::FireAlarm
+        )
+        && (def.kind != PropKind::Coffee || n != 0);
+    if own_lines {
+        let k = n.wrapping_add(nth) as usize % def.lines.len();
+        return def.lines.get(k).cloned();
+    }
     Some(match def.kind {
         PropKind::Coffee if n == 0 => "Descaling required. Since 2019.".to_string(),
         PropKind::Coffee => pick(&COFFEE_OK, nth).to_string(),
@@ -375,6 +385,27 @@ mod tests {
                 assert!(!line.is_empty(), "{} {n}", p.key);
             }
             assert!(!tooltip(p).0.is_empty());
+        }
+        // Zone-flavoured props speak their own lines; vending still names the reward.
+        for key in [
+            "gong_sales",
+            "printer_board_deck",
+            "whiteboard_hall_b",
+            "coffee_exec",
+        ] {
+            let Some(p) = c.prop(key) else {
+                panic!("no prop {key}");
+            };
+            for n in 1..6 {
+                let line = mine(p, n, n, &c).unwrap_or_default();
+                assert!(p.lines.contains(&line), "{key}: {line}");
+            }
+        }
+        if let Some(p) = c.prop("coffee_exec") {
+            assert_eq!(
+                mine(p, 0, 3, &c).as_deref(),
+                Some("Descaling required. Since 2019.")
+            );
         }
         let vending = c.prop("vending_open_space");
         let names: Vec<String> = (1..=5)
