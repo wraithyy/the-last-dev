@@ -148,7 +148,7 @@ fn hover_radius(kind: PropKind) -> f32 {
         | PropKind::SprintBoard
         | PropKind::ScrumBoard
         | PropKind::Calendar => 1.0,
-        PropKind::Bench | PropKind::BeanBag | PropKind::Dog => 0.9,
+        PropKind::Bench | PropKind::BeanBag | PropKind::Dog | PropKind::VrDemo => 0.9,
         PropKind::QuietRoom => 1.2,
         PropKind::Scooter | PropKind::Printer => 0.6,
         PropKind::Coffee => 0.5,
@@ -252,7 +252,7 @@ fn hover_props(
         if paused.0 || ui.iter().any(|i| *i != Interaction::None) {
             return None;
         }
-        if pick_unit(cursor, *camera, &colliders.0, &units).is_some() {
+        if pick_unit(cursor, *camera, &colliders.0, &units, 0.0).is_some() {
             return None;
         }
         let (cam, cam_tf) = *camera;

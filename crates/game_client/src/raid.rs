@@ -119,6 +119,8 @@ fn events(
             && sim
                 .content()
                 .reverses_controls(std::iter::once(key.as_str()))
+            // The VR demo headset is a prop joke with its own chat line, not a raid debuff.
+            && sim.content().aura(key).is_some_and(|a| a.harmful)
         {
             notices.write(UiNotice(
                 "Ignore Previous Instructions: your movement is reversed for a few seconds.".into(),

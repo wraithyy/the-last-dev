@@ -251,9 +251,11 @@ fn window(width: f32, top: Val, border: Color, z: i32) -> impl Bundle {
             row_gap: px(6),
             border: UiRect::all(px(1)),
             border_radius: BorderRadius::all(px(5)),
+            overflow: Overflow::scroll_y(),
             display: Display::None,
             ..default()
         },
+        crate::hud::scroll::ScrollList::fit(12.0),
         BorderColor::all(border),
         // Opaque under the gradient: world-space bubbles must not read through a modal.
         BackgroundColor(Color::srgb(0.05, 0.055, 0.08)),

@@ -10,10 +10,14 @@ use bevy::prelude::*;
 use std::f32::consts::PI;
 
 /// Sim-facing mirror of a unit, refreshed by the combat bridge every tick.
-#[derive(Component)]
+#[derive(Component, Clone, Copy)]
 pub struct Unit {
     pub hostile: bool,
     pub alive: bool,
+    /// A corpse the sim still lets us loot: the picker gives it a generous volume and priority.
+    pub lootable: bool,
+    /// A living enemy in combat: while any exists, clicks near corpses do not override targeting.
+    pub fighting: bool,
 }
 
 pub struct UnitsPlugin;
@@ -118,6 +122,8 @@ pub fn spawn_unit(
     commands.entity(e).insert(Unit {
         hostile,
         alive: true,
+        lootable: false,
+        fighting: false,
     });
     let height = catalog::unit_visual(key).height;
     match key {

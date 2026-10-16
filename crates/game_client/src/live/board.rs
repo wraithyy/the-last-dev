@@ -55,9 +55,11 @@ pub(super) fn spawn_window(mut commands: Commands) {
                 row_gap: px(6),
                 border: UiRect::all(px(1)),
                 border_radius: BorderRadius::all(px(5)),
+                overflow: Overflow::scroll_y(),
                 display: Display::None,
                 ..default()
             },
+            crate::hud::scroll::ScrollList::fit(12.0),
             BorderColor::all(Color::srgb(0.4, 0.75, 0.45).with_alpha(0.8)),
             BackgroundColor(Color::srgb(0.05, 0.055, 0.08)),
             panel_bg(),

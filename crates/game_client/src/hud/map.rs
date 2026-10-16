@@ -86,8 +86,11 @@ fn spawn_map(mut commands: Commands) {
                     padding: UiRect::all(px(10)),
                     border: UiRect::all(px(1)),
                     border_radius: BorderRadius::all(px(5)),
+                    max_height: percent(94),
+                    overflow: Overflow::scroll_y(),
                     ..default()
                 },
+                super::scroll::ScrollList::default(),
                 BorderColor::all(ACCENT.with_alpha(0.7)),
                 panel_bg(),
                 drop_shadow(),

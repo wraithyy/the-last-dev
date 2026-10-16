@@ -207,29 +207,82 @@ fn handle_keys(
     }
 }
 
-/// Own ray-vs-sphere picking: no render-backend dependency, so it behaves
-/// the same on native and WebGL2. Corpses are pickable (for looting).
+/// Half extents of the pick box of a lootable corpse. It is a flat square wide enough for any
+/// lying direction (the death pose is about 1.7 m long), because the standing sphere sat above
+/// the body and missed the head and feet.
+const LOOT_BOX_HALF: Vec3 = Vec3::new(1.4, 0.5, 1.4);
+/// Same for a corpse with nothing to take (still targetable, e.g. a teammate to resurrect).
+const CORPSE_BOX_HALF: Vec3 = Vec3::new(0.8, 0.4, 0.8);
+
+/// What the picker needs to know about one unit.
+pub struct Pickable<K> {
+    pub key: K,
+    pub pos: Vec3,
+    pub unit: Unit,
+}
+
+/// Own ray picking: no render-backend dependency, so it behaves the same on native and
+/// WebGL2. Living units are spheres, corpses lying boxes. Out of combat a lootable corpse under
+/// the cursor wins over a nearer living unit (WoW-style), so a mob that wandered behind it
+/// does not steal the click. `slack` widens every volume (finger taps).
+pub fn pick_ray<K: Copy>(
+    ray: (Vec3, Vec3),
+    units: impl Iterator<Item = Pickable<K>>,
+    colliders: &[Aabb],
+    slack: f32,
+) -> Option<K> {
+    let (origin, dir) = ray;
+    let units: Vec<_> = units.collect();
+    let calm = !units.iter().any(|u| u.unit.fighting);
+    let mut hits: Vec<(bool, f32, f32, K)> = units
+        .iter()
+        .filter_map(|u| {
+            let (near, far) = if u.unit.alive {
+                let center = u.pos + Vec3::Y * PICK_SPHERE_HEIGHT;
+                let t = ray_sphere(origin, dir, center, PICK_SPHERE_RADIUS + slack)?;
+                (t, t)
+            } else {
+                let half = if u.unit.lootable {
+                    LOOT_BOX_HALF
+                } else {
+                    CORPSE_BOX_HALF
+                };
+                let half = half + Vec3::new(slack, 0.0, slack);
+                let center = u.pos + Vec3::Y * half.y * 0.8;
+                let t = ray_aabb(origin, dir, center - half, center + half)?;
+                // Where the ray passes the body root: the fallback aim for the sight check.
+                let closest = (u.pos - origin).dot(dir).clamp(t, t + 2.0 * half.length());
+                (t, closest)
+            };
+            Some((calm && u.unit.lootable, near, far, u.key))
+        })
+        .collect();
+    hits.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.total_cmp(&b.1)));
+    let sees = |t: f32| line_of_sight(to_core(origin), to_core(origin + dir * t), colliders);
+    hits.into_iter()
+        .find(|(_, near, far, _)| sees(*near) || sees(*far))
+        .map(|(.., k)| k)
+}
+
 pub fn pick_unit(
     cursor: Vec2,
     camera: (&Camera, &GlobalTransform),
     colliders: &[Aabb],
     units: &Query<(Entity, &Transform, &Unit)>,
+    slack: f32,
 ) -> Option<Entity> {
     let (cam, cam_tf) = camera;
     let ray = cam.viewport_to_world(cam_tf, cursor).ok()?;
-    let (t, e) = units
-        .iter()
-        .filter_map(|(e, tf, _)| {
-            let center = tf.translation + Vec3::Y * PICK_SPHERE_HEIGHT;
-            ray_sphere(ray.origin, *ray.direction, center, PICK_SPHERE_RADIUS).map(|t| (t, e))
-        })
-        .min_by(|a, b| a.0.total_cmp(&b.0))?;
-    line_of_sight(
-        to_core(ray.origin),
-        to_core(ray.origin + *ray.direction * t),
+    pick_ray(
+        (ray.origin, *ray.direction),
+        units.iter().map(|(key, tf, u)| Pickable {
+            key,
+            pos: tf.translation,
+            unit: *u,
+        }),
         colliders,
+        slack,
     )
-    .then_some(e)
 }
 
 fn click_select(
@@ -246,9 +299,26 @@ fn click_select(
     if paused.0 || ui.iter().any(|i| *i != Interaction::None) {
         return;
     }
-    if let Some(e) = pick_unit(cursor, *camera, &colliders.0, &units) {
+    if let Some(e) = pick_unit(cursor, *camera, &colliders.0, &units, 0.0) {
         target.0 = Some(e);
     }
+}
+
+/// Entry distance of the ray into the box, or `None` (slab method).
+pub fn ray_aabb(origin: Vec3, dir: Vec3, lo: Vec3, hi: Vec3) -> Option<f32> {
+    let (mut near, mut far) = (0.0_f32, f32::INFINITY);
+    for i in 0..3 {
+        if dir[i].abs() < 1e-6 {
+            if origin[i] < lo[i] || origin[i] > hi[i] {
+                return None;
+            }
+            continue;
+        }
+        let (a, b) = ((lo[i] - origin[i]) / dir[i], (hi[i] - origin[i]) / dir[i]);
+        near = near.max(a.min(b));
+        far = far.min(a.max(b));
+    }
+    (near <= far).then_some(near)
 }
 
 pub fn ray_sphere(origin: Vec3, dir: Vec3, center: Vec3, radius: f32) -> Option<f32> {
@@ -347,6 +417,95 @@ fn update_ring(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn unit(alive: bool, hostile: bool, lootable: bool, fighting: bool) -> Unit {
+        Unit {
+            hostile,
+            alive,
+            lootable,
+            fighting,
+        }
+    }
+
+    /// Camera 8 m up and 6 m back looking down at `at`, the usual follow-camera angle.
+    fn ray_at(at: Vec3) -> (Vec3, Vec3) {
+        let origin = at + Vec3::new(0.0, 8.0, 6.0);
+        (origin, (at - origin).normalize())
+    }
+
+    fn pick(ray: (Vec3, Vec3), units: &[(u8, Vec3, Unit)], slack: f32) -> Option<u8> {
+        pick_ray(
+            ray,
+            units
+                .iter()
+                .map(|&(key, pos, unit)| Pickable { key, pos, unit }),
+            &[],
+            slack,
+        )
+    }
+
+    #[test]
+    fn lootable_corpse_is_pickable_at_head_and_feet() {
+        let corpse = [(1, Vec3::ZERO, unit(false, true, true, false))];
+        // 1.2 m from the root along the floor: the old standing sphere missed this.
+        for dx in [-1.2, 1.2] {
+            assert_eq!(pick(ray_at(Vec3::new(dx, 0.1, 0.0)), &corpse, 0.0), Some(1));
+        }
+        assert_eq!(pick(ray_at(Vec3::new(2.4, 0.1, 0.0)), &corpse, 0.0), None);
+        // A finger tap reaches a bit further.
+        assert_eq!(
+            pick(ray_at(Vec3::new(1.8, 0.1, 0.0)), &corpse, 0.5),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn calm_click_prefers_the_lootable_corpse_over_a_nearer_live_unit() {
+        let corpse = (1, Vec3::ZERO, unit(false, true, true, false));
+        // Standing between the camera (+z) and the corpse, the intern is hit first.
+        let intern = (2, Vec3::new(0.0, 0.0, 0.8), unit(true, false, false, false));
+        let ray = ray_at(Vec3::new(0.0, 0.2, 0.3));
+        assert_eq!(pick(ray, &[corpse, intern], 0.0), Some(1));
+        // The same click mid-fight keeps the live unit, so targeting is not hijacked.
+        let fighting = (3, Vec3::new(5.0, 0.0, 5.0), unit(true, true, false, true));
+        assert_eq!(pick(ray, &[corpse, intern, fighting], 0.0), Some(2));
+    }
+
+    #[test]
+    fn interact_loots_the_nearest_corpse_without_a_target() {
+        let at = |x: f32| Vec3::new(x, 0.0, 0.0);
+        let corpse = unit(false, true, true, false);
+        let npc = unit(true, false, false, false);
+        let units = [
+            (1, at(4.0), corpse),
+            (2, at(2.0), npc),
+            (3, at(3.0), corpse),
+        ];
+        assert_eq!(
+            crate::combat::interact_target(None, Vec3::ZERO, 6.0, &units),
+            Some(3)
+        );
+        // Out of reach: nothing to loot, so the friendly in reach is talked to.
+        assert_eq!(
+            crate::combat::interact_target(None, Vec3::ZERO, 2.5, &units),
+            Some(2)
+        );
+        assert_eq!(
+            crate::combat::interact_target(None, Vec3::ZERO, 1.0, &units),
+            None
+        );
+        // A live enemy target out of combat no longer blocks looting; in combat it does.
+        let enemy = (9, at(8.0), unit(true, true, false, false));
+        assert_eq!(
+            crate::combat::interact_target(Some(9), Vec3::ZERO, 6.0, &[units[0], enemy]),
+            Some(1)
+        );
+        let fighting = (9, at(8.0), unit(true, true, false, true));
+        assert_eq!(
+            crate::combat::interact_target(Some(9), Vec3::ZERO, 6.0, &[units[0], fighting]),
+            Some(9)
+        );
+    }
 
     #[test]
     fn party_keys_map_to_self_then_other_members_in_join_order() {

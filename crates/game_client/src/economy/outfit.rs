@@ -207,6 +207,10 @@ fn rebuild_on_respawn(
     }
 }
 
+const VR_AURA: &str = "vr_headset";
+/// Any headgear with `style: 15` would do; this is the lab-appropriate one.
+const VR_VISOR: &str = "Booth Duty: Demo VR Headset (Strapped On, Sticky)";
+
 fn wanted(
     sim: &dyn SimRead,
     unit: Option<&SimUnit>,
@@ -218,7 +222,16 @@ fn wanted(
     let id = unit?.0;
     sim.players()
         .contains(&id)
-        .then(|| sim.unit(id).map(|u| super::goods::slots_of(&u.equipped)))
+        .then(|| {
+            sim.unit(id).map(|u| {
+                let mut slots = super::goods::slots_of(&u.equipped);
+                // The VR demo prop: wear the VibeCon visor look for as long as its aura lasts.
+                if u.auras.iter().any(|a| a.key == VR_AURA) {
+                    slots[Slot::Headgear.index()] = VR_VISOR.to_string();
+                }
+                slots
+            })
+        })
         .flatten()
 }
 

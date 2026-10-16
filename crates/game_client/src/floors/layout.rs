@@ -1,9 +1,10 @@
 //! Pure, deterministic floor layouts: blockers, anchors, dressing pieces and
 //! the palette. `build_floor` has no ECS or asset dependencies.
 
-use super::kit::{Anchor, Piece, Plan};
+use super::kit::{Anchor, Piece, Plan, PrimKind};
 use super::shape::Footprint;
 use super::themes;
+use crate::arena::DecorRect;
 use crate::collision::aabb;
 use bevy::prelude::*;
 use combat_core::Aabb;
@@ -132,6 +133,77 @@ fn blockers_of(pieces: &[Piece]) -> Vec<Aabb> {
         .collect()
 }
 
+/// Decor taller than this is furniture, not floor covering.
+const FLAT_DECOR_MAX_TOP: f32 = 0.3;
+/// A piece whose underside is higher than this floats above the floor (shelf, lamp), not on it.
+const FLAT_DECOR_MAX_BOTTOM: f32 = 0.06;
+
+/// Rugs, carpet runners, mats and neon strips: low, non-solid pieces lying on the floor. A
+/// corpse rests on their top face; without this its lying pose is cut off by the decor.
+pub fn flat_decor(pieces: &[Piece]) -> Vec<DecorRect> {
+    let low = |center: Vec3, size: Vec3| {
+        let (bottom, top) = (center.y - size.y / 2.0, center.y + size.y / 2.0);
+        (bottom <= FLAT_DECOR_MAX_BOTTOM && (0.005..=FLAT_DECOR_MAX_TOP).contains(&top))
+            .then_some(top)
+    };
+    pieces
+        .iter()
+        .filter_map(|p| match p {
+            Piece::Box {
+                center,
+                size,
+                solid: false,
+                ..
+            } => low(*center, *size).map(|top| DecorRect {
+                center: Vec2::new(center.x, center.z),
+                half: Vec2::new(size.x, size.z) / 2.0,
+                yaw: 0.0,
+                top,
+                round: false,
+            }),
+            Piece::Slab {
+                center, yaw, size, ..
+            } => low(*center, *size).map(|top| DecorRect {
+                center: Vec2::new(center.x, center.z),
+                half: Vec2::new(size.x, size.z) / 2.0,
+                yaw: *yaw,
+                top,
+                round: false,
+            }),
+            Piece::Prim {
+                kind: PrimKind::Cylinder,
+                center,
+                size,
+                ..
+            } => low(*center, *size).map(|top| DecorRect {
+                center: Vec2::new(center.x, center.z),
+                half: Vec2::new(size.x, size.z) / 2.0,
+                yaw: 0.0,
+                top,
+                round: true,
+            }),
+            Piece::Prop {
+                model,
+                pos,
+                yaw,
+                scale,
+                ..
+            } if model.file.starts_with("rug") => {
+                let size = Vec3::from(model.size) * super::kit::FURNITURE_SCALE * *scale;
+                let fp = super::kit::rotated_footprint(size, *yaw);
+                Some(DecorRect {
+                    center: Vec2::new(pos.x, pos.z),
+                    half: Vec2::new(fp.x, fp.z) / 2.0,
+                    yaw: 0.0,
+                    top: pos.y + size.y,
+                    round: false,
+                })
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 /// Shared tail of every zone builder: turns a filled `Plan` into a layout.
 pub fn assemble(
     zone: &'static str,
@@ -223,6 +295,31 @@ mod tests {
         "elevator",
         "elevator_exit",
     ];
+
+    #[test]
+    fn flat_decor_lifts_enemy_corpses_off_rugs_in_every_zone() {
+        use crate::arena::FlatDecor;
+        use crate::floors::zones::{ZONE_IDS, build_zone};
+        let (mut covered, mut zones_with_rugs) = (Vec::new(), 0);
+        for id in ZONE_IDS {
+            let l = build_zone(id).unwrap_or_else(|| panic!("zone {id}"));
+            let decor = FlatDecor(flat_decor(&l.pieces));
+            zones_with_rugs += usize::from(!decor.0.is_empty());
+            for d in &decor.0 {
+                assert!(d.top > 0.0 && d.top <= FLAT_DECOR_MAX_TOP, "{id}: {d:?}");
+            }
+            for (name, pos, _) in &l.anchors {
+                if (name.starts_with("pack") || name.starts_with("boss"))
+                    && decor.top_near(*pos, 0.0) > 0.0
+                {
+                    covered.push(format!("{id}:{name}"));
+                }
+            }
+        }
+        // The tower boss halls lay a runner under the boss; a regression would drop it silently.
+        assert!(zones_with_rugs >= 10, "{zones_with_rugs}");
+        assert!(!covered.is_empty());
+    }
 
     #[test]
     fn deterministic() {

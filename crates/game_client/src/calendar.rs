@@ -8,13 +8,14 @@
 //! minimap and the map show on the board, and the log line for closed Jira tickets.
 //! Data: `content.calendar` (`combat_core::calendar`); a minigame row turns from "Coming soon"
 //! into a playable one as soon as its `MinigameDef` exists.
-//! QA: `WOW_CALENDAR=1` opens it at start; `WOW_CALENDAR=end` also scrolls the list down.
+//! QA: `WOW_CALENDAR=1` opens it at start; `WOW_SCROLL=end` (see `hud/scroll.rs`) scrolls the list down.
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
 use crate::combat::{CombatEvent, CombatSim, PendingCommands, SimReady, SimView};
 use crate::game::GameFlow;
 use crate::hud::quests::QuestTrack;
+use crate::hud::scroll::{ScrollHint, ScrollList};
 use crate::hud::{
     ACCENT, ACCENT_WARM, DIM, GOLD, IconCache, KEY_RIM, LogLineMsg, PANEL_EDGE, drop_shadow, label,
 };
@@ -22,7 +23,6 @@ use crate::input::{EndgameOpen, MinigameWindows, Paused, TextFocus};
 use crate::keybinds::{Action, Keybinds};
 use crate::net::NetWorld;
 use crate::touch::TouchMode;
-use bevy::input::mouse::{AccumulatedMouseScroll, MouseScrollUnit};
 use bevy::prelude::*;
 use combat_core::{CalendarReward, ChainStatus, Command, Event, Medal};
 use std::collections::HashMap;
@@ -71,11 +71,6 @@ pub struct OpenCalendar;
 struct CalendarWindow;
 #[derive(Component)]
 struct CalendarBody;
-#[derive(Component)]
-struct CalendarList;
-/// "More below" while the list is not scrolled to its end.
-#[derive(Component)]
-struct CalendarMore;
 
 #[derive(Component, Clone)]
 enum CalButton {
@@ -93,7 +88,7 @@ impl Plugin for CalendarPlugin {
             .add_systems(Startup, spawn_window)
             .add_systems(
                 Update,
-                (track_events, toggle, buttons, rebuild, scroll, news)
+                (track_events, toggle, buttons, rebuild, news)
                     .chain()
                     .in_set(SimReady),
             );
@@ -483,8 +478,8 @@ fn rebuild(
             });
             h.spawn(button(CalButton::Close, "Close (Esc)", false));
         });
-        c.spawn((
-            CalendarList,
+        let mut list = c.spawn((
+            ScrollList::default(),
             Node {
                 flex_direction: FlexDirection::Column,
                 row_gap: px(2),
@@ -493,11 +488,9 @@ fn rebuild(
                 margin: UiRect::top(px(6)),
                 ..default()
             },
-            ScrollPosition::default(),
-            // Presses and drags on the list scroll it instead of turning the camera.
-            Button,
-        ))
-        .with_children(|l| {
+        ));
+        let list_id = list.id();
+        list.with_children(|l| {
             group(l, "MINIGAMES", "solo or co-op, the group lead starts");
             for r in &games {
                 row(l, r, &assets, &mut icons);
@@ -543,7 +536,7 @@ fn rebuild(
                 ),
                 TextColor(DIM),
             ));
-            f.spawn((CalendarMore, label("", 12.0), TextColor(ACCENT_WARM)));
+            f.spawn((ScrollHint(list_id), label("", 12.0), TextColor(ACCENT_WARM)));
         });
     });
 }
@@ -707,56 +700,6 @@ fn button(kind: CalButton, text: &str, primary: bool) -> impl Bundle {
             TextColor(if primary { Color::WHITE } else { DIM })
         )],
     )
-}
-
-/// Mouse wheel over the window and finger drags on the list scroll it.
-fn scroll(
-    windows: Res<MinigameWindows>,
-    wheel: Res<AccumulatedMouseScroll>,
-    touches: Res<Touches>,
-    ui_scale: Res<UiScale>,
-    mut list: Query<(&mut ScrollPosition, &Interaction, &ComputedNode), With<CalendarList>>,
-    mut more: Query<&mut Text, With<CalendarMore>>,
-    mut qa_end: Local<bool>,
-) {
-    if !windows.calendar {
-        return;
-    }
-    let Ok((mut pos, hover, node)) = list.single_mut() else {
-        return;
-    };
-    let lines = match wheel.unit {
-        MouseScrollUnit::Line => wheel.delta.y * LINE_PX,
-        MouseScrollUnit::Pixel => wheel.delta.y,
-    };
-    let mut dy = if *hover == Interaction::None {
-        0.0
-    } else {
-        -lines
-    };
-    if *hover == Interaction::Pressed {
-        let s = ui_scale.0.max(0.01);
-        dy -= touches.iter().map(|t| t.delta().y).sum::<f32>() / s;
-    }
-    let k = node.inverse_scale_factor();
-    let max = ((node.content_size().y - node.size().y) * k).max(0.0);
-    if !*qa_end && max > 0.0 && std::env::var("WOW_CALENDAR").is_ok_and(|v| v == "end") {
-        *qa_end = true;
-        dy = max;
-    }
-    if dy != 0.0 {
-        pos.0.y = (pos.0.y + dy).clamp(0.0, max);
-    }
-    let hint = if pos.0.y + 4.0 < max {
-        "More below: scroll or swipe the list."
-    } else {
-        ""
-    };
-    for mut t in &mut more {
-        if t.0 != hint {
-            t.0 = hint.to_string();
-        }
-    }
 }
 
 /// The board's "!": anything listed today that was never played or started.

@@ -88,9 +88,11 @@ fn spawn_window(mut commands: Commands) {
                 row_gap: px(6),
                 border: UiRect::all(px(1)),
                 border_radius: BorderRadius::all(px(5)),
+                overflow: Overflow::scroll_y(),
                 display: Display::None,
                 ..default()
             },
+            super::scroll::ScrollList::fit(12.0),
             BorderColor::all(ACCENT.with_alpha(0.7)),
             panel_bg(),
             drop_shadow(),

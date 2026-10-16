@@ -372,6 +372,7 @@ fn row_label(text: &str) -> impl Bundle {
 fn slider(kind: SliderKind) -> impl Bundle {
     (
         Button,
+        crate::hud::scroll::NoScrollDrag,
         Slider(kind),
         RelativeCursorPosition::default(),
         Node {
@@ -461,8 +462,11 @@ fn spawn_ui(mut commands: Commands) {
                     padding: UiRect::all(px(16)),
                     border: UiRect::all(px(2)),
                     border_radius: BorderRadius::all(px(6)),
+                    max_height: percent(94),
+                    overflow: Overflow::scroll_y(),
                     ..default()
                 },
+                crate::hud::scroll::ScrollList::default(),
                 BorderColor::all(PANEL_EDGE),
                 // Opaque: the Esc menu sits right behind this panel and must not bleed through.
                 BackgroundColor(Color::srgb(0.04, 0.045, 0.07)),

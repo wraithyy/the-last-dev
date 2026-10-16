@@ -228,9 +228,15 @@ pub fn player_speed(
     if speed.0 != want {
         speed.0 = want;
     }
+    // Self-inflicted mirroring (the VR demo headset) pauses in combat; raid debuffs never do.
     let flip = sim.unit(player.0).is_some_and(|u| {
-        sim.content()
-            .reverses_controls(u.auras.iter().map(|a| a.key.as_str()))
+        let c = sim.content();
+        c.reverses_controls(
+            u.auras
+                .iter()
+                .filter(|a| !u.in_combat || c.aura(&a.key).is_some_and(|d| d.harmful))
+                .map(|a| a.key.as_str()),
+        )
     });
     if reversed.0 != flip {
         reversed.0 = flip;

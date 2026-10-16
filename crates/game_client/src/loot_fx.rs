@@ -4,7 +4,7 @@
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::too_many_arguments)]
 
-use crate::arena::Colliders;
+use crate::arena::{Colliders, FlatDecor};
 use crate::combat::{CombatEvent, SimRead, SimReady, SimUnit, SimView};
 use crate::input::{MouseState, Paused};
 use crate::nameplates::{PlateLootTag, PlateName};
@@ -28,6 +28,15 @@ const PICK_EVERY: f32 = 0.15;
 /// WebGL2 has no order-independent transparency to fade skinned meshes cleanly anyway).
 const SINK_M: f32 = 0.8;
 const SINK_SECS: f32 = 3.0;
+/// Horizontal reach of a lying body around its root, for finding the decor it rests on.
+const CORPSE_RADIUS: f32 = 0.7;
+/// Gap above the surface so the lying mesh never z-fights with floor or rug.
+const CORPSE_CLEARANCE: f32 = 0.015;
+
+/// Height a corpse at `pos` rests at: on top of the rug or carpet under it, not inside it.
+fn rest_lift(decor: &FlatDecor, pos: Vec3) -> f32 {
+    decor.top_near(pos, CORPSE_RADIUS) + CORPSE_CLEARANCE
+}
 
 /// This player's view of a corpse's timer, mirroring the sim's `refresh_corpse`: 3 minutes
 /// from the death while it holds loot for us, 30 s once it holds none. Online a teammate's roll
@@ -143,12 +152,17 @@ fn decay_corpses(
     mut commands: Commands,
     sim: SimView,
     empty: Res<EmptyCorpses>,
+    decor: Res<FlatDecor>,
     mut target: ResMut<Target>,
     mut corpses: Query<CorpseParts, Without<Player>>,
 ) {
     let now = sim.now().0;
     for (e, su, mut tf, mut vis, clock, mirrored) in &mut corpses {
         let Some(u) = sim.unit(su.0) else { continue };
+        if !u.alive {
+            // Bosses and respawners keep their corpse too, so the lift is not tied to the sink.
+            tf.translation.y += rest_lift(&decor, tf.translation);
+        }
         // Bosses are set pieces, respawning units come back in place, players get resurrected.
         let keeps = u.boss || u.respawn_in_ms.is_some() || sim.players().contains(&u.id);
         if u.alive || keeps {
@@ -159,6 +173,8 @@ fn decay_corpses(
                     commands.entity(e).insert(Unit {
                         hostile: u.hostile,
                         alive: u.alive,
+                        lootable: false,
+                        fighting: false,
                     });
                 }
             }
@@ -332,7 +348,7 @@ fn hover_cursor(
         _ if paused.0 => Hover::Nothing,
         None => Hover::Nothing,
         Some(_) if ui.iter().any(|i| *i != Interaction::None) => Hover::Ui,
-        Some(c) => pick_unit(c, *camera, &colliders.0, &units)
+        Some(c) => pick_unit(c, *camera, &colliders.0, &units, 0.0)
             .and_then(|e| {
                 let (_, tf, unit) = units.get(e).ok()?;
                 let id = sims.get(e).ok()?.0;
@@ -379,6 +395,29 @@ mod tests {
         assert_eq!(cursor_for(Hover::Hostile), Crosshair);
         assert_eq!(cursor_for(Hover::Corpse { in_reach: true }), Grab);
         assert_eq!(cursor_for(Hover::Corpse { in_reach: false }), NotAllowed);
+    }
+
+    #[test]
+    fn corpse_rests_on_the_rug_and_only_half_on_it_too() {
+        use crate::arena::DecorRect;
+        let rug = DecorRect {
+            center: Vec2::new(10.0, 0.0),
+            half: Vec2::new(2.0, 1.0),
+            yaw: 0.0,
+            top: 0.024,
+            round: false,
+        };
+        let decor = FlatDecor(vec![rug]);
+        let on = rest_lift(&decor, Vec3::new(10.0, 0.0, 0.0));
+        assert!(on > rug.top, "{on}");
+        // Root just off the rug edge but the body reaches over it.
+        assert!(rest_lift(&decor, Vec3::new(12.3, 0.0, 0.0)) > rug.top);
+        assert_eq!(
+            rest_lift(&decor, Vec3::new(20.0, 0.0, 0.0)),
+            CORPSE_CLEARANCE
+        );
+        // The sink starts only at the end of the timer, so the lifted pose is the resting one.
+        assert_eq!(sink_depth(SINK_SECS + 1.0), 0.0);
     }
 
     #[test]

@@ -4,6 +4,7 @@
 //! Everything is read from the sim (or the online mirror) each frame; widgets are rebuilt only
 //! when the shown state changes.
 
+use super::scroll::{ScrollList, key_of};
 use super::{
     ACCENT, BAR_BG, Banner, DIM, IconCache, PANEL_EDGE, asset_key, drop_shadow, label, panel_bg,
     set_text,
@@ -339,13 +340,17 @@ impl Plugin for QuestsPlugin {
     }
 }
 
+/// Bottom margin that keeps the windows above the chat panel (hidden on touch).
+fn chat_clear(touch: bool) -> f32 {
+    if touch { 12.0 } else { 165.0 }
+}
+
 fn window_node(top: f32) -> Node {
     Node {
         position_type: PositionType::Absolute,
         left: px(12),
         top: px(top),
         width: px(WINDOW_W),
-        max_height: percent(78),
         padding: UiRect::all(px(10)),
         flex_direction: FlexDirection::Column,
         row_gap: px(6),
@@ -354,7 +359,7 @@ fn window_node(top: f32) -> Node {
             ..UiRect::all(px(1))
         },
         border_radius: BorderRadius::all(px(5)),
-        overflow: Overflow::clip(),
+        overflow: Overflow::scroll_y(),
         display: Display::None,
         ..default()
     }
@@ -363,6 +368,7 @@ fn window_node(top: f32) -> Node {
 fn spawn_quest_ui(mut commands: Commands) {
     commands.spawn((
         DialogWindow,
+        ScrollList::fit(12.0),
         window_node(132.0),
         BorderColor {
             left: GOLD,
@@ -374,6 +380,7 @@ fn spawn_quest_ui(mut commands: Commands) {
     ));
     commands.spawn((
         LogWindow,
+        ScrollList::fit(12.0),
         window_node(132.0),
         BorderColor {
             left: ACCENT,
@@ -814,9 +821,11 @@ fn update_dialog(
     mut windows: ResMut<QuestWindows>,
     mut state: ResMut<DialogState>,
     player: Single<&Transform, With<Player>>,
-    mut window: Single<(Entity, &mut Node), With<DialogWindow>>,
+    touch: Res<TouchMode>,
+    mut window: Single<(Entity, &mut Node, &mut ScrollList), With<DialogWindow>>,
 ) {
-    let (root, node) = &mut *window;
+    let (root, node, scroll) = &mut *window;
+    scroll.fit = Some(chat_clear(touch.active));
     let npc = windows.dialog.and_then(|id| sim.unit(id));
     let reach = sim.content().config.loot_range_m + combat_core::GIVER_REACH_SLACK_M;
     let near = npc.is_some_and(|u| {
@@ -856,6 +865,8 @@ fn update_dialog(
         "{}|{:?}|{}|{}|{list:?}|{counts:?}",
         npc.id, state.selected, state.cursor, state.choice
     );
+    // A new giver or quest page starts at the top; progress refreshes keep the offset.
+    scroll.key = key_of(&format!("{}|{:?}", npc.id, state.selected));
     if sig == state.shown {
         return;
     }
@@ -993,9 +1004,11 @@ fn update_log(
     windows: Res<QuestWindows>,
     track: Res<QuestTrack>,
     mut shown: ResMut<Shown>,
-    mut window: Single<(Entity, &mut Node), With<LogWindow>>,
+    touch: Res<TouchMode>,
+    mut window: Single<(Entity, &mut Node, &mut ScrollList), With<LogWindow>>,
 ) {
-    let (root, node) = &mut *window;
+    let (root, node, scroll) = &mut *window;
+    scroll.fit = Some(chat_clear(touch.active));
     if !windows.log {
         node.display = Display::None;
         shown.log.clear();

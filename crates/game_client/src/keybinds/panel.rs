@@ -121,8 +121,11 @@ fn spawn_ui(mut commands: Commands) {
                     padding: UiRect::all(px(16)),
                     border: UiRect::all(px(2)),
                     border_radius: BorderRadius::all(px(6)),
+                    max_height: percent(94),
+                    overflow: Overflow::scroll_y(),
                     ..default()
                 },
+                crate::hud::scroll::ScrollList::default(),
                 BorderColor::all(PANEL_EDGE),
                 BackgroundColor(Color::srgb(0.05, 0.055, 0.08)),
                 panel_bg(),

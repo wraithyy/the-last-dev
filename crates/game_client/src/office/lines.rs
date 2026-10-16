@@ -165,6 +165,19 @@ const QUIET: [&str; 4] = [
     "The room is so quiet you can hear the open space deciding things without you.",
 ];
 
+const VR: [&str; 4] = [
+    "Headset on. Your legs are not rendered.",
+    "Welcome to the metaverse. The meeting is also here.",
+    "Investors loved this in 2021. Your controls are mirrored for 15 s.",
+    "Please remove the headset. Someone needs the conference room.",
+];
+
+const PRINT_3D: [&str; 3] = [
+    "PRINTING... 0%. The progress bar has been honest since the Q3 offsite.",
+    "The printer hums and prints a tiny prototype of the word 'synergy'. It collapses.",
+    "Estimated time remaining: after the roadmap. It has been 0% for so long it counts as stable.",
+];
+
 const DOG: [&str; 5] = [
     "Biscuit sniffs your badge and approves your access without a ticket. Best stakeholder here.",
     "Biscuit rolls over. You pet the belly. Your heart rate drops below 'incident'.",
@@ -215,7 +228,9 @@ pub fn mine(def: &PropDef, outcome: u32, nth: u32, content: &Content) -> Option<
             reward_name(def, n, content),
             def.cost_sp
         ),
+        PropKind::Printer if def.key == "printer_3d" => pick(&PRINT_3D, nth).to_string(),
         PropKind::Printer => format!("The printer says: {}", pick(&PRINTER, n)),
+        PropKind::VrDemo => pick(&VR, nth).to_string(),
         PropKind::Whiteboard => format!("The whiteboard suggests: {}", strategy(n)),
         PropKind::Billboard => format!("AI Billboard: \"{}\"", pick(&BILLBOARD, n)),
         PropKind::AiCar => format!("The AI-powered car: {}", pick(&CAR, n)),
@@ -297,6 +312,7 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::BeanBag => "Take a power nap",
         PropKind::QuietRoom => "Hide in the quiet room",
         PropKind::Dog => "Pet the office dog",
+        PropKind::VrDemo => "Put on a VR headset (15 s)",
     };
     let extra = match def.kind {
         PropKind::FireAlarm => "WARNING: every enemy on this floor will come for you.".to_string(),
@@ -305,6 +321,7 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::Scooter => "+60% speed out of combat. Damage ends the ride.".to_string(),
         PropKind::Printer => "Users report persistence helps. Users are wrong.".to_string(),
         PropKind::BikeRack => "It has been waiting a long time.".to_string(),
+        PropKind::VrDemo => "Mirrored controls for 15 s. Not in combat.".to_string(),
         PropKind::SprintBoard => {
             "Story points, affixes, a par time. Velocity is mandatory.".to_string()
         }

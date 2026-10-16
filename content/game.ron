@@ -202,6 +202,9 @@
         // ---- raid: VibeCon (raid.rs) ----
         (key: "vc_reversed", name: "Ignore Previous Instructions", icon: "prompt_injected", harmful: true,
             reverse_controls: true, dispel: Magic),
+        // The Innovation Lab VR demo (prop vr_demo): the same mirroring, self-inflicted and harmless.
+        (key: "vr_headset", name: "In the Metaverse", icon: "gear_vr", harmful: false,
+            reverse_controls: true, dispel: Never),
         (key: "shipped_to_prod", name: "Shipped to Prod", icon: "pull_request", harmful: false, damage_done_pct: 15, max_stacks: 10),
         (key: "panel_muted", name: "Waiting to Talk (Not Holding the Mic)", icon: "megaphone", harmful: false, damage_taken_pct: -80),
         (key: "enterprise_pricing", name: "Enterprise Pricing", icon: "token_invoice", harmful: false, damage_done_pct: 25),
@@ -9754,6 +9757,11 @@
              items: ["AI-Generated Motivational Quote", "Energy Drink"]),
             (key: "whiteboard_lab", name: "Innovation Whiteboard", zone: "lab/1", kind: Whiteboard),
             (key: "foosball_lab", name: "Foosball Table (Disrupted)", zone: "lab/1", kind: Table, calm: Some((120, 180000))),
+            (key: "printer_3d", name: "3D Printer (0%)", zone: "lab/1", kind: Printer, cooldown_ms: 1500),
+            // One aura, no failure roll: the use always puts the headset on. Burnout relief is a
+            // short break from reality, with its own long cooldown.
+            (key: "vr_demo", name: "VR Demo (No One Asked)", zone: "lab/1", kind: VrDemo, reach_m: 3.0, cooldown_ms: 45000,
+             auras: [("vr_headset", 15000)], calm: Some((60, 240000))),
         ],
         secrets: [
             (zone: "tower/1", anchor: "secret:last_human_qa", unit: "last_human_qa"),
@@ -9820,6 +9828,10 @@
              text: "Reset the counter yourself. Somebody had to.",
              hint: "Some counters want to be reset.",
              trigger: Streak(DaysSign, 1)),
+            (key: "early_adopter", name: "Early Adopter (of Something Nobody Uses)", title: "Metaverse Native",
+             text: "Tried the VR demo in the Innovation Lab. Your legs were not rendered. Neither was the product.",
+             hint: "Somewhere a demo nobody asked for is still waiting for a taker.",
+             trigger: Streak(VrDemo, 1), sp: 20),
             (key: "fire_drill", name: "This Is Not a Drill", title: "Pulled the Whole Floor",
              text: "Pulled the fire alarm. Everyone came. Nobody evacuated.",
              hint: "In case of emergency, break glass. Or don't.",

@@ -59,6 +59,8 @@ pub fn place(zone: &str, p: &mut Plan) {
         "lab/1" => {
             spot(p, "prop:whiteboard_lab", (-24.0, 1.9, 23.9), (-24.0, 21.6));
             spot(p, "prop:foosball_lab", (6.0, 0.9, -6.0), (6.0, -4.2));
+            spot(p, "prop:printer_3d", (-8.0, 1.2, -19.0), (-8.0, -17.0));
+            spot(p, "prop:vr_demo", (-14.0, 0.95, 19.0), (-14.0, 17.0));
         }
         _ => {}
     }

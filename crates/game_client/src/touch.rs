@@ -271,6 +271,9 @@ fn detect_touch(mut touches: MessageReader<TouchInput>, mut mode: ResMut<TouchMo
     touches.clear();
 }
 
+/// Fingers cover about this much more than a pointer: tap volumes grow by it (metres).
+const TAP_PICK_SLACK: f32 = 0.5;
+
 fn gestures(
     time: Res<Time>,
     touches: Res<Touches>,
@@ -369,11 +372,14 @@ fn gestures(
         if !tap {
             continue;
         }
-        let Some(picked) = pick_unit(t.position(), *camera, &colliders.0, &units) else {
+        let Some(picked) = pick_unit(t.position(), *camera, &colliders.0, &units, TAP_PICK_SLACK)
+        else {
             continue;
         };
-        // A second tap on the current target is the touch "talk / loot / engage" (F).
-        if target.0 == Some(picked) {
+        // A second tap on the current target is the touch "talk / loot / engage" (F); a first
+        // tap on a lootable corpse loots at once, since there is nothing to confirm.
+        let corpse = units.get(picked).is_ok_and(|(_, _, u)| u.lootable);
+        if target.0 == Some(picked) || corpse {
             let f = binds.key(Action::Interact);
             keys.press(f);
             st.release.push(f);
@@ -474,7 +480,7 @@ fn spawn_hud(mut commands: Commands) {
     // `hud::actionbar` places around `primary()`; the rest of the arc is built here.
     for (text, tb, c) in [
         ("Jump", TouchButton::Jump, arc(150.0)),
-        ("F", TouchButton::Act(Action::Interact), arc(120.0)),
+        ("Use", TouchButton::Act(Action::Interact), arc(120.0)),
         ("More", TouchButton::More, arc(90.0)),
     ] {
         let (tb, btn, mut node, border, bg, kids) = button(text, tb, BTN, BTN);
@@ -526,8 +532,11 @@ fn spawn_hud(mut commands: Commands) {
                         row_gap: px(8),
                         border: UiRect::all(px(2)),
                         border_radius: BorderRadius::all(px(12)),
+                        max_height: percent(94),
+                        overflow: Overflow::scroll_y(),
                         ..default()
                     },
+                    crate::hud::scroll::ScrollList::default(),
                     BorderColor::all(PANEL_EDGE),
                     panel_bg(),
                 ))

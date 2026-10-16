@@ -215,6 +215,7 @@ fn window_node(width: f32) -> Node {
         row_gap: px(7),
         border: UiRect::all(px(1)),
         border_radius: BorderRadius::all(px(5)),
+        overflow: Overflow::scroll_y(),
         display: Display::None,
         ..default()
     }
@@ -225,6 +226,7 @@ fn spawn_ui(mut commands: Commands) {
         .spawn((
             PlannerWindow,
             window_node(640.0),
+            crate::hud::scroll::ScrollList::fit(12.0),
             BorderColor::all(ACCENT.with_alpha(0.7)),
             // Opaque under the gradient: world-space bubbles must not read through a modal.
             BackgroundColor(Color::srgb(0.05, 0.055, 0.08)),
@@ -244,6 +246,7 @@ fn spawn_ui(mut commands: Commands) {
         .spawn((
             ReviewWindow,
             window_node(680.0),
+            crate::hud::scroll::ScrollList::fit(12.0),
             BorderColor::all(GOLD.with_alpha(0.8)),
             BackgroundColor(Color::srgb(0.05, 0.055, 0.08)),
             panel_bg(),

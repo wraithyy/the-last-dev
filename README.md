@@ -118,6 +118,7 @@ docs/                 plan, version choices, known limitations
 | `WOW_HOVER_SLOT=0..9`, `WOW_AUTORUN=1`, `WOW_LINEUP=1\|2` | Force a tooltip, hold forward, show the cast lineup |
 | `WOW_HOVER_TIP=player-aura\|target-aura\|party-aura\|target-cast` | Force the aura or cast tooltip of the first matching node |
 | `WOW_KEYBIND_DEMO=1\|2` | Rebind slot 1 to X and coffee to R in memory only (not saved); `1` also opens the `~/keybindings` panel |
+| `WOW_SCROLL=<px>\|end` | Scroll every window list that overflows by that many UI px (or to its end) once, for screenshots (`hud/scroll.rs`) |
 
 ## Credits
 

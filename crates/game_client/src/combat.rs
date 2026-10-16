@@ -387,6 +387,8 @@ fn tick_sim(
         };
         unit.alive = state.alive;
         unit.hostile = state.hostile;
+        unit.lootable = !state.alive && state.lootable;
+        unit.fighting = state.alive && state.hostile && state.in_combat;
         pose.prev_pos = pose.pos;
         pose.prev_yaw = pose.yaw;
         pose.pos = v3(state.pos);
@@ -776,22 +778,15 @@ fn interact_input(
         && let Some((cursor, travel)) = press.take()
         && travel <= CLICK_DRAG_THRESHOLD
     {
-        picked = pick_unit(cursor, *camera, &colliders.0, &units);
+        picked = pick_unit(cursor, *camera, &colliders.0, &units, 0.0);
         clicked = true;
     }
     if binds.just(&keys, crate::keybinds::Action::Interact) {
-        picked = target.0.or_else(|| {
-            units
-                .iter()
-                .filter(|(_, tf, u)| {
-                    !u.hostile && u.alive && tf.translation.distance(player_tf.translation) <= reach
-                })
-                .min_by(|a, b| {
-                    let d = |t: &Transform| t.translation.distance(player_tf.translation);
-                    d(a.1).total_cmp(&d(b.1))
-                })
-                .map(|(e, ..)| e)
-        });
+        let mirrored: Vec<_> = units
+            .iter()
+            .map(|(e, tf, u)| (e, tf.translation, *u))
+            .collect();
+        picked = interact_target(target.0, player_tf.translation, reach, &mirrored);
     }
     let Some(entity) = picked else { return };
     let (Ok(su), Ok((_, unit_tf, _))) = (sim_units.get(entity), units.get(entity)) else {
@@ -833,6 +828,34 @@ fn interact_input(
             });
         }
     }
+}
+
+/// What F acts on. A target that can be talked to or looted wins; otherwise the nearest
+/// lootable corpse in reach, then the nearest friendly (so F works with no target, as in WoW).
+/// In a fight an enemy target keeps F inert instead of looting around it.
+pub(crate) fn interact_target<K: Copy + PartialEq>(
+    target: Option<K>,
+    from: Vec3,
+    reach: f32,
+    units: &[(K, Vec3, crate::units::Unit)],
+) -> Option<K> {
+    if let Some(t) = target {
+        match units.iter().find(|(e, ..)| *e == t).map(|(.., u)| u) {
+            // Not a mirrored unit (the player's own body): keep the old behaviour.
+            None => return Some(t),
+            Some(u) if u.alive && !u.hostile || u.lootable => return Some(t),
+            Some(u) if u.alive && units.iter().any(|(.., o)| o.fighting) => return Some(t),
+            Some(_) => {}
+        }
+    }
+    let nearest = |pred: &dyn Fn(&crate::units::Unit) -> bool| {
+        units
+            .iter()
+            .filter(|(_, p, u)| pred(u) && p.distance(from) <= reach)
+            .min_by(|a, b| a.1.distance(from).total_cmp(&b.1.distance(from)))
+            .map(|(e, ..)| *e)
+    };
+    nearest(&|u| u.lootable).or_else(|| nearest(&|u| u.alive && !u.hostile))
 }
 
 // ---- WOW_AUTOFIGHT: a scripted player for screenshots and smoke runs.

@@ -15,6 +15,7 @@ mod map;
 mod meter;
 mod minimap;
 pub(crate) mod quests;
+pub(crate) mod scroll;
 mod trophies;
 
 /// The minimap's width, so the touch layout can park its buttons beside it.
@@ -72,6 +73,7 @@ impl Plugin for HudPlugin {
                 logs::LogsPlugin,
                 meter::MeterPlugin,
                 banners::BannersPlugin,
+                scroll::ScrollPlugin,
                 trophies::TrophiesPlugin,
                 career::CareerPlugin,
                 endgame::EndgamePlugin,

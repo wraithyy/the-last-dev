@@ -190,7 +190,7 @@ fn follow_player(
 
 fn orbit_input(
     paused: Res<Paused>,
-    windows: Res<crate::input::MinigameWindows>,
+    over_list: Res<crate::hud::scroll::ScrollHover>,
     mouse: Res<MouseState>,
     motion: Res<AccumulatedMouseMotion>,
     scroll: Res<AccumulatedMouseScroll>,
@@ -215,8 +215,8 @@ fn orbit_input(
         MouseScrollUnit::Line => scroll.delta.y,
         MouseScrollUnit::Pixel => scroll.delta.y / CAM_ZOOM_PIXELS_PER_LINE,
     };
-    // The wheel scrolls the calendar's list while it is open.
-    if !windows.calendar {
+    // The wheel scrolls a window's list while the pointer is over one.
+    if !over_list.0 {
         cam.zoom = (cam.zoom - lines * CAM_ZOOM_STEP).clamp(CAM_MIN_DIST, CAM_MAX_DIST);
     }
 }

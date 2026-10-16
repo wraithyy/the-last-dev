@@ -30,8 +30,8 @@ const FIELD_CHARS_BESIDE_BUTTON: usize = 17;
 const GLYPH_W: f32 = 9.6;
 /// Box border + horizontal padding: where the first glyph starts inside a field box.
 const TEXT_INSET: f32 = 10.0;
-/// Rows the room browser shows; the rest are counted in the footer.
-const MAX_ROWS: usize = 8;
+/// Height of the room list before it scrolls: about eight rows, so the panel keeps its shape.
+const ROOM_LIST_H: f32 = 260.0;
 /// The server answers one list per 2 s per connection.
 const REFRESH_SECS: f64 = 2.0;
 
@@ -539,8 +539,11 @@ fn spawn_ui(mut commands: Commands) {
                     padding: UiRect::all(px(18)),
                     border: UiRect::all(px(2)),
                     border_radius: BorderRadius::all(px(6)),
+                    max_height: percent(94),
+                    overflow: Overflow::scroll_y(),
                     ..default()
                 },
+                crate::hud::scroll::ScrollList::default(),
                 BorderColor::all(PANEL_EDGE),
                 // Opaque under the gradient so the pause text and volume rows do not show through.
                 BackgroundColor(Color::srgb(0.05, 0.055, 0.08)),
@@ -683,9 +686,12 @@ fn spawn_ui(mut commands: Commands) {
                     });
                     t.spawn((
                         RoomRows,
+                        crate::hud::scroll::ScrollList::default(),
                         Node {
                             flex_direction: FlexDirection::Column,
                             row_gap: px(3),
+                            max_height: px(ROOM_LIST_H),
+                            overflow: Overflow::scroll_y(),
                             ..default()
                         },
                     ));
@@ -1014,7 +1020,7 @@ fn lobby_browse(
                 Some((true, title, _)) => format!("Public: listed as \"{title}\"."),
                 _ => "Private: only people with the code can join.".to_string(),
             },
-            BrowseText::Footer => list_footer(lobby.rooms.len().min(MAX_ROWS), lobby.rooms.len()),
+            BrowseText::Footer => list_footer(lobby.rooms.len(), lobby.rooms.len()),
         };
         set_text(&mut text, &line);
     }
@@ -1025,7 +1031,7 @@ fn lobby_browse(
     let content = sim.0.content();
     commands.entity(*list).despawn_related::<Children>();
     commands.entity(*list).with_children(|l| {
-        for r in lobby.rooms.iter().take(MAX_ROWS) {
+        for r in lobby.rooms.iter() {
             let open = r.players < r.max;
             let tint = if open { Color::WHITE } else { DIM };
             let cells = row_cells(r, content);

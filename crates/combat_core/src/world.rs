@@ -63,6 +63,8 @@ pub enum PropKind {
     /// The Company Calendar: the client opens the calendar on its own use; it also closes
     /// Jira tickets, like the Scrum board.
     Calendar,
+    /// The Innovation Lab VR demo: a short headset aura (mirrored controls, out of combat only).
+    VrDemo,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -463,6 +465,10 @@ impl Sim {
         }
         if !in_range(s.pos, spot, def.reach_m) {
             return self.item_error(player, ItemError::TooFar);
+        }
+        // Mirrored controls in a fight would be a griefing tool, not a joke.
+        if def.kind == PropKind::VrDemo && s.in_combat {
+            return self.item_error(player, ItemError::InCombat);
         }
         let rewards = !def.auras.is_empty() || !def.items.is_empty();
         if rewards && s.sp < def.cost_sp {

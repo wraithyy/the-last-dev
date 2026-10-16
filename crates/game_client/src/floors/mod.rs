@@ -71,7 +71,7 @@ pub fn model_size(model: &kit::Model) -> Vec3 {
     Vec3::from(model.size) * FURNITURE_SCALE
 }
 
-use crate::arena::Colliders;
+use crate::arena::{Colliders, FlatDecor};
 use crate::config::WALL_HEIGHT;
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::VisibilityRange;
@@ -242,6 +242,7 @@ fn load_floor(
     mut images: ResMut<Assets<Image>>,
     assets: Res<AssetServer>,
     mut colliders: ResMut<Colliders>,
+    mut decor: ResMut<FlatDecor>,
     mut look: Look,
     mut blink: ResMut<BlinkMats>,
     bare: Option<Res<BareStage>>,
@@ -289,6 +290,7 @@ fn load_floor(
     } else {
         layout.blockers.clone()
     };
+    decor.0 = layout::flat_decor(&layout.pieces);
 
     let runs = layout.footprint.floor_runs();
     let floor = materials.add(StandardMaterial {
