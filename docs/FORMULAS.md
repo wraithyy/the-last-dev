@@ -380,7 +380,7 @@ Time alone does not separate solo from group: without the group HP bonus a survi
 
 ## Raid: All-Hands Offsite
 
-All in `content/game.ron` under `raid` (`raid.rs`); bosses, trash and spells are ordinary content.
+All in `content/game.ron` under `raids` (`raid.rs`, one entry per raid; VibeCon below); bosses, trash and spells are ordinary content.
 
 ```
 entrance      = campus shuttle stop (door:offsite/1); open while every member is at level 10
@@ -411,7 +411,8 @@ Pair Up        = Effect::PairUp: players within the spell range shuffled into pa
                  caster's damage scaling) each second, both members; every 30 s
 Synergy Twins  = linked HP (a hit on one sets the other to the same HP fraction; one death kills
                  both); the shielded twin takes -80% damage; every 18 s in combat they swap
-                 places and the shield; Leverage never moves (chase speed 0)
+                 places and the shield; Leverage never moves (chase speed 0); a pull on either
+                 pulls both, and both reset when the boss evades
 Next Slide     = 9 parallel lanes 34 x 4.5 m, 300 ms apart (a sweep), one inner lane left out at
 (Keynote)        random (TelegraphDef::gap); 190 per lane hit; every 20 s, 13 s below 50%;
                  Live Product Demo: 3 s must-interrupt, 300 to everyone within 45 m
@@ -429,11 +430,65 @@ Measured (`tests/coop.rs`, `the_raid_takes_a_group_and_async_attendance_takes_on
 
 | run | Lobby | Breakout | Terrace | Ballroom | whole raid |
 |---|---|---|---|---|---|
-| trio, Normal | 189-203 s, low 29-69% | 187-266 s, low 35-45% | 180-205 s, low 41-77% | 277-285 s, low 41-68% | 4/4 bosses, 894-934 s, nobody died |
-| solo DPS, Async | 158-167 s, low 44-49% | 143-207 s, low 37-44% | 145-156 s, low 43-50% | 166-175 s, low 42-44% | 4/4 bosses, 642-696 s, nobody died |
-| solo DPS, Normal | 296-310 s, low 29-37% | 327-349 s, low 20-32% | 275-303 s, low 17-39% | died (family dinner) | 3/4, wipes at the Founder |
+| trio, Normal | 189-203 s, low 29-69% | 187-215 s, low 43-49% | 205-211 s, low 62-64% | 265-285 s, low 61-67% | 4/4 bosses, 876-894 s, nobody died |
+| solo DPS, Async | 158-167 s, low 44-49% | 141-150 s, low 33-47% | 135-156 s, low 32-48% | 150-180 s, low 42-47% | 4/4 bosses, 616-642 s, nobody died |
+| solo DPS, Normal | 296-310 s, low 29-37% | died (both twins pull together) | - | - | 1/4, wipes at the Twins |
 
 The gate: the trio clears every seed, the lone DPS clears Async Attendance every seed, and the lone DPS never clears Normal (it would also fail if it scraped through above 25% HP).
+
+## Raid: VibeCon
+
+The second entry in `raids`; same framework, difficulty model, lockout and loot rules as the offsite.
+
+```
+entrance      = registration desk with a lanyard queue on the campus east lawn (door:vibecon/1);
+                open while every member is at level 10
+rooms         = vibecon/1 Expo Hall (The Vibe Coder) -> vibecon/2 Workshop Rooms (The Prompt
+                Whisperer) -> vibecon/3 Hackathon Corner (The Demo God) -> vibecon/4 Afterparty
+                (The Hype Panel) -> vibecon/5 Main Stage (The Keynote AGI-Announcer) -> campus
+difficulty    = as the offsite; Async enemy HP x40%, damage x50% (one bot needs the extra room
+                for the keynote's adds)
+boss loot     = as the offsite; raid pieces only from VibeCon's own `sets` (Booth Duty, Volunteer
+                Crew, Speaker Kit, All-Nighter), one Legendary per boss
+reputation    = boss: 120 with every department (60 Async); trash: Marketing (5)
+burnout       = management: the '10x' Founder, the three panellists, the keynote (150 per mille
+                for the bosses, kill relief for the founder)
+achievements  = raid:vc_<boss>; the keynote's title is "Speaker"
+pet           = Conference Wi-Fi Router: 25% from the keynote (never works)
+```
+
+Mechanics (bosses 9000-13000 HP before group scaling, level 12):
+
+```
+Ship It        = every 15 s the Vibe Coder opens an Unreviewed PR (650 HP, max 3); it casts Merge
+(Vibe Coder)     to Prod (10 s, uninterruptible): 300 to everyone within 70 m, then
+                 Effect::Detonate kills it and gives the boss Shipped to Prod (+15% damage per
+                 stack, 10 max); a killed PR does nothing, a stun restarts its merge
+Ignore Previous= 2 s cast, then a 3.5 m circle under each player for 2.6 s; whoever is still in
+Instructions     it takes 30 and Ignore Previous Instructions for 4 s: movement input mirrored
+(Whisperer)      on the client (AuraDef::reverse_controls; Magic, dispellable); every 24 s, 17 s
+                 below 50%
+Live Demo      = 4 s must-interrupt cast every 18-20 s; if it lands: 240 to everyone within
+(Demo God)       45 m and two Live Demo Bugs (600 HP); Works on My Machine: 7 m circle on him
+Hype Panel     = moderator + two seated panellists (7000 HP each), linked HP and one death like
+                 the twins; two wear Waiting to Talk (-80% damage taken); every 15 s the mic
+                 passes in seat order (moderator, VC, Chief AI Officer), nobody moves;
+                 More of a Comment: 3 s must-interrupt, 180 to everyone within 45 m
+One More Thing = 66%: AGI (Beta) (2000 HP, must-interrupt 200 nuke), again every 40 s; 33%:
+(Keynote)        Enterprise Pricing (+25% damage) and Auto-Renewing Subscription (60 + 30 per
+                 2 s for 10 s, Magic); This Changes Everything: 9 m circle on him
+enrage         = Running Over Time after 5 min (keynote 6 min)
+```
+
+Raid tier: 16 set pieces and five Legendaries, ilvl 14, same budget as the offsite tier. Three new looks: the conference VR headset (headgear style 15), the branded conference hoodie (hoodie 10) and the neon lanyard with a QR badge (lanyard 9).
+
+Measured (`tests/coop.rs`, `vibecon_takes_a_group_and_async_attendance_takes_one`, same bots and seeds):
+
+| run | Expo Hall | Workshops | Hackathon | Afterparty | Main Stage | whole raid |
+|---|---|---|---|---|---|---|
+| trio, Normal | 261-272 s, low 18-61% | 222-230 s, low 42-53% | 181-193 s, low 67-69% | 165-197 s, low 19-32% | 295-301 s, low 8-38% | 5/5 bosses, 1199-1217 s, nobody died |
+| solo DPS, Async | 177-196 s, low 47-49% | 147-157 s, low 45-48% | 128-144 s, low 47-51% | 125-150 s, low 44-48% | 166-200 s, low 33-36% | 5/5 bosses, 791-816 s, nobody died |
+| solo DPS, Normal | died (PR merges) | - | - | - | - | 0/5, wipes at the Vibe Coder |
 
 ## Weekly Sprint ladder
 
@@ -447,3 +502,88 @@ ladder        = delivered weekly runs of the week, fastest first (ties: fewer de
 storage       = offline: the save's ladder key (ladder=<week>*<ms>~<deaths>~<crew+crew>|...);
                 online: the room's sim (per-room board), sent to joiners; a new week empties it
 ```
+
+## Minigame: Teambuilding
+
+```
+start         = group lead on the campus, everyone alive and out of combat, no sprint;
+                travel 1.2 s later; every member gets a run on arrival
+patrol        = loop of waypoints (route:<r>:<n>) at speed_mps, pause_ms at each (scanning
+                +-0.75 rad over 4.2 s), longer pauses per waypoint; a pure function of the
+                time since arrival, so every peer sees the same party
+seen          = inside range_m and +-half_angle_deg of the facing, sight line eye 1.55 m to
+                chest 1.1 m clear of blockers (tables do not hide, hedges and banners do)
+suspicion    += rate per second while seen or heard, else -0.5 per second; 1.0 is a catch
+rate          = 1000 / notice_ms * (1 + 2 * (1 - d / range))   (edge 0.9 /s, close 2.7 /s)
+              = instant for the CEO; heard (speed > noisy_mps 5 within noise_m 7, clear line)
+                0.8 * 1000 / notice_ms
+speed         = distance over the last 15 ticks (0.5 s); a step > 4 m is a teleport
+hidden        = within hide_radius_m 1.3 of a hiding spot and slower than 1.5 m/s
+sneak         = client run speed * 0.5 (7 -> 3.5 m/s), toggled with jump in the venue
+catch         = manager / CEO: back to tb_start; talker: stun tb_cornered 5 s with an AI take;
+                HR: tb_icebreaker and stun 3 s; then grace_ms 2.5 s after the stun; the
+                objective being held starts over
+objectives    = stand dwell_ms inside radius_m: canape 1.5 s, drink 2 s, swag 1.5 s,
+                photo 0.8 s, prod incident 20 s; then the exit (radius 3 m) ends the run
+score         = max(0, 2400 + 60 * canapes - 250 * catches - 3 * whole seconds)
+medals        = Bronze "Attended": finish; Silver "Networked": score 1300+;
+                Gold "Was Never Seen": score 1600+ and no catch
+rewards       = HR standing 60 / 120 / 200, burnout relief 5 / 10 / 15 %, items once per
+                character (Bronze: name tag; Silver: + Party Leftovers Container carrier;
+                Gold: + Party Hat and the title "Ghosted the Teambuilding")
+time limit    = 900 s, then the run ends with no medal; leaving early: no medal, no score
+group score   = sum of the finished runs' scores; the group returns to the campus 10 s after
+                the last run ends
+save          = minigames=<key>*<medal 0..2>|...  (best medal per minigame)
+```
+
+## Minigames: the Company Calendar's five
+
+```
+shared        = the Teambuilding frame (start, travel, time limit, group score, return,
+                save); one run per member; the card's options answer with MinigamePick
+                {seq, option} (a stale seq is ignored); medals pay standing and relief
+                every time, items once (skipped when owned), titles, Kudos and trophies
+                once (achievements)
+review        = 9 questions, 4 answers each in a shuffled order per player; 20 s to answer,
+                else Silence; the reply stays 4.5 s (or Continue); verdict 15 s
+  tones       = (minutes, patience, gauge in tenths of a star)
+                Honest 2/10/-8  Buzz 6/25/+6  Stall 9/35/-2  Agree 1/-20/0  Raise 12/60/-10
+                Silence 4/15/-3; patience starts at 100 and never goes above it
+  repeat      = the same tone as the last answer: cost * 150 % (a restore halves)
+  walkout     = patience <= 0 after an answer: the verdict comes next
+  gauge       = 1..5 stars, starts at 3, drifts back to 3 at 0.3 stars per second
+  score       = 10 * minutes, halved after a walkout; best line 46 min with the manager
+                staying (dynamic programming over the answers)
+  medals      = Bronze any finish; Silver 320+; Gold 420+ and no walkout; limit 420 s
+reorg         = 5 rounds of 45 s after a 4 s shuffle (round 1 starts at once); a round ends
+                6 s after every open run found its manager
+  deal        = 6 colleagues on 6 of 8 desk slots, names and roles dealt from 8 each, one
+                manager; one colleague tells the manager's slot, one the role, one the old
+                manager's slot (or any other wrong desk), the rest nothing; partitions 1-6
+                stand with chance 1/2 each
+  talk        = within 2.4 m of a desk slot's colleague
+  score       = per find 150 + 4 * whole seconds left on the 45 s clock; wrong guess -50
+                (not below 0) and no asking for 2.5 s
+  medals      = Bronze 150+; Silver 900+; Gold 1150+ and no wrong guess; limit 360 s
+migration     = 20 tickets, export within 2.2 m of term_old, fields within 2.2 m of term_new
+  fields      = 2 to 4 per ticket, 4 options each; a wrong pick: +1 error, 3 s spinner
+  score       = max(0, 1500 - 75 * errors - 2 * whole seconds)
+  medals      = Bronze finish; Silver 850+; Gold 1000+ and no error; limit 480 s
+hackathon     = 24 h, 10 s each, Saturday 10:00 to Sunday 10:00; demo on stage for 12 s
+  focus       = starts 70, -1.0 per second (-2.0 in hours 16-19, 02:00-06:00), 0..100
+  snacks      = 6 pizza (+22, +12 from hour 15) and 4 drinks (+35) within 1.5 m, taken
+                only below 85 focus, back after 30 s (per player)
+  demo        = +0.55 % per second * focus / 100, at most 100 %
+  score       = 10 * whole percent + 5 * snacks
+  medals      = Bronze finish; Silver 750+; Gold 1000+; limit 300 s
+focus         = 60 s streak at the pod (within 3.6 m); away from it the streak pauses
+  walkers     = 4 loops, waypoint 0 far, 1 at the pod: colleague 1.5 m/s waits 6 s / 2 s,
+                caller 1.3 m/s 9 s / 3 s, cake 1.1 m/s 14 s / 3 s, warden 1.8 m/s 26 s / 2 s
+  arrival     = a walker reaches waypoint 1; the card counts it down from 6 s
+  defence     = up 2.5 s, rests 4.5 s; colleague: In a meeting, caller and warden:
+                Headphones, cake: Duck; an arrival without it resets the streak
+  score       = max(0, 1500 + 15 * deflections - 150 * interruptions - 4 * whole seconds)
+  medals      = Bronze finish; Silver 900+; Gold 1200+ and never interrupted; limit 300 s
+```
+

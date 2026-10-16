@@ -239,6 +239,8 @@ pub enum GearSource {
     Legacy,
     /// Only raid bosses drop it (`raid.rs`): the raid tier sets.
     Raid,
+    /// Only a minigame medal grants it (`minigame.rs`): cosmetic-first pieces.
+    Minigame,
 }
 
 /// How the piece looks on the character: a tint and a model variant per slot.
@@ -366,6 +368,9 @@ pub struct JunkDef {
     /// Drops only from mobs of this gear tier; 0 drops anywhere.
     #[serde(default)]
     pub tier: u8,
+    /// A Jira ticket: the Scrum board and the Company Calendar close it for Kudos.
+    #[serde(default)]
+    pub ticket: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1636,6 +1641,7 @@ impl Sim {
         let legacy_floor = self.legacy.fx.is_some();
         let legacy = legacy_floor || self.in_raid();
         let raid = self.raid_loot(mob);
+        let raid_sets = self.raid_sets();
         let rolls = match (legacy_floor, boss) {
             _ if raid.is_some() => raid.map_or(0, |r| r.0),
             (true, true) if self.legacy_locked(&d.key) => 0,
@@ -1694,6 +1700,8 @@ impl Sim {
                         // Raid pieces come in one rarity: any rolled rarity takes them.
                         (if raid.is_some() {
                             g.source == GearSource::Raid
+                                && (raid_sets.is_empty()
+                                    || g.set.as_ref().is_some_and(|k| raid_sets.contains(k)))
                         } else if legacy {
                             g.source == GearSource::Legacy && g.rarity == r
                         } else {

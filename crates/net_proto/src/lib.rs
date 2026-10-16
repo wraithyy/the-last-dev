@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 17;
+pub const PROTOCOL_VERSION: u16 = 20;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -657,6 +657,8 @@ pub fn is_player_command(cmd: &Command) -> bool {
         Command::SummonPet { pet } => pet.len() <= combat_core::world::WORLD_KEY_MAX,
         Command::DuelRequest { .. } | Command::DuelRespond { .. } => true,
         Command::SetLegacy { .. } | Command::StartWeeklySprint => true,
+        Command::StartMinigame { key } => key.len() <= combat_core::minigame::MINIGAME_KEY_MAX,
+        Command::LeaveMinigame | Command::MinigamePick { .. } => true,
     }
 }
 
@@ -946,8 +948,50 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
             }
             Ok(())
         }
+        Event::MinigameStarted { key, .. }
+            if key.len() > combat_core::minigame::MINIGAME_KEY_MAX =>
+        {
+            Err(ProtoError::TooMany)
+        }
+        Event::Minigame { view, .. } => check_minigame_view(view),
+        Event::MinigameCaught { line: text, .. } | Event::MinigameNote { text, .. }
+            if text.len() > MAX_TEXT_BYTES =>
+        {
+            Err(ProtoError::TooMany)
+        }
+        Event::MinigameEnded { result } => {
+            names(&result.items)?;
+            if result.key.len() > combat_core::minigame::MINIGAME_KEY_MAX
+                || result.summary.len() > MAX_TEXT_BYTES
+            {
+                return Err(ProtoError::TooMany);
+            }
+            Ok(())
+        }
         _ => Ok(()),
     }
+}
+
+/// A minigame HUD: a key, a few short lines and bars, one card of a few options, a badge per
+/// unit at most.
+fn check_minigame_view(v: &combat_core::MinigameView) -> Result<(), ProtoError> {
+    use combat_core::minigame::{CARD_OPTIONS_MAX, MINIGAME_KEY_MAX, VIEW_LINES_MAX};
+    let text = |t: &str| t.len() <= MAX_TEXT_BYTES;
+    let card_ok = v.card.as_ref().is_none_or(|c| {
+        text(&c.who)
+            && text(&c.text)
+            && c.options.len() <= CARD_OPTIONS_MAX
+            && c.options.iter().all(|o| text(o))
+    });
+    let ok = v.key.len() <= MINIGAME_KEY_MAX
+        && v.lines.len() <= VIEW_LINES_MAX
+        && v.lines.iter().all(|l| text(l))
+        && v.gauges.len() <= VIEW_LINES_MAX
+        && v.gauges.iter().all(|g| text(&g.label))
+        && card_ok
+        && v.badges.len() <= MAX_LIST_LEN
+        && v.badges.iter().all(|(_, b)| b.len() <= MAX_ITEM_NAME_BYTES);
+    if ok { Ok(()) } else { Err(ProtoError::TooMany) }
 }
 
 /// A board is a handful of tasks with a few goals each; keys and names are short content keys.
@@ -1821,6 +1865,32 @@ mod tests {
     }
 
     #[test]
+    fn calendar_events_cross_the_wire() {
+        let msg = ServerMsg::Events {
+            tick: 30,
+            events: vec![
+                Event::TicketsClosed {
+                    unit: 4,
+                    count: 3,
+                    sp: 18,
+                },
+                Event::Burnout {
+                    unit: 4,
+                    value: 380,
+                    delta: 80,
+                    cause: combat_core::BurnoutCause::Quest,
+                },
+            ],
+        };
+        assert_eq!(roundtrip(&msg), Ok(msg.clone()));
+        // The calendar starts a chain with the plain quest accept.
+        let c = ClientMsg::Cmd(Command::AcceptQuest {
+            quest: "er_receipt".into(),
+        });
+        assert_eq!(roundtrip(&c), Ok(c.clone()));
+    }
+
+    #[test]
     fn the_raid_and_the_weekly_ladder_cross_the_wire_and_are_capped() {
         use combat_core::{LadderEntry, LadderView, RaidView};
         let raid = RaidView {
@@ -1867,6 +1937,162 @@ mod tests {
         ] {
             let bad = ServerMsg::Events {
                 tick: 41,
+                events: vec![e],
+            };
+            assert_eq!(roundtrip(&bad), Err(ProtoError::TooMany));
+        }
+    }
+
+    #[test]
+    fn minigames_cross_the_wire_and_are_capped() {
+        use combat_core::{Card, Gauge, Medal, MinigameResult, MinigameView, WatcherKind};
+        let view = MinigameView {
+            key: "teambuilding".into(),
+            elapsed_ms: 61_000,
+            limit_ms: 900_000,
+            objectives: 0b10101,
+            dwell: Some((4, 55)),
+            collected: 3,
+            collectibles: 10,
+            taken: 0b1011,
+            catches: 1,
+            suspicion: 45,
+            hidden: true,
+            noisy: false,
+            score: 2010,
+            ..Default::default()
+        };
+        let corporate = MinigameView {
+            key: "performance_review".into(),
+            elapsed_ms: 30_000,
+            limit_ms: 420_000,
+            lines: vec!["Question 2/9".into(), "Calendar burned: 8 min".into()],
+            gauges: vec![Gauge {
+                label: "Meets Expectations: 3.4 of 5".into(),
+                value: 60,
+                mark: Some(50),
+            }],
+            card: Some(Card {
+                seq: 7,
+                who: "Your Manager".into(),
+                text: "Where do you see yourself in five years?".into(),
+                options: vec!["Here.".into(), "Owning the vision.".into()],
+            }),
+            badges: vec![(12, "Sam, VP of Vibes".into())],
+            layout: 0b11_0000_0000_0000_0000_1011,
+            score: 80,
+            ..Default::default()
+        };
+        let result = MinigameResult {
+            unit: 3,
+            key: "teambuilding".into(),
+            medal: Some(Medal::Silver),
+            score: 1450,
+            time_ms: 312_000,
+            catches: 1,
+            collected: 6,
+            quit: false,
+            group_score: 3100,
+            items: vec!["Party Leftovers Container (Sealed)".into()],
+            summary: String::new(),
+        };
+        let msg = ServerMsg::Events {
+            tick: 9,
+            events: vec![
+                Event::MinigameStarted {
+                    key: "teambuilding".into(),
+                    limit_ms: 900_000,
+                },
+                Event::Minigame {
+                    unit: 3,
+                    view: view.clone(),
+                },
+                Event::MinigameCaught {
+                    unit: 3,
+                    by: 12,
+                    kind: WatcherKind::Talker,
+                    line: "Prompting is a love language.".into(),
+                },
+                Event::Minigame {
+                    unit: 3,
+                    view: corporate.clone(),
+                },
+                Event::MinigameNote {
+                    unit: 3,
+                    text: "Validation error: that value does not match the ticket.".into(),
+                    good: false,
+                },
+                Event::MinigameEnded {
+                    result: result.clone(),
+                },
+            ],
+        };
+        assert_eq!(roundtrip(&msg), Ok(msg.clone()));
+        for cmd in [
+            Command::StartMinigame {
+                key: "teambuilding".into(),
+            },
+            Command::LeaveMinigame,
+            Command::MinigamePick { seq: 7, option: 3 },
+        ] {
+            let c = ClientMsg::Cmd(cmd);
+            assert_eq!(roundtrip(&c), Ok(c.clone()));
+        }
+        let long_key = ClientMsg::Cmd(Command::StartMinigame {
+            key: "k".repeat(combat_core::minigame::MINIGAME_KEY_MAX + 1),
+        });
+        assert_eq!(roundtrip(&long_key), Err(ProtoError::IllegalCommand));
+        let mut long_view = view;
+        long_view.key = "k".repeat(combat_core::minigame::MINIGAME_KEY_MAX + 1);
+        let mut many_items = result.clone();
+        many_items.items = vec!["x".into(); MAX_LIST_LEN + 1];
+        let mut long_summary = result;
+        long_summary.summary = "s".repeat(MAX_TEXT_BYTES + 1);
+        let mut many_options = corporate.clone();
+        if let Some(c) = many_options.card.as_mut() {
+            c.options = vec!["o".into(); combat_core::minigame::CARD_OPTIONS_MAX + 1];
+        }
+        let mut long_card = corporate.clone();
+        if let Some(c) = long_card.card.as_mut() {
+            c.text = "t".repeat(MAX_TEXT_BYTES + 1);
+        }
+        let mut many_lines = corporate;
+        many_lines.lines = vec!["l".into(); combat_core::minigame::VIEW_LINES_MAX + 1];
+        for e in [
+            Event::Minigame {
+                unit: 3,
+                view: long_view,
+            },
+            Event::MinigameCaught {
+                unit: 3,
+                by: 12,
+                kind: WatcherKind::Ceo,
+                line: "z".repeat(MAX_TEXT_BYTES + 1),
+            },
+            Event::MinigameEnded { result: many_items },
+            Event::MinigameEnded {
+                result: long_summary,
+            },
+            Event::Minigame {
+                unit: 3,
+                view: many_options,
+            },
+            Event::Minigame {
+                unit: 3,
+                view: long_card,
+            },
+            Event::Minigame {
+                unit: 3,
+                view: many_lines,
+            },
+            Event::MinigameNote {
+                unit: 3,
+                text: "n".repeat(MAX_TEXT_BYTES + 1),
+                good: true,
+            },
+        ] {
+            let bad = ServerMsg::Events {
+                tick: 9,
                 events: vec![e],
             };
             assert_eq!(roundtrip(&bad), Err(ProtoError::TooMany));

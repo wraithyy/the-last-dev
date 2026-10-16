@@ -148,6 +148,9 @@ fn parts(kind: &str) -> Vec<Part> {
         "cooling_failure" => cooling_failure(),
         "agi_prototype" => agi_prototype(),
         "scooter" => scooter(),
+        "unreviewed_pr" => unreviewed_pr(),
+        "demo_bug" => demo_bug(),
+        "agi_beta" => agi_beta(),
         k if k.starts_with("pet_") => pet(&k[4..]),
         _ => vec![Part::cube(
             [0.0, 0.5, 0.0],
@@ -343,6 +346,114 @@ fn agi_prototype() -> Vec<Part> {
     v
 }
 
+/// VibeCon's Unreviewed PR: a floating page of diff, green and red lines, an orange merge bar and
+/// a fuse ring spinning round it while the merge counts down.
+fn unreviewed_pr() -> Vec<Part> {
+    const PAGE: [f32; 3] = [0.95, 0.95, 0.97];
+    const ADD: [f32; 3] = [0.2, 0.95, 0.35];
+    const DEL: [f32; 3] = [1.0, 0.3, 0.3];
+    let mut page = vec![
+        Part::cube([0.0, 0.0, 0.0], [0.9, 1.2, 0.05], PAGE),
+        Part::cube([0.0, 0.5, -0.03], [0.8, 0.1, 0.01], [0.3, 0.32, 0.4]),
+        Part::cube([0.0, -0.5, -0.03], [0.7, 0.1, 0.01], HOT).glow(3.0),
+    ];
+    for k in 0..7 {
+        let (w, c) = if k % 3 == 2 {
+            (0.4, DEL)
+        } else {
+            (0.6 - 0.05 * k as f32, ADD)
+        };
+        page.push(
+            Part::cube(
+                [-0.35 + w / 2.0, 0.32 - k as f32 * 0.1, -0.03],
+                [w, 0.05, 0.01],
+                c,
+            )
+            .glow(1.5),
+        );
+    }
+    let ring = (0..8)
+        .map(|k| {
+            let a = k as f32 * TAU / 8.0;
+            Part::cube(
+                [0.75 * a.cos(), 0.0, 0.75 * a.sin()],
+                [0.22, 0.06, 0.08],
+                HOT,
+            )
+            .glow(2.5)
+            .rot([0.0, -a.to_degrees() + 90.0, 0.0])
+        })
+        .collect();
+    vec![
+        Part::cube([0.0, 0.9, 0.0], [0.0; 3], PAGE)
+            .with(page)
+            .bob(0.08, 2.0),
+        Part::cube([0.0, 0.9, 0.0], [0.0; 3], HOT)
+            .with(ring)
+            .spin(Vec3::Y, 2.5),
+        Part::cyl([0.0, 0.02, 0.0], 0.9, 0.03, DARK),
+    ]
+}
+
+/// Live Demo Bug: a knee-high beetle with glowing eyes, six legs and twitchy antennae.
+fn demo_bug() -> Vec<Part> {
+    const SHELL: [f32; 3] = [0.55, 0.08, 0.12];
+    let mut v = vec![
+        Part::ball([0.0, 0.3, 0.05], 0.55, SHELL),
+        Part::cube([0.0, 0.42, 0.05], [0.02, 0.2, 0.5], DARK),
+        Part::ball([0.0, 0.3, -0.3], 0.28, DARK),
+        Part::ball([-0.07, 0.36, -0.42], 0.07, [1.0, 0.85, 0.1]).glow(3.0),
+        Part::ball([0.07, 0.36, -0.42], 0.07, [1.0, 0.85, 0.1]).glow(3.0),
+        Part::cube([-0.08, 0.5, -0.48], [0.02, 0.02, 0.25], DARK).rot([30.0, -20.0, 0.0]),
+        Part::cube([0.08, 0.5, -0.48], [0.02, 0.02, 0.25], DARK).rot([30.0, 20.0, 0.0]),
+    ];
+    for s in [-1.0, 1.0] {
+        for k in 0..3 {
+            v.push(
+                Part::cube(
+                    [0.28 * s, 0.14, -0.12 + k as f32 * 0.17],
+                    [0.3, 0.03, 0.03],
+                    DARK,
+                )
+                .rot([0.0, 0.0, -25.0 * s]),
+            );
+        }
+    }
+    v
+}
+
+/// AGI (Beta): a hovering glow orb wearing an orange BETA band, two counter-rotating rings.
+fn agi_beta() -> Vec<Part> {
+    const ORANGE: [f32; 3] = [1.0, 0.55, 0.1];
+    let ring = |r: f32| -> Vec<Part> {
+        (0..10)
+            .map(|k| {
+                let a = k as f32 * TAU / 10.0;
+                Part::cube([r * a.cos(), 0.0, r * a.sin()], [0.35, 0.06, 0.12], CYAN)
+                    .glow(3.0)
+                    .rot([0.0, -a.to_degrees() + 90.0, 0.0])
+            })
+            .collect()
+    };
+    vec![
+        Part::cube([0.0, 1.3, 0.0], [0.0; 3], CYAN)
+            .with(vec![
+                Part::ball([0.0, 0.0, 0.0], 1.0, [0.75, 0.95, 1.0]).glow(1.5),
+                Part::cyl([0.0, 0.0, 0.0], 1.04, 0.16, ORANGE).glow(2.0),
+                Part::cube([-0.15, 0.12, -0.46], [0.12, 0.05, 0.02], DARK),
+                Part::cube([0.15, 0.12, -0.46], [0.12, 0.05, 0.02], DARK),
+            ])
+            .bob(0.12, 1.4),
+        Part::cube([0.0, 1.3, 0.0], [0.0; 3], CYAN)
+            .with(ring(0.95))
+            .spin(Vec3::Y, 1.2),
+        Part::cube([0.0, 1.3, 0.0], [0.0; 3], CYAN)
+            .with(ring(1.15))
+            .spin(Vec3::Y, -0.8),
+        Part::cyl([0.0, 0.03, 0.0], 1.2, 0.04, DARK),
+    ]
+}
+
 /// Companions (`social.rs`), knee-high next to a character. Faces -Z like the units.
 fn pet(key: &str) -> Vec<Part> {
     const YELLOW: [f32; 3] = [1.0, 0.85, 0.1];
@@ -460,6 +571,61 @@ fn pet(key: &str) -> Vec<Part> {
                 ])
                 .bob(0.05, 1.8),
         ],
+        "wifi_router" => {
+            // Four antennas, one orange LED (never green), and a "connecting" spinner above.
+            let mut v = vec![
+                Part::cube([0.0, 0.1, 0.0], [0.42, 0.09, 0.3], [0.92, 0.92, 0.95]),
+                Part::cube([0.0, 0.05, 0.0], [0.44, 0.02, 0.32], DARK),
+                Part::cube([-0.12, 0.15, -0.151], [0.04, 0.02, 0.01], ORANGE).glow(3.5),
+                Part::cube([0.0, 0.15, -0.151], [0.04, 0.02, 0.01], DARK),
+                Part::cube([0.12, 0.15, -0.151], [0.04, 0.02, 0.01], DARK),
+            ];
+            for (k, x) in [-0.18, -0.06, 0.06, 0.18].into_iter().enumerate() {
+                let tilt = [-14.0, -5.0, 5.0, 14.0][k];
+                v.push(
+                    Part::cube([x, 0.3, 0.12], [0.025, 0.32, 0.025], DARK).rot([0.0, 0.0, tilt]),
+                );
+            }
+            let dots = (0..6)
+                .map(|k| {
+                    let a = k as f32 * TAU / 6.0;
+                    Part::ball([0.14 * a.cos(), 0.0, 0.14 * a.sin()], 0.04, ORANGE).glow(2.5)
+                })
+                .collect();
+            v.push(
+                Part::cube([0.0, 0.62, 0.0], [0.0; 3], ORANGE)
+                    .with(dots)
+                    .spin(Vec3::Y, 3.0),
+            );
+            v
+        }
+        "party_leftovers" => {
+            // A takeaway tub with its foil lid half open, a skewer poking out and a curl of
+            // steam: still technically food.
+            let mut v = vec![
+                Part::cube([0.0, 0.12, 0.0], [0.42, 0.22, 0.3], [0.95, 0.95, 0.92]),
+                Part::cube([0.0, 0.235, 0.0], [0.44, 0.02, 0.32], [0.75, 0.78, 0.82])
+                    .rot([-18.0, 0.0, 0.0]),
+                Part::ball([-0.1, 0.25, 0.04], 0.1, [0.95, 0.75, 0.3]),
+                Part::ball([0.06, 0.25, -0.02], 0.09, [0.85, 0.3, 0.25]),
+                Part::cube([0.12, 0.34, 0.04], [0.015, 0.3, 0.015], [0.7, 0.55, 0.35])
+                    .rot([0.0, 0.0, -25.0]),
+                Part::ball([-0.07, 0.13, -0.151], 0.05, DARK),
+                Part::ball([0.07, 0.13, -0.151], 0.05, DARK),
+            ];
+            let steam = (0..3)
+                .map(|k| {
+                    let y = k as f32 * 0.08;
+                    Part::ball([0.03 * (k as f32 - 1.0), y, 0.0], 0.07, [0.95, 0.95, 1.0]).glow(0.6)
+                })
+                .collect();
+            v.push(
+                Part::cube([0.0, 0.42, 0.0], [0.0; 3], [0.95, 0.95, 1.0])
+                    .with(steam)
+                    .bob(0.04, 1.6),
+            );
+            v
+        }
         _ => vec![Part::ball([0.0, 0.2, 0.0], 0.3, MAGENTA)],
     }
 }
@@ -692,6 +858,11 @@ mod tests {
             "cooling_failure",
             "agi_prototype",
             "scooter",
+            "unreviewed_pr",
+            "demo_bug",
+            "agi_beta",
+            "pet_wifi_router",
+            "pet_party_leftovers",
         ] {
             let n: usize = parts(kind).iter().map(count).sum();
             assert!((6..=80).contains(&n), "{kind}: {n} parts");

@@ -6,7 +6,9 @@
 mod ai;
 mod auto_attack;
 pub mod burnout;
+pub mod calendar;
 pub mod content;
+pub mod corporate;
 pub mod dailies;
 pub mod duel;
 pub mod economy;
@@ -16,6 +18,7 @@ mod floors;
 pub mod geom;
 pub mod legacy;
 pub mod live;
+pub mod minigame;
 mod nav;
 pub mod pets;
 mod progression;
@@ -27,6 +30,7 @@ mod sim;
 pub mod sprint;
 pub mod talents;
 pub mod targeting;
+pub mod teambuilding;
 mod telegraph;
 pub mod time;
 pub mod types;
@@ -35,6 +39,9 @@ pub mod world;
 mod zones;
 
 pub use burnout::{BURNOUT_MAX, BurnoutCause, BurnoutDef, QuipKind};
+pub use calendar::{
+    CalendarChain, CalendarDef, CalendarGame, CalendarReward, ChainStatus, TICKET_BOARD_MULT,
+};
 pub use content::{
     AiAbility, AiDef, AiTarget, ApplyAura, Area, AuraDef, AutoAttackDef, ClassDef, Config,
     ConsumeAura, Content, ContentError, DispelType, Effect, EnrageDef, Execute, FleeDef,
@@ -54,6 +61,9 @@ pub use floors::{CORPSE_EMPTY_MS, CORPSE_LOOT_MS, pack_offsets};
 pub use geom::{Aabb, Vec3, distance, forward, in_range, is_facing, line_of_sight};
 pub use legacy::{LegacyDef, LegacyError, LegacyView, LegacyZone};
 pub use live::WorldBossState;
+pub use minigame::{
+    Card, Gauge, Medal, MedalDef, MinigameDef, MinigameResult, MinigameView, Rules,
+};
 pub use pets::{PetDef, PetDrop, duck_tip};
 pub use progression::GROUP_SHARE_RANGE_M;
 pub use quests::{ActiveQuest, GIVER_REACH_SLACK_M, QuestLog, QuestStatus};
@@ -70,6 +80,9 @@ pub use talents::{
 };
 pub use targeting::{
     EntityId, TAB_TARGET_RANGE, TargetCandidate, TargetError, tab_target, validate_target,
+};
+pub use teambuilding::{
+    ObjectiveDef, Patrol, PatrolPose, ScoreDef, TeambuildingDef, WatcherDef, WatcherKind,
 };
 pub use telegraph::{TelegraphShape, TelegraphView};
 pub use time::{FixedStepper, TICK_HZ, Tick, ms_to_ticks, ticks_to_ms};

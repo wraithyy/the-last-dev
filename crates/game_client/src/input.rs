@@ -43,6 +43,26 @@ impl SprintWindows {
     }
 }
 
+/// Minigame windows (`minigame.rs`): the invite card, the leave confirm and the medal screen,
+/// plus the Company Calendar (`calendar.rs`) that starts them. Here for the same reason as
+/// `SprintWindows`: Esc closes them first.
+#[derive(Resource, Default)]
+pub struct MinigameWindows {
+    pub invite: bool,
+    pub leave: bool,
+    pub result: bool,
+    pub calendar: bool,
+}
+
+impl MinigameWindows {
+    pub fn close_one(&mut self) -> bool {
+        std::mem::take(&mut self.leave)
+            || std::mem::take(&mut self.result)
+            || std::mem::take(&mut self.invite)
+            || std::mem::take(&mut self.calendar)
+    }
+}
+
 /// Quest dialog (sim id of the giver), `~/jira` log (J) and map (N). Here for the same reason as
 /// `TrophiesOpen`: Esc closes them before it clears the target or pauses.
 #[derive(Resource, Default)]
@@ -117,6 +137,7 @@ impl Plugin for InputPlugin {
             .init_resource::<EndgameOpen>()
             .init_resource::<QuestWindows>()
             .init_resource::<SprintWindows>()
+            .init_resource::<MinigameWindows>()
             .init_resource::<PlayerInput>()
             .init_resource::<MouseState>()
             .add_systems(

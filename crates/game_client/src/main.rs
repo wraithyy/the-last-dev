@@ -1,6 +1,7 @@
 mod anim;
 mod arena;
 mod audio;
+mod calendar;
 mod camera;
 mod catalog;
 mod classes;
@@ -23,6 +24,7 @@ mod keybinds;
 mod legacy;
 mod live;
 mod loot_fx;
+mod minigame;
 mod nameplates;
 mod net;
 mod office;
@@ -124,6 +126,8 @@ fn main() {
         .add_plugins(live::LivePlugin)
         .add_plugins(legacy::LegacyPlugin)
         .add_plugins(raid::RaidPlugin)
+        .add_plugins(minigame::MinigamePlugin)
+        .add_plugins(calendar::CalendarPlugin)
         .run();
 }
 

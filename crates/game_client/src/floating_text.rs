@@ -236,7 +236,10 @@ fn spawn_texts(
             } if *unit == player.0
                 && matches!(
                     cause,
-                    BurnoutCause::Kill | BurnoutCause::Prop | BurnoutCause::CoffeeBreak
+                    BurnoutCause::Kill
+                        | BurnoutCause::Prop
+                        | BurnoutCause::CoffeeBreak
+                        | BurnoutCause::Quest
                 ) =>
             {
                 (
@@ -244,7 +247,12 @@ fn spawn_texts(
                     vec![Spec {
                         text: format!("{} burnout", crate::copy::burnout_pct(*delta)),
                         size: 18.0,
-                        color: HEAL_GREEN,
+                        // An expense report costs burnout; everything else here relieves it.
+                        color: if *delta < 0 {
+                            HEAL_GREEN
+                        } else {
+                            Color::srgb(1.0, 0.6, 0.35)
+                        },
                         offset: Vec2::new(0.0, -30.0),
                         pop: false,
                     }],

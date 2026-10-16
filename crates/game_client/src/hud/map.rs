@@ -292,11 +292,14 @@ fn update_map(
     paused: Res<Paused>,
     sim: SimView,
     flow: Res<GameFlow>,
-    (mut windows, track, live, time): (
+    (mut windows, track, live, time, cal, assets, mut icons): (
         ResMut<QuestWindows>,
         Res<super::quests::QuestTrack>,
         Res<crate::live::LiveState>,
         Res<Time>,
+        Res<crate::calendar::CalendarState>,
+        Res<AssetServer>,
+        ResMut<super::IconCache>,
     ),
     mut view: ResMut<MapView>,
     mut images: ResMut<Assets<Image>>,
@@ -398,8 +401,13 @@ fn update_map(
             Some((view.to_canvas(*pos), l.to, open))
         })
         .collect();
+    let calendar = flow
+        .anchors
+        .iter()
+        .find(|a| a.0 == super::minimap::CALENDAR_ANCHOR)
+        .map(|a| view.to_canvas(a.1));
     let sig = format!(
-        "{:?}|{:?}|{:?}|{quest_zones:?}",
+        "{:?}|{:?}|{:?}|{quest_zones:?}|{calendar:?}{}",
         marks.iter().map(|m| (m.0.round(), m.1)).collect::<Vec<_>>(),
         doors.iter().map(|d| (&d.1, d.2)).collect::<Vec<_>>(),
         zone_tree(&*sim)
@@ -408,7 +416,8 @@ fn update_map(
                 sim.zone_cleared(z),
                 zone_state(&*sim, z, flow.unlock_all).is_ok()
             ))
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>(),
+        cal.news
     );
     if sig == view.shown {
         return;
@@ -420,6 +429,38 @@ fn update_map(
     commands.entity(canvas.0).with_children(|c| {
         for (at, glyph, color) in &marks {
             marker(c, *at, glyph, 15.0, *color);
+        }
+        // The Company Calendar: its icon, a "!" while something is unplayed, and its name.
+        if let Some(at) = calendar {
+            const S: f32 = 20.0;
+            c.spawn((
+                MapMarker,
+                ImageNode::new(icons.get(&assets, "calendar")),
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(at.x - S / 2.0),
+                    top: px(at.y - S / 2.0),
+                    width: px(S),
+                    height: px(S),
+                    border: UiRect::all(px(1)),
+                    ..default()
+                },
+                BorderColor::all(Color::WHITE),
+                GlobalZIndex(36),
+            ));
+            let name = if cal.news { "! Calendar" } else { "Calendar" };
+            c.spawn((
+                MapMarker,
+                label(name, 11.0),
+                TextColor(super::GOLD),
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(at.x - 32.0),
+                    top: px(at.y + S / 2.0 + 1.0),
+                    ..default()
+                },
+                GlobalZIndex(36),
+            ));
         }
         for (at, to, open) in &doors {
             let color = if *open { OPEN } else { LOCKED };
@@ -495,7 +536,14 @@ mod tests {
         };
         let t = zone_tree(&sim);
         assert_eq!(t[0], (0, "campus".to_string()));
-        assert_eq!(t.len(), sim.content().zones.len());
+        // Minigame venues are reached through their invite, not a door: not on the map.
+        let c = sim.content();
+        let doors = c
+            .zones
+            .iter()
+            .filter(|z| !c.minigames.iter().any(|m| m.zone == z.id))
+            .count();
+        assert_eq!(t.len(), doors);
         assert!(zone_state(&sim, "datacenter/1", false).is_err());
         assert!(zone_state(&sim, "datacenter/1", true).is_ok());
         assert!(zone_state(&sim, "tower/1", false).is_ok());

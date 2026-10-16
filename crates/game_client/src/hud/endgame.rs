@@ -18,7 +18,7 @@ use combat_core::DEPARTMENTS;
 const GOLD: Color = Color::srgb(1.0, 0.82, 0.3);
 const OPEN: Color = Color::srgb(0.45, 0.95, 0.55);
 /// Lockout chips spawned up front: one per Legacy floor boss, then one per raid encounter.
-const LOCK_SLOTS: usize = 16;
+const LOCK_SLOTS: usize = 20;
 const REP_BLUE: Color = Color::srgb(0.35, 0.7, 0.95);
 const WIDTH: f32 = 600.0;
 const NAME_W: f32 = 96.0;
@@ -130,7 +130,19 @@ fn spawn_ui(mut commands: Commands) {
             })
             .with_children(|h| {
                 h.spawn((Line::Header, label("~/endgame", 14.0), TextColor(DIM)));
-                h.spawn((CloseButton, Button, label("[x]", 14.0)));
+                h.spawn(Node {
+                    column_gap: px(14),
+                    ..default()
+                })
+                .with_children(|b| {
+                    b.spawn((
+                        crate::calendar::OpenCalendar,
+                        Button,
+                        label("[Company Calendar]", 14.0),
+                        TextColor(ACCENT),
+                    ));
+                    b.spawn((CloseButton, Button, label("[x]", 14.0)));
+                });
             });
             w.spawn(section("PROMOTION"));
             w.spawn((Line::Rank, label("", 14.0), TextColor(GOLD)));
@@ -435,34 +447,36 @@ fn update_window(
         .collect();
     let taken = bosses.iter().filter(|b| b.1).count();
     let legacy_n = bosses.len();
-    // The raid: chips for the difficulty this group size would get.
+    // The raids: chips for the difficulty this group size would get.
     let raid = sim.raid_view();
-    let async_mode = sim.players().len() < usize::from(content.raid.normal_min_players);
+    let min = content.raids.first().map_or(3, |r| r.normal_min_players);
+    let async_mode = sim.players().len() < usize::from(min);
     let raid_locked = week.map_or(&[][..], |w| raid.locked_in(w));
-    for key in content.raid.bosses(content) {
-        let name = content
-            .unit_def(&key)
-            .map_or_else(|| key.clone(), |d| d.name.clone());
-        let lock = combat_core::raid::lock_key(&key, async_mode);
-        bosses.push((name, raid_locked.contains(&lock), true));
+    let mut tallies = Vec::new();
+    for r in &content.raids {
+        let keys = r.bosses(content);
+        let mut done = 0;
+        for key in &keys {
+            let name = content
+                .unit_def(key)
+                .map_or_else(|| key.clone(), |d| d.name.clone());
+            let name = format!("[{}] {name}", raid_tag(&r.name));
+            let lock = combat_core::raid::lock_key(key, async_mode);
+            let locked = raid_locked.contains(&lock);
+            done += usize::from(locked);
+            bosses.push((name, locked, true));
+        }
+        tallies.push(format!("{} {done}/{}", r.name, keys.len()));
     }
-    let raid_done = bosses[legacy_n..].iter().filter(|b| b.1).count();
     let raid_line = if u.level < cap {
-        format!(
-            "{} opens at level {cap}: the shuttle stop on campus.",
-            content.raid.name
-        )
+        format!("Raids open at level {cap}: the offsite shuttle and the VibeCon desk on campus.")
     } else {
         let mode = if async_mode {
             "Async Attendance (fewer than three of you)"
         } else {
             "Full Programme"
         };
-        format!(
-            "{}: {mode}, {raid_done}/{} sessions attended this week.",
-            content.raid.name,
-            bosses.len() - legacy_n
-        )
+        format!("Raids, {mode}: {} this week.", tallies.join(", "))
     };
     let lockouts = if u.level < cap {
         format!(
@@ -604,20 +618,38 @@ fn weekly_line(
     )
 }
 
-/// Legacy floor bosses in content order: (unit key, display name).
+/// Legacy floor bosses in content order: (unit key, chip label). The label leads with a short
+/// zone tag ("[T1]", "[DC2]"), because a raid boss may share a floor boss's name.
 fn eg_bosses(content: &combat_core::Content) -> Vec<(String, String)> {
     content
         .legacy
         .zones
         .iter()
-        .filter_map(|z| content.zone(&z.zone)?.boss.as_ref())
-        .map(|b| {
+        .filter_map(|z| Some((zone_tag(&z.zone), content.zone(&z.zone)?.boss.as_ref()?)))
+        .map(|(tag, b)| {
             let name = content
                 .unit_def(&b.unit)
                 .map_or_else(|| b.unit.clone(), |d| d.name.clone());
-            (b.unit.clone(), name)
+            (b.unit.clone(), format!("[{tag}] {name}"))
         })
         .collect()
+}
+
+/// "tower/1" -> "T1", "datacenter/2" -> "DC2", "lab/1" -> "Lab1".
+fn zone_tag(zone: &str) -> String {
+    let (building, n) = zone.split_once('/').unwrap_or((zone, ""));
+    let short = match building {
+        "tower" => "T",
+        "datacenter" => "DC",
+        "lab" => "Lab",
+        other => other,
+    };
+    format!("{short}{n}")
+}
+
+/// The raid's chip tag: the last word of its name ("All-Hands Offsite" -> "Offsite").
+fn raid_tag(name: &str) -> &str {
+    name.rsplit(' ').next().unwrap_or(name)
 }
 
 #[cfg(test)]
@@ -650,6 +682,28 @@ mod tests {
         };
         let best = weekly_line(c, &ladder, unix);
         assert!(best.contains("12:34") && best.contains("Ada"), "{best}");
-        assert!(eg_bosses(c).len() + c.raid.bosses(c).len() <= LOCK_SLOTS);
+        let raid_bosses: usize = c.raids.iter().map(|r| r.bosses(c).len()).sum();
+        assert!(eg_bosses(c).len() + raid_bosses <= LOCK_SLOTS);
+    }
+
+    #[test]
+    fn lockout_chips_are_unambiguous() {
+        let Ok(sim) = crate::combat::new_sim() else {
+            panic!("embedded content invalid");
+        };
+        let c = sim.content();
+        let mut labels: Vec<String> = eg_bosses(c).into_iter().map(|(_, l)| l).collect();
+        for r in &c.raids {
+            for b in r.bosses(c) {
+                let name = c.unit_def(&b).map_or(b.clone(), |d| d.name.clone());
+                labels.push(format!("[{}] {name}", raid_tag(&r.name)));
+            }
+        }
+        let mut unique = labels.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), labels.len(), "{labels:?}");
+        assert_eq!(zone_tag("datacenter/2"), "DC2");
+        assert_eq!(raid_tag("All-Hands Offsite"), "Offsite");
     }
 }

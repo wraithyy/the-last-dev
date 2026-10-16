@@ -3,19 +3,22 @@
 
 use super::campus;
 use super::client;
+use super::corporate;
 use super::datacenter;
 use super::kit::{Plan, Sign};
 use super::lab;
 use super::layout::{FloorLayout, TOWER_ZONES, build_floor, yaw_towards};
 use super::offsite;
+use super::teambuilding;
 use super::themes::{pt, route_point_near, v};
+use super::vibecon;
 use crate::collision::aabb;
 use bevy::prelude::*;
 use combat_core::Aabb;
 
 /// Every zone id of the contract, in a stable order.
 #[allow(dead_code)] // contract surface; the tests iterate it
-pub const ZONE_IDS: [&str; 14] = [
+pub const ZONE_IDS: [&str; 19] = [
     "campus",
     "tower/1",
     "tower/2",
@@ -30,6 +33,11 @@ pub const ZONE_IDS: [&str; 14] = [
     "offsite/2",
     "offsite/3",
     "offsite/4",
+    "vibecon/1",
+    "vibecon/2",
+    "vibecon/3",
+    "vibecon/4",
+    "vibecon/5",
 ];
 
 /// Pure and deterministic: the same id always yields the same layout. `None` for unknown ids.
@@ -44,7 +52,14 @@ pub fn build_zone(id: &str) -> Option<FloorLayout> {
         "offsite/2" => Some(offsite::build(2)),
         "offsite/3" => Some(offsite::build(3)),
         "offsite/4" => Some(offsite::build(4)),
+        "vibecon/1" => Some(vibecon::build(1)),
+        "vibecon/2" => Some(vibecon::build(2)),
+        "vibecon/3" => Some(vibecon::build(3)),
+        "vibecon/4" => Some(vibecon::build(4)),
+        "vibecon/5" => Some(vibecon::build(5)),
         client::ZONE => Some(client::build()),
+        teambuilding::ZONE => Some(teambuilding::build()),
+        id if corporate::ZONES.contains(&id) => corporate::build(id),
         _ => TOWER_ZONES
             .iter()
             .position(|z| *z == id)
@@ -142,18 +157,19 @@ mod tests {
         let packs = match id {
             "campus" => 8,
             "datacenter/1" | "datacenter/2" | "lab/1" | "lab/2" => 5,
-            "offsite/1" | "offsite/2" => 4,
-            "offsite/3" | "offsite/4" => 3,
+            "offsite/1" | "offsite/2" | "vibecon/1" | "vibecon/2" => 4,
+            "offsite/3" | "offsite/4" | "vibecon/3" | "vibecon/4" | "vibecon/5" => 3,
             _ => 6,
         };
         r.extend((1..=packs).map(|i| format!("pack_{i}")));
         if id != "campus" {
             r.push("boss".into());
         }
-        // Only the offsite lobby has a friendly NPC in content; the other raid rooms have none.
+        // Only the first room of a raid has a friendly NPC in content.
         let npcs = match id {
             "campus" => 6,
             "offsite/2" | "offsite/3" | "offsite/4" => 0,
+            "vibecon/2" | "vibecon/3" | "vibecon/4" | "vibecon/5" => 0,
             _ => 1,
         };
         r.extend((1..=npcs).map(|i| format!("npc_{i}")));
@@ -163,6 +179,7 @@ mod tests {
                 "door:datacenter/1",
                 "door:lab/1",
                 "door:offsite/1",
+                "door:vibecon/1",
             ],
             "tower/1" | "tower/2" | "tower/3" | "tower/4" => {
                 &["door:campus", "elevator", "elevator_exit"]
@@ -175,6 +192,11 @@ mod tests {
             "offsite/2" => &["door:offsite/1", "door:offsite/3"],
             "offsite/3" => &["door:offsite/2", "door:offsite/4"],
             "offsite/4" => &["door:offsite/3", "door:campus"],
+            "vibecon/1" => &["door:campus", "door:vibecon/2"],
+            "vibecon/2" => &["door:vibecon/1", "door:vibecon/3"],
+            "vibecon/3" => &["door:vibecon/2", "door:vibecon/4"],
+            "vibecon/4" => &["door:vibecon/3", "door:vibecon/5"],
+            "vibecon/5" => &["door:vibecon/4", "door:campus"],
             _ => &["elevator", "elevator_exit"],
         };
         r.extend(doors.iter().map(|d| (*d).to_string()));
@@ -352,6 +374,11 @@ mod tests {
             "offsite/2",
             "offsite/3",
             "offsite/4",
+            "vibecon/1",
+            "vibecon/2",
+            "vibecon/3",
+            "vibecon/4",
+            "vibecon/5",
         ] {
             let l = zone(id);
             let g = Grid::from(&l, pos(&l, "player_spawn"));

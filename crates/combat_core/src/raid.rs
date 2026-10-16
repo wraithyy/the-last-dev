@@ -1,11 +1,13 @@
-//! The raid "All-Hands Offsite": a chain of zones (`raid.zones`) reached from the campus at
-//! the level cap, one boss encounter per zone. Two difficulties: Normal for 3-5 players and
-//! Async Attendance (picked automatically for smaller groups) with weaker enemies and less
-//! loot. Every encounter is locked per difficulty for the ISO week once killed (per room
-//! online, per save offline); a locked boss does not come back until the reset.
+//! Raids ("All-Hands Offsite", "VibeCon"): each a chain of zones (`RaidDef::zones`) reached
+//! from the campus at the level cap, one boss encounter per zone. Two difficulties: Normal for
+//! 3-5 players and Async Attendance (picked automatically for smaller groups) with weaker
+//! enemies and less loot. Every encounter is locked per difficulty for the ISO week once killed
+//! (per room online, per save offline); a locked boss does not come back until the reset. Boss
+//! keys are unique across raids, so one `Lockout` holds every raid's encounters.
 //! Encounter mechanics that the generic AI cannot express live here: "Pair Up" tethers
-//! (`Effect::PairUp`) and the Synergy Twins' linked HP and swap.
-//! Content: `raid` in `game.ron`; numbers in docs/FORMULAS.md.
+//! (`Effect::PairUp`) and linked bosses (the Synergy Twins, the Hype Panel) with one health bar
+//! and a rotating shield. `Effect::Detonate` (VibeCon's unreviewed PRs) lives in `effects.rs`.
+//! Content: `raids` in `game.ron`; numbers in docs/FORMULAS.md.
 
 use crate::content::{Content, ContentError, School, SpellId, ticks};
 use crate::legacy::Lockout;
@@ -21,16 +23,39 @@ const TETHER_TICK_MS: u32 = 1000;
 /// Long enough to outlast any fight; the twin swap moves the aura itself.
 const SHIELD_MS: u32 = 3_600_000;
 
+fn yes() -> bool {
+    true
+}
+
+/// Linked bosses: one shared health bar (proportional), one death, and every member but one
+/// shielded; each swap hands the opening to the next member in order.
 #[derive(Clone, Debug, Deserialize)]
 pub struct TwinsDef {
     /// The zone boss (loot, lockout) and its linked partner, spawned beside it.
     pub boss: String,
     pub twin: String,
-    /// Carried by one twin at a time; the swap moves it to the other.
+    /// Further linked members (the Hype Panel's third panelist), spawned on the other side.
+    #[serde(default)]
+    pub extra: Vec<String>,
+    /// Carried by every member except the open one; the swap moves the opening on.
     pub shield_aura: String,
     pub swap_ms: u32,
+    /// Shouted by the member that just lost its shield.
     #[serde(default)]
     pub swap_yells: Vec<String>,
+    /// Twins trade places on a swap; a panel stays seated.
+    #[serde(default = "yes")]
+    pub swap_places: bool,
+}
+
+impl TwinsDef {
+    /// The boss first, then the partners in spawn and rotation order.
+    pub fn members(&self) -> Vec<&str> {
+        std::iter::once(self.boss.as_str())
+            .chain(std::iter::once(self.twin.as_str()))
+            .chain(self.extra.iter().map(String::as_str))
+            .collect()
+    }
 }
 
 /// Absent in minimal test content: no raid.
@@ -51,6 +76,9 @@ pub struct RaidDef {
     pub boss_rep: u32,
     #[serde(default)]
     pub twins: Option<TwinsDef>,
+    /// Tier sets (`GearDef::set`) its bosses drop; empty: every raid piece.
+    #[serde(default)]
+    pub sets: Vec<String>,
 }
 
 impl RaidDef {
@@ -83,7 +111,7 @@ impl RaidDef {
             return bad("zero player count or async percent".into());
         }
         if let Some(t) = &self.twins {
-            for k in [&t.boss, &t.twin] {
+            for k in t.members() {
                 if !c.unit_def(k).is_some_and(|u| u.boss && u.hostile) {
                     return bad(format!("twin {k} is not a hostile boss"));
                 }
@@ -95,8 +123,30 @@ impl RaidDef {
                 return bad("twins need a shield aura and a swap period".into());
             }
         }
+        for s in &self.sets {
+            if !c.economy.gear.iter().any(|g| g.set.as_ref() == Some(s)) {
+                return bad(format!("{}: unknown tier set {s}", self.name));
+            }
+        }
         Ok(())
     }
+}
+
+/// Every raid on its own, then across raids: unique names, and no zone in two raids (a boss
+/// key in two raids would share one lockout).
+pub(crate) fn validate_all(c: &Content) -> Result<(), ContentError> {
+    for (i, r) in c.raids.iter().enumerate() {
+        r.validate(c)?;
+        for o in &c.raids[..i] {
+            if o.name == r.name || o.zones.iter().any(|z| r.is_raid_zone(z)) {
+                return Err(ContentError::Invalid(format!(
+                    "raid: {} and {} share a name or a zone",
+                    o.name, r.name
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// What the client shows and draws: the raid zone loaded ("" outside), the difficulty in force,
@@ -160,11 +210,14 @@ impl Sim {
         self.legacy_week()
     }
 
-    /// The loaded zone is part of the raid.
+    /// The raid of the loaded zone.
+    fn cur_raid(&self) -> Option<&RaidDef> {
+        self.zone.as_deref().and_then(|z| self.content.raid_of(z))
+    }
+
+    /// The loaded zone is part of a raid.
     pub fn in_raid(&self) -> bool {
-        self.zone
-            .as_deref()
-            .is_some_and(|z| self.content.raid.is_raid_zone(z))
+        self.cur_raid().is_some()
     }
 
     pub fn raid_async(&self) -> bool {
@@ -207,11 +260,15 @@ impl Sim {
         }
     }
 
-    /// The door from outside into the raid opens only with everyone at the level cap; links
+    /// The door from outside into a raid opens only with everyone at the level cap; links
     /// inside the raid follow their content `requires`.
     pub(crate) fn raid_link_open(&self, from: &str, to: &str) -> Option<bool> {
-        let r = &self.content.raid;
-        (r.is_raid_zone(to) && !r.is_raid_zone(from)).then(|| self.everyone_capped())
+        let into = self.content.raid_of(to)?;
+        let inside = self
+            .content
+            .raid_of(from)
+            .is_some_and(|r| r.name == into.name);
+        (!inside).then(|| self.everyone_capped())
     }
 
     /// Called by `load_zone` before anything spawns: picks the difficulty for a raid zone and
@@ -220,52 +277,75 @@ impl Sim {
         let was = self.in_raid() || !self.raid.tethers.is_empty();
         self.raid.tethers.clear();
         self.raid.next_swap = u64::MAX;
-        let raid = self.content.raid.is_raid_zone(id);
-        if raid {
-            let min = usize::from(self.content.raid.normal_min_players);
-            self.raid.async_mode = self.raid.force.unwrap_or(self.players.len() < min);
+        let min = self.content.raid_of(id).map(|r| r.normal_min_players);
+        if let Some(min) = min {
+            self.raid.async_mode = self
+                .raid
+                .force
+                .unwrap_or(self.players.len() < usize::from(min));
         }
-        self.raid.announce = raid || was;
+        self.raid.announce = min.is_some() || was;
     }
 
     /// Raid bosses come back every week: a locked encounter stays dead, an unlocked one spawns
-    /// even in a zone cleared before. `None` outside the raid (the campaign rule applies).
+    /// even in a zone cleared before. `None` outside the raids (the campaign rule applies).
     pub(crate) fn raid_boss_spawns(&self, zone: &str, boss: &str) -> Option<bool> {
         self.content
-            .raid
-            .is_raid_zone(zone)
-            .then(|| !self.raid_locked(boss, self.raid.async_mode))
+            .raid_of(zone)
+            .map(|_| !self.raid_locked(boss, self.raid.async_mode))
     }
 
-    /// After the zone's units exist: the second twin joins its partner, shielded.
+    fn twins(&self) -> Option<TwinsDef> {
+        self.cur_raid().and_then(|r| r.twins.clone())
+    }
+
+    /// The living unit of each member, in member order; `None` unless all of them live.
+    fn twin_units(&self, t: &TwinsDef) -> Option<Vec<usize>> {
+        t.members()
+            .into_iter()
+            .map(|k| {
+                (0..self.units.len()).find(|&i| {
+                    let u = &self.units[i];
+                    !u.despawned && u.state.alive && u.state.key == k
+                })
+            })
+            .collect()
+    }
+
+    /// After the zone's units exist: the linked partners join the boss, shielded (the twin on
+    /// its right, further members on its left).
     pub(crate) fn raid_after_load(&mut self) {
-        if self.in_raid()
-            && let Some(t) = self.content.raid.twins.clone()
+        if let Some(t) = self.twins()
             && let Some(bi) = (0..self.units.len()).find(|&i| {
                 let u = &self.units[i];
                 u.floor_boss && !u.despawned && u.state.alive && u.state.key == t.boss
             })
-            && let Ok(def) = self.def_index(&t.twin)
         {
             let b = &self.units[bi];
             let (pos, yaw, level, pack) = (b.state.pos, b.state.yaw, b.state.level, b.state.pack);
             let side = crate::telegraph::right(yaw);
-            let at = crate::geom::Vec3::new(pos.x + side.x * 5.0, pos.y, pos.z + side.z * 5.0);
-            let id = self.spawn(
-                def,
-                at,
-                yaw,
-                SpawnOpts {
-                    level: Some(level),
-                    pack,
-                    respawns: false,
-                    summoner: None,
-                    floor_boss: false,
-                    zone_slot: None,
-                },
-            );
-            if let Some(i) = self.index(id) {
-                self.apply_aura(i, &t.shield_aura, SHIELD_MS, None, id, None);
+            for (k, key) in t.members().into_iter().skip(1).enumerate() {
+                let Ok(def) = self.def_index(key) else {
+                    continue;
+                };
+                let off = if k == 0 { 5.0 } else { -5.0 * k as f32 };
+                let at = crate::geom::Vec3::new(pos.x + side.x * off, pos.y, pos.z + side.z * off);
+                let id = self.spawn(
+                    def,
+                    at,
+                    yaw,
+                    SpawnOpts {
+                        level: Some(level),
+                        pack,
+                        respawns: false,
+                        summoner: None,
+                        floor_boss: false,
+                        zone_slot: None,
+                    },
+                );
+                if let Some(i) = self.index(id) {
+                    self.apply_aura(i, &t.shield_aura, SHIELD_MS, None, id, None);
+                }
             }
         }
         if std::mem::take(&mut self.raid.announce) {
@@ -273,13 +353,11 @@ impl Sim {
         }
     }
 
-    /// Async Attendance enemy (HP %, damage %) in the raid; 100/100 elsewhere.
+    /// Async Attendance enemy (HP %, damage %) in a raid; 100/100 elsewhere.
     pub(crate) fn raid_mob_pct(&self) -> (u32, u32) {
-        let r = &self.content.raid;
-        if self.in_raid() && self.raid.async_mode {
-            (r.async_hp_pct, r.async_damage_pct)
-        } else {
-            (100, 100)
+        match self.cur_raid() {
+            Some(r) if self.raid.async_mode => (r.async_hp_pct, r.async_damage_pct),
+            _ => (100, 100),
         }
     }
 
@@ -411,77 +489,74 @@ impl Sim {
         }
     }
 
-    // ---- the Synergy Twins ----
+    // ---- linked bosses (the Synergy Twins, the Hype Panel) ----
 
-    /// Linked HP: whatever one twin loses, the other loses too.
+    /// Linked HP: whatever one member loses, the others lose too.
     pub(crate) fn raid_link_hp(&mut self, ti: usize) {
-        if self.raid.linking || !self.in_raid() {
+        if self.raid.linking {
             return;
         }
-        let Some(t) = self.content.raid.twins.as_ref() else {
-            return;
-        };
-        let key = &self.units[ti].state.key;
-        let other = if *key == t.boss {
-            &t.twin
-        } else if *key == t.twin {
-            &t.boss
-        } else {
-            return;
-        };
-        let hp = self.units[ti].state.hp;
-        if let Some(pi) = (0..self.units.len()).find(|&i| {
-            let u = &self.units[i];
-            !u.despawned && u.state.alive && u.state.key == *other
-        }) && self.units[pi].state.hp > hp
-        {
-            // Proportional, so a different max HP (group scaling) still empties both at once.
-            let (max_t, max_p) = (self.units[ti].state.max_hp, self.units[pi].state.max_hp);
-            let want = (u64::from(hp) * u64::from(max_p) / u64::from(max_t.max(1))) as u32;
-            self.units[pi].state.hp = want.min(self.units[pi].state.hp);
-        }
-    }
-
-    /// A twin's death takes the other with it (same killer, so the floor boss pays out).
-    fn raid_twin_death(&mut self, ti: usize, killer: Option<EntityId>) {
-        let Some(t) = self.content.raid.twins.as_ref() else {
+        let Some(t) = self.twins() else {
             return;
         };
         let key = self.units[ti].state.key.clone();
-        let other = if key == t.boss {
-            t.twin.clone()
-        } else if key == t.twin {
-            t.boss.clone()
-        } else {
+        if !t.members().contains(&key.as_str()) {
             return;
-        };
-        if let Some(pi) = (0..self.units.len()).find(|&i| {
-            let u = &self.units[i];
-            !u.despawned && u.state.alive && u.state.key == other
-        }) {
-            self.raid.linking = true;
-            self.die(pi, killer);
-            self.raid.linking = false;
+        }
+        let (hp, max_t) = (self.units[ti].state.hp, self.units[ti].state.max_hp);
+        for pi in 0..self.units.len() {
+            let u = &self.units[pi];
+            if pi == ti
+                || u.despawned
+                || !u.state.alive
+                || !t.members().contains(&u.state.key.as_str())
+            {
+                continue;
+            }
+            // Proportional, so a different max HP (group scaling) still empties all at once.
+            let want = (u64::from(hp) * u64::from(u.state.max_hp) / u64::from(max_t.max(1))) as u32;
+            if u.state.hp > want {
+                self.units[pi].state.hp = want;
+            }
         }
     }
 
-    fn update_twins(&mut self) {
-        let Some(t) = self.content.raid.twins.clone() else {
+    /// A member's death takes the others with it (same killer, so the floor boss pays out).
+    fn raid_twin_death(&mut self, ti: usize, killer: Option<EntityId>) {
+        let Some(t) = self.twins() else {
             return;
         };
-        if !self.in_raid() {
+        let key = self.units[ti].state.key.clone();
+        if !t.members().contains(&key.as_str()) {
             return;
         }
-        let find = |s: &Sim, k: &str| {
-            (0..s.units.len()).find(|&i| {
-                let u = &s.units[i];
-                !u.despawned && u.state.alive && u.state.key == k
+        let others: Vec<usize> = (0..self.units.len())
+            .filter(|&i| {
+                let u = &self.units[i];
+                i != ti
+                    && !u.despawned
+                    && u.state.alive
+                    && t.members().contains(&u.state.key.as_str())
             })
-        };
-        let (Some(a), Some(b)) = (find(self, &t.boss), find(self, &t.twin)) else {
+            .collect();
+        self.raid.linking = true;
+        for pi in others {
+            if self.units[pi].state.alive {
+                self.die(pi, killer);
+            }
+        }
+        self.raid.linking = false;
+    }
+
+    fn update_twins(&mut self) {
+        let Some(t) = self.twins() else {
             return;
         };
-        let fighting = self.units[a].state.in_combat || self.units[b].state.in_combat;
+        let Some(idx) = self.twin_units(&t) else {
+            return;
+        };
+        self.link_threat(&idx);
+        let fighting = idx.iter().any(|&i| self.units[i].state.in_combat);
         if !fighting {
             self.raid.next_swap = u64::MAX;
             return;
@@ -494,25 +569,61 @@ impl Sim {
             return;
         }
         self.raid.next_swap = self.now + ticks(t.swap_ms);
-        let (pa, pb) = (self.units[a].state.pos, self.units[b].state.pos);
-        for (i, pos) in [(a, pb), (b, pa)] {
-            self.units[i].state.pos = pos;
-            self.events.push(Event::Teleported {
-                unit: Self::id_of(i),
-                pos,
-            });
+        let n = idx.len();
+        if t.swap_places {
+            // Everyone takes the seat of the next member (two twins simply trade places).
+            let pos: Vec<_> = idx.iter().map(|&i| self.units[i].state.pos).collect();
+            for (k, &i) in idx.iter().enumerate() {
+                let to = pos[(k + 1) % n];
+                self.units[i].state.pos = to;
+                self.events.push(Event::Teleported {
+                    unit: Self::id_of(i),
+                    pos: to,
+                });
+            }
         }
-        let (from, to) = if self.has_aura(a, &t.shield_aura) {
-            (a, b)
-        } else {
-            (b, a)
-        };
-        self.remove_aura(from, &t.shield_aura, AuraEnd::Expired);
-        let to_id = Self::id_of(to);
-        self.apply_aura(to, &t.shield_aura, SHIELD_MS, None, to_id, None);
+        let open = (0..n)
+            .find(|&k| !self.has_aura(idx[k], &t.shield_aura))
+            .unwrap_or(0);
+        let next = idx[(open + 1) % n];
+        self.remove_aura(next, &t.shield_aura, AuraEnd::Expired);
+        let was = idx[open];
+        let was_id = Self::id_of(was);
+        self.apply_aura(was, &t.shield_aura, SHIELD_MS, None, was_id, None);
         if !t.swap_yells.is_empty() {
             let line = t.swap_yells[self.rng.below(t.swap_yells.len() as u32) as usize].clone();
-            self.request_yell_line(from, crate::content::YellKind::Blast, Some(line));
+            self.request_yell_line(next, crate::content::YellKind::Blast, Some(line));
+        }
+    }
+
+    /// Linked members pull and reset as one: a pull on any member pulls them all, and when the
+    /// boss evades the others do too (a seated partner cannot chase, so it would never leash).
+    fn link_threat(&mut self, idx: &[usize]) {
+        let boss = idx[0];
+        if self.units[boss].state.ai == Some(AiState::Evade) {
+            for &i in &idx[1..] {
+                if !matches!(
+                    self.units[i].state.ai,
+                    Some(AiState::Evade) | Some(AiState::Idle)
+                ) {
+                    self.begin_evade(i);
+                }
+            }
+            return;
+        }
+        let foes: Vec<EntityId> = idx
+            .iter()
+            .flat_map(|&i| self.units[i].threat.keys().copied())
+            .collect();
+        for &i in idx {
+            for &f in &foes {
+                if !self.units[i].threat.contains_key(&f) {
+                    self.add_threat(i, f, 1);
+                    if self.units[i].state.ai == Some(AiState::Idle) {
+                        self.set_ai(i, AiState::Chase);
+                    }
+                }
+            }
         }
     }
 
@@ -527,8 +638,8 @@ impl Sim {
 
     // ---- kills, loot, lockout ----
 
-    /// After a raid death: the twin goes along; a zone boss locks its encounter for the week
-    /// and grants the raid achievements (`raid:<boss>`, `raid:<normal|async>:<boss>`).
+    /// After a raid death: the linked members go along; a zone boss locks its encounter for
+    /// the week and grants the raid achievements (`raid:<boss>`, `raid:<normal|async>:<boss>`).
     pub(crate) fn raid_on_kill(&mut self, ti: usize, killer: Option<EntityId>) {
         if !self.in_raid() {
             return;
@@ -555,14 +666,14 @@ impl Sim {
         self.raid_broadcast();
     }
 
-    /// Raid-piece rolls of a raid boss kill: `Some((rolls, chance %, legendary %))`; the twin
-    /// rolls nothing. `None` for everything else (raid trash rolls the Legacy tier).
+    /// Raid-piece rolls of a raid boss kill: `Some((rolls, chance %, legendary %))`; linked
+    /// partners roll nothing. `None` for everything else (raid trash rolls the Legacy tier).
     pub(crate) fn raid_loot(&self, mob: usize) -> Option<(u32, u32, u32)> {
         let u = &self.units[mob];
-        if !self.in_raid() || !u.state.boss {
+        let r = self.cur_raid()?;
+        if !u.state.boss {
             return None;
         }
-        let r = &self.content.raid;
         let legendary = self.content.economy.legendary_pct;
         Some(match (u.floor_boss, self.raid.async_mode) {
             (true, false) => (r.boss_items.max(1), 100, legendary),
@@ -571,12 +682,17 @@ impl Sim {
         })
     }
 
+    /// The tier sets the loaded raid drops (empty: any raid piece).
+    pub(crate) fn raid_sets(&self) -> Vec<String> {
+        self.cur_raid().map(|r| r.sets.clone()).unwrap_or_default()
+    }
+
     /// Department standing per raid boss kill: every department, halved on Async.
     pub(crate) fn raid_boss_rep(&self, ti: usize) -> Option<u32> {
-        (self.in_raid() && self.units[ti].floor_boss).then(|| {
-            let r = self.content.raid.boss_rep;
-            if self.raid.async_mode { r / 2 } else { r }
-        })
+        let r = self.cur_raid()?.boss_rep;
+        self.units[ti]
+            .floor_boss
+            .then_some(if self.raid.async_mode { r / 2 } else { r })
     }
 
     /// The lockout for the save: (ISO week, encounter keys).
@@ -586,7 +702,12 @@ impl Sim {
 
     /// Restores a saved lockout; unknown encounters are dropped, an old week is stale.
     pub(crate) fn set_raid_lockout(&mut self, week: u32, keys: &[String]) {
-        let bosses = self.content.raid.bosses(&self.content);
+        let bosses: Vec<String> = self
+            .content
+            .raids
+            .iter()
+            .flat_map(|r| r.bosses(&self.content))
+            .collect();
         let known: Vec<String> = keys
             .iter()
             .filter(|k| {

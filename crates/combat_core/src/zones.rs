@@ -99,6 +99,7 @@ impl Sim {
         self.sprint_on_load(id);
         self.legacy_on_load(id);
         self.raid_on_load(id);
+        self.minigame_on_load(id);
         let state = self.world.zones.get(id);
         let recent = state
             .and_then(|s| s.left_at)
@@ -232,6 +233,7 @@ impl Sim {
         }
         self.load_world(id, anchors);
         self.load_live(id, anchors);
+        self.minigame_after_load(id, anchors);
         self.events.push(Event::ZoneLoaded {
             zone: id.to_string(),
         });

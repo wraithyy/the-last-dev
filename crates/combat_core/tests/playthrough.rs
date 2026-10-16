@@ -868,7 +868,7 @@ impl Bot {
 /// Zones with nothing to fight (the Body Leasing office) have no run to play; the raid is
 /// group content above the cap with its own gate (tests/coop.rs).
 fn has_combat(z: &combat_core::ZoneDef) -> bool {
-    (!z.packs.is_empty() || z.boss.is_some()) && !content().raid.is_raid_zone(&z.id)
+    (!z.packs.is_empty() || z.boss.is_some()) && content().raid_of(&z.id).is_none()
 }
 
 #[test]
@@ -1240,6 +1240,25 @@ type ZoneLine = (String, u32, u64, bool);
 
 /// The whole campaign for one class and seed, carrying the character (gear, bag, SP) from zone
 /// to zone through a save, as the client does across sessions.
+/// Company Calendar chains are optional side trips, like the dailies: the campaign and its
+/// level bands are measured without them.
+fn side_quest(c: &combat_core::Content, id: &str) -> bool {
+    c.calendar
+        .chains
+        .iter()
+        .any(|ch| ch.quests.iter().any(|q| q == id))
+}
+
+/// Every quest id except the Company Calendar chains.
+fn main_quests() -> Vec<String> {
+    let c = content();
+    c.quests
+        .iter()
+        .filter(|q| !side_quest(&c, &q.id))
+        .map(|q| q.id.clone())
+        .collect()
+}
+
 /// Also returns how many quests the bot closed on the way.
 fn campaign(class: &'static str, seed: u64) -> (Vec<ZoneLine>, combat_core::UnitState, usize) {
     campaign_build(class, seed, 0)
@@ -1255,7 +1274,7 @@ fn campaign_build(
     let mut save: Option<combat_core::SaveData> = None;
     let mut lines = Vec::new();
     let mut last = None;
-    let quests: Vec<String> = content().quests.iter().map(|q| q.id.clone()).collect();
+    let quests = main_quests();
     let quests: Vec<&str> = quests.iter().map(String::as_str).collect();
     for zone in CAMPAIGN {
         let max = content().zone(zone).map_or(1, |z| z.level_range.1);
@@ -1314,7 +1333,7 @@ fn every_class_clears_the_campaign_equipping_drops() {
             let total = c
                 .quests
                 .iter()
-                .filter(|q| c.zone(&q.giver.zone).is_some_and(has_combat))
+                .filter(|q| c.zone(&q.giver.zone).is_some_and(has_combat) && !side_quest(&c, &q.id))
                 .count();
             assert!(
                 done * 5 >= total * 3,
@@ -1630,7 +1649,7 @@ type ZoneEnd = (String, u8, u64);
 /// level (sim time of fights and rests plus the walking the bot teleports over), the level after
 /// each zone with the zone's seconds, and the zones the bot died in.
 fn natural_campaign(class: &'static str, seed: u64) -> (Vec<u64>, Vec<ZoneEnd>, Vec<String>) {
-    let quests: Vec<String> = content().quests.iter().map(|q| q.id.clone()).collect();
+    let quests = main_quests();
     let quests: Vec<&str> = quests.iter().map(String::as_str).collect();
     let mut save: Option<combat_core::SaveData> = None;
     let (mut clock_ms, mut level, mut since_ms) = (0u64, 1u8, 0u64);
@@ -1733,7 +1752,11 @@ fn dailies_keep_the_campaign_inside_the_level_bands() {
                 let n = c.kill_xp(level, ml, reward);
                 gain(&mut level, &mut xp, n);
             }
-            for q in c.quests.iter().filter(|q| q.ender().zone == zone) {
+            for q in c
+                .quests
+                .iter()
+                .filter(|q| q.ender().zone == zone && !side_quest(&c, &q.id))
+            {
                 gain(&mut level, &mut xp, c.quest_xp(q));
             }
             out.push((zone.to_string(), arrive, level));

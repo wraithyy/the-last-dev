@@ -713,14 +713,24 @@ impl RoomState {
                 _ => m.exit_since = None,
             }
         }
+        // One member lingering must not pull the whole group into a raid; entering one needs
+        // everyone at the door.
+        let content = self.sim.content();
+        if dwelled
+            .as_deref()
+            .is_some_and(|d| content.raid_of(d).is_some() && content.raid_of(&zone).is_none())
+        {
+            dwelled = None;
+        }
         let to = exit_choice(living, ready, in_combat, dest, dwelled);
         to.is_some_and(|to| self.travel(&zone, &to))
     }
 
-    /// Sprint mode: the sim names the next stage (or campus after the review); the server
-    /// loads it for the whole group. True when the group travelled.
+    /// Sprint mode and minigames: the sim names the next stage, the venue or the campus after
+    /// the review; the server loads it for the whole group. True when the group travelled.
     fn follow_sprint(&mut self) -> bool {
-        let Some(to) = self.sim.sprint_travel().map(str::to_string) else {
+        let to = self.sim.sprint_travel().or(self.sim.minigame_travel());
+        let Some(to) = to.map(str::to_string) else {
             return false;
         };
         let from = self.sim.zone().unwrap_or(START_ZONE).to_string();
@@ -1399,6 +1409,41 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Teambuilding online: the lead's RSVP moves the group to the venue, each member gets a
+    /// run (routed views), and leaving ends your own run for everyone to see.
+    #[tokio::test(start_paused = true)]
+    async fn the_lead_takes_the_group_to_the_teambuilding_and_each_member_runs_alone() {
+        let mut s = room();
+        s.on_join(0, "lead", "fullstack");
+        s.on_join(1, "member", "devops");
+        s.tick();
+        s.on_message(
+            0,
+            ClientMsg::Cmd(Command::StartMinigame {
+                key: "teambuilding".into(),
+            }),
+        );
+        let mut out = Vec::new();
+        for _ in 0..90 {
+            out.extend(s.tick());
+        }
+        assert_eq!(s.sim.zone(), Some("teambuilding/1"));
+        for p in [0, 1] {
+            let me = eid_of(&s, p);
+            assert!(
+                msgs(&out, p).iter().any(|m| matches!(m, ServerMsg::Events { events, .. }
+                    if events.iter().any(|e| matches!(e, Event::Minigame { unit, .. } if *unit == me)))),
+                "player {p} has no run view"
+            );
+        }
+        s.on_message(1, ClientMsg::Cmd(Command::LeaveMinigame));
+        let out = s.tick();
+        let gone = eid_of(&s, 1);
+        assert!(msgs(&out, 0).iter().any(|m| matches!(m, ServerMsg::Events { events, .. }
+            if events.iter().any(|e| matches!(e, Event::MinigameEnded { result } if result.unit == gone && result.quit)))));
+        assert!(s.sim.minigame_result(eid_of(&s, 0)).is_none());
     }
 
     /// The room runs on the server's clock; the joiner learns it, daily progress goes only to

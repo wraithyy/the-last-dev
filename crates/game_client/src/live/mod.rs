@@ -412,6 +412,7 @@ fn tracker_lines(
     net: Option<Res<NetWorld>>,
     flow: Res<GameFlow>,
     st: Res<LiveState>,
+    calendar: Res<crate::calendar::CalendarState>,
     mut out: ResMut<LiveTracker>,
 ) {
     let content = sim.content();
@@ -495,6 +496,9 @@ fn tracker_lines(
             "Board Meeting in session (east lawn). Group up.".into(),
             BOSS_RED,
         ));
+    }
+    if let Some(h) = &calendar.hint {
+        footer.push((h.clone(), ACCENT));
     }
     let sig = format!("{entries:?}|{footer:?}");
     if sig != out.sig {

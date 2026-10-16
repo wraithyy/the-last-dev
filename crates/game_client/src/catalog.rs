@@ -1144,6 +1144,73 @@ static TABLE: &[(&str, UnitVisual)] = &[
             &[],
         ),
     ),
+    // ---- Company Calendar quest-chain givers on the campus
+    (
+        "expense_controller",
+        v(
+            SUIT_F,
+            1.7,
+            "Expense Controller",
+            "<Receipts or It Didn't Happen>",
+            &[
+                paint("Black", 0.2, 0.22, 0.3),
+                paint("Shirt", 0.95, 0.95, 0.97),
+                paint("Skin", 0.85, 0.68, 0.56),
+            ],
+        ),
+    ),
+    (
+        "leaving_colleague",
+        v(
+            CASUAL_F,
+            1.7,
+            "Departing Senior Engineer",
+            "<Last Day, Nothing Left to Lose>",
+            &[
+                paint("Shirt", 0.22, 0.5, 0.45),
+                paint("Pants", 0.18, 0.2, 0.26),
+                paint("Hair", 0.55, 0.55, 0.58),
+            ],
+        ),
+    ),
+    (
+        "security_trainer",
+        v(
+            CASUAL2,
+            1.8,
+            "Security Awareness Officer",
+            "<Click Here to Learn More>",
+            &[
+                paint("Shirt", 0.8, 0.22, 0.2),
+                paint("Pants", 0.16, 0.17, 0.2),
+                paint("Skin", 0.7, 0.52, 0.4),
+            ],
+        ),
+    ),
+    (
+        "rto_coordinator",
+        v(
+            SUIT_M,
+            1.78,
+            "Workplace Experience Lead",
+            "<Hybrid Means Office>",
+            &[
+                paint("Black", 0.36, 0.26, 0.46),
+                paint("Shirt", 0.98, 0.96, 0.9),
+                paint("Skin", 0.92, 0.74, 0.62),
+            ],
+        ),
+    ),
+    (
+        "comms_lead",
+        v(
+            CASUAL3,
+            1.76,
+            "Internal Comms Lead",
+            "<Exciting Times Ahead>",
+            &[],
+        ),
+    ),
     (
         "client_delivery_lead",
         v(
@@ -1195,6 +1262,673 @@ static TABLE: &[(&str, UnitVisual)] = &[
                 paint("Shirt", 0.32, 0.33, 0.36),
                 paint("Pants", 0.2, 0.2, 0.24),
                 paint("Skin", 0.72, 0.62, 0.55),
+            ],
+        ),
+    ),
+    // ---- VibeCon (raid): lanyard neon on black, the founders in vests ----
+    (
+        "vc_registration",
+        v(
+            CASUAL_F,
+            1.7,
+            "Registration Volunteer",
+            "<VibeCon Crew>",
+            &[
+                paint("Shirt", 0.3, 1.0, 0.45),
+                paint("Hair", 0.35, 0.22, 0.12),
+                paint("Pants", 0.12, 0.12, 0.14),
+            ],
+        ),
+    ),
+    (
+        "vc_prompt_engineer",
+        v(
+            CASUAL_M,
+            1.8,
+            "Prompt Engineer",
+            "<Six-Figure Adjectives>",
+            &[
+                paint("Shirt", 0.55, 0.35, 0.9),
+                paint("Pants", 0.1, 0.1, 0.12),
+            ],
+        ),
+    ),
+    (
+        "vc_tenx_founder",
+        v(
+            SUIT_M,
+            1.85,
+            "'10x' Founder",
+            "<Pre-Seed, Post-Truth>",
+            &[
+                paint("Vest", 0.35, 0.4, 0.48),
+                paint("Shirt", 0.85, 0.9, 1.0),
+                paint("Pants", 0.25, 0.32, 0.45),
+            ],
+        ),
+    ),
+    (
+        "vc_booth_staff",
+        v(
+            CASUAL2,
+            1.8,
+            "Booth Staff",
+            "<Agent Framework of the Week>",
+            &[
+                paint("Shirt", 1.0, 0.45, 0.1),
+                paint("Pants", 0.08, 0.08, 0.1),
+            ],
+        ),
+    ),
+    (
+        "vc_swag_goblin",
+        v(
+            CASUAL3,
+            1.45,
+            "Swag Goblin",
+            "<Has Forty Tote Bags>",
+            &[
+                paint("Shirt", 1.0, 0.85, 0.15),
+                paint("Pants", 0.2, 0.55, 0.3),
+                paint("Skin", 0.62, 0.78, 0.45),
+            ],
+        ),
+    ),
+    (
+        "vc_influencer",
+        v(
+            CASUAL_F,
+            1.75,
+            "LinkedIn Influencer",
+            "<Filming You for Content>",
+            &[
+                paint("Shirt", 0.15, 0.45, 0.85),
+                paint("Hair", 0.98, 0.85, 0.35),
+                paint("Pants", 0.95, 0.95, 0.95),
+            ],
+        ),
+    ),
+    (
+        "vc_hackathon_zombie",
+        v(
+            CASUAL2,
+            1.8,
+            "Hackathon Zombie",
+            "<Hour 47, Still Pivoting>",
+            &[
+                paint("Shirt", 0.3, 0.3, 0.34),
+                paint("Pants", 0.2, 0.2, 0.25),
+                paint("Skin", 0.66, 0.74, 0.6),
+            ],
+        ),
+    ),
+    (
+        "vc_web3_pivot",
+        v(
+            CASUAL_M,
+            1.8,
+            "Web3 Survivor",
+            "<Formerly Blockchain, Now AI-Native>",
+            &[
+                paint("Shirt", 0.95, 0.6, 0.1),
+                paint("Pants", 0.1, 0.1, 0.12),
+                paint("Hair", 0.1, 0.1, 0.1),
+            ],
+        ),
+    ),
+    (
+        "vc_vibe_coder",
+        v(
+            CASUAL2,
+            2.3,
+            "The Vibe Coder",
+            "<Talk: I Haven't Read Code Since March>",
+            &[
+                paint("Shirt", 0.2, 1.0, 0.4),
+                paint("Pants", 0.95, 0.25, 0.75),
+            ],
+        ),
+    ),
+    (
+        "vc_unreviewed_pr",
+        v(
+            "prim/unreviewed_pr",
+            1.4,
+            "Unreviewed PR",
+            "<+4,812 / -3>",
+            &[],
+        ),
+    ),
+    (
+        "vc_prompt_whisperer",
+        v(
+            SUIT_F,
+            2.3,
+            "The Prompt Whisperer",
+            "<Prompting Is the New Programming>",
+            &[
+                paint("Shirt", 0.7, 0.55, 1.0),
+                paint("Pants", 0.18, 0.12, 0.3),
+                paint("Hair", 0.92, 0.92, 0.95),
+            ],
+        ),
+    ),
+    (
+        "vc_demo_god",
+        v(
+            CASUAL_M,
+            2.3,
+            "The Demo God",
+            "<Head of DevRel>",
+            &[
+                paint("Shirt", 0.2, 0.85, 1.0),
+                paint("Pants", 0.1, 0.1, 0.14),
+                paint("Hair", 0.95, 0.75, 0.2),
+            ],
+        ),
+    ),
+    (
+        "vc_demo_bug",
+        v(
+            "prim/demo_bug",
+            0.9,
+            "Live Demo Bug",
+            "<Only Happens On Stage>",
+            &[],
+        ),
+    ),
+    (
+        "vc_hype_moderator",
+        v(
+            SUIT_M,
+            2.3,
+            "The Hype Panel",
+            "<Moderator>",
+            &[
+                paint("Shirt", 0.95, 0.95, 0.95),
+                paint("Pants", 0.12, 0.14, 0.28),
+            ],
+        ),
+    ),
+    (
+        "vc_hype_vc",
+        v(
+            SUIT_M,
+            2.2,
+            "Panelist: Seed-Stage VC",
+            "<Has Never Shipped Anything>",
+            &[
+                paint("Vest", 0.4, 0.45, 0.5),
+                paint("Shirt", 0.6, 0.78, 0.95),
+                paint("Pants", 0.75, 0.68, 0.5),
+            ],
+        ),
+    ),
+    (
+        "vc_hype_caio",
+        v(
+            SUIT_F,
+            2.2,
+            "Panelist: Chief AI Officer",
+            "<In the Role Since Tuesday>",
+            &[
+                paint("Shirt", 0.95, 0.3, 0.75),
+                paint("Pants", 0.1, 0.1, 0.12),
+            ],
+        ),
+    ),
+    (
+        "vc_keynote_agi",
+        v(
+            SUIT_M_BALD,
+            2.4,
+            "The Keynote AGI-Announcer",
+            "<Black Turtleneck>",
+            &[
+                paint("Shirt", 0.06, 0.06, 0.07),
+                paint("Vest", 0.06, 0.06, 0.07),
+                paint("Pants", 0.25, 0.32, 0.45),
+            ],
+        ),
+    ),
+    (
+        "vc_agi_beta",
+        v("prim/agi_beta", 2.0, "AGI (Beta)", "<Waitlist Only>", &[]),
+    ),
+    // The lab boss's summoned copies share its rig, a size smaller.
+    (
+        "agi_hallucination",
+        v(
+            "prim/agi_prototype",
+            2.4,
+            "AGI Prototype",
+            "<Definitely Not Sentient>",
+            &[],
+        ),
+    ),
+    // ---- All-Hands Offsite (raid): resort staff in navy and gold, the company in fleece ----
+    (
+        "offsite_concierge",
+        v(
+            SUIT_F,
+            1.72,
+            "Offsite Concierge",
+            "<Lakeside Resort & Conference Centre>",
+            &[
+                paint("Black", 0.12, 0.16, 0.34),
+                paint("Details", 0.85, 0.68, 0.25),
+                paint("Hair", 0.82, 0.66, 0.3),
+            ],
+        ),
+    ),
+    (
+        "offsite_planner",
+        v(
+            CASUAL_F,
+            1.72,
+            "Offsite Event Planner",
+            "<Agenda v14 (Final) (Final)>",
+            &[
+                paint("Shirt", 0.98, 0.55, 0.62),
+                paint("Pants", 0.2, 0.22, 0.3),
+                paint("Hair", 0.2, 0.12, 0.08),
+            ],
+        ),
+    ),
+    (
+        "lanyard_enforcer",
+        v(
+            WORKER,
+            1.85,
+            "Lanyard Enforcer",
+            "<People Ops>",
+            &[
+                paint("Vest", 0.15, 0.45, 0.95),
+                paint("Shirt", 0.92, 0.92, 0.95),
+                paint("Hat", 0.15, 0.45, 0.95),
+            ],
+        ),
+    ),
+    (
+        "breakout_facilitator",
+        v(
+            CASUAL_M,
+            1.8,
+            "Breakout Room Facilitator",
+            "<Owns the Sticky Notes>",
+            &[
+                paint("Shirt", 1.0, 0.9, 0.25),
+                paint("Pants", 0.35, 0.3, 0.25),
+            ],
+        ),
+    ),
+    (
+        "av_technician",
+        v(
+            WORKER,
+            1.8,
+            "AV Technician",
+            "<Can You Hear Me Now>",
+            &[
+                paint("Vest", 0.1, 0.1, 0.12),
+                paint("Shirt", 0.16, 0.16, 0.18),
+                paint("Hat", 0.1, 0.1, 0.12),
+            ],
+        ),
+    ),
+    (
+        "open_bar_rep",
+        v(
+            SUIT_M,
+            1.82,
+            "Open Bar Account Executive",
+            "<Expensing It>",
+            &[
+                paint("Black", 0.42, 0.08, 0.14),
+                paint("Shirt", 0.95, 0.92, 0.85),
+                paint("Details", 0.85, 0.68, 0.25),
+            ],
+        ),
+    ),
+    (
+        "icebreaker_facilitator",
+        v(
+            CASUAL_F,
+            2.3,
+            "Icebreaker Facilitator",
+            "<Certified Fun Practitioner>",
+            &[
+                paint("Shirt", 1.0, 0.35, 0.1),
+                paint("Pants", 0.2, 0.75, 0.7),
+                paint("Hair", 0.95, 0.4, 0.6),
+            ],
+        ),
+    ),
+    // The twins wear the same suit in opposite colours, so the open one is easy to call.
+    (
+        "synergy_alignment",
+        v(
+            SUIT_M,
+            2.2,
+            "Synergy Twin: Alignment",
+            "<Co-Head of Synergy>",
+            &[
+                paint("Black", 0.12, 0.3, 0.8),
+                paint("Shirt", 0.95, 0.95, 0.95),
+                paint("Details", 0.95, 0.95, 0.95),
+            ],
+        ),
+    ),
+    (
+        "synergy_leverage",
+        v(
+            SUIT_M,
+            2.2,
+            "Synergy Twin: Leverage",
+            "<Other Co-Head of Synergy>",
+            &[
+                paint("Black", 0.9, 0.45, 0.08),
+                paint("Shirt", 0.95, 0.95, 0.95),
+                paint("Details", 0.95, 0.95, 0.95),
+            ],
+        ),
+    ),
+    (
+        "keynote_speaker",
+        v(
+            SUIT_M,
+            2.4,
+            "Keynote Speaker",
+            "<AI Hologram, Thought Leader>",
+            &[
+                glow("Black", 0.1, 0.5, 0.9),
+                glow("Shirt", 0.25, 0.85, 1.0),
+                glow("Details", 0.6, 0.95, 1.0),
+                glow("Skin", 0.45, 0.9, 1.0),
+                glow("Hair", 0.3, 0.7, 1.0),
+            ],
+        ),
+    ),
+    (
+        "the_founder",
+        v(
+            SUIT_M_BALD,
+            2.5,
+            "The Founder",
+            "<Chief Vision Officer, Majority Shareholder>",
+            &[
+                paint("Black", 0.38, 0.4, 0.43),
+                paint("Shirt", 0.55, 0.7, 0.88),
+                paint("Details", 0.55, 0.7, 0.88),
+            ],
+        ),
+    ),
+    (
+        "founders_nephew",
+        v(
+            CASUAL2,
+            1.75,
+            "Founder's Nephew",
+            "<Head of Growth, Age 23>",
+            &[
+                paint("Shirt", 0.95, 0.95, 0.95),
+                paint("Pants", 0.3, 0.45, 0.7),
+                paint("Hair", 0.75, 0.55, 0.25),
+            ],
+        ),
+    ),
+    (
+        "cofounders_spouse",
+        v(
+            SUIT_F,
+            1.75,
+            "Co-Founder's Spouse",
+            "<Chief People Officer>",
+            &[
+                paint("Black", 0.45, 0.1, 0.3),
+                paint("Shirt", 0.95, 0.9, 0.82),
+                paint("Hair", 0.9, 0.85, 0.75),
+            ],
+        ),
+    ),
+    // ---- Teambuilding minigame: the people you sneak past, colour-coded like their cones ----
+    (
+        "tb_manager",
+        v(
+            SUIT_M,
+            1.82,
+            "Engineering Manager",
+            "<Let's Circle Back>",
+            &[
+                paint("Black", 0.22, 0.26, 0.34),
+                paint("Shirt", 1.0, 0.72, 0.35),
+                paint("Details", 0.95, 0.5, 0.1),
+            ],
+        ),
+    ),
+    (
+        "tb_ai_talker",
+        v(
+            CASUAL_M,
+            1.8,
+            "AI Enthusiast",
+            "<Let Me Tell You About AI>",
+            &[
+                glow("Shirt", 0.35, 0.65, 1.0),
+                paint("Pants", 0.1, 0.1, 0.14),
+                paint("Hair", 0.15, 0.1, 0.08),
+            ],
+        ),
+    ),
+    (
+        "tb_hr_fun",
+        v(
+            CASUAL_F,
+            1.72,
+            "HR Fun Committee",
+            "<Mandatory Fun Lead>",
+            &[
+                paint("Shirt", 1.0, 0.4, 0.75),
+                paint("Pants", 0.98, 0.82, 0.25),
+                paint("Hair", 0.95, 0.55, 0.2),
+            ],
+        ),
+    ),
+    (
+        "tb_ceo",
+        v(
+            SUIT_M_BALD,
+            2.0,
+            "The CEO",
+            "<Just Here for the Photo>",
+            &[
+                paint("Black", 0.08, 0.08, 0.1),
+                paint("Shirt", 0.96, 0.96, 0.96),
+                paint("Details", 0.85, 0.12, 0.12),
+            ],
+        ),
+    ),
+    // ---- Company Calendar minigames: the manager, the reorganised, the disturbers ----
+    (
+        "pr_manager",
+        v(
+            SUIT_F,
+            1.74,
+            "Your Manager",
+            "<Has a Hard Stop>",
+            &[
+                paint("Black", 0.24, 0.26, 0.32),
+                paint("Shirt", 0.92, 0.9, 0.86),
+                paint("Hair", 0.3, 0.2, 0.14),
+            ],
+        ),
+    ),
+    (
+        "rg_colleague_1",
+        v(
+            CASUAL_M,
+            1.78,
+            "Confused Colleague",
+            "<Reorganised>",
+            &[
+                paint("Shirt", 0.35, 0.55, 0.85),
+                paint("Pants", 0.2, 0.22, 0.3),
+            ],
+        ),
+    ),
+    (
+        "rg_colleague_2",
+        v(
+            CASUAL_F,
+            1.7,
+            "Confused Colleague",
+            "<Reorganised>",
+            &[
+                paint("Shirt", 0.85, 0.45, 0.35),
+                paint("Hair", 0.2, 0.12, 0.08),
+            ],
+        ),
+    ),
+    (
+        "rg_colleague_3",
+        v(
+            CASUAL2,
+            1.8,
+            "Confused Colleague",
+            "<Reorganised>",
+            &[
+                paint("Shirt", 0.4, 0.7, 0.45),
+                paint("Pants", 0.3, 0.26, 0.2),
+            ],
+        ),
+    ),
+    (
+        "rg_colleague_4",
+        v(
+            SUIT_M,
+            1.82,
+            "Confused Colleague",
+            "<Reorganised>",
+            &[
+                paint("Black", 0.3, 0.3, 0.36),
+                paint("Shirt", 0.95, 0.85, 0.5),
+            ],
+        ),
+    ),
+    (
+        "rg_colleague_5",
+        v(
+            CASUAL3,
+            1.76,
+            "Confused Colleague",
+            "<Reorganised>",
+            &[
+                paint("Shirt", 0.7, 0.45, 0.8),
+                paint("Pants", 0.25, 0.25, 0.28),
+            ],
+        ),
+    ),
+    (
+        "rg_colleague_6",
+        v(
+            SUIT_F,
+            1.72,
+            "Confused Colleague",
+            "<Reorganised>",
+            &[
+                paint("Black", 0.4, 0.3, 0.2),
+                paint("Shirt", 0.8, 0.9, 0.95),
+            ],
+        ),
+    ),
+    (
+        "tm_champion",
+        v(
+            ENGINEER,
+            1.8,
+            "Migration Champion",
+            "<FlowSphere Evangelist>",
+            &[
+                glow("Shirt", 0.3, 0.75, 0.95),
+                paint("Pants", 0.15, 0.15, 0.2),
+            ],
+        ),
+    ),
+    (
+        "hk_mc",
+        v(
+            CASUAL_M,
+            1.84,
+            "Hackathon MC",
+            "<Disrupting Saturday>",
+            &[
+                glow("Shirt", 1.0, 0.45, 0.2),
+                paint("Pants", 0.1, 0.1, 0.12),
+            ],
+        ),
+    ),
+    (
+        "hk_hacker",
+        v(
+            CASUAL2,
+            1.76,
+            "Hackathon Teammate",
+            "<Pivoting>",
+            &[
+                paint("Shirt", 0.2, 0.2, 0.24),
+                paint("Pants", 0.25, 0.3, 0.45),
+            ],
+        ),
+    ),
+    (
+        "os_colleague",
+        v(
+            CASUAL_M,
+            1.78,
+            "Got-a-Minute Colleague",
+            "<Quick Question>",
+            &[
+                paint("Shirt", 1.0, 0.62, 0.2),
+                paint("Pants", 0.25, 0.25, 0.3),
+            ],
+        ),
+    ),
+    (
+        "os_caller",
+        v(
+            SUIT_M,
+            1.84,
+            "Speakerphone Account Manager",
+            "<On a Call, Loudly>",
+            &[
+                paint("Black", 0.12, 0.2, 0.4),
+                glow("Shirt", 0.35, 0.65, 1.0),
+            ],
+        ),
+    ),
+    (
+        "os_cake",
+        v(
+            CASUAL_F,
+            1.7,
+            "Birthday Committee",
+            "<It's Someone's Birthday>",
+            &[
+                paint("Shirt", 1.0, 0.4, 0.75),
+                paint("Hair", 0.95, 0.75, 0.3),
+            ],
+        ),
+    ),
+    (
+        "os_warden",
+        v(
+            WORKER,
+            1.82,
+            "Fire Warden",
+            "<Drill Test, Please Ignore>",
+            &[
+                glow("Shirt", 1.0, 0.25, 0.15),
+                paint("Pants", 0.2, 0.2, 0.2),
             ],
         ),
     ),
@@ -1466,6 +2200,20 @@ mod tests {
         "shadow_it_server",
         "hype_cycle_analyst",
     ];
+
+    /// A unit without an entry renders as the "Unknown" fallback, so every content unit needs one.
+    #[test]
+    fn every_content_unit_is_mapped() {
+        let sim = crate::combat::new_sim().unwrap_or_else(|e| panic!("{e:?}"));
+        let missing: Vec<&str> = sim
+            .content()
+            .units
+            .iter()
+            .map(|u| u.key.as_str())
+            .filter(|k| !is_known(k))
+            .collect();
+        assert!(missing.is_empty(), "unmapped units: {missing:?}");
+    }
 
     #[test]
     fn every_contract_key_is_mapped() {

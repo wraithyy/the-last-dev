@@ -355,6 +355,19 @@ impl Sim {
                     amount,
                 );
             }
+            (Effect::Detonate { boost_aura }, _) => {
+                if let (Some(key), Some(si)) = (
+                    boost_aura,
+                    self.units[ci].summoner.and_then(|s| self.index(s)),
+                ) && self.units[si].state.alive
+                {
+                    let summoner = Self::id_of(si);
+                    self.apply_aura(si, key, 600_000, None, summoner, Some(spell.id));
+                }
+                if self.units[ci].state.alive {
+                    self.die(ci, None);
+                }
+            }
             (Effect::ResetAllyThreat { radius_m }, _) => {
                 let side = self.units[ci].state.hostile;
                 let center = self.units[ci].state.pos;

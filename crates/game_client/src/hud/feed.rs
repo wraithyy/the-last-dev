@@ -704,8 +704,18 @@ fn collect_events(
                         continue;
                     }
                     if content.economy.goods(item).is_some() {
+                        let ticket = content
+                            .economy
+                            .junk
+                            .iter()
+                            .any(|j| j.ticket && j.name == *item);
+                        let tip = if ticket {
+                            " Close it at the Scrum board or the Company Calendar for Kudos."
+                        } else {
+                            ""
+                        };
                         out.push(
-                            format!("You receive: [{item}]"),
+                            format!("You receive: [{item}]{tip}"),
                             goods::name_color(content, item),
                         );
                         continue;
@@ -813,6 +823,8 @@ fn collect_events(
                         Some(format!("Burnout {pct}: mandatory fun is still mandatory."))
                     }
                     BurnoutCause::CoffeeBreak => Some(format!("Burnout {pct}: coffee.")),
+                    BurnoutCause::Quest if *delta > 0 => Some(format!("Burnout {pct}: paperwork.")),
+                    BurnoutCause::Quest => Some(format!("Burnout {pct}: that felt honest.")),
                     _ => None,
                 };
                 if let Some(l) = line {
@@ -952,6 +964,13 @@ fn update_loot(
                         },
                     )
                 }
+                Some(combat_core::Goods::Junk(j)) if j.ticket => (
+                    format!(
+                        "Close it at the Scrum board or Calendar: {} Kudos",
+                        j.price.saturating_mul(combat_core::TICKET_BOARD_MULT)
+                    ),
+                    goods::SP_GOLD,
+                ),
                 Some(g) => (
                     format!(
                         "Sells for {} Kudos",
@@ -1129,11 +1148,16 @@ fn loot_demo(
     if std::mem::replace(&mut *done, true) {
         return;
     }
-    for name in [
-        "Prompt Fragment",
-        "Expired GPU Credits",
-        "Unread AI Strategy Deck",
-    ] {
+    // A Jira ticket shows the junk path: no bonus, a hint where to close it.
+    let ticket = "Jira Ticket: Won't Fix";
+    lines.write(LogLineMsg(
+        format!(
+            "You receive: [{ticket}] Close it at the Scrum board or the Company Calendar for Kudos."
+        ),
+        goods::name_color(sim.content(), ticket),
+    ));
+    loot.items.push(ticket.to_string());
+    for name in ["Prompt Fragment", "Expired GPU Credits"] {
         let Some(def) = sim.content().item(name) else {
             continue;
         };

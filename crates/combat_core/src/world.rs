@@ -60,6 +60,9 @@ pub enum PropKind {
     QuietRoom,
     /// The office dog, who reports to nobody.
     Dog,
+    /// The Company Calendar: the client opens the calendar on its own use; it also closes
+    /// Jira tickets, like the Scrum board.
+    Calendar,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -498,6 +501,9 @@ impl Sim {
             outcome,
         });
         self.burnout_on_prop(pi, k);
+        if matches!(def.kind, PropKind::ScrumBoard | PropKind::Calendar) {
+            self.close_tickets(pi);
+        }
         let kind = def.kind;
         if rewards && outcome == 0 {
             self.check_achievements(player, |t| *t == Trigger::Fail(kind));

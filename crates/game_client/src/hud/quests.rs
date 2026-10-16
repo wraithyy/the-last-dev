@@ -169,9 +169,14 @@ pub fn giver_quests(sim: &dyn SimRead, npc_key: &str, zone: &str) -> Vec<(String
         .collect()
 }
 
-/// Yellow "?" to turn in, yellow "!" to pick up, grey "?" while work is pending.
+/// Yellow "?" to turn in, yellow "!" to pick up, grey "?" while work is pending. A Company
+/// Calendar chain's first quest gets no "!": the calendar board carries one for all of them.
 pub fn giver_mark(sim: &dyn SimRead, npc_key: &str, zone: &str) -> Option<(&'static str, Color)> {
-    let qs = giver_quests(sim, npc_key, zone);
+    let mut qs = giver_quests(sim, npc_key, zone);
+    let chains = &sim.content().calendar.chains;
+    qs.retain(|(id, s)| {
+        *s != QuestStatus::Available || !chains.iter().any(|c| c.quests.first() == Some(id))
+    });
     let has = |s: QuestStatus| qs.iter().any(|(_, q)| *q == s);
     if has(QuestStatus::Ready) {
         Some(("?", GOLD))
@@ -528,6 +533,24 @@ fn reward(
         "Exposure".into()
     };
     text(c, xp, 13.0, Color::srgb(0.75, 0.6, 1.0));
+    if let Some((dept, n)) = &def.reward.rep {
+        text(
+            c,
+            format!("+{n} {dept} standing"),
+            12.0,
+            Color::srgb(0.35, 0.7, 0.95),
+        );
+    }
+    match def.reward.burnout {
+        0 => {}
+        b if b < 0 => text(c, format!("Burnout -{}%", -b / 10), 12.0, DONE_GREEN),
+        b => text(
+            c,
+            format!("Burnout +{}% (paperwork is work)", b / 10),
+            12.0,
+            Color::srgb(1.0, 0.6, 0.35),
+        ),
+    }
     let role = sim
         .player()
         .and_then(|p| sim.unit(p))
@@ -1109,6 +1132,7 @@ fn update_tracker(
     mut tracker: Single<(Entity, &mut Node), With<Tracker>>,
     live: Res<crate::live::LiveTracker>,
     sprint: Res<crate::sprint::SprintHud>,
+    minigame: Res<crate::minigame::MinigameHud>,
 ) {
     let (area_node, computed) = &mut *area;
     // Touch: the right side holds the buttons, so the tracker moves under the player frame
@@ -1127,9 +1151,13 @@ fn update_tracker(
     let room = computed.size().y * computed.inverse_scale_factor();
     let (root, node) = &mut *tracker;
     let list = tracked(&*sim, &track);
-    // A sprint's run panel takes the tracker's slot, as WoW's challenge timer does.
-    let visible =
-        (!list.is_empty() || !live.is_empty()) && !trophies.0 && !windows.map && !sprint.active;
+    // A sprint's run panel or a minigame header takes the tracker's slot, as WoW's challenge
+    // timer does.
+    let visible = (!list.is_empty() || !live.is_empty())
+        && !trophies.0
+        && !windows.map
+        && !sprint.active
+        && !minigame.active;
     node.display = if visible {
         Display::Flex
     } else {

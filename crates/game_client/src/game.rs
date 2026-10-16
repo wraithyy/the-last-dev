@@ -464,6 +464,17 @@ fn zone_tagline(id: &str) -> &'static str {
         "offsite/2" => "Today's breakout topic: aligning on what we are aligning on.",
         "offsite/3" => "A lake view, an open bar and a keynote about the open bar.",
         "offsite/4" => "We are a family. Families do not log off at six.",
+        "vibecon/1" => "Two hundred booths, one product, forty names for it.",
+        "vibecon/2" => "Today's workshop: replacing yourself with a prompt, hands-on.",
+        "vibecon/3" => "Hour 47 of 48. The demo works if nobody breathes near it.",
+        "vibecon/4" => "Open bar, closed questions. The panel is already talking.",
+        "vibecon/5" => "Doors close at five. The keynote changes everything at five past.",
+        "teambuilding/1" => "Attendance is optional. Not attending is noted. Sneak.",
+        "review/1" => "Thirty minutes, one rating, no budget.",
+        "reorg/1" => "Effective immediately, until further notice, which is now.",
+        "migration/1" => "Twenty tickets, two tools, one Friday.",
+        "hackathon/1" => "Twenty-four hours to build what the roadmap could not.",
+        "openspace/1" => "Collaboration happens spontaneously. Constantly. At your desk.",
         _ => "A new quarter begins. Same OKRs.",
     }
 }
@@ -478,6 +489,9 @@ fn unlock_subtitle(id: &str) -> &'static str {
         }
         "offsite/1" => {
             "The shuttle finally came. It was full of lanyards, and it only goes to the offsite."
+        }
+        "vibecon/1" => {
+            "Registration is open. Your badge is a QR code that subscribes you to everything."
         }
         "client/1" => "Your vendor has allocated you. The client has not been told.",
         "campus" => "The door that said 'Badge pending' has nothing more to add.",

@@ -6,6 +6,7 @@
 
 mod campus;
 mod client;
+pub mod corporate;
 mod datacenter;
 #[cfg(test)]
 mod export;
@@ -16,16 +17,59 @@ mod office;
 mod offsite;
 mod props;
 mod shape;
+mod teambuilding;
 #[cfg(test)]
 mod testgrid;
 mod textures;
 mod themes;
+mod vibecon;
 mod zones;
 
 use layout::build_floor;
 pub use layout::{FloorLayout, elevator_exit_trigger};
 pub use textures::{icon_image, z_image};
 pub use zones::{build_zone, door_trigger};
+
+/// The desk kit the Reorg moves around at run time (`minigame.rs`).
+pub mod furniture {
+    pub use super::kit::{DESK, KEYBOARD, SCREEN};
+}
+
+/// A kit model placed the way layout props are (footprint centred on `pos`, its front +Z
+/// turned by `yaw`), for furniture that moves at run time. Returns the root entity.
+pub fn spawn_model(
+    commands: &mut Commands,
+    assets: &AssetServer,
+    model: &'static kit::Model,
+    pos: Vec3,
+    yaw: f32,
+) -> Entity {
+    let s = FURNITURE_SCALE;
+    let scene = assets
+        .load(GltfAssetLabel::Scene(0).from_asset(format!("models/furniture/{}.glb", model.file)));
+    let offset = Vec3::new(
+        -(model.lo[0] + model.size[0] / 2.0),
+        0.0,
+        -(model.lo[1] + model.size[2] / 2.0),
+    ) * s;
+    commands
+        .spawn((
+            Transform::from_translation(pos).with_rotation(Quat::from_rotation_y(yaw)),
+            Visibility::default(),
+        ))
+        .with_children(|c| {
+            c.spawn((
+                WorldAssetRoot(scene),
+                Transform::from_translation(offset).with_scale(Vec3::splat(s)),
+            ));
+        })
+        .id()
+}
+
+/// Footprint of a kit model at furniture scale (width, height, depth).
+pub fn model_size(model: &kit::Model) -> Vec3 {
+    Vec3::from(model.size) * FURNITURE_SCALE
+}
 
 use crate::arena::Colliders;
 use crate::config::WALL_HEIGHT;

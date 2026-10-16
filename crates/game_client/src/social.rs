@@ -26,7 +26,7 @@ use bevy::window::PrimaryWindow;
 use combat_core::{Command, DuelOutcome, EntityId, Event};
 
 /// Rig names (`rigs.rs`) for the pet keys in `game.ron`; `PrimRig` needs static names.
-const PET_RIGS: [&str; 8] = [
+const PET_RIGS: [&str; 10] = [
     "pet_rubber_duck",
     "pet_ai_copilot",
     "pet_office_plant",
@@ -35,6 +35,8 @@ const PET_RIGS: [&str; 8] = [
     "pet_stress_ball",
     "pet_server_rack",
     "pet_golden_unicorn",
+    "pet_wifi_router",
+    "pet_party_leftovers",
 ];
 /// Where a pet trots, in the owner's frame (owners face -Z): behind and to the right.
 const HEEL: Vec3 = Vec3::new(1.0, 0.0, 0.45);

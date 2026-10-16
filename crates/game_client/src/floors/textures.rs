@@ -153,7 +153,15 @@ fn unlit(tex: Tex) -> bool {
                 | Sign::Shrine
                 | Sign::KeynoteScreen
                 | Sign::FamilyBanner
-                | Sign::OffsiteBar,
+                | Sign::OffsiteBar
+                | Sign::VibeConBanner
+                | Sign::VibeConBooth
+                | Sign::VibeConSwag
+                | Sign::VibeConShipLive
+                | Sign::VibeConJudging
+                | Sign::VibeConAfterparty
+                | Sign::VibeConFireside
+                | Sign::VibeConKeynote,
         ) | Tex::DaysCounter
             | Tex::CloseDeals
             | Tex::ChatbotFace
@@ -997,6 +1005,275 @@ fn sign_spec(s: Sign) -> SignSpec {
             [24, 10, 40],
             [255, 225, 160],
             [255, 110, 150],
+        ),
+        // VibeCon: black and neon, like every conference that rebranded this year.
+        Sign::VibeConBanner => sp(
+            &["VIBECON 2026", "SHIP VIBES NOT CODE"],
+            [16, 8, 30],
+            [120, 245, 255],
+            [255, 80, 200],
+        ),
+        Sign::VibeConRegistration => sp(
+            &["REGISTRATION", "BADGES + LANYARDS"],
+            [16, 8, 30],
+            [250, 250, 250],
+            [120, 255, 140],
+        ),
+        Sign::VibeConLanyards => sp(
+            &["LANYARD QUEUE", "WAIT TIME: 40 MIN"],
+            [250, 250, 250],
+            [30, 20, 50],
+            [255, 80, 200],
+        ),
+        Sign::VibeConBooth => sp(
+            &["AGENTFLOWCHAINGRAPH", "FRAMEWORK OF THE WEEK"],
+            [30, 30, 40],
+            [250, 250, 250],
+            [255, 150, 40],
+        ),
+        Sign::VibeConShipLive => sp(
+            &["BOOTH 12: SHIP LIVE", "0 REVIEWS / 41 MERGES"],
+            [10, 20, 14],
+            [120, 255, 140],
+            [255, 90, 90],
+        ),
+        Sign::VibeConSwag => sp(
+            &["FREE SWAG", "STAR THE REPO"],
+            [255, 200, 40],
+            [30, 20, 50],
+            [200, 30, 120],
+        ),
+        Sign::VibeConWifi => sp(
+            &["WIFI: VIBECON-GUEST", "PASSWORD: SEE KEYNOTE"],
+            [236, 240, 244],
+            [40, 50, 70],
+            [200, 40, 120],
+        ),
+        Sign::VibeConMasterclass => sp(
+            &["MASTERCLASS", "PROMPTING IS THE", "NEW PROGRAMMING"],
+            [20, 10, 40],
+            [235, 225, 255],
+            [180, 130, 255],
+        ),
+        Sign::VibeConWorkshop => sp(
+            &["WORKSHOP", "PROMPTS FOR CEOS"],
+            [236, 240, 244],
+            [40, 30, 70],
+            [140, 90, 230],
+        ),
+        Sign::VibeConHackathon => sp(
+            &["HACKATHON", "HOUR 47 OF 48"],
+            [20, 20, 24],
+            [255, 230, 80],
+            [255, 80, 200],
+        ),
+        Sign::VibeConJudging => sp(
+            &["DEMO DAY: LIVE*", "*PRE-RECORDED"],
+            [8, 14, 30],
+            [120, 245, 255],
+            [255, 200, 60],
+        ),
+        Sign::VibeConAfterparty => sp(
+            &["AFTERPARTY", "SPONSORED BY A DATABASE"],
+            [24, 6, 36],
+            [255, 120, 230],
+            [120, 245, 255],
+        ),
+        Sign::VibeConFireside => sp(
+            &["FIRESIDE CHAT", "IS AI OVERHYPED? NO."],
+            [30, 12, 8],
+            [255, 210, 150],
+            [255, 120, 60],
+        ),
+        Sign::VibeConKeynote => sp(
+            &["THIS CHANGES", "EVERYTHING"],
+            [4, 4, 10],
+            [250, 250, 255],
+            [120, 245, 255],
+        ),
+        Sign::ToExpo => sp(
+            &["EXPO HALL", "BOOTHS + SWAG"],
+            [16, 8, 30],
+            [250, 250, 250],
+            [255, 150, 40],
+        ),
+        Sign::ToWorkshops => sp(
+            &["WORKSHOPS", "BRING A PROMPT"],
+            [16, 8, 30],
+            [250, 250, 250],
+            [180, 130, 255],
+        ),
+        Sign::ToHackathon => sp(
+            &["HACKATHON", "CORNER"],
+            [16, 8, 30],
+            [250, 250, 250],
+            [255, 230, 80],
+        ),
+        Sign::ToAfterparty => sp(
+            &["AFTERPARTY", "OPEN BAR 1 TOKEN"],
+            [16, 8, 30],
+            [250, 250, 250],
+            [255, 120, 230],
+        ),
+        Sign::ToMainStage => sp(
+            &["MAIN STAGE", "KEYNOTE AT 5"],
+            [16, 8, 30],
+            [250, 250, 250],
+            [120, 245, 255],
+        ),
+        Sign::Calendar => sp(
+            &[
+                "COMPANY CALENDAR",
+                "MINIGAMES  QUEST CHAINS",
+                "EVERYTHING, ALL WEEK",
+            ],
+            [22, 26, 38],
+            [245, 245, 250],
+            [255, 90, 80],
+        ),
+        Sign::TbWelcome => sp(
+            &["WELCOME TEAM!", "FUN STARTS AT 4:00"],
+            [250, 244, 232],
+            [40, 30, 50],
+            [230, 70, 120],
+        ),
+        Sign::TbBuffet => sp(
+            &["BUFFET", "ONE CANAPE EACH"],
+            [250, 244, 232],
+            [60, 40, 30],
+            [200, 140, 40],
+        ),
+        Sign::TbVip => sp(
+            &["VIP", "C-SUITE ONLY"],
+            [20, 16, 24],
+            [240, 210, 120],
+            [240, 210, 120],
+        ),
+        Sign::TbQuiet => sp(
+            &["QUIET CORNER", "1 BAR OF SIGNAL"],
+            [236, 240, 244],
+            [40, 50, 70],
+            [60, 150, 90],
+        ),
+        Sign::TbTrustFall => sp(
+            &["TRUST FALL", "CATCHING OPTIONAL"],
+            [250, 244, 232],
+            [40, 30, 50],
+            [60, 120, 220],
+        ),
+        Sign::TbIcebreaker => sp(
+            &["ICEBREAKER", "2 TRUTHS + 1 LIE"],
+            [250, 244, 232],
+            [40, 30, 50],
+            [230, 90, 40],
+        ),
+        Sign::TbPhoto => sp(
+            &["TEAM PHOTO!", "SAY 'SYNERGY'"],
+            [230, 70, 120],
+            [255, 255, 255],
+            [255, 220, 90],
+        ),
+        Sign::TbToilets => sp(
+            &["TOILETS", "QUEUE: 14 MIN"],
+            [236, 240, 244],
+            [40, 50, 70],
+            [60, 120, 220],
+        ),
+        Sign::TbSwag => sp(
+            &["FREE SWAG", "TAKE ONE (TAKE 5)"],
+            [250, 244, 232],
+            [40, 30, 50],
+            [230, 70, 120],
+        ),
+        Sign::TbBanner => sp(
+            &["FUN IS A", "DELIVERABLE"],
+            [30, 60, 140],
+            [255, 255, 255],
+            [255, 220, 90],
+        ),
+        Sign::TbKaraoke => sp(
+            &["KARAOKE", "NEXT: YOUR MANAGER"],
+            [16, 8, 30],
+            [250, 250, 250],
+            [255, 120, 230],
+        ),
+        Sign::TbTaxi => sp(
+            &["TAXI RANK", "EXIT >"],
+            [250, 210, 40],
+            [20, 20, 20],
+            [20, 20, 20],
+        ),
+        Sign::ReviewRoom => sp(
+            &["MEETING ROOM 4B", "BOOKED UNTIL Q4"],
+            [236, 236, 240],
+            [50, 56, 70],
+            [90, 120, 200],
+        ),
+        Sign::ReviewScale => sp(
+            &["1  2  3  4  5", "3 IS THE NEW 5"],
+            [24, 30, 44],
+            [230, 230, 236],
+            [250, 200, 70],
+        ),
+        Sign::ReorgChart => sp(
+            &["ORG CHART V14", "SUBJECT TO CHANGE"],
+            [240, 240, 244],
+            [40, 46, 60],
+            [210, 70, 70],
+        ),
+        Sign::ReorgExit => sp(
+            &["FIRE EXIT", "ALSO A HOT DESK"],
+            [30, 140, 70],
+            [250, 250, 250],
+            [250, 250, 250],
+        ),
+        Sign::MigrationOld => sp(
+            &["TICKETRON 2009", "DO NOT TURN OFF"],
+            [12, 20, 12],
+            [90, 240, 110],
+            [90, 240, 110],
+        ),
+        Sign::MigrationNew => sp(
+            &["FLOWSPHERE CLOUD", "THE FUTURE OF WORK"],
+            [245, 248, 255],
+            [40, 60, 110],
+            [60, 150, 240],
+        ),
+        Sign::MigrationDeadline => sp(
+            &["MIGRATION DONE BY", "FRIDAY. WHICH ONE?"],
+            [250, 230, 120],
+            [40, 30, 20],
+            [180, 40, 30],
+        ),
+        Sign::HackBanner => sp(
+            &["HACKATHON 24H", "AI FOR GOOD (FOR BIZ)"],
+            [20, 16, 40],
+            [250, 250, 250],
+            [255, 120, 60],
+        ),
+        Sign::HackStage => sp(
+            &["DEMO DAY", "IT WORKED AN HOUR AGO"],
+            [30, 30, 36],
+            [250, 250, 250],
+            [90, 200, 255],
+        ),
+        Sign::HackPizza => sp(
+            &["FREE PIZZA", "COLD BY 2 AM"],
+            [250, 244, 232],
+            [60, 30, 20],
+            [220, 80, 40],
+        ),
+        Sign::OpenQuiet => sp(
+            &["QUIET ZONE", "OPEN PLAN"],
+            [236, 240, 236],
+            [50, 60, 50],
+            [70, 150, 90],
+        ),
+        Sign::OpenCollab => sp(
+            &["COLLABORATE", "SPONTANEOUSLY"],
+            [255, 210, 70],
+            [40, 30, 20],
+            [200, 60, 40],
         ),
         Sign::LabRules => sp(
             &["COMPUTE IS OUR MOST", "VALUABLE EMPLOYEE"],

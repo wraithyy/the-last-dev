@@ -1416,10 +1416,68 @@ pub fn attach_unit_fx(c: &mut Kids, fx: &Fx, id: EntityId, head: f32, is_player:
             Vec3::new(head * 0.7, head * 0.75, head * 0.7),
         );
     });
+    // The Hype Panel: every panellist without the mic sits in the same bubble.
+    c.spawn((
+        AuraFx {
+            id,
+            key: "panel_muted",
+        },
+        Transform::from_xyz(0.0, head * 0.5, 0.0),
+        Visibility::Hidden,
+    ))
+    .with_children(|s| {
+        part(
+            s,
+            &fx.sphere,
+            &fx.m.bubble,
+            Vec3::ZERO,
+            Quat::IDENTITY,
+            Vec3::new(head * 0.7, head * 0.75, head * 0.7),
+        );
+    });
 
     if !is_player {
         return;
     }
+    // Ignore Previous Instructions: a magenta halo with two orbs circling the wrong way round,
+    // so the reversed controls read on the character, not on a new HUD element.
+    c.spawn((
+        AuraFx {
+            id,
+            key: "vc_reversed",
+        },
+        Transform::from_xyz(0.0, head + 0.35, 0.0),
+        Visibility::Hidden,
+    ))
+    .with_children(|s| {
+        part(
+            s,
+            &fx.torus,
+            &m.magenta,
+            Vec3::ZERO,
+            Quat::IDENTITY,
+            Vec3::new(0.45, 0.3, 0.45),
+        );
+        for i in 0..2 {
+            let e = part(
+                s,
+                &fx.sphere,
+                &m.magenta,
+                Vec3::ZERO,
+                Quat::IDENTITY,
+                Vec3::splat(0.14),
+            );
+            s.commands().entity(e).insert(Wobble {
+                phase: i as f32 * std::f32::consts::PI,
+                speed: -2.4,
+                radius: 0.45,
+                bob: 0.05,
+                center: Vec3::ZERO,
+                base: 0.14,
+                pulse: 0.03,
+            });
+        }
+    });
     // Guardrails: rotating hexagonal cage; bars drop out as the absorb depletes.
     c.spawn((
         Cage,

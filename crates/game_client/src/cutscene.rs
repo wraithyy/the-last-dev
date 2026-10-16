@@ -1,8 +1,9 @@
 //! Short in-engine cutscenes after the campaign bosses (letterbox bars, a slow camera move to the
 //! fallen boss, two to four subtitled lines) and the epilogue after the AGI reveal, which ends in
-//! the credits roll. The raid has its own: an intro on the first walk into the offsite lobby, one
-//! per boss, and the closing remarks right after the Founder's. They are presentation only: the sim keeps running (online the server never
-//! waits), Esc, a tap or the skip button ends one, and sprint runs never play them.
+//! the credits roll. Each raid has its own: an intro on the first walk into its first room, one
+//! per boss, and the closing remarks right after the final boss's. They are presentation only:
+//! the sim keeps running (online the server never waits), Esc, a tap or the skip button ends
+//! one, and sprint runs never play them.
 //!
 //! QA hook: `WOW_CUTSCENE=<boss key>@<secs>` plays that boss's scene at that time (at the player);
 //! `WOW_CREDITS=<secs>` starts the credits roll.
@@ -37,11 +38,35 @@ const fn l(who: &'static str, text: &'static str) -> Line {
 }
 
 pub const EPILOGUE: &str = "agi_prototype";
-/// Raid scenes that no death starts: the intro (first raid zone entered) and the closing remarks
-/// (after the final boss's scene).
-pub const RAID_INTRO: &str = "offsite_intro";
-pub const RAID_END: &str = "offsite_end";
-const RAID_FINAL_BOSS: &str = "the_founder";
+/// A raid's scenes that no death starts: the intro (its first zone entered) and the closing
+/// remarks (straight after the final boss's scene).
+pub struct RaidScenes {
+    pub first_zone: &'static str,
+    pub intro: &'static str,
+    pub final_boss: &'static str,
+    pub end: &'static str,
+}
+
+pub const RAID_SCENES: [RaidScenes; 2] = [
+    RaidScenes {
+        first_zone: "offsite/1",
+        intro: "offsite_intro",
+        final_boss: "the_founder",
+        end: "offsite_end",
+    },
+    RaidScenes {
+        first_zone: "vibecon/1",
+        intro: "vibecon_intro",
+        final_boss: "vc_keynote_agi",
+        end: "vibecon_end",
+    },
+];
+
+/// Scene keys that are not units (raid intros and closing remarks).
+#[cfg(test)]
+fn bookend(key: &str) -> bool {
+    RAID_SCENES.iter().any(|r| r.intro == key || r.end == key)
+}
 
 pub const SCENES: &[Scene] = &[
     Scene {
@@ -204,7 +229,7 @@ pub const SCENES: &[Scene] = &[
     },
     // ---- the raid: All-Hands Offsite ----
     Scene {
-        boss: RAID_INTRO,
+        boss: "offsite_intro",
         title: "All-Hands Offsite: day one, 08:00",
         lines: &[
             l(
@@ -279,7 +304,7 @@ pub const SCENES: &[Scene] = &[
         ],
     },
     Scene {
-        boss: RAID_FINAL_BOSS,
+        boss: "the_founder",
         title: "postmortem: the Grand Ballroom",
         lines: &[
             l(
@@ -298,7 +323,7 @@ pub const SCENES: &[Scene] = &[
         ],
     },
     Scene {
-        boss: RAID_END,
+        boss: "offsite_end",
         title: "All-Hands Offsite: closing remarks",
         lines: &[
             l(
@@ -309,6 +334,122 @@ pub const SCENES: &[Scene] = &[
             l(
                 "Offsite Concierge",
                 "That option is reserved for next week's offsite. Same programme. Lanyards are non-refundable.",
+            ),
+        ],
+    },
+    // ---- the raid: VibeCon ----
+    Scene {
+        boss: "vibecon_intro",
+        title: "VibeCon 2026: doors open 08:30",
+        lines: &[
+            l(
+                "Registration Volunteer",
+                "Welcome to VibeCon! Your badge has a QR code. It signs you up for forty newsletters.",
+            ),
+            l(
+                "You",
+                "The schedule just says 'Keynote: TBA. It changes everything.'",
+            ),
+            l(
+                "Registration Volunteer",
+                "It always does. Expo hall's that way. Avoid eye contact. The booths can smell budget.",
+            ),
+            l(
+                "The Vibe Coder",
+                "LIVE FROM BOOTH 12: shipping a startup before lunch! Nobody look at the code!",
+            ),
+        ],
+    },
+    Scene {
+        boss: "vc_vibe_coder",
+        title: "postmortem: the Expo Hall",
+        lines: &[
+            l(
+                "The Vibe Coder",
+                "Forty-one PRs merged, zero read. Velocity was incredible right up until the shipping.",
+            ),
+            l("You", "Your app is down."),
+            l(
+                "The Vibe Coder",
+                "It's not down. It's in a vibe it hasn't explained yet.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "vc_prompt_whisperer",
+        title: "postmortem: Workshop Room B",
+        lines: &[
+            l(
+                "The Prompt Whisperer",
+                "You resisted my injection. That's going in my course. 'Prompting for Executives', two thousand dollars.",
+            ),
+            l(
+                "You",
+                "You told me to walk left. I stepped out of the circle.",
+            ),
+            l(
+                "The Prompt Whisperer",
+                "Nobody has ever followed my instructions. That's why I teach them.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "vc_demo_god",
+        title: "postmortem: Hackathon Corner",
+        lines: &[
+            l(
+                "The Demo God",
+                "Ten years of live demos. Not one of them ran live. The video was always the product.",
+            ),
+            l("You", "Was anything on that laptop real?"),
+            l("The Demo God", "The sticker. The sticker was real."),
+        ],
+    },
+    Scene {
+        boss: "vc_hype_moderator",
+        title: "postmortem: the Afterparty fireside chat",
+        lines: &[
+            l(
+                "Panelist: Seed-Stage VC",
+                "To summarise the panel: AI is huge, we are early, and I'm on the cap table of whatever you just said.",
+            ),
+            l(
+                "Panelist: Chief AI Officer",
+                "Last year I was Chief Metaverse Officer. Before that, Chief Blockchain Officer. Same chair.",
+            ),
+            l(
+                "The Hype Panel",
+                "We are out of time for questions. We were always out of time for questions.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "vc_keynote_agi",
+        title: "postmortem: the Main Stage",
+        lines: &[
+            l(
+                "The Keynote AGI-Announcer",
+                "AGI was going to ship next quarter. It has been shipping next quarter for six quarters.",
+            ),
+            l("You", "And the 'one more thing'?"),
+            l(
+                "The Keynote AGI-Announcer",
+                "A waitlist. One more thing is always a waitlist.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "vibecon_end",
+        title: "VibeCon: closing remarks",
+        lines: &[
+            l(
+                "Registration Volunteer",
+                "Thanks for attending! Your badge scans were sold to 212 sponsors. That's the business model.",
+            ),
+            l("You", "Can I get a refund?"),
+            l(
+                "Registration Volunteer",
+                "Next year's VibeCon is already sold out. Nobody knows what it's about yet. That's the hype.",
             ),
         ],
     },
@@ -355,20 +496,18 @@ pub fn scene_for(boss: &str) -> Option<usize> {
     SCENES.iter().position(|s| s.boss == boss)
 }
 
-/// The raid intro plays the first time this session the group walks into `first` (the first
-/// raid zone); `zone` is the raid zone just loaded.
-pub fn raid_intro(zone: &str, first: Option<&str>, seen: &[usize]) -> Option<usize> {
-    if first != Some(zone) {
-        return None;
-    }
-    scene_for(RAID_INTRO).filter(|i| !seen.contains(i))
+/// A raid's intro plays the first time this session the group walks into its first zone;
+/// `zone` is the raid zone just loaded.
+pub fn raid_intro(zone: &str, seen: &[usize]) -> Option<usize> {
+    let r = RAID_SCENES.iter().find(|r| r.first_zone == zone)?;
+    scene_for(r.intro).filter(|i| !seen.contains(i))
 }
 
-/// The scene that follows scene `i` straight away (the raid's closing remarks).
+/// The scene that follows scene `i` straight away (a raid's closing remarks).
 pub fn follow_up(i: usize) -> Option<usize> {
-    (SCENES.get(i)?.boss == RAID_FINAL_BOSS)
-        .then(|| scene_for(RAID_END))
-        .flatten()
+    let boss = SCENES.get(i)?.boss;
+    let r = RAID_SCENES.iter().find(|r| r.final_boss == boss)?;
+    scene_for(r.end)
 }
 
 /// Which scene a death starts: a campaign milestone in a campaign run, never a sprint stage,
@@ -553,8 +692,7 @@ fn triggers(
 ) {
     for CombatEvent(ev) in events.read() {
         if let Event::Raid { view } = ev {
-            let first = sim.content().raid.zones.first().map(String::as_str);
-            if let Some(i) = raid_intro(&view.zone, first, &cinema.seen) {
+            if let Some(i) = raid_intro(&view.zone, &cinema.seen) {
                 cinema.seen.push(i);
                 cinema.intro_pending = Some(i);
             }
@@ -937,10 +1075,7 @@ mod tests {
         let Ok(sim) = crate::combat::new_sim() else {
             panic!("embedded content invalid");
         };
-        for s in SCENES
-            .iter()
-            .filter(|s| ![RAID_INTRO, RAID_END].contains(&s.boss))
-        {
+        for s in SCENES.iter().filter(|s| !bookend(s.boss)) {
             assert!(
                 sim.content().unit_def(s.boss).is_some(),
                 "{} is unknown",
@@ -950,41 +1085,38 @@ mod tests {
     }
 
     #[test]
-    fn the_raid_has_an_intro_a_scene_per_boss_and_closing_remarks() {
+    fn every_raid_has_an_intro_a_scene_per_boss_and_closing_remarks() {
         let Ok(sim) = crate::combat::new_sim() else {
             panic!("embedded content invalid");
         };
         let c = sim.content();
-        let bosses = c.raid.bosses(c);
-        assert_eq!(bosses.len(), 4);
-        for b in bosses
-            .iter()
-            .map(String::as_str)
-            .chain([RAID_INTRO, RAID_END])
-        {
-            let Some(i) = scene_for(b) else {
-                panic!("{b} has no scene");
-            };
-            let s = &SCENES[i];
-            assert!((2..=4).contains(&s.lines.len()), "{b}");
-            let secs = scene_secs(s);
-            assert!((10.0..=22.0).contains(&secs), "{b}: {secs}");
+        assert_eq!(c.raids.len(), RAID_SCENES.len());
+        for (raid, r) in c.raids.iter().zip(&RAID_SCENES) {
+            let bosses = raid.bosses(c);
+            assert_eq!(bosses.last().map(String::as_str), Some(r.final_boss));
+            assert_eq!(raid.zones.first().map(String::as_str), Some(r.first_zone));
+            for b in bosses.iter().map(String::as_str).chain([r.intro, r.end]) {
+                let Some(i) = scene_for(b) else {
+                    panic!("{b} has no scene");
+                };
+                let s = &SCENES[i];
+                assert!((2..=4).contains(&s.lines.len()), "{b}");
+                let secs = scene_secs(s);
+                assert!((10.0..=22.0).contains(&secs), "{b}: {secs}");
+            }
+            let intro = raid_intro(r.first_zone, &[]);
+            assert_eq!(intro, scene_for(r.intro));
+            assert_eq!(raid_intro(&raid.zones[1], &[]), None, "only the first room");
+            let seen: Vec<usize> = intro.into_iter().collect();
+            assert_eq!(raid_intro(r.first_zone, &seen), None, "once per session");
+            let last = scene_for(r.final_boss).unwrap_or(usize::MAX);
+            assert_eq!(follow_up(last), scene_for(r.end));
         }
-        let first = c.raid.zones.first().map(String::as_str);
-        let intro = raid_intro("offsite/1", first, &[]);
-        assert_eq!(intro, scene_for(RAID_INTRO));
-        assert_eq!(raid_intro("offsite/2", first, &[]), None, "only the lobby");
-        let seen: Vec<usize> = intro.into_iter().collect();
-        assert_eq!(
-            raid_intro("offsite/1", first, &seen),
-            None,
-            "once per session"
-        );
-        let founder = scene_for(RAID_FINAL_BOSS).unwrap_or(usize::MAX);
-        assert_eq!(follow_up(founder), scene_for(RAID_END));
         assert_eq!(follow_up(0), None);
-        // The twin that is not the zone boss stays quiet: one scene per encounter.
-        assert_eq!(trigger("synergy_leverage", false, &[]), None);
+        // Linked partners that are not the zone boss stay quiet: one scene per encounter.
+        for k in ["synergy_leverage", "vc_hype_vc", "vc_hype_caio"] {
+            assert_eq!(trigger(k, false, &[]), None);
+        }
     }
 
     #[test]

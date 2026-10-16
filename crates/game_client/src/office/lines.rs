@@ -242,6 +242,9 @@ pub fn mine(def: &PropDef, outcome: u32, nth: u32, content: &Content) -> Option<
         PropKind::ScrumBoard => {
             "Your name is on three sticky notes. One of them just says 'why'.".to_string()
         }
+        PropKind::Calendar => {
+            "Every slot is double-booked. Yours is triple-booked, with yourself.".to_string()
+        }
     })
 }
 
@@ -290,6 +293,7 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::Scooter => "Borrow (unlock with your face)",
         PropKind::SprintBoard => "Plan a sprint (timed run)",
         PropKind::ScrumBoard => "Daily Standup (daily and weekly tasks)",
+        PropKind::Calendar => "Company Calendar (minigames and quest chains)",
         PropKind::BeanBag => "Take a power nap",
         PropKind::QuietRoom => "Hide in the quiet room",
         PropKind::Dog => "Pet the office dog",
@@ -305,7 +309,11 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
             "Story points, affixes, a par time. Velocity is mandatory.".to_string()
         }
         PropKind::ScrumBoard => {
-            "Three dailies a day, one Sprint Goal a week. Attendance is tracked.".to_string()
+            "Three dailies a day, one Sprint Goal a week. Closes your Jira tickets for Kudos."
+                .to_string()
+        }
+        PropKind::Calendar => {
+            "Every side activity in one place. Closes your Jira tickets for Kudos.".to_string()
         }
         _ => String::new(),
     };

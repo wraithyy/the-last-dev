@@ -226,6 +226,7 @@ fn load_zone_spawns_the_campus_and_reports_its_links() {
             ("lab/1".to_string(), false),
             ("client/1".to_string(), false),
             ("offsite/1".to_string(), false),
+            ("vibecon/1".to_string(), false),
         ]
     );
     assert!(t.sim.zone_links("nowhere").is_empty());
@@ -769,8 +770,19 @@ fn every_quest_is_given_where_its_work_happens() {
             continue;
         }
         assert_eq!(q.ender().zone, q.giver.zone, "{}", q.id);
+        // Company Calendar chains are side trips from the campus: their work may sit in any
+        // zone open from level 1 (the Open Space).
+        let calendar = c.calendar.chains.iter().any(|ch| ch.quests.contains(&q.id));
         for o in &q.objectives {
             let zones = c.objective_zones(o);
+            if calendar {
+                assert!(
+                    zones.iter().any(|z| ["campus", "tower/1"].contains(z)),
+                    "{}: {o:?} happens in {zones:?}",
+                    q.id
+                );
+                continue;
+            }
             let here = zones
                 .iter()
                 .any(|z| *z == q.giver.zone || area(z) == area(&q.giver.zone) && z != &"campus");
@@ -782,8 +794,14 @@ fn every_quest_is_given_where_its_work_happens() {
         }
     }
     // Every zone with packs has local work, and each zone's givers stand in it. The raid is
-    // weekly endgame content above the cap: its work is the lockout, not tickets.
-    for z in c.zones.iter().filter(|z| !c.raid.is_raid_zone(&z.id)) {
+    // weekly endgame content above the cap: its work is the lockout, not tickets; a minigame's
+    // venue has its own objectives.
+    let minigame_zone = |id: &str| c.minigames.iter().any(|m| m.zone == id);
+    for z in c
+        .zones
+        .iter()
+        .filter(|z| c.raid_of(&z.id).is_none() && !minigame_zone(&z.id))
+    {
         let n = c
             .quests
             .iter()

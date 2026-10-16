@@ -76,6 +76,8 @@ pub struct SaveData {
     pub raid_locks: Vec<String>,
     /// The local Weekly Sprint ladder (optional key; older saves have none).
     pub ladder: crate::sprint::LadderView,
+    /// Best medal per minigame key (optional key; older saves have none).
+    pub minigames: Vec<(String, crate::minigame::Medal)>,
 }
 
 fn list(v: &str) -> Vec<String> {
@@ -190,6 +192,14 @@ impl SaveData {
                 .collect();
             out.push_str(&format!("ladder={}*{}\n", self.ladder.week, rows.join("|")));
         }
+        if !self.minigames.is_empty() {
+            let rows: Vec<String> = self
+                .minigames
+                .iter()
+                .map(|(k, m)| format!("{k}*{}", m.index()))
+                .collect();
+            out.push_str(&format!("minigames={}\n", rows.join("|")));
+        }
         if self.onboarding_pending {
             out.push_str("onboarding=pending\n");
         }
@@ -278,6 +288,16 @@ impl SaveData {
                 "pet" => s.pet = v.chars().take(crate::world::WORLD_KEY_MAX).collect(),
                 "duel_streak" => s.duel_streak = v.parse().unwrap_or(0),
                 "respecs" => s.respecs = v.parse().unwrap_or(0),
+                "minigames" => {
+                    s.minigames = list(v)
+                        .iter()
+                        .filter_map(|row| {
+                            let (k, m) = row.split_once('*')?;
+                            let medal = crate::minigame::Medal::from_index(m.parse().ok()?)?;
+                            Some((k.to_string(), medal))
+                        })
+                        .collect();
+                }
                 "ladder" => {
                     let (w, rows) = v.split_once('*').unwrap_or(("0", ""));
                     s.ladder.week = w.parse().unwrap_or(0);
@@ -447,6 +467,7 @@ impl Sim {
             raid_week: self.raid_lockout().0,
             raid_locks: self.raid_lockout().1,
             ladder: self.ladder_saved(),
+            minigames: self.minigame_bests(player),
         })
     }
 
@@ -555,6 +576,7 @@ impl Sim {
         self.set_legacy_lockout(save.legacy_week, &save.legacy_locks);
         self.set_raid_lockout(save.raid_week, &save.raid_locks);
         self.set_ladder(save.ladder.week, save.ladder.entries.clone());
+        self.set_minigame_bests(player, &save.minigames);
         let class = self.class_at(i).map(|c| c.key.clone()).unwrap_or_default();
         self.units[i].state.talents = self.content.talents.sanitize(&class, &save.talents, level);
         let title = Some(&save.title)

@@ -1069,10 +1069,14 @@ impl NetWorld {
         }
     }
 
-    /// Like the server's `raid_link_open`: the door into the raid needs everyone at the cap.
+    /// Like the server's `raid_link_open`: the door into a raid needs everyone at the cap.
     fn raid_gate(&self, from: &str, to: &str) -> Option<bool> {
-        let r = &self.content.raid;
-        (r.is_raid_zone(to) && !r.is_raid_zone(from)).then(|| {
+        let into = self.content.raid_of(to)?;
+        let inside = self
+            .content
+            .raid_of(from)
+            .is_some_and(|r| r.name == into.name);
+        (!inside).then(|| {
             let cap = self.content.max_level();
             !self.players.is_empty()
                 && self

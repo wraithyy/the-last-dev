@@ -197,7 +197,12 @@ fn spawn_lineup(mut commands: Commands, lineup: Res<Lineup>) {
     // 3: only the campus, data center and lab units (everything after the tower cast), wider
     // spaced because the rigs are big; WOW_CAM_DIST=20 frames them.
     let new_only = lineup.0 >= 3;
-    let keys: Vec<&'static str> = if new_only {
+    // 5: from the offsite raid cast on (raids and minigames), same framing as 3.
+    let keys: Vec<&'static str> = if lineup.0 == 5 {
+        catalog::unit_keys()
+            .skip_while(|k| *k != "offsite_concierge")
+            .collect()
+    } else if new_only {
         catalog::unit_keys()
             .skip_while(|k| *k != "ceo")
             .skip(1)

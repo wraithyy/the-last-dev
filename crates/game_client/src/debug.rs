@@ -3,6 +3,7 @@
 //!   `WOW_SHOT_TIMES=t1,t2,..` instead saves one `<path>_<n>.png` per time (seconds since start).
 //! - `WOW_LINEUP=1|2`: bare stage with half of the cast in two rows (see `units.rs`); `0` leaves the stage empty.
 //! - `WOW_LINEUP=3`: only the campus/data center/lab units, three rows (use `WOW_CAM_DIST=20`).
+//! - `WOW_LINEUP=5`: the raid (and minigame) cast from the offsite on, three rows like 3.
 //! - `WOW_LINEUP=4`: the four class skins with their kits, plus the Backend's five hair stages.
 //! - `WOW_CLASS=fullstack|frontend|backend|devops`: play that class and skip the role picker;
 //!   `WOW_PICKER=1` opens the picker even when a role is stored (see `classes.rs`).

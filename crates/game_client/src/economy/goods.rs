@@ -419,6 +419,15 @@ pub fn tooltip(content: &Content, name: &str, v: &Viewer) -> Tip {
         let p = g.price();
         let color = if v.kudos >= p { SP_GOLD } else { DOWNGRADE_RED };
         out.push((format!("Price: {}", crate::copy::kudos(p)), color));
+    } else if let Some(j) = eco.junk.iter().find(|j| j.ticket && j.name == name) {
+        let board = j.price.saturating_mul(combat_core::TICKET_BOARD_MULT);
+        out.push((
+            format!(
+                "Close it at the Scrum board or Calendar: {}",
+                crate::copy::kudos(board)
+            ),
+            SP_GOLD,
+        ));
     } else if let Some(p) = eco.sell_price(name) {
         out.push((format!("Sells for {}", crate::copy::kudos(p)), SP_GOLD));
     }

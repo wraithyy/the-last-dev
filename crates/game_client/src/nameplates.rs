@@ -229,13 +229,21 @@ fn plate_title(title: &str) -> String {
     }
 }
 
-/// Titles change when a player unlocks or picks an achievement.
-fn update_titles(sim: SimView, mut titles: Query<(&PlateTitle, &mut Text)>) {
+/// Titles change when a player unlocks or picks an achievement, and a minigame may badge a
+/// unit with something else for a while (the Reorg's names and roles).
+fn update_titles(
+    sim: SimView,
+    badges: Res<crate::minigame::PlateBadges>,
+    mut titles: Query<(&PlateTitle, &mut Text)>,
+) {
     for (PlateTitle(id), mut text) in &mut titles {
         let Some(u) = sim.unit(*id) else { continue };
         let content = sim.content();
-        let title = content
-            .title_text(&u.title)
+        let title = badges
+            .0
+            .get(id)
+            .map(String::as_str)
+            .or_else(|| content.title_text(&u.title))
             .or_else(|| content.unit_def(&u.key).map(|d| d.title.as_str()))
             .unwrap_or("");
         let want = plate_title(title);

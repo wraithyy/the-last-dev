@@ -61,11 +61,30 @@ impl Default for MoveSpeed {
     }
 }
 
+/// VibeCon's "Ignore Previous Instructions": movement input is mirrored while the player wears
+/// a `reverse_controls` aura (kept by `office::ride` with the speed). Movement is client-owned,
+/// so this is the whole mechanic; the sim only applies the aura.
+#[derive(Resource, Default)]
+pub struct ControlsReversed(pub bool);
+
+/// Teambuilding: while a stealth run is on (`venue`), the jump key toggles sneaking, which
+/// walks at `SNEAK_FACTOR` of the run speed; the sim hears anyone faster (`noisy_mps`).
+#[derive(Resource, Default)]
+pub struct Sneak {
+    pub venue: bool,
+    pub on: bool,
+}
+
+/// 7 m/s * 0.5 stays under the sim's 5 m/s noise line with room for frame jitter.
+pub const SNEAK_FACTOR: f32 = 0.5;
+
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MoveSpeed>()
+            .init_resource::<ControlsReversed>()
+            .init_resource::<Sneak>()
             .add_systems(Startup, spawn_player)
             .add_systems(FixedUpdate, simulate)
             .add_systems(
@@ -103,6 +122,8 @@ fn simulate(
     mut input: ResMut<PlayerInput>,
     colliders: Res<Colliders>,
     speed: Res<MoveSpeed>,
+    reversed: Res<ControlsReversed>,
+    mut sneak: ResMut<Sneak>,
     mut body: Single<&mut PlayerBody>,
 ) {
     let dt = time.delta_secs();
@@ -112,17 +133,28 @@ fn simulate(
     if let Some(yaw) = input.face_yaw.take() {
         body.yaw = yaw;
     }
-    body.yaw += input.turn * KEY_TURN_RATE * dt + input.mouse_yaw;
+    let flip = if reversed.0 { -1.0 } else { 1.0 };
+    let (forward, strafe, turn) = (input.forward * flip, input.strafe * flip, input.turn * flip);
+    body.yaw += turn * KEY_TURN_RATE * dt + input.mouse_yaw;
     input.mouse_yaw = 0.0;
 
     let rot = Quat::from_rotation_y(body.yaw);
-    let run = RUN_SPEED * speed.0;
-    let max_speed = if input.forward < 0.0 {
+    if sneak.venue && input.jump {
+        input.jump = false;
+        sneak.on = !sneak.on;
+    }
+    let stealth = if sneak.venue && sneak.on {
+        SNEAK_FACTOR
+    } else {
+        1.0
+    };
+    let run = RUN_SPEED * speed.0 * stealth;
+    let max_speed = if forward < 0.0 {
         run * BACKPEDAL_FACTOR
     } else {
         run
     };
-    let local = Vec3::new(input.strafe, 0.0, -input.forward) * run;
+    let local = Vec3::new(strafe, 0.0, -forward) * run;
     let velocity = rot * local.clamp_length_max(max_speed);
     let knock = body.knock;
     body.pos = slide(body.pos, (velocity + knock) * dt, &colliders.0);

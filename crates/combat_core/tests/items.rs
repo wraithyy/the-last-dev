@@ -29,8 +29,12 @@ fn hostile_levels(c: &Content) -> Vec<u8> {
 fn every_gear_piece_follows_the_stat_budget() {
     let c = content();
     let eco = &c.economy;
-    let raid_bosses = c.raid.bosses(&c);
-    assert_eq!(raid_bosses.len(), 4, "the raid has four encounters");
+    let raid_bosses: Vec<String> = c.raids.iter().flat_map(|r| r.bosses(&c)).collect();
+    assert_eq!(
+        raid_bosses.len(),
+        9,
+        "four offsite and five VibeCon encounters"
+    );
     let mut bad = Vec::new();
     for g in &eco.gear {
         let keyboard = if g.slot == Slot::Keyboard { 125 } else { 100 };
@@ -176,7 +180,15 @@ fn every_item_is_reachable_from_some_source() {
                 !c.legacy.zones.is_empty() && g.tier() > top && !shelves.contains(&&g.name)
             }
             GearSource::Raid => {
-                !c.raid.zones.is_empty() && g.tier() > top && !shelves.contains(&&g.name)
+                !c.raids.is_empty() && g.tier() > top && !shelves.contains(&&g.name)
+            }
+            // Medal rewards only: some medal must hand it out, and no vendor sells it.
+            GearSource::Minigame => {
+                !shelves.contains(&&g.name)
+                    && c.minigames
+                        .iter()
+                        .flat_map(|m| &m.medals)
+                        .any(|d| d.items.contains(&g.name))
             }
         };
         if !ok {
@@ -584,10 +596,10 @@ fn a_finished_daily_hands_out_its_item() {
 fn visual_styles_exist_for_their_slot() {
     let c = content();
     let max = |s: Slot| match s {
-        Slot::Headgear => 14,
-        Slot::Hoodie => 9,
+        Slot::Headgear => 16,
+        Slot::Hoodie => 10,
         Slot::Mug => 7,
-        Slot::Lanyard => 8,
+        Slot::Lanyard => 9,
         Slot::Keyboard => 6,
     };
     let bad: Vec<String> = c

@@ -8,7 +8,7 @@ use crate::game::GameFlow;
 use crate::input::Paused;
 use crate::keybinds::{Action, Keybinds};
 use crate::net::NetWorld;
-use crate::player::{MoveSpeed, Player, PlayerBody};
+use crate::player::{ControlsReversed, MoveSpeed, Player, PlayerBody};
 use crate::rigs::PrimRig;
 use crate::seat;
 use bevy::prelude::*;
@@ -214,6 +214,7 @@ pub fn player_speed(
     sim: SimView,
     player: Single<&SimUnit, With<Player>>,
     mut speed: ResMut<MoveSpeed>,
+    mut reversed: ResMut<ControlsReversed>,
 ) {
     // Burnout drags on top of any ride or sprint; the server's movement budget is only a
     // ceiling, so a slower client never trips it.
@@ -226,6 +227,13 @@ pub fn player_speed(
     let want = pct as f32 / 100.0;
     if speed.0 != want {
         speed.0 = want;
+    }
+    let flip = sim.unit(player.0).is_some_and(|u| {
+        sim.content()
+            .reverses_controls(u.auras.iter().map(|a| a.key.as_str()))
+    });
+    if reversed.0 != flip {
+        reversed.0 = flip;
     }
 }
 

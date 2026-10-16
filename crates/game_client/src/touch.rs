@@ -185,8 +185,41 @@ impl Plugin for TouchPlugin {
         )
         .add_systems(
             Update,
-            (detect_touch, apply_mode, show_menu, draw_stick, tag_spots),
+            (
+                detect_touch,
+                apply_mode,
+                show_menu,
+                draw_stick,
+                tag_spots,
+                jump_label,
+            ),
         );
+    }
+}
+
+/// In a Teambuilding run the jump key toggles sneaking (`player::Sneak`); the button says so.
+fn jump_label(
+    sneak: Res<crate::player::Sneak>,
+    buttons: Query<(&TouchButton, &Children)>,
+    mut texts: Query<&mut Text>,
+) {
+    if !sneak.is_changed() {
+        return;
+    }
+    let want = match (sneak.venue, sneak.on) {
+        (false, _) => "Jump",
+        (true, true) => "Run",
+        (true, false) => "Sneak",
+    };
+    for (b, kids) in &buttons {
+        if !matches!(b, TouchButton::Jump) {
+            continue;
+        }
+        for k in kids {
+            if let Ok(mut t) = texts.get_mut(*k) {
+                crate::hud::set_text(&mut t, want);
+            }
+        }
     }
 }
 
@@ -507,6 +540,7 @@ fn spawn_hud(mut commands: Commands) {
                         ("Gear", TouchButton::Act(Action::CharacterSheet)),
                         ("Pets", TouchButton::Act(Action::Pets)),
                         ("Endgame", TouchButton::Act(Action::Endgame)),
+                        ("Calendar", TouchButton::Act(Action::Calendar)),
                         ("Sound", TouchButton::Act(Action::Mute)),
                         ("Pause", TouchButton::Key(KeyCode::Escape)),
                     ] {

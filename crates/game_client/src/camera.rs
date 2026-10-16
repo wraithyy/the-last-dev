@@ -190,6 +190,7 @@ fn follow_player(
 
 fn orbit_input(
     paused: Res<Paused>,
+    windows: Res<crate::input::MinigameWindows>,
     mouse: Res<MouseState>,
     motion: Res<AccumulatedMouseMotion>,
     scroll: Res<AccumulatedMouseScroll>,
@@ -214,7 +215,10 @@ fn orbit_input(
         MouseScrollUnit::Line => scroll.delta.y,
         MouseScrollUnit::Pixel => scroll.delta.y / CAM_ZOOM_PIXELS_PER_LINE,
     };
-    cam.zoom = (cam.zoom - lines * CAM_ZOOM_STEP).clamp(CAM_MIN_DIST, CAM_MAX_DIST);
+    // The wheel scrolls the calendar's list while it is open.
+    if !windows.calendar {
+        cam.zoom = (cam.zoom - lines * CAM_ZOOM_STEP).clamp(CAM_MIN_DIST, CAM_MAX_DIST);
+    }
 }
 
 /// Largest distance along `dir` from `origin` (up to `max`) with clear sight.

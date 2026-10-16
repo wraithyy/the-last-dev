@@ -618,8 +618,10 @@ fn cast_keys(
     sim: SimView,
     mut pending: ResMut<PendingCommands>,
     player: Single<&SimUnit, With<Player>>,
+    minigame: Res<crate::minigame::MinigameHud>,
 ) {
-    if paused.0 || !can_act(&*sim, &flow, player.0) {
+    // A minigame's choice card takes the number keys while it is up.
+    if paused.0 || minigame.card_keys() || !can_act(&*sim, &flow, player.0) {
         return;
     }
     for slot in 0..SLOT_COUNT {

@@ -196,6 +196,10 @@ pub struct AuraDef {
     /// `scooters`.
     #[serde(default)]
     pub mount: bool,
+    /// Prompt Whisperer's "Ignore Previous Instructions": the bearer's movement input is
+    /// mirrored on the client (movement is client-owned), so it needs no sim support.
+    #[serde(default)]
+    pub reverse_controls: bool,
     /// Extra in-combat mana per 5 s while it lasts (Fresh Brew).
     #[serde(default)]
     pub mana_regen: u32,
@@ -333,6 +337,12 @@ pub enum Effect {
         max_m: f32,
         base: u32,
     },
+    /// Caster-centric raid mechanic (VibeCon's unreviewed PRs): the caster dies on the spot (no
+    /// killer, so no loot), and its summoner, if alive, gains a stack of `boost_aura`.
+    Detonate {
+        #[serde(default)]
+        boost_aura: Option<String>,
+    },
     Nothing,
 }
 
@@ -344,6 +354,7 @@ impl Effect {
                 | Effect::ResetAllyThreat { .. }
                 | Effect::ThreatSwap
                 | Effect::PairUp { .. }
+                | Effect::Detonate { .. }
         )
     }
 
@@ -364,6 +375,7 @@ impl Effect {
                 vec![aura.as_str()]
             }
             Effect::RandomAura { auras, .. } => auras.iter().map(String::as_str).collect(),
+            Effect::Detonate { boost_aura } => boost_aura.iter().map(String::as_str).collect(),
             _ => vec![],
         }
     }
@@ -933,6 +945,12 @@ pub struct QuestReward {
     /// `Content::quest_gear_choices` for the player's role.
     #[serde(default)]
     pub gear_tier: u8,
+    /// Standing with a department (`DepartmentDef::name`, amount).
+    #[serde(default)]
+    pub rep: Option<(String, u32)>,
+    /// Burnout per mille on turn-in: negative relieves, positive costs (expense reports).
+    #[serde(default)]
+    pub burnout: i16,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1076,9 +1094,15 @@ pub struct Content {
     /// Legacy Mode zone variants (`legacy.rs`); absent in minimal test content.
     #[serde(default)]
     pub legacy: crate::legacy::LegacyDef,
-    /// The raid (`raid.rs`); absent in minimal test content.
+    /// The raids (`raid.rs`), each its own chain of zones; absent in minimal test content.
     #[serde(default)]
-    pub raid: crate::raid::RaidDef,
+    pub raids: Vec<crate::raid::RaidDef>,
+    /// Minigames (`minigame.rs`); absent in minimal test content.
+    #[serde(default)]
+    pub minigames: Vec<crate::minigame::MinigameDef>,
+    /// The Company Calendar's listing (`calendar.rs`).
+    #[serde(default)]
+    pub calendar: crate::calendar::CalendarDef,
 }
 
 impl Content {
@@ -1087,6 +1111,10 @@ impl Content {
             ron::from_str(src).map_err(|e| ContentError::Parse(e.to_string()))?;
         content.validate()?;
         Ok(content)
+    }
+
+    pub fn minigame(&self, key: &str) -> Option<&crate::minigame::MinigameDef> {
+        self.minigames.iter().find(|m| m.key == key)
     }
 
     pub fn spell(&self, id: SpellId) -> Option<&SpellDef> {
@@ -1130,6 +1158,16 @@ impl Content {
         self.spells
             .iter()
             .find(|s| s.target == SpellTarget::DeadAlly)
+    }
+
+    /// The raid `zone` belongs to.
+    pub fn raid_of(&self, zone: &str) -> Option<&crate::raid::RaidDef> {
+        self.raids.iter().find(|r| r.is_raid_zone(zone))
+    }
+
+    /// Any aura in `auras` mirrors movement ("Ignore Previous Instructions").
+    pub fn reverses_controls<'a>(&self, mut auras: impl Iterator<Item = &'a str>) -> bool {
+        auras.any(|k| self.aura(k).is_some_and(|a| a.reverse_controls))
     }
 
     pub fn unit_def(&self, key: &str) -> Option<&UnitDef> {
@@ -1385,7 +1423,9 @@ impl Content {
         crate::pets::validate(self)?;
         self.endgame.validate(self)?;
         self.legacy.validate(self)?;
-        self.raid.validate(self)?;
+        crate::raid::validate_all(self)?;
+        crate::minigame::validate(self)?;
+        self.calendar.validate(self)?;
         Ok(())
     }
 }
@@ -1544,6 +1584,11 @@ impl Content {
             }
             if q.reward.gear_tier > 5 {
                 return bad(format!("quest {} gear tier out of range", q.id));
+            }
+            if let Some((dept, _)) = &q.reward.rep
+                && self.endgame.department_index(dept).is_none()
+            {
+                return bad(format!("quest {} rewards unknown department {dept}", q.id));
             }
         }
         for u in &self.units {

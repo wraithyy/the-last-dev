@@ -32,6 +32,9 @@ const QUEST_TARGET: Color = Color::srgb(1.0, 0.9, 0.2);
 const LOOT: Color = Color::srgb(1.0, 0.82, 0.25);
 const DOOR_OPEN: Color = Color::srgb(0.4, 1.0, 0.5);
 const DOOR_LOCKED: Color = Color::srgb(1.0, 0.42, 0.36);
+/// The board's stand spot; the map uses it too.
+pub const CALENDAR_ANCHOR: &str = "prop:company_calendar";
+const CAL_PX: f32 = 15.0;
 
 #[derive(Resource)]
 struct Radar {
@@ -52,6 +55,11 @@ struct RadarDot(usize);
 struct RadarGlyph(usize);
 #[derive(Component)]
 struct RadarArrow;
+/// The Company Calendar's icon on the campus, with a "!" while something is unplayed.
+#[derive(Component)]
+struct RadarCalendar;
+#[derive(Component)]
+struct RadarCalendarBang;
 #[derive(Component)]
 struct RadarZone;
 #[derive(Component)]
@@ -70,7 +78,10 @@ impl Plugin for MinimapPlugin {
             scale: 1.0,
         })
         .add_systems(Startup, spawn_radar)
-        .add_systems(Update, update_radar.in_set(SimReady));
+        .add_systems(
+            Update,
+            (update_radar, calendar_pin).chain().in_set(SimReady),
+        );
     }
 }
 
@@ -93,7 +104,12 @@ fn zoom_button(step: i32, text: &str) -> impl Bundle {
     )
 }
 
-fn spawn_radar(mut commands: Commands) {
+fn spawn_radar(
+    mut commands: Commands,
+    assets: Res<AssetServer>,
+    mut icons: ResMut<super::IconCache>,
+) {
+    let calendar = icons.get(&assets, "calendar");
     commands
         .spawn((
             Node {
@@ -168,6 +184,30 @@ fn spawn_radar(mut commands: Commands) {
                     ));
                 }
                 view.spawn((
+                    RadarCalendar,
+                    ImageNode::new(calendar),
+                    Node {
+                        position_type: PositionType::Absolute,
+                        width: px(CAL_PX),
+                        height: px(CAL_PX),
+                        border: UiRect::all(px(1)),
+                        display: Display::None,
+                        ..default()
+                    },
+                    BorderColor::all(Color::WHITE),
+                    children![(
+                        RadarCalendarBang,
+                        label("!", 14.0),
+                        TextColor(super::GOLD),
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: px(CAL_PX - 1.0),
+                            top: px(-9),
+                            ..default()
+                        },
+                    )],
+                ));
+                view.spawn((
                     RadarArrow,
                     Node {
                         position_type: PositionType::Absolute,
@@ -231,6 +271,40 @@ enum Kind {
     Party,
     Loot,
     Glyph(&'static str, Color),
+}
+
+/// Places the calendar icon where the board stands (campus only) and shows its "!".
+fn calendar_pin(
+    flow: Res<GameFlow>,
+    radar: Res<Radar>,
+    cal: Res<crate::calendar::CalendarState>,
+    player: Single<&PlayerBody, With<Player>>,
+    mut pin: Single<&mut Node, With<RadarCalendar>>,
+    mut bang: Single<&mut Visibility, With<RadarCalendarBang>>,
+) {
+    let me = Vec2::new(player.pos.x, player.pos.z);
+    let half = RADII[radar.zoom];
+    let at = flow
+        .anchors
+        .iter()
+        .find(|a| a.0 == CALENDAR_ANCHOR)
+        .map(|a| Vec2::new(a.1.x, a.1.z))
+        .filter(|p| (*p - me).abs().max_element() <= half);
+    let Some(p) = at else {
+        if pin.display != Display::None {
+            pin.display = Display::None;
+        }
+        return;
+    };
+    let v = to_view(p, me, (MM / 2.0) / half);
+    pin.display = Display::Flex;
+    pin.left = px(MM / 2.0 + v.x - CAL_PX / 2.0);
+    pin.top = px(MM / 2.0 + v.y - CAL_PX / 2.0);
+    bang.set_if_neq(if cal.news {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    });
 }
 
 /// Zoom index after one step, clamped to the table.

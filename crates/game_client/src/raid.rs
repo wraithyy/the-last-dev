@@ -1,5 +1,5 @@
-//! Raid presentation ("All-Hands Offsite"). Entering a raid room names the difficulty in the
-//! zone banner slot (once per raid visit), a locked encounter becomes a notice, and "Pair Up"
+//! Raid presentation ("All-Hands Offsite", "VibeCon"). Entering a raid room names the difficulty
+//! in the zone banner slot (once per raid visit), a locked encounter becomes a notice, and "Pair Up"
 //! tethers are drawn as a cord between partners: green while together, red once stretched past
 //! the range. No permanent HUD element: everything else reuses the boss frame, auras and
 //! telegraphs. Rules live in `combat_core::raid`.
@@ -107,18 +107,32 @@ pub fn locked_notice(view: &RaidView, boss_name: &str, boss_key: &str) -> Option
 
 fn events(
     sim: SimView,
+    me: Option<Single<&SimUnit, With<crate::player::Player>>>,
     mut last: Local<(String, bool)>,
     mut reader: MessageReader<CombatEvent>,
     mut banners: MessageWriter<Banner>,
     mut notices: MessageWriter<UiNotice>,
 ) {
     for CombatEvent(e) in reader.read() {
+        if let Event::AuraApplied { target, key } = e
+            && me.as_ref().is_some_and(|m| m.0 == *target)
+            && sim
+                .content()
+                .reverses_controls(std::iter::once(key.as_str()))
+        {
+            notices.write(UiNotice(
+                "Ignore Previous Instructions: your movement is reversed for a few seconds.".into(),
+            ));
+            continue;
+        }
         let Event::Raid { view } = e else { continue };
         let content = sim.content();
         let entered = !view.zone.is_empty() && last.0 != view.zone;
         // One difficulty banner per visit, not per room.
-        if entered && (last.0.is_empty() || last.1 != view.async_mode) {
-            let (title, subtitle) = difficulty_banner(&content.raid.name, view.async_mode);
+        let raid = content.raid_of(&view.zone).map_or("", |r| r.name.as_str());
+        let new_raid = content.raid_of(&last.0).is_none_or(|r| r.name != raid);
+        if entered && (new_raid || last.1 != view.async_mode) {
+            let (title, subtitle) = difficulty_banner(raid, view.async_mode);
             banners.write(Banner {
                 title,
                 subtitle,

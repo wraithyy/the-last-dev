@@ -496,6 +496,47 @@ fn build_piece(
                     None,
                 ));
             }
+            15 => {
+                // VibeCon: the conference VR headset. A chunky white visor with a lens bar in the
+                // set colour, a top strap over the crown and a battery brick on the back.
+                let shell = a.mat(materials, (0.94, 0.94, 0.97), 0);
+                out.push((
+                    cube.clone(),
+                    shell.clone(),
+                    at(0.0, 0.47, 0.58, Vec3::new(1.05, 0.42, 0.36)),
+                    None,
+                ));
+                out.push((
+                    cube.clone(),
+                    main.clone(),
+                    at(0.0, 0.47, 0.77, Vec3::new(0.9, 0.12, 0.02)),
+                    None,
+                ));
+                out.push((
+                    cube.clone(),
+                    dark.clone(),
+                    at(0.0, 0.33, 0.7, Vec3::new(0.7, 0.06, 0.1)),
+                    None,
+                ));
+                out.push((
+                    torus.clone(),
+                    shell.clone(),
+                    at(0.0, 0.5, 0.0, Vec3::new(0.62, 0.5, 0.62)),
+                    None,
+                ));
+                out.push((
+                    cube.clone(),
+                    shell,
+                    at(0.0, 0.92, 0.0, Vec3::new(0.12, 0.06, 1.0)),
+                    None,
+                ));
+                out.push((
+                    cube,
+                    main,
+                    at(0.0, 0.52, -0.62, Vec3::new(0.34, 0.24, 0.14)),
+                    None,
+                ));
+            }
             14 => {
                 // Raid: the offsite bucket hat. Soft crown, drooping brim all round, the event
                 // logo band in white so the livestream catches it from any angle.
@@ -693,6 +734,32 @@ fn build_piece(
                     None,
                 ));
             }
+            16 => {
+                // Party hat, worn at a tilt, with a white pompom and a gold band.
+                let tilt = Quat::from_rotation_z(-0.3);
+                out.push((
+                    cone.clone(),
+                    main.clone(),
+                    Transform::from_xyz(0.14, 1.2, 0.0)
+                        .with_rotation(tilt)
+                        .with_scale(Vec3::new(0.62, 0.85, 0.62)),
+                    None,
+                ));
+                out.push((
+                    cyl.clone(),
+                    gold.clone(),
+                    Transform::from_xyz(0.03, 0.85, 0.0)
+                        .with_rotation(tilt)
+                        .with_scale(Vec3::new(0.6, 0.05, 0.6)),
+                    None,
+                ));
+                out.push((
+                    sphere.clone(),
+                    white.clone(),
+                    at(0.27, 1.6, 0.0, Vec3::splat(0.2)),
+                    None,
+                ));
+            }
             6 => {
                 // Shades.
                 for side in [-1.0f32, 1.0] {
@@ -861,6 +928,45 @@ fn build_piece(
                             None,
                         ));
                     }
+                }
+                10 => {
+                    // VibeCon: the branded conference hoodie. A big white chest print with the
+                    // logo bar in the set colour, the event name across the back, neon
+                    // drawstrings and a kangaroo pocket.
+                    out.push((
+                        cube.clone(),
+                        white.clone(),
+                        at(0.0, 0.12, 0.31, Vec3::new(0.42, 0.2, 0.02)),
+                        None,
+                    ));
+                    out.push((
+                        cube.clone(),
+                        main.clone(),
+                        at(0.0, 0.12, 0.325, Vec3::new(0.34, 0.07, 0.01)),
+                        None,
+                    ));
+                    out.push((
+                        cube.clone(),
+                        white.clone(),
+                        at(0.0, 0.18, -0.31, Vec3::new(0.5, 0.12, 0.02)),
+                        None,
+                    ));
+                    let neon = a.mat(materials, c, glow.max(2));
+                    for side in [-1.0f32, 1.0] {
+                        out.push((
+                            cube.clone(),
+                            neon.clone(),
+                            at(side * 0.06, 0.24, 0.31, Vec3::new(0.02, 0.18, 0.02)),
+                            None,
+                        ));
+                    }
+                    let pocket = a.mat(materials, (c.0 * 0.35, c.1 * 0.35, c.2 * 0.35), 0);
+                    out.push((
+                        cube,
+                        pocket,
+                        at(0.0, -0.2, 0.31, Vec3::new(0.36, 0.14, 0.02)),
+                        None,
+                    ));
                 }
                 9 => {
                     // Raid: the offsite fleece vest over the hoodie. Puffed front panels either
@@ -1425,6 +1531,45 @@ fn build_piece(
                         at(0.0, -0.07, 0.345, Vec3::new(0.18, 0.1, 0.01)),
                         None,
                     ));
+                    return out;
+                }
+                9 => {
+                    // VibeCon: the oversized conference badge on a neon cord. A white card, a
+                    // colour band with the attendee type and a QR code nobody ever scans.
+                    out.push((
+                        cube.clone(),
+                        white.clone(),
+                        at(0.0, -0.02, 0.32, Vec3::new(0.24, 0.3, 0.02)),
+                        None,
+                    ));
+                    let band = a.mat(materials, c, glow.max(2));
+                    out.push((
+                        cube.clone(),
+                        band,
+                        at(0.0, -0.14, 0.335, Vec3::new(0.24, 0.06, 0.01)),
+                        None,
+                    ));
+                    for (k, (x, y)) in [
+                        (-0.05, 0.08),
+                        (0.0, 0.08),
+                        (0.05, 0.03),
+                        (-0.05, 0.03),
+                        (0.0, -0.02),
+                        (0.05, -0.02),
+                        (-0.02, 0.055),
+                    ]
+                    .into_iter()
+                    .enumerate()
+                    {
+                        if k % 3 != 1 {
+                            out.push((
+                                cube.clone(),
+                                dark.clone(),
+                                at(x, y, 0.335, Vec3::new(0.04, 0.04, 0.01)),
+                                None,
+                            ));
+                        }
+                    }
                     return out;
                 }
                 8 => {

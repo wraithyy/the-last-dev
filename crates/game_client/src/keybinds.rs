@@ -46,6 +46,8 @@ pub enum Action {
     Pets,
     /// `~/endgame`: Promotion rank, reputations, lockouts and the weekly seed.
     Endgame,
+    /// `~/calendar`: the Company Calendar (minigames and quest chains).
+    Calendar,
     /// Gadget bar slot 0..3: equipped on-use items.
     Gadget(u8),
     Chat,
@@ -112,6 +114,7 @@ impl Action {
             Career,
             Pets,
             Endgame,
+            Calendar,
             Chat,
             CombatLog,
             Meter,
@@ -154,6 +157,7 @@ impl Action {
             Career => "career".into(),
             Pets => "pets".into(),
             Endgame => "endgame".into(),
+            Calendar => "calendar".into(),
             Gadget(i) => format!("gadget{i}"),
             Chat => "chat".into(),
             CombatLog => "combat_log".into(),
@@ -193,6 +197,7 @@ impl Action {
             Career => "~/career talents".into(),
             Pets => "~/pets journal".into(),
             Endgame => "~/endgame ranks and reputation".into(),
+            Calendar => "~/calendar side quests and minigames".into(),
             Gadget(i) => format!("gadget {} (on-use gear)", i + 1),
             Chat => "chat window".into(),
             CombatLog => "combat log".into(),
@@ -213,8 +218,10 @@ impl Action {
             AutoAttack | Coffee | Resurrect | Interact | Gadget(_) => Group::Combat,
             Slot(_) => Group::Bar,
             NumSlot(_) => Group::Numpad,
-            QuestLog | Map | Trophies | CharacterSheet | Career | Pets | Endgame | Chat
-            | CombatLog | Meter | Emotes | Mute | MinimapZoomIn | MinimapZoomOut => Group::Windows,
+            QuestLog | Map | Trophies | CharacterSheet | Career | Pets | Endgame | Calendar
+            | Chat | CombatLog | Meter | Emotes | Mute | MinimapZoomIn | MinimapZoomOut => {
+                Group::Windows
+            }
         }
     }
 
@@ -254,6 +261,8 @@ impl Action {
             Pets => KeyCode::KeyZ,
             // The tilde key: `~/endgame`.
             Endgame => KeyCode::Backquote,
+            // Every letter is taken; the period sits where a calendar dot would.
+            Calendar => KeyCode::Period,
             Gadget(i) => [KeyCode::KeyU, KeyCode::KeyO, KeyCode::KeyP][usize::from(i).min(2)],
             Chat => KeyCode::KeyH,
             CombatLog => KeyCode::KeyL,

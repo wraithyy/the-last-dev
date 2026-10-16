@@ -34,6 +34,8 @@ pub enum BurnoutCause {
     /// Defeated management.
     Kill,
     Debug,
+    /// A quest chain's turn-in (`QuestReward::burnout`).
+    Quest,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

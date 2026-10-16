@@ -49,6 +49,17 @@ const DATA_CENTER: (Vec2, Vec3) = (Vec2::new(54.0, -8.0), Vec3::new(24.0, 11.0, 
 const ANNEX: (Vec2, Vec3) = (Vec2::new(32.0, -12.0), Vec3::new(12.0, 6.0, 6.0));
 /// The vendor's account manager waits between the plaza and the annex.
 const ACCOUNT_MANAGER: (f32, f32) = (25.0, -5.5);
+/// Company Calendar quest-chain givers, each where its story lives: Finance by the cafe,
+/// the leaver at the smoking corner, Security at the tower path, the RTO lead by the bike
+/// rack and Internal Comms on the plaza. Each looks at the point after it.
+type Xz = (f32, f32);
+const CHAIN_NPCS: [(&str, Xz, Xz); 5] = [
+    ("npc_expense", (-25.5, 8.0), (-12.0, 8.0)),
+    ("npc_exit", (43.5, 23.0), (46.0, 26.0)),
+    ("npc_security", (-4.5, -18.5), (0.0, -10.0)),
+    ("npc_rto", (11.5, -12.0), (0.0, 2.0)),
+    ("npc_comms", (4.5, -7.0), (0.0, 2.0)),
+];
 pub(super) const LAB: (Vec2, Vec3) = (Vec2::new(-50.0, -36.0), Vec3::new(26.0, 9.0, 22.0));
 
 fn theme() -> Theme {
@@ -95,6 +106,7 @@ pub fn build() -> FloorLayout {
             facade_door(&mut p, ANNEX, Face::PosZ, Sign::ClientName),
         ),
         ("door:offsite/1", shuttle_stop(&mut p)),
+        ("door:vibecon/1", vibecon_entrance(&mut p)),
     ];
     tower_shell(&mut p);
     data_center_shell(&mut p);
@@ -149,6 +161,10 @@ pub fn build() -> FloorLayout {
     }
     let am = v(ACCOUNT_MANAGER.0, 0.0, ACCOUNT_MANAGER.1);
     p.anchor("npc_am", am, yaw_towards(am, doors[3].1.0));
+    for (name, (x, z), (lx, lz)) in CHAIN_NPCS {
+        let at = v(x, 0.0, z);
+        p.anchor(name, at, yaw_towards(at, v(lx, 0.0, lz)));
+    }
     for (name, (x, z)) in ONBOARDING {
         let at = v(x, 0.0, z);
         p.anchor(name, at, yaw_towards(at, spawn));
@@ -842,6 +858,123 @@ fn ambient_props(p: &mut Plan) {
     p.sign(v(-16.0, 2.7, 21.1), 0.0, 1.6, Sign::ShuttleBus);
 }
 
+/// VibeCon on the east lawn: a pop-up backdrop wall with the entrance in it, a truss arch over
+/// the lanyard queue, the registration desk beside the queue and a poster easel facing the plaza.
+/// Returns the door anchor in front of the entrance (facing the plaza).
+fn vibecon_entrance(p: &mut Plan) -> (Vec3, f32) {
+    const WALL_X: f32 = 33.0;
+    const Z: f32 = 16.0;
+    let neon = [Mat::NeonYellow, Mat::LedGreen, Mat::NeonCyan, Mat::NeonPink];
+    p.boxed(v(27.0, 0.03, Z), v(14.0, 0.06, 10.0), Mat::Dark, false);
+    // Backdrop wall: two panels either side of the entrance, a lintel over it.
+    for (z, len) in [(Z - 3.4, 4.0), (Z + 3.4, 4.0)] {
+        p.boxed(v(WALL_X, 1.9, z), v(0.4, 3.8, len), Mat::Dark, true);
+    }
+    p.boxed(v(WALL_X, 3.3, Z), v(0.4, 1.0, 2.8), Mat::Dark, true);
+    p.boxed(v(WALL_X + 0.1, 1.25, Z), v(0.2, 2.5, 2.8), Mat::Dark, true);
+    p.boxed(
+        v(WALL_X - 0.12, 1.2, Z),
+        v(0.04, 2.3, 2.2),
+        Mat::ScreenGlow,
+        false,
+    );
+    for (k, dz) in [-1.45, 1.45].into_iter().enumerate() {
+        p.boxed(
+            v(WALL_X - 0.22, 1.4, Z + dz),
+            v(0.06, 2.8, 0.1),
+            neon[k + 2],
+            false,
+        );
+    }
+    p.boxed(
+        v(WALL_X - 0.22, 2.8, Z),
+        v(0.06, 0.1, 3.0),
+        Mat::NeonPink,
+        false,
+    );
+    p.sign(
+        v(WALL_X - 0.22, 3.3, Z),
+        Face::NegX.yaw(),
+        2.6,
+        Sign::VibeConRegistration,
+    );
+    for dz in [-3.4, 3.4] {
+        p.sign(
+            v(WALL_X - 0.22, 2.1, Z + dz),
+            Face::NegX.yaw(),
+            3.6,
+            Sign::VibeConBanner,
+        );
+    }
+    // Truss arch over the start of the queue, readable from the plaza.
+    for dz in [-3.8, 3.8] {
+        p.boxed(v(22.0, 2.6, Z + dz), v(0.35, 5.2, 0.35), Mat::Metal, false);
+        p.block(v(22.0, 1.3, Z + dz), v(0.5, 2.6, 0.5));
+    }
+    p.boxed(v(22.0, 5.2, Z), v(0.35, 0.35, 8.0), Mat::Metal, false);
+    p.sign(v(21.8, 4.1, Z), Face::NegX.yaw(), 6.4, Sign::VibeConBanner);
+    p.sign(v(22.2, 4.1, Z), Face::PosX.yaw(), 6.4, Sign::VibeConBanner);
+    // The lanyard queue: posts and neon ropes in a lane from the arch to the door.
+    for (k, x) in [23.5, 25.5, 27.5, 29.5].into_iter().enumerate() {
+        for dz in [-2.6, 2.6] {
+            p.prim(
+                PrimKind::Cylinder,
+                v(x, 0.5, Z + dz),
+                v(0.12, 1.0, 0.12),
+                Mat::Chrome,
+            );
+            if x < 29.0 {
+                p.boxed(v(x + 1.0, 0.85, Z + dz), v(2.0, 0.04, 0.04), neon[k], false);
+            }
+        }
+    }
+    // Registration desk north of the queue, lanyards on a rail behind it.
+    p.boxed(v(27.0, 0.55, Z - 4.6), v(5.0, 1.1, 0.9), Mat::White, true);
+    p.boxed(
+        v(27.0, 1.12, Z - 4.6),
+        v(5.2, 0.06, 1.0),
+        Mat::NeonCyan,
+        false,
+    );
+    for x in [25.5, 28.5] {
+        p.boxed(v(x, 1.3, Z - 4.8), v(0.45, 0.3, 0.05), Mat::Dark, false);
+        p.boxed(
+            v(x, 1.3, Z - 4.77),
+            v(0.38, 0.22, 0.02),
+            Mat::ScreenGlow,
+            false,
+        );
+    }
+    p.boxed(v(27.0, 1.8, Z - 5.8), v(4.0, 0.05, 0.05), Mat::Metal, false);
+    for k in 0..12 {
+        p.boxed(
+            v(25.2 + k as f32 * 0.32, 1.45, Z - 5.8),
+            v(0.04, 0.7, 0.02),
+            neon[k % 4],
+            false,
+        );
+    }
+    for x in [25.1, 28.9] {
+        p.boxed(v(x, 0.9, Z - 5.8), v(0.06, 1.8, 0.06), Mat::Metal, false);
+    }
+    p.sign(
+        v(27.0, 2.4, Z - 5.82),
+        Face::PosZ.yaw(),
+        3.2,
+        Sign::VibeConLanyards,
+    );
+    // Poster easel by the plaza path.
+    p.boxed(v(19.5, 1.2, Z + 6.0), v(0.1, 2.4, 1.8), Mat::Wood, false);
+    p.block(v(19.5, 0.6, Z + 6.0), v(0.5, 1.2, 1.8));
+    p.sign(
+        v(19.42, 1.6, Z + 6.0),
+        Face::NegX.yaw(),
+        1.6,
+        Sign::VibeConBanner,
+    );
+    (v(WALL_X - 2.0, 0.0, Z), FRAC_PI_2)
+}
+
 /// The All-Hands Offsite shuttle: a shelter, a parked coach in offsite livery and a tall pylon
 /// that reads from the arrival spot. Returns the door anchor in front of the coach's boarding door.
 fn shuttle_stop(p: &mut Plan) -> (Vec3, f32) {
@@ -914,6 +1047,8 @@ fn shuttle_stop(p: &mut Plan) -> (Vec3, f32) {
     p.boxed(v(1.0, 1.3, 31.76), v(4.6, 2.4, 0.04), Mat::Glass, false);
     p.boxed(v(1.0, 0.5, 32.4), v(2.4, 0.1, 0.5), Mat::Wood, true);
     p.sign(v(-0.4, 1.5, 31.8), 0.0, 1.6, Sign::ShuttleBus);
+    // Through the glass the back of that sign read mirrored from the plaza: give it a front there.
+    p.sign(v(-0.4, 1.5, 31.7), PI, 1.6, Sign::ShuttleBus);
     // Pylon visible across the lawn.
     p.boxed(v(13.8, 3.0, 33.5), v(0.25, 6.0, 0.25), Mat::Metal, false);
     p.block(v(13.8, 1.5, 33.5), v(0.5, 3.0, 0.5));
@@ -994,7 +1129,6 @@ fn trees(p: &mut Plan, doors: &[(&'static str, (Vec3, f32))]) {
         (-22.0, -30.0, false),
         (22.0, -30.0, false),
         (-24.0, 2.0, true),
-        (24.0, 14.0, false),
         (-8.0, 28.0, false),
         (8.0, 24.0, true),
         (40.0, 38.0, false),

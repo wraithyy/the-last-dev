@@ -477,7 +477,7 @@ impl Sim {
     }
 
     /// Resets the encounter: cast, every aura (Scope Creep stacks too), threat and phase.
-    fn begin_evade(&mut self, i: usize) {
+    pub(crate) fn begin_evade(&mut self, i: usize) {
         // Kiting a pull away until it resets is not a free reset: no regen or rez for a while.
         let lock = self.now + ticks(self.content.config.combat_lock_ms);
         let chased: Vec<EntityId> = self.units[i].threat.keys().copied().collect();

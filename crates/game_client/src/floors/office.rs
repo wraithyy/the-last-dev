@@ -133,6 +133,7 @@ fn live_world(p: &mut Plan) {
         );
     }
     spot(p, "prop:scrum_board", (x, 1.6, z), (x, z + 2.0));
+    company_calendar(p);
     let bot = v(x + 2.4, 0.0, z + 1.4);
     p.anchor(
         "scrum_bot",
@@ -151,6 +152,44 @@ fn live_world(p: &mut Plan) {
         p.anchor(name, at, super::layout::yaw_towards(at, v(0.0, 0.0, 0.0)));
     }
     lit_windows(p);
+}
+
+/// The Company Calendar beside the Welcome arch, on the walk from the parking lot and across
+/// the arch from the Daily Standup board: a wall calendar with a red header and binder rings.
+/// `door:<venue>` is where a minigame group comes back to (no door, no trigger: the minigame
+/// frame moves the group).
+fn company_calendar(p: &mut Plan) {
+    let (x, z) = (-6.5, 12.0);
+    p.boxed(v(x, 1.55, z), v(2.6, 1.7, 0.06), Mat::Board, true);
+    p.sign(v(x, 1.5, z + 0.05), 0.0, 2.5, Sign::Calendar);
+    p.boxed(v(x, 2.55, z + 0.02), v(2.6, 0.32, 0.1), Mat::CarRed, false);
+    for dx in [-0.8, -0.27, 0.27, 0.8] {
+        p.prim(
+            PrimKind::Cylinder,
+            v(x + dx, 2.75, z + 0.04),
+            v(0.08, 0.22, 0.08),
+            Mat::Chrome,
+        );
+    }
+    for dx in [-1.2, 1.2] {
+        p.boxed(
+            v(x + dx, 0.8, z - 0.06),
+            v(0.07, 1.6, 0.07),
+            Mat::Metal,
+            false,
+        );
+    }
+    spot(p, "prop:company_calendar", (x, 1.6, z), (x, z + 2.0));
+    for door in [
+        "door:teambuilding/1",
+        "door:review/1",
+        "door:reorg/1",
+        "door:migration/1",
+        "door:hackathon/1",
+        "door:openspace/1",
+    ] {
+        p.anchor(door, v(x, 0.0, z + 2.2), 0.0);
+    }
 }
 
 /// Office windows on the tower's three visible faces (some offices lit, some not, the same

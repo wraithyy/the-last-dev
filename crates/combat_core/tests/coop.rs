@@ -1059,6 +1059,15 @@ fn three_players_clear_every_legacy_floor_and_one_does_not_trivially() {
 // ---- the raid: All-Hands Offsite ----
 
 const RAID: [&str; 4] = ["offsite/1", "offsite/2", "offsite/3", "offsite/4"];
+const VIBECON: [&str; 5] = [
+    "vibecon/1",
+    "vibecon/2",
+    "vibecon/3",
+    "vibecon/4",
+    "vibecon/5",
+];
+/// Shields of linked bosses: the open member is the only one worth hitting.
+const LINK_SHIELDS: [&str; 2] = ["synergy_shield", "panel_muted"];
 
 impl Group {
     /// Every member in the best Legacy piece (ilvl 12) of each slot for its role.
@@ -1122,10 +1131,10 @@ struct RaidRun {
     deaths: u32,
 }
 
-/// Level-10 members (`keep` of tank, DPS, healer) in the best Legacy gear walk the four raid
-/// rooms in order on the difficulty `async_mode`, packs one by one, boss last; the dead are
+/// Level-10 members (`keep` of tank, DPS, healer) in the best Legacy gear walk the raid's
+/// `rooms` in order on the difficulty `async_mode`, packs one by one, boss last; the dead are
 /// released and everyone rests between rooms. Stops at the first wipe.
-fn raid_run(keep: &[Role], async_mode: bool, seed: u64) -> RaidRun {
+fn raid_run(rooms: &[&str], keep: &[Role], async_mode: bool, seed: u64) -> RaidRun {
     let mut g = Group::new(content(), "campus", 10, seed);
     for k in (0..g.m.len()).rev() {
         if !keep.contains(&g.m[k].role) {
@@ -1140,7 +1149,7 @@ fn raid_run(keep: &[Role], async_mode: bool, seed: u64) -> RaidRun {
     let mut bosses = 0;
     let mut low = 100;
     g.in_boss = true;
-    for zone in RAID {
+    for &zone in rooms {
         if let Err(e) = g.sim.load_zone(zone, &anchor, Vec::new()) {
             panic!("load_zone {zone}: {e}");
         }
@@ -1215,16 +1224,21 @@ impl Group {
         self.tick();
     }
 
-    /// `focus`, except that a shielded Synergy Twin is never the target while its partner is
-    /// open (linked HP: hitting the open one is the whole fight).
+    /// `focus`, except that a shielded linked boss (Synergy Twin, Hype Panel seat) is never the
+    /// target while a partner is open (linked HP: hitting the open one is the whole fight).
     fn raid_focus(&self) -> Option<UnitState> {
+        let shielded = |u: &UnitState| {
+            u.auras
+                .iter()
+                .any(|a| LINK_SHIELDS.contains(&a.key.as_str()))
+        };
         let f = self.focus()?;
-        if !f.auras.iter().any(|a| a.key == "synergy_shield") {
+        if !shielded(&f) {
             return Some(f);
         }
         self.enemies()
             .into_iter()
-            .find(|u| u.boss && !u.auras.iter().any(|a| a.key == "synergy_shield"))
+            .find(|u| u.boss && !shielded(u))
             .or(Some(f))
     }
 
@@ -1288,9 +1302,9 @@ fn the_raid_takes_a_group_and_async_attendance_takes_one() {
     let mut failures = Vec::new();
     let trio = [Role::Tank, Role::Dps, Role::Healer];
     for seed in [7u64, 42, 1234] {
-        let g = raid_run(&trio, false, seed);
-        let a = raid_run(&[Role::Dps], true, seed);
-        let s = raid_run(&[Role::Dps], false, seed);
+        let g = raid_run(&RAID, &trio, false, seed);
+        let a = raid_run(&RAID, &[Role::Dps], true, seed);
+        let s = raid_run(&RAID, &[Role::Dps], false, seed);
         println!(
             "Raid seed {seed}: trio Normal {}/4 bosses in {} s (low {}%, most dead {}); solo Async {}/4 in {} s (low {}%, died {}); solo Normal {}/4 in {} s (low {}%, died {})",
             g.bosses,
@@ -1319,6 +1333,55 @@ fn the_raid_takes_a_group_and_async_attendance_takes_one() {
             ));
         }
         if s.bosses == 4 && s.low >= 25 {
+            failures.push(format!(
+                "seed {seed}: solo Normal cleared it at {}% lowest",
+                s.low
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// The VibeCon balance gate (docs/FORMULAS.md, Raid), same bar as the offsite: a trio clears all
+/// five encounters on Normal, one bot clears Async Attendance, one bot on Normal either fails
+/// or only scrapes through (below 25% HP at some point).
+#[test]
+fn vibecon_takes_a_group_and_async_attendance_takes_one() {
+    let mut failures = Vec::new();
+    let trio = [Role::Tank, Role::Dps, Role::Healer];
+    let n = VIBECON.len() as u32;
+    for seed in [7u64, 42, 1234] {
+        let g = raid_run(&VIBECON, &trio, false, seed);
+        let a = raid_run(&VIBECON, &[Role::Dps], true, seed);
+        let s = raid_run(&VIBECON, &[Role::Dps], false, seed);
+        println!(
+            "VibeCon seed {seed}: trio Normal {}/{n} bosses in {} s (low {}%, most dead {}); solo Async {}/{n} in {} s (low {}%, died {}); solo Normal {}/{n} in {} s (low {}%, died {})",
+            g.bosses,
+            g.secs,
+            g.low,
+            g.deaths,
+            a.bosses,
+            a.secs,
+            a.low,
+            a.deaths,
+            s.bosses,
+            s.secs,
+            s.low,
+            s.deaths
+        );
+        if g.bosses < n {
+            failures.push(format!(
+                "seed {seed}: the trio stopped after {} bosses",
+                g.bosses
+            ));
+        }
+        if a.bosses < n {
+            failures.push(format!(
+                "seed {seed}: solo Async stopped after {} bosses",
+                a.bosses
+            ));
+        }
+        if s.bosses == n && s.low >= 25 {
             failures.push(format!(
                 "seed {seed}: solo Normal cleared it at {}% lowest",
                 s.low

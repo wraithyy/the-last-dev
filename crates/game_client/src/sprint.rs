@@ -497,7 +497,8 @@ fn follow_travel(sim: Res<CombatSim>, net: Option<Res<NetWorld>>, mut flow: ResM
     if net.is_some() {
         return;
     }
-    if let Some(z) = sim.0.sprint_travel() {
+    // Minigames ride the same hook: the venue, and the campus once every run is over.
+    if let Some(z) = sim.0.sprint_travel().or(sim.0.minigame_travel()) {
         flow.travel_to(z);
     }
 }

@@ -236,6 +236,19 @@ pub enum Command {
     SetLegacy {
         on: bool,
     },
+    /// Group lead, on the campus: take the group to minigame `key` (`MinigameDef::key`). The
+    /// invite board and the Company Calendar both send it.
+    StartMinigame {
+        key: String,
+    },
+    /// End your own minigame run now, without a medal (the client asks first).
+    LeaveMinigame,
+    /// Answer the choice card of your run (`MinigameView::card`): option `option` of card
+    /// `seq`; a pick for an older card does nothing.
+    MinigamePick {
+        seq: u16,
+        option: u8,
+    },
 }
 
 /// Why an item command did nothing; routed to the player.
@@ -572,6 +585,35 @@ pub enum Event {
     Ladder {
         view: crate::sprint::LadderView,
     },
+    /// A minigame outing began in the loaded zone: every member has a run (`minigame.rs`).
+    MinigameStarted {
+        key: String,
+        limit_ms: u32,
+    },
+    /// A run's HUD (routed to its player): on change and once a second.
+    Minigame {
+        unit: EntityId,
+        view: crate::minigame::MinigameView,
+    },
+    /// Teambuilding: watcher `by` caught `unit`; `line` is what the player gets told (a talker's
+    /// take, or the watcher's line).
+    MinigameCaught {
+        unit: EntityId,
+        by: EntityId,
+        kind: crate::teambuilding::WatcherKind,
+        line: String,
+    },
+    /// Something happened in your run worth a line on screen (routed): a validation error,
+    /// a deflected colleague, a reorg. `good` picks the colour.
+    MinigameNote {
+        unit: EntityId,
+        text: String,
+        good: bool,
+    },
+    /// A run is over (finished with a medal, left early or out of time).
+    MinigameEnded {
+        result: crate::minigame::MinigameResult,
+    },
     /// `StartSprint` was refused (routed to the asker).
     SprintRefused {
         reason: crate::sprint::SprintError,
@@ -696,6 +738,13 @@ pub enum Event {
         unit: EntityId,
         kind: crate::burnout::QuipKind,
         line: u16,
+    },
+    /// The Scrum board or the Company Calendar closed `count` Jira tickets from the bag for
+    /// `sp` Kudos (routed).
+    TicketsClosed {
+        unit: EntityId,
+        count: u32,
+        sp: u32,
     },
 }
 

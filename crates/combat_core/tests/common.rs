@@ -454,6 +454,9 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             unit, value, cause, ..
         } => format!("{} burnout {value} ({cause:?})", t(*unit)),
         Event::BurnoutQuip { unit, kind, line } => format!("{} {kind:?} #{line}", t(*unit)),
+        Event::TicketsClosed { unit, count, sp } => {
+            format!("{} closed {count} Jira tickets for {sp} Kudos", t(*unit))
+        }
         Event::Legacy { view } => format!(
             "legacy {} in {:?}, week {} locked {:?}",
             view.on, view.zone, view.week, view.locked
@@ -467,6 +470,33 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             "ladder week {}: {:?}",
             view.week,
             view.entries.iter().map(|e| e.time_ms).collect::<Vec<_>>()
+        ),
+        Event::MinigameStarted { key, limit_ms } => {
+            format!("minigame {key} starts ({limit_ms} ms)")
+        }
+        Event::Minigame { unit, view } => format!(
+            "{} minigame: objectives {:b} snacks {} catches {} suspicion {}",
+            t(*unit),
+            view.objectives,
+            view.collected,
+            view.catches,
+            view.suspicion
+        ),
+        Event::MinigameCaught {
+            unit,
+            by,
+            kind,
+            line,
+        } => format!("{} caught by {} ({kind:?}): {line}", t(*unit), t(*by)),
+        Event::MinigameNote { unit, text, good } => {
+            format!("{} minigame note ({good}): {text}", t(*unit))
+        }
+        Event::MinigameEnded { result } => format!(
+            "{} minigame over: {:?} score {} group {}",
+            t(result.unit),
+            result.medal,
+            result.score,
+            result.group_score
         ),
     };
     format!("[{tick:05}] {body}")

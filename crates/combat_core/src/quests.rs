@@ -116,8 +116,9 @@ impl Sim {
         let Some(def) = self.content.quest(id).cloned() else {
             return;
         };
+        // The Company Calendar hands out the first quest of its chains from anywhere.
         if self.quest_status_of(pid, id) != QuestStatus::Available
-            || !self.near_npc(pid, &def.giver)
+            || !(self.near_npc(pid, &def.giver) || self.calendar_starts(id))
         {
             return;
         }
@@ -215,6 +216,16 @@ impl Sim {
         }
         self.grant_xp(pi, self.content.quest_xp(&def));
         self.quest_sp(pi, def.reward.xp, def.reward.sp);
+        if let Some((d, amount)) = &def.reward.rep
+            && let Some(dept) = self.content.endgame.department_index(d)
+        {
+            self.gain_rep(pi, dept, *amount);
+        }
+        self.add_burnout(
+            pi,
+            i32::from(def.reward.burnout),
+            crate::burnout::BurnoutCause::Quest,
+        );
         // A quest can carry a title: achievements keyed `quest:<id>` unlock on its turn-in.
         let key = format!("quest:{id}");
         self.check_achievements(

@@ -210,6 +210,8 @@ pub struct Sim {
     pub(crate) legacy: crate::legacy::LegacyState,
     /// Raid difficulty, weekly lockout, tethers and the twins (`raid.rs`).
     pub(crate) raid: crate::raid::RaidState,
+    /// The minigame outing and best medals (`minigame.rs`, `teambuilding.rs`).
+    pub(crate) minigame: crate::minigame::MinigameState,
 }
 
 impl Sim {
@@ -243,6 +245,7 @@ impl Sim {
             burnout: crate::burnout::BurnoutRt::new(seed),
             legacy: Default::default(),
             raid: Default::default(),
+            minigame: Default::default(),
         }
     }
 
@@ -310,6 +313,7 @@ impl Sim {
         self.live.tasks.remove(&id);
         self.duels.next_request.remove(&id);
         self.burnout_on_leave(id);
+        self.minigame_on_leave(id);
         for u in &mut self.units {
             u.loot.retain(|l| l.owner != Some(id));
             if u.state.lootable && u.loot.is_empty() {
@@ -555,7 +559,10 @@ impl Sim {
             | Command::GoHome
             | Command::SummonPet { .. }
             | Command::DuelRequest { .. }
-            | Command::DuelRespond { .. } => {}
+            | Command::DuelRespond { .. }
+            | Command::StartMinigame { .. }
+            | Command::LeaveMinigame
+            | Command::MinigamePick { .. } => {}
         }
         self.pending.push((Some(player), cmd));
     }
@@ -681,6 +688,7 @@ impl Sim {
         self.update_hp_history();
         self.update_combat_flags();
         self.update_world();
+        self.update_minigame();
         self.update_sprint();
         self.update_raid();
         self.update_live();
@@ -767,6 +775,9 @@ impl Sim {
             Command::SummonPet { pet } => self.summon_pet(actor, &pet),
             Command::DuelRequest { target } => self.duel_request(actor, target),
             Command::DuelRespond { accept } => self.duel_respond(actor, accept),
+            Command::StartMinigame { key } => self.start_minigame(actor, &key),
+            Command::LeaveMinigame => self.leave_minigame(actor),
+            Command::MinigamePick { seq, option } => self.pick_minigame(actor, seq, option),
             other => self.apply_named(other),
         }
     }
@@ -823,7 +834,10 @@ impl Sim {
             | Command::GoHome
             | Command::SummonPet { .. }
             | Command::DuelRequest { .. }
-            | Command::DuelRespond { .. } => {}
+            | Command::DuelRespond { .. }
+            | Command::StartMinigame { .. }
+            | Command::LeaveMinigame
+            | Command::MinigamePick { .. } => {}
         }
     }
 
