@@ -1,10 +1,8 @@
-//! Event-driven HUD: combat log, error banner, death prompt, loot window, XP bar.
+//! Event-driven HUD: combat log, error banner, death prompt, XP bar (the loot window is `loot.rs`).
 
 use super::logs::{ChatKind, ChatLog, CombatLog, LogBuf, classify_yell};
-use super::{
-    ACCENT, DIM, IconCache, KEY_RIM, KEY_TOP, KEY_TOP_HI, PANEL_EDGE, drop_shadow, label, panel_bg,
-    set_text, vgrad,
-};
+use super::loot::Shown;
+use super::{KEY_RIM, KEY_TOP, KEY_TOP_HI, PANEL_EDGE, label, set_text, vgrad};
 use crate::combat::{CombatEvent, PendingCommands, SimRead, SimReady, SimView, UiNotice};
 use crate::config::*;
 use crate::copy;
@@ -35,22 +33,6 @@ struct DeathPanel;
 #[derive(Component)]
 struct RespawnButton;
 
-#[derive(Resource, Default)]
-struct LootState {
-    items: Vec<String>,
-    sp: u32,
-    dirty: bool,
-}
-#[derive(Component)]
-struct LootWindow;
-#[derive(Component)]
-struct LootRow;
-/// The item a loot row shows (hover or tap it for the comparison tooltip).
-#[derive(Component)]
-struct LootItem(String);
-#[derive(Component)]
-struct LootClose;
-
 #[derive(Component)]
 struct XpFill;
 #[derive(Component)]
@@ -60,26 +42,13 @@ pub struct FeedPlugin;
 
 impl Plugin for FeedPlugin {
     fn build(&self, app: &mut App) {
-        app.add_message::<LogLineMsg>()
+        app.add_plugins(super::loot::LootPlugin)
+            .add_message::<LogLineMsg>()
             .init_resource::<ErrorBanner>()
-            .init_resource::<LootState>()
             .add_systems(Startup, spawn_feed)
-            .add_systems(Update, close_loot_on_restart)
             .add_systems(
                 Update,
-                loot_demo
-                    .in_set(SimReady)
-                    .run_if(|| std::env::var_os("WOW_LOOT_DEMO").is_some()),
-            )
-            .add_systems(
-                Update,
-                (
-                    collect_events,
-                    update_error,
-                    update_death,
-                    update_loot,
-                    update_xp,
-                )
+                (collect_events, update_error, update_death, update_xp)
                     .chain()
                     .in_set(SimReady),
             );
@@ -137,40 +106,6 @@ fn spawn_feed(mut commands: Commands) {
                 vgrad(KEY_TOP_HI, KEY_TOP),
                 children![label("[ Release / Re-onboard ]", 16.0)],
             ));
-        });
-    commands
-        .spawn((
-            LootWindow,
-            Node {
-                position_type: PositionType::Absolute,
-                right: percent(24),
-                top: percent(30),
-                width: px(300),
-                padding: UiRect::all(px(8)),
-                flex_direction: FlexDirection::Column,
-                row_gap: px(6),
-                border: UiRect::all(px(1)),
-                border_radius: BorderRadius::all(px(5)),
-                overflow: Overflow::scroll_y(),
-                display: Display::None,
-                ..default()
-            },
-            // Corpses can hold more rows than the screen is tall.
-            super::scroll::ScrollList::fit(12.0),
-            BorderColor::all(ACCENT.with_alpha(0.7)),
-            panel_bg(),
-            drop_shadow(),
-            GlobalZIndex(30),
-        ))
-        .with_children(|c| {
-            c.spawn(Node {
-                justify_content: JustifyContent::SpaceBetween,
-                ..default()
-            })
-            .with_children(|h| {
-                h.spawn((label("// loot", 14.0), TextColor(DIM)));
-                h.spawn((LootClose, Button, label("[x]", 14.0)));
-            });
         });
     commands
         .spawn((
@@ -357,7 +292,9 @@ fn collect_events(
     mut chat: ResMut<ChatLog>,
     mut combat: ResMut<CombatLog>,
     mut banner: ResMut<ErrorBanner>,
-    mut loot: ResMut<LootState>,
+    mut loot: ResMut<super::loot::LootState>,
+    mut toasts: MessageWriter<super::loot::LootToast>,
+    settings: Res<crate::settings::Settings>,
     mut best_gear: Local<Option<u64>>,
     mut xp_gains: Local<usize>,
     // Mana ticks of the running Coffee Break, reported once as a single line.
@@ -680,7 +617,10 @@ fn collect_events(
                 QUEST_YELLOW,
             ),
             Event::Looted {
-                looter, items, sp, ..
+                looter,
+                corpse,
+                items,
+                sp,
             } if Some(*looter) == me => {
                 let content = sim.content();
                 let me_state = me.and_then(|p| sim.unit(p));
@@ -741,15 +681,21 @@ fn collect_events(
                 if *sp > 0 {
                     out.push(format!("You receive {sp} Kudos."), goods::SP_GOLD);
                 }
-                if items.is_empty() && *sp == 0 {
-                    out.push(
+                let left = sim.unit(*corpse).is_some_and(|u| u.lootable);
+                match loot.on_looted(*corpse, items, *sp, left, settings.auto_loot) {
+                    Shown::Nothing => out.push(
                         "You find nothing to loot. The AI already expensed it.".into(),
                         Color::srgb(0.7, 0.7, 0.7),
-                    );
-                } else {
-                    loot.items.clone_from(items);
-                    loot.sp = *sp;
-                    loot.dirty = true;
+                    ),
+                    Shown::Feed => {
+                        for item in items {
+                            toasts.write(super::loot::LootToast(
+                                format!("+ [{item}]"),
+                                goods::name_color(content, item),
+                            ));
+                        }
+                    }
+                    Shown::Window => {}
                 }
             }
             Event::RankProgress { unit, gained, .. } if Some(*unit) == me && *gained > 0 => {
@@ -896,187 +842,6 @@ fn update_death(
     }
 }
 
-fn update_loot(
-    mut commands: Commands,
-    assets: Res<AssetServer>,
-    mut icons: ResMut<IconCache>,
-    sim: SimView,
-    mut loot: ResMut<LootState>,
-    mut window: Single<(Entity, &mut Node), With<LootWindow>>,
-    rows: Query<Entity, With<LootRow>>,
-    clicks: Query<
-        (&Interaction, Option<&LootItem>),
-        (Or<(With<LootRow>, With<LootClose>)>, Changed<Interaction>),
-    >,
-    hovered: Query<(&Interaction, &LootItem)>,
-    touch: Res<crate::touch::TouchMode>,
-    touches: Res<bevy::input::touch::Touches>,
-    mut hover: ResMut<crate::economy::HoverItem>,
-    mut inspect: ResMut<crate::economy::Inspect>,
-) {
-    for (i, item) in &hovered {
-        if *i != Interaction::None {
-            hover.set(&item.0, false);
-        }
-    }
-    let (window_entity, node) = &mut *window;
-    if loot.dirty {
-        loot.dirty = false;
-        for e in &rows {
-            commands.entity(e).despawn();
-        }
-        let content = sim.content();
-        let me_state = sim.player().and_then(|p| sim.unit(p));
-        let equipped = me_state
-            .map(|u| goods::slots_of(&u.equipped))
-            .unwrap_or_default();
-        let role = me_state
-            .and_then(|u| content.class_of_unit(&u.key))
-            .map(|c| c.role);
-        let mut rows: Vec<(String, Color, String, Color, String, &str)> = Vec::new();
-        if loot.sp > 0 {
-            rows.push((
-                crate::copy::kudos(loot.sp),
-                goods::SP_GOLD,
-                format!(
-                    "{} Spend them at Procurement (campus) or the IT Asset Store.",
-                    copy::KUDOS_FLAVOUR
-                ),
-                DIM,
-                String::new(),
-                "story_points",
-            ));
-        }
-        for item in &loot.items {
-            let icon = goods::icon_of(content, item);
-            let color = goods::name_color(content, item);
-            let (line, line_color) = match content.economy.goods(item) {
-                Some(combat_core::Goods::Gear(g)) => {
-                    let mut l = format!("{} {}  ", g.rarity.label(), g.slot.label());
-                    l.push_str(&goods::stat_lines(&g.stats()).join(", "));
-                    let up = goods::is_upgrade(content, item, &equipped, role);
-                    if up {
-                        l = format!("UPGRADE  {l}");
-                    }
-                    (
-                        l,
-                        if up {
-                            goods::UPGRADE_GREEN
-                        } else {
-                            Color::WHITE
-                        },
-                    )
-                }
-                Some(combat_core::Goods::Junk(j)) if j.ticket => (
-                    format!(
-                        "Close it at the Scrum board or Calendar: {} Kudos",
-                        j.price.saturating_mul(combat_core::TICKET_BOARD_MULT)
-                    ),
-                    goods::SP_GOLD,
-                ),
-                Some(g) => (
-                    format!(
-                        "Sells for {} Kudos",
-                        content.economy.sell_price(g.name()).unwrap_or(0)
-                    ),
-                    goods::SP_GOLD,
-                ),
-                None => (
-                    content
-                        .item(item)
-                        .map_or_else(String::new, |d| copy::bonus_text(&d.bonus.totals(1))),
-                    copy::BONUS_GREEN,
-                ),
-            };
-            let desc = content
-                .economy
-                .goods(item)
-                .map(|g| g.description().to_string())
-                .or_else(|| content.item(item).map(|d| d.description.clone()))
-                .unwrap_or_default();
-            rows.push((item.clone(), color, line, line_color, desc, icon));
-        }
-        for (item, color, bonus, bonus_color, desc, icon) in rows {
-            let icon = icons.get(&assets, icon);
-            let is_item = content.economy.goods(&item).is_some() || content.item(&item).is_some();
-            let mut row = commands.spawn_empty();
-            if is_item {
-                row.insert(LootItem(item.clone()));
-            }
-            let row = row.id();
-            commands.entity(*window_entity).add_child(row);
-            commands.entity(row).insert((
-                LootRow,
-                Button,
-                Node {
-                    column_gap: px(8),
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
-                children![
-                    (
-                        ImageNode::new(icon),
-                        Node {
-                            width: px(36),
-                            height: px(36),
-                            flex_shrink: 0.0,
-                            ..default()
-                        }
-                    ),
-                    (
-                        Node {
-                            flex_direction: FlexDirection::Column,
-                            flex_shrink: 1.0,
-                            flex_basis: px(0),
-                            flex_grow: 1.0,
-                            ..default()
-                        },
-                        children![
-                            (label(item.clone(), 13.0), TextColor(color)),
-                            (label(bonus, 12.0), TextColor(bonus_color)),
-                            (label(desc, 11.0), TextColor(DIM)),
-                        ]
-                    ),
-                ],
-            ));
-        }
-        node.display = if loot.items.is_empty() && loot.sp == 0 {
-            Display::None
-        } else {
-            Display::Flex
-        };
-    }
-    let mut close = false;
-    for (i, item) in &clicks {
-        if *i != Interaction::Pressed {
-            continue;
-        }
-        close |= match item {
-            Some(LootItem(name)) => {
-                let act = inspect.gate(
-                    touch.active,
-                    name,
-                    false,
-                    crate::economy::tap_position(&touches),
-                );
-                inspect.loot = !act;
-                act
-            }
-            None => true,
-        };
-    }
-    if close {
-        inspect.loot = false;
-        inspect.name = None;
-        loot.items.clear();
-        loot.sp = 0;
-        node.display = Display::None;
-        for e in &rows {
-            commands.entity(e).despawn();
-        }
-    }
-}
-
 fn update_xp(
     sim: SimView,
     mut fill: Single<&mut Node, With<XpFill>>,
@@ -1127,53 +892,6 @@ fn update_xp(
             u.level, u.xp, u.xp_to_next
         ),
     );
-}
-
-/// The old sim's corpse loot must not survive a restart.
-fn close_loot_on_restart(
-    mut restarted: MessageReader<crate::game::GameRestarted>,
-    mut loot: ResMut<LootState>,
-) {
-    if restarted.read().count() > 0 {
-        loot.items.clear();
-        loot.dirty = true;
-    }
-}
-
-/// QA hook (`WOW_LOOT_DEMO`): shows the loot window and the matching log lines for three sample items
-/// without a kill, so the layout can be screenshotted when no fight is available. Display only; nothing is granted.
-fn loot_demo(
-    sim: SimView,
-    mut loot: ResMut<LootState>,
-    mut lines: MessageWriter<LogLineMsg>,
-    mut done: Local<bool>,
-) {
-    if std::mem::replace(&mut *done, true) {
-        return;
-    }
-    // A Jira ticket shows the junk path: no bonus, a hint where to close it.
-    let ticket = "Jira Ticket: Won't Fix";
-    lines.write(LogLineMsg(
-        format!(
-            "You receive: [{ticket}] Close it at the Scrum board or the Company Calendar for Kudos."
-        ),
-        goods::name_color(sim.content(), ticket),
-    ));
-    loot.items.push(ticket.to_string());
-    for name in ["Prompt Fragment", "Expired GPU Credits"] {
-        let Some(def) = sim.content().item(name) else {
-            continue;
-        };
-        lines.write(LogLineMsg(
-            format!(
-                "You receive trophy: [{name}] ({})",
-                copy::bonus_text(&def.bonus.totals(1))
-            ),
-            copy::BONUS_GREEN,
-        ));
-        loot.items.push(name.to_string());
-    }
-    loot.dirty = true;
 }
 
 #[cfg(test)]

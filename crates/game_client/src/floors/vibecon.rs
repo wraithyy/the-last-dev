@@ -6,12 +6,16 @@
 
 use super::kit::*;
 use super::layout::{FloorKind, FloorLayout, Theme, assemble};
-use super::props::{beanbag, lounge};
+use super::offsite::{
+    balloons, beams, bunting, chair_to, cove, floor_patch, plant_pair, round_patch, wall_dress,
+    wall_prop,
+};
+use super::props::{beanbag, lounge, mini_fridge, vending};
 use super::shape::{blob, rounded_rect, stroke};
 use super::themes::{ceiling_lights, pt, runner, v};
 use super::zones::{ZoneCast, cast_zone};
 use bevy::prelude::*;
-use std::f32::consts::{FRAC_PI_2, PI};
+use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 /// The four lanyard colours (exhibitor, volunteer, speaker, hacker), reused everywhere.
 const NEON: [Mat; 4] = [Mat::NeonYellow, Mat::LedGreen, Mat::NeonCyan, Mat::NeonPink];
@@ -31,14 +35,14 @@ pub fn build(level: u8) -> FloorLayout {
 fn theme(level: u8) -> Theme {
     let c = Color::srgb;
     let base = Theme {
-        wall: c(0.3, 0.28, 0.4),
+        wall: c(0.46, 0.42, 0.6),
         trim: c(0.08, 0.08, 0.12),
         accent: LinearRgba::rgb(0.4, 2.6, 3.2),
         fabric: [c(0.95, 0.3, 0.75), c(0.2, 0.8, 0.95), c(0.98, 0.85, 0.2)],
-        floor: FloorKind::Carpet([0.55, 0.5, 0.7]),
-        fog: c(0.08, 0.07, 0.13),
-        ambient: c(0.9, 0.9, 1.0),
-        ambient_brightness: 780.0,
+        floor: FloorKind::Carpet([0.78, 0.72, 0.98]),
+        fog: c(0.12, 0.1, 0.2),
+        ambient: c(0.95, 0.93, 1.0),
+        ambient_brightness: 1150.0,
         sun: c(0.95, 0.95, 1.0),
         sun_illuminance: 7000.0,
         fog_range: (45.0, 130.0),
@@ -115,6 +119,18 @@ fn booth(p: &mut Plan, x: f32, z: f32, face: Face, neon: Mat, sign: Sign) {
         // Roll-up banner beside the counter, logo side out.
         p.boxed(v(1.9, 1.0, 0.1), v(0.8, 2.0, 0.04), neon, false);
         p.boxed(v(1.9, 0.04, 0.1), v(0.9, 0.08, 0.3), Mat::Metal, false);
+        // Booth carpet, side wings, a demo stool, a lighting ring and a plant for authenticity.
+        floor_patch(p, 0.0, -0.1, 0.0, 5.2, 4.2, Mat::MarbleDark);
+        for sx in [-2.35, 2.35] {
+            p.boxed(v(sx, 1.0, -0.9), v(0.1, 2.0, 1.5), Mat::Dark, false);
+            p.boxed(v(sx, 2.05, -0.9), v(0.12, 0.06, 1.5), neon, false);
+        }
+        p.prop(&STOOL_BAR, v(-1.4, 0.0, 1.2), 0.0, false);
+        p.prop(&POTTED_PLANT, v(-2.9, 0.0, -1.2), 0.0, false);
+        p.boxed(v(0.0, 3.5, -0.3), v(4.6, 0.08, 0.08), Mat::Metal, false);
+        for sx in [-1.6, 0.0, 1.6] {
+            p.boxed(v(sx, 3.4, -0.3), v(0.4, 0.2, 0.4), Mat::LightPanel, false);
+        }
     });
 }
 
@@ -224,10 +240,45 @@ fn stage(p: &mut Plan, x: f32, z: f32, face: Face, w: f32, d: f32, sign: Sign) {
         for k in 0..5 {
             let sx = -w / 2.0 + 1.0 + k as f32 * (w - 2.0) / 4.0;
             p.boxed(
-                v(sx, 4.6, d / 2.0 - 0.5),
+                v(sx, 4.0, d / 2.0 - 0.5),
                 v(0.4, 0.25, 0.4),
                 Mat::LightPanel,
                 false,
+            );
+        }
+        // Truss bar, speaker stacks, front steps and footlights.
+        p.boxed(
+            v(0.0, 4.2, d / 2.0 - 0.5),
+            v(w, 0.16, 0.16),
+            Mat::Metal,
+            false,
+        );
+        for s in [-1.0, 1.0] {
+            p.boxed(
+                v(s * (w / 2.0 + 0.7), 1.3, 0.0),
+                v(1.0, 2.6, 1.0),
+                Mat::Dark,
+                false,
+            );
+            p.boxed(
+                v(s * (w / 2.0 + 0.7), 1.0, 0.52),
+                v(0.8, 0.9, 0.04),
+                Mat::Metal,
+                false,
+            );
+        }
+        p.boxed(
+            v(0.0, 0.07, d / 2.0 + 0.5),
+            v(3.0, 0.14, 1.0),
+            Mat::MarbleDark,
+            false,
+        );
+        for k in 0..((w / 1.5) as usize) {
+            p.prim(
+                PrimKind::Sphere,
+                v(-w / 2.0 + 0.75 + k as f32 * 1.5, 0.34, d / 2.0 - 0.1),
+                v(0.14, 0.1, 0.14),
+                NEON[k % 4],
             );
         }
     });
@@ -236,6 +287,9 @@ fn stage(p: &mut Plan, x: f32, z: f32, face: Face, w: f32, d: f32, sign: Sign) {
 /// Hackathon table: laptops with glowing lids, pizza boxes and an energy-drink pyramid.
 fn hack_table(p: &mut Plan, x: f32, z: f32) {
     p.boxed(v(x, 0.38, z), v(5.0, 0.76, 1.2), Mat::Wood, true);
+    for (sx, sz) in [(-1.2, 1.3), (1.2, -1.3), (-1.2, -1.3), (1.2, 1.3)] {
+        chair_to(p, x + sx, z + sz, x + sx, z);
+    }
     for k in 0..4 {
         let lx = x - 1.8 + k as f32 * 1.2;
         for s in [-1.0, 1.0] {
@@ -308,6 +362,324 @@ fn lights(p: &mut Plan, spots: &[(f32, f32)], color: Color, intensity: f32) {
     }
 }
 
+// ------------------------------------------------------------------ room dressing
+
+/// Neon vertical LED column against the nearest wall: the hall's ribs.
+fn led_column(p: &mut Plan, x: f32, z: f32, neon: Mat) {
+    let Some((at, n)) = p.wall_near(x, z) else {
+        return;
+    };
+    let yaw = n.x.atan2(n.y);
+    let c = at + n * 0.12;
+    p.framed(v(c.x, 0.0, c.y), yaw, |p| {
+        p.boxed(v(0.0, 2.2, 0.0), v(0.5, 4.4, 0.2), Mat::Dark, false);
+        p.boxed(v(0.0, 2.2, 0.11), v(0.12, 4.0, 0.02), neon, false);
+    });
+}
+
+/// The conference mascot: a chrome robot with a chatbot face on its chest.
+fn mascot(p: &mut Plan, x: f32, z: f32, yaw: f32) {
+    p.framed(v(x, 0.0, z), yaw, |p| {
+        p.prim(
+            PrimKind::Cylinder,
+            v(0.0, 0.1, 0.0),
+            v(1.6, 0.2, 1.6),
+            Mat::MarbleDark,
+        );
+        p.prim(
+            PrimKind::Cylinder,
+            v(0.0, 1.0, 0.0),
+            v(1.1, 1.6, 0.9),
+            Mat::Chrome,
+        );
+        p.prim(
+            PrimKind::Sphere,
+            v(0.0, 2.1, 0.0),
+            v(0.9, 0.8, 0.8),
+            Mat::Chrome,
+        );
+        for sx in [-0.18, 0.18] {
+            p.boxed(v(sx, 2.15, 0.36), v(0.14, 0.14, 0.04), Mat::NeonCyan, false);
+        }
+        p.boxed(v(0.0, 2.7, 0.0), v(0.04, 0.5, 0.04), Mat::Metal, false);
+        p.prim(
+            PrimKind::Sphere,
+            v(0.0, 3.0, 0.0),
+            v(0.2, 0.2, 0.2),
+            Mat::NeonPink,
+        );
+        for sx in [-0.75, 0.75] {
+            p.prim(
+                PrimKind::Cylinder,
+                v(sx, 1.1, 0.0),
+                v(0.28, 1.1, 0.28),
+                Mat::Chrome,
+            );
+        }
+        p.panel(
+            v(0.0, 1.2, 0.46),
+            0.0,
+            Vec2::new(0.8, 0.8),
+            Tex::ChatbotFace,
+        );
+    });
+    p.block(v(x, 1.0, z), v(1.7, 2.0, 1.7));
+}
+
+/// Neon-lit wall base shared by the VibeCon halls.
+fn hall_walls(p: &mut Plan, rail: Mat, cove_mat: Mat) {
+    wall_dress(p, Mat::Dark, rail, Mat::Trim);
+    cove(p, cove_mat);
+}
+
+fn expo_dress(p: &mut Plan) {
+    hall_walls(p, Mat::NeonPink, Mat::NeonCyan);
+    beams(p, -18.0, 34.0, -24.0, 24.0, 8.0, Mat::Metal);
+    floor_patch(p, 4.0, 0.0, 0.0, 46.0, 5.6, Mat::MarbleDark);
+    for (k, x) in [-4.0, 12.0, 28.0].into_iter().enumerate() {
+        led_column(p, x, -23.9, NEON[k]);
+        led_column(p, x - 4.0, 23.9, NEON[k + 1]);
+    }
+    mascot(p, 14.0, -8.5, FRAC_PI_2 * 0.5);
+    mascot(p, 14.0, 8.5, PI - FRAC_PI_2 * 0.5);
+    balloons(p, 30.5, -9.0, [Mat::Fabric0, Mat::Fabric1, Mat::Fabric2]);
+    balloons(p, 30.5, 9.0, [Mat::Fabric2, Mat::Fabric0, Mat::Fabric1]);
+    bunting(
+        p,
+        (-16.0, -11.0),
+        (30.0, -11.0),
+        3.9,
+        [Mat::NeonPink, Mat::NeonCyan, Mat::NeonYellow],
+    );
+    bunting(
+        p,
+        (-16.0, 11.0),
+        (30.0, 11.0),
+        3.9,
+        [Mat::NeonYellow, Mat::NeonPink, Mat::NeonCyan],
+    );
+    for (x, z, tex, w, h) in [
+        (-20.0, -12.0, Tex::PromptTips, 1.6, 1.3),
+        (-20.0, 12.0, Tex::Suggestions, 1.4, 1.5),
+        (37.0, -6.0, Tex::Brand, 1.6, 1.2),
+        (37.0, 8.0, Tex::ChatbotFace, 1.4, 1.4),
+    ] {
+        p.poster_near(x, z, 2.3, Vec2::new(w, h), tex);
+    }
+    // Registration corner: carpet under the queue, plants at the door.
+    floor_patch(p, -34.0, -5.5, 0.0, 12.0, 6.0, Mat::MarbleDark);
+    plant_pair(p, -43.0, 10.5);
+    plant_pair(p, -25.0, 10.5);
+    for (x, z) in [(-30.0, 9.0), (-38.0, 9.0)] {
+        beanbag(p, x, z, Mat::BeanA);
+    }
+}
+
+fn workshops_dress(p: &mut Plan) {
+    wall_dress(p, Mat::Trim, Mat::NeonPink, Mat::Trim);
+    cove(p, Mat::NeonPink);
+    beams(p, -4.0, 40.0, -22.0, 22.0, 8.0, Mat::Metal);
+    for (x, z) in [
+        (-48.0, 14.0),
+        (-48.0, -14.0),
+        (-34.0, 14.0),
+        (-34.0, -14.0),
+        (-20.0, 14.0),
+        (-20.0, -14.0),
+    ] {
+        floor_patch(p, x, z, 0.0, 5.6, 4.4, Mat::MarbleDark);
+        wall_prop(p, &TV, x, z + z.signum() * 5.4, false);
+    }
+    for z in [-3.0, 3.0] {
+        wall_prop(p, &BOOKCASE_OPEN, -56.0, z * 3.0, true);
+    }
+    p.prop(
+        &COFFEE_MACHINE,
+        v(-40.0, SIDE_TABLE.size[1] * FURNITURE_SCALE, -2.2),
+        0.0,
+        false,
+    );
+    p.prop(&SIDE_TABLE, v(-40.0, 0.0, -2.2), 0.0, false);
+    // Masterclass: lectern light pool, LED columns beside the screen, plants.
+    round_patch(p, 30.0, -5.5, 3.0, Mat::NeonPink);
+    for (k, z) in [-10.0, 10.0].into_iter().enumerate() {
+        p.boxed(v(35.6, 2.2, z), v(0.3, 4.2, 0.5), Mat::Dark, false);
+        p.boxed(v(35.4, 2.2, z), v(0.04, 4.0, 0.1), NEON[k * 2], false);
+    }
+    plant_pair(p, 4.0, -20.0);
+    plant_pair(p, 4.0, 20.0);
+    p.poster_near(14.0, -21.8, 2.2, Vec2::new(2.6, 1.6), Tex::PromptTips);
+    p.poster_near(14.0, 21.8, 2.2, Vec2::new(1.6, 1.3), Tex::ChatbotFace);
+}
+
+fn hackathon_dress(p: &mut Plan) {
+    hall_walls(p, Mat::NeonYellow, Mat::NeonYellow);
+    beams(p, -26.0, 4.0, -24.0, 24.0, 8.0, Mat::Metal);
+    // Extension cords snaking between the tables, because there are never enough sockets.
+    for (a, b) in [
+        ((-30.0, -6.5), (-18.0, -13.0)),
+        ((-6.0, -6.5), (-18.0, -13.0)),
+        ((-30.0, 6.5), (-18.0, 13.0)),
+        ((-6.0, 6.5), (6.0, 13.0)),
+    ] {
+        let (dx, dz) = (b.0 - a.0, b.1 - a.1);
+        p.slab(
+            v((a.0 + b.0) / 2.0, 0.02, (a.1 + b.1) / 2.0),
+            (-dz).atan2(dx),
+            v((dx * dx + dz * dz).sqrt(), 0.03, 0.06),
+            Mat::Cable,
+        );
+    }
+    // Snack and charging station on the south wall.
+    vending(p, -4.0, 23.4, Face::NegZ);
+    vending(p, -2.4, 23.4, Face::NegZ);
+    mini_fridge(p, -0.6, 23.5, Face::NegZ);
+    for (x, z, tex) in [
+        (-30.0, 24.5, Tex::Leaderboard),
+        (-22.0, -24.5, Tex::WarRoom),
+        (6.0, -24.5, Tex::SocAlert),
+        (-42.0, -10.0, Tex::DemoScreen),
+    ] {
+        p.poster_near(x, z, 2.4, Vec2::new(2.0, 1.4), tex);
+    }
+    // Sleeping bags by the beanbags.
+    for (x, z, yaw) in [(-22.0, 14.5, 0.3), (-30.0, 15.0, -0.2)] {
+        p.slab(v(x, 0.08, z), yaw, v(0.9, 0.16, 2.0), Mat::Fabric1);
+    }
+    // Demo day: carpet under the judges, spotlights on the stage.
+    floor_patch(p, 36.0, -8.0, 0.0, 6.0, 5.0, Mat::MarbleDark);
+    for z in [-3.0, 3.0] {
+        p.prim(
+            PrimKind::Cylinder,
+            v(41.0, 0.012, z),
+            v(1.8, 0.01, 1.8),
+            Mat::NeonYellow,
+        );
+    }
+    plant_pair(p, 34.0, 12.0);
+}
+
+fn afterparty_dress(p: &mut Plan) {
+    hall_walls(p, Mat::NeonPink, Mat::NeonCyan);
+    beams(p, -34.0, 6.0, -20.0, 20.0, 8.0, Mat::Metal);
+    // Mirror ball and coloured lamps over the dance floor, speaker stacks round it.
+    p.boxed(v(-18.9, 3.9, 0.7), v(0.04, 0.5, 0.04), Mat::Metal, false);
+    p.prim(
+        PrimKind::Sphere,
+        v(-18.9, 3.45, 0.7),
+        v(0.9, 0.9, 0.9),
+        Mat::Chrome,
+    );
+    for (k, (x, z)) in [(-24.0, -3.0), (-14.0, -3.0), (-24.0, 4.5), (-14.0, 4.5)]
+        .into_iter()
+        .enumerate()
+    {
+        p.prim(
+            PrimKind::Cylinder,
+            v(x, 3.9, z),
+            v(0.35, 0.3, 0.35),
+            NEON[k],
+        );
+    }
+    for (x, z) in [(-27.0, -4.5), (-27.0, 5.5), (-11.0, -4.5), (-11.0, 5.5)] {
+        p.boxed(v(x, 1.1, z), v(0.9, 2.2, 0.9), Mat::Dark, true);
+        p.prim(
+            PrimKind::Cylinder,
+            v(x, 0.8, z + 0.46),
+            v(0.5, 0.04, 0.5),
+            Mat::Metal,
+        );
+    }
+    // Stools at the high tables, more couches for the quiet ones.
+    for (x, z) in [(-36.0, -10.0), (-36.0, 10.0), (0.0, -17.0), (4.0, 16.0)] {
+        for k in 0..3 {
+            let a = k as f32 * TAU / 3.0 + 0.5;
+            p.prop(
+                &STOOL_BAR,
+                v(x + 1.0 * a.cos(), 0.0, z + 1.0 * a.sin()),
+                -a,
+                false,
+            );
+        }
+    }
+    lounge(p, -46.0, -12.0, FRAC_PI_2, false);
+    lounge(p, -46.0, 12.0, FRAC_PI_2, true);
+    balloons(
+        p,
+        -28.0,
+        16.0,
+        [Mat::NeonPink, Mat::NeonCyan, Mat::NeonYellow],
+    );
+    balloons(
+        p,
+        -8.0,
+        -16.0,
+        [Mat::NeonCyan, Mat::NeonYellow, Mat::NeonPink],
+    );
+    for k in 0..30 {
+        let (a, r) = (k as f32 * 2.399, 1.0 + (k as f32 * 1.3).sin().abs() * 9.0);
+        p.slab(
+            v(-19.0 + r * a.cos(), 0.03, 0.7 + r * 0.8 * a.sin()),
+            a,
+            v(0.16, 0.01, 0.1),
+            NEON[k % 4],
+        );
+    }
+    // Fireside: rug, bookcases, side tables, a mantel of awards.
+    p.prop(&RUG, v(36.0, 0.25, 0.0), FRAC_PI_2, false);
+    wall_prop(p, &BOOKCASE_OPEN, 44.0, -7.0, true);
+    wall_prop(p, &BOOKCASE_CLOSED, 44.0, 7.0, true);
+    for z in [-2.5, 2.5] {
+        p.prop(&SIDE_TABLE, v(37.5, 0.24, z * 1.9), FRAC_PI_2, false);
+    }
+    p.boxed(v(44.0, 1.5, 0.0), v(0.5, 0.1, 5.0), Mat::Wood, false);
+    for k in 0..4 {
+        p.prim(
+            PrimKind::Cylinder,
+            v(43.9, 1.7, -1.5 + k as f32),
+            v(0.2, 0.3, 0.2),
+            Mat::Gold,
+        );
+    }
+    plant_pair(p, 30.0, 8.0);
+}
+
+fn main_dress(p: &mut Plan) {
+    hall_walls(p, Mat::NeonCyan, Mat::NeonPink);
+    beams(p, -20.0, 22.0, -26.0, 26.0, 8.0, Mat::Metal);
+    for (k, x) in [-18.0, -6.0, 6.0, 18.0].into_iter().enumerate() {
+        led_column(p, x, -25.9, NEON[k]);
+        led_column(p, x, 25.9, NEON[(k + 2) % 4]);
+    }
+    // Moving heads on a truss over the crowd, light pools on the floor beneath.
+    for (k, x) in [-2.0, 10.0, 22.0].into_iter().enumerate() {
+        p.boxed(v(x, 4.05, 0.0), v(0.2, 0.2, 22.0), Mat::Metal, false);
+        for (j, z) in [-8.0, -4.0, 4.0, 8.0].into_iter().enumerate() {
+            p.prim(
+                PrimKind::Cylinder,
+                v(x, 3.8, z),
+                v(0.3, 0.3, 0.3),
+                NEON[(k + j) % 4],
+            );
+            round_patch(p, x + 1.0, z * 1.4, 2.4, NEON[(k + j) % 4]);
+        }
+    }
+    // Front-of-house desk: three screens and a very serious mixer.
+    p.boxed(v(14.0, 0.5, -9.0), v(3.0, 1.0, 1.2), Mat::Dark, true);
+    for sx in [-1.0, 0.0, 1.0] {
+        p.boxed(
+            v(14.0 + sx, 1.35, -9.3),
+            v(0.8, 0.5, 0.05),
+            Mat::ScreenGlow,
+            false,
+        );
+    }
+    p.prop(&LAPTOP, v(13.0, 1.0, -8.8), PI, false);
+    chair_to(p, 14.0, -7.4, 14.0, -9.0);
+    plant_pair(p, -43.0, 5.5);
+    p.poster_near(-38.0, -6.0, 2.4, Vec2::new(1.6, 1.3), Tex::Brand);
+}
+
 // ------------------------------------------------------------------ vibecon/1: expo hall
 
 fn expo(p: &mut Plan) -> Theme {
@@ -325,6 +697,7 @@ fn expo(p: &mut Plan) -> Theme {
         pt(22.0, 0.0),
     ];
     p.build_walls();
+    expo_dress(p);
 
     runner(
         p,
@@ -417,8 +790,8 @@ fn expo(p: &mut Plan) -> Theme {
             (20.0, 12.0),
             (30.0, 0.0),
         ],
-        Color::srgb(0.85, 0.85, 1.0),
-        420_000.0,
+        Color::srgb(0.9, 0.88, 1.0),
+        560_000.0,
     );
     cast_zone(
         p,
@@ -459,6 +832,7 @@ fn workshops(p: &mut Plan) -> Theme {
         pt(14.0, 0.0),
     ];
     p.build_walls();
+    workshops_dress(p);
 
     runner(
         p,
@@ -582,6 +956,7 @@ fn hackathon(p: &mut Plan) -> Theme {
         pt(32.0, 0.0),
     ];
     p.build_walls();
+    hackathon_dress(p);
 
     runner(
         p,
@@ -706,6 +1081,7 @@ fn afterparty(p: &mut Plan) -> Theme {
         pt(26.0, 0.0),
     ];
     p.build_walls();
+    afterparty_dress(p);
 
     // Dance floor: a grid of glowing tiles, the DJ booth south, the bar north.
     for i in 0..5 {
@@ -844,6 +1220,7 @@ fn main_stage(p: &mut Plan) -> Theme {
         pt(22.0, 0.0),
     ];
     p.build_walls();
+    main_dress(p);
 
     runner(
         p,

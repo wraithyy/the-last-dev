@@ -103,6 +103,8 @@ pub struct Settings {
     /// No camera shake, no spell flashes, no cutscene camera drift.
     pub reduce_motion: bool,
     pub show_fps: bool,
+    /// A corpse loots fully on open and the loot window only appears for what did not fit.
+    pub auto_loot: bool,
 }
 
 impl Settings {
@@ -114,18 +116,20 @@ impl Settings {
             colorblind: Colorblind::Off,
             reduce_motion: false,
             show_fps: false,
+            auto_loot: mobile,
         }
     }
 
     pub fn encode(&self) -> String {
         format!(
-            "quality={}\nfov={:.0}\nui_scale={}\ncolorblind={}\nreduce_motion={}\nshow_fps={}\n",
+            "quality={}\nfov={:.0}\nui_scale={}\ncolorblind={}\nreduce_motion={}\nshow_fps={}\nauto_loot={}\n",
             self.quality.key(),
             self.fov_deg,
             self.ui_scale.map_or("auto".into(), |s| format!("{s:.2}")),
             self.colorblind.key(),
             u8::from(self.reduce_motion),
             u8::from(self.show_fps),
+            u8::from(self.auto_loot),
         )
     }
 
@@ -164,6 +168,7 @@ impl Settings {
                 }
                 "reduce_motion" => s.reduce_motion = v == "1",
                 "show_fps" => s.show_fps = v == "1",
+                "auto_loot" => s.auto_loot = v == "1",
                 _ => {}
             }
         }
@@ -243,6 +248,7 @@ enum Ctl {
     UiAuto,
     Motion,
     Fps,
+    AutoLoot,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -310,6 +316,9 @@ impl Plugin for SettingsPlugin {
                 .find(|c| c.key() == v.trim().to_lowercase())
         }) {
             settings.colorblind = c;
+        }
+        if let Ok(v) = std::env::var("WOW_AUTO_LOOT") {
+            settings.auto_loot = v.trim() == "1";
         }
         let open = std::env::var_os("WOW_SETTINGS").is_some();
         app.insert_resource(palette(settings.colorblind))
@@ -586,6 +595,10 @@ fn spawn_ui(mut commands: Commands) {
                     r.spawn(row_label("show FPS"));
                     r.spawn(button(Ctl::Fps, "", 13.0));
                 });
+                p.spawn(row()).with_children(|r| {
+                    r.spawn(row_label("auto loot"));
+                    r.spawn(button(Ctl::AutoLoot, "", 13.0));
+                });
                 p.spawn(Node {
                     column_gap: px(10),
                     margin: UiRect::top(px(4)),
@@ -635,6 +648,7 @@ fn panel_input(
             Ctl::UiAuto => s.ui_scale = None,
             Ctl::Motion => s.reduce_motion = !s.reduce_motion,
             Ctl::Fps => s.show_fps = !s.show_fps,
+            Ctl::AutoLoot => s.auto_loot = !s.auto_loot,
         }
     }
     let show_menu = if paused.0 && !lobby.open && !state.open {
@@ -726,6 +740,7 @@ fn panel_visuals(
             Ctl::UiAuto => Some(s.ui_scale.is_none()),
             Ctl::Motion => Some(s.reduce_motion),
             Ctl::Fps => Some(s.show_fps),
+            Ctl::AutoLoot => Some(s.auto_loot),
             _ => None,
         };
         let c = if on == Some(true) {
@@ -734,7 +749,7 @@ fn panel_visuals(
             KEY_RIM
         };
         border.set_all(c);
-        if matches!(t.0, Ctl::Motion | Ctl::Fps)
+        if matches!(t.0, Ctl::Motion | Ctl::Fps | Ctl::AutoLoot)
             && let Some(k) = kids.first()
             && let Ok(mut text) = texts.get_mut(*k)
         {
@@ -903,6 +918,7 @@ mod tests {
             colorblind: Colorblind::Tritanopia,
             reduce_motion: true,
             show_fps: true,
+            auto_loot: true,
         };
         assert_eq!(Settings::decode(&s.encode(), false), s);
         let auto = Settings::defaults(false);
@@ -922,10 +938,22 @@ mod tests {
         assert_eq!(s.ui_scale, None);
         assert_eq!(s.colorblind, Colorblind::Off);
         assert!(!s.reduce_motion);
+        assert!(!s.auto_loot);
         assert_eq!(
             Settings::decode("ui_scale=9", false).ui_scale,
             Some(UI_SCALE_MAX)
         );
+    }
+
+    #[test]
+    fn auto_loot_defaults_on_for_touch_and_off_for_desktop_and_persists() {
+        assert!(Settings::decode("", true).auto_loot);
+        assert!(!Settings::decode("", false).auto_loot);
+        let mut s = Settings::defaults(false);
+        s.auto_loot = true;
+        assert!(Settings::decode(&s.encode(), false).auto_loot);
+        s.auto_loot = false;
+        assert!(!Settings::decode(&s.encode(), true).auto_loot);
     }
 
     #[test]

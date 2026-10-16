@@ -8,8 +8,9 @@
 
 use super::kit::*;
 use super::layout::{FloorKind, FloorLayout, Theme, assemble, yaw_towards};
+use super::offsite::{balloons, bunting, chair_to, floor_patch, round_patch, wall_band};
 use super::shape::rounded_rect;
-use super::themes::{pt, v};
+use super::themes::{pt, runner, v};
 use bevy::prelude::*;
 use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
@@ -211,6 +212,260 @@ fn hotel(p: &mut Plan) {
         p.prop(&LOUNGE_CHAIR, v(-44.0, 0.0, z), FRAC_PI_2, true);
     }
     post_sign(p, -43.5, -4.5, 2.6, 3.4, FRAC_PI_2, Sign::TbWelcome);
+}
+
+/// Garden-party dressing, all visual: the stone path, flower beds, a gazebo, a rose arch, patio
+/// sets, picnic blankets, lanterns and a fountain. Nothing here blocks: the stealth rules own
+/// the solid cover (hedges, tents, banners) and the tests check the anchors against it.
+fn garden(p: &mut Plan) {
+    // Lighter hedge crown so the outline reads as hedge, not wall.
+    wall_band(p, Mat::Leaf, 3.6, H, 0.05);
+    runner(
+        p,
+        &[
+            pt(-38.0, 0.0),
+            pt(-20.0, -2.0),
+            pt(0.0, 0.0),
+            pt(20.0, 2.0),
+            pt(40.0, 0.0),
+        ],
+        3.0,
+        Mat::Sand,
+        Mat::Concrete,
+    );
+    // Flower beds: a soil ring with a dome of blooms.
+    for (k, (x, z)) in [
+        (-36.0, -14.0),
+        (36.0, 12.0),
+        (10.0, 21.0),
+        (-4.0, 26.0),
+        (-44.0, 18.0),
+        (44.0, -12.0),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        p.prim(
+            PrimKind::Cylinder,
+            v(x, 0.12, z),
+            v(2.6, 0.24, 2.6),
+            Mat::Bark,
+        );
+        p.prim(PrimKind::Sphere, v(x, 0.3, z), v(2.2, 0.8, 2.2), Mat::Leaf);
+        for j in 0..7 {
+            let a = j as f32 * 0.9 + k as f32;
+            let r = 0.2 + (j % 3) as f32 * 0.35;
+            p.prim(
+                PrimKind::Sphere,
+                v(x + r * a.cos(), 0.62 - r * 0.25, z + r * a.sin()),
+                v(0.3, 0.3, 0.3),
+                [Mat::Fabric0, Mat::Fabric1, Mat::Fabric2, Mat::Yellow][(j + k) % 4],
+            );
+        }
+    }
+    // Gazebo on the east lawn with a little table.
+    let (gx, gz) = (40.0, 10.0);
+    p.prim(
+        PrimKind::Cylinder,
+        v(gx, 0.1, gz),
+        v(6.4, 0.2, 6.4),
+        Mat::Wood,
+    );
+    for k in 0..6 {
+        let a = k as f32 * TAU / 6.0;
+        p.boxed(
+            v(gx + 2.8 * a.cos(), 1.6, gz + 2.8 * a.sin()),
+            v(0.18, 3.2, 0.18),
+            Mat::White,
+            false,
+        );
+    }
+    p.prim(
+        PrimKind::Cone,
+        v(gx, 3.8, gz),
+        v(7.0, 1.4, 7.0),
+        Mat::Fabric0,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(gx, 0.55, gz),
+        v(1.2, 0.7, 1.2),
+        Mat::White,
+    );
+    for k in 0..3 {
+        let a = k as f32 * TAU / 3.0 + 0.4;
+        chair_to(p, gx + 1.7 * a.cos(), gz + 1.7 * a.sin(), gx, gz);
+    }
+    // Rose arch over the path near the start.
+    for z in [-1.8, 1.8] {
+        p.boxed(v(-33.0, 1.3, z), v(0.14, 2.6, 0.14), Mat::White, false);
+        for j in 0..4 {
+            p.prim(
+                PrimKind::Sphere,
+                v(-33.0, 0.5 + j as f32 * 0.6, z),
+                v(0.3, 0.3, 0.3),
+                Mat::Fabric0,
+            );
+        }
+    }
+    p.boxed(v(-33.0, 2.65, 0.0), v(0.16, 0.16, 3.9), Mat::White, false);
+    for j in 0..7 {
+        p.prim(
+            PrimKind::Sphere,
+            v(-33.0, 2.7, -1.8 + j as f32 * 0.6),
+            v(0.32, 0.3, 0.32),
+            [Mat::Fabric0, Mat::Leaf][j % 2],
+        );
+    }
+    // Patio sets on the hotel terrace.
+    for (x, z) in [(-43.0, -6.0), (-43.0, 6.0)] {
+        p.prim(
+            PrimKind::Cylinder,
+            v(x, 0.45, z),
+            v(1.1, 0.06, 1.1),
+            Mat::White,
+        );
+        p.prim(
+            PrimKind::Cylinder,
+            v(x, 0.22, z),
+            v(0.1, 0.44, 0.1),
+            Mat::Metal,
+        );
+        p.prim(
+            PrimKind::Cylinder,
+            v(x, 1.6, z),
+            v(0.05, 3.2, 0.05),
+            Mat::Metal,
+        );
+        p.prim(PrimKind::Cone, v(x, 3.1, z), v(2.6, 0.6, 2.6), Mat::Fabric1);
+        for k in 0..3 {
+            let a = k as f32 * TAU / 3.0 + 1.0;
+            chair_to(p, x + 1.0 * a.cos(), z + 1.0 * a.sin(), x, z);
+        }
+    }
+    // Picnic blankets with baskets, on the lawn away from the stealth spots.
+    for (x, z, yaw, m) in [
+        (-8.0, 28.0, 0.2, Mat::Fabric0),
+        (22.0, -14.5, -0.3, Mat::Fabric1),
+        (-28.0, 28.0, 0.5, Mat::Fabric2),
+    ] {
+        floor_patch(p, x, z, yaw, 2.6, 2.2, m);
+        floor_patch(p, x, z, yaw, 1.8, 1.4, Mat::White);
+        p.prim(
+            PrimKind::Cylinder,
+            v(x, 0.18, z),
+            v(0.6, 0.3, 0.6),
+            Mat::Wood,
+        );
+    }
+    // Hay bales along the south hedge.
+    for x in [10.0, 12.2, 11.1] {
+        let up = if x > 12.0 { 0.9 } else { 0.0 };
+        p.boxed(v(x, 0.4 + up, 32.0), v(1.4, 0.8, 0.9), Mat::Sand, false);
+    }
+    // Fountain in the north-west corner.
+    let (fx, fz) = (-38.0, -28.0);
+    p.prim(
+        PrimKind::Cylinder,
+        v(fx, 0.3, fz),
+        v(4.0, 0.6, 4.0),
+        Mat::Concrete,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(fx, 0.61, fz),
+        v(3.5, 0.03, 3.5),
+        Mat::Water,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(fx, 1.0, fz),
+        v(0.5, 1.4, 0.5),
+        Mat::Concrete,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(fx, 1.7, fz),
+        v(1.6, 0.12, 1.6),
+        Mat::Concrete,
+    );
+    p.prim(PrimKind::Cone, v(fx, 2.2, fz), v(0.6, 1.0, 0.6), Mat::Glass);
+    // Topiary: a ball on a stem by the tents, the gate and the bar.
+    for (x, z) in [
+        (-7.5, -23.0),
+        (7.5, -23.0),
+        (43.0, 4.2),
+        (43.0, -4.2),
+        (28.0, -23.5),
+    ] {
+        p.prim(
+            PrimKind::Cylinder,
+            v(x, 0.5, z),
+            v(0.15, 1.0, 0.15),
+            Mat::Bark,
+        );
+        p.prim(PrimKind::Sphere, v(x, 1.4, z), v(1.1, 1.1, 1.1), Mat::Leaf);
+        p.prim(
+            PrimKind::Cylinder,
+            v(x, 0.2, z),
+            v(0.7, 0.4, 0.7),
+            Mat::Concrete,
+        );
+    }
+    // Lanterns along the path and warm bunting between the tents.
+    for x in [-26.0, -10.0, 10.0, 26.0] {
+        for z in [-3.2, 3.2] {
+            p.boxed(v(x, 0.9, z), v(0.06, 1.8, 0.06), Mat::Metal, false);
+            p.prim(
+                PrimKind::Sphere,
+                v(x, 1.9, z),
+                v(0.3, 0.38, 0.3),
+                Mat::Candle,
+            );
+        }
+    }
+    bunting(
+        p,
+        (-6.0, -24.8),
+        (6.0, -24.8),
+        3.3,
+        [Mat::Fabric0, Mat::Fabric1, Mat::Fabric2],
+    );
+    bunting(
+        p,
+        (11.5, -25.0),
+        (24.5, -25.0),
+        3.5,
+        [Mat::Fabric2, Mat::Fabric0, Mat::Fabric1],
+    );
+    bunting(
+        p,
+        (-6.0, 22.0),
+        (6.0, 22.0),
+        3.4,
+        [Mat::Fabric1, Mat::Fabric2, Mat::Fabric0],
+    );
+    balloons(p, 24.0, 22.0, [Mat::Fabric0, Mat::Yellow, Mat::Fabric1]);
+    balloons(p, 33.0, 22.5, [Mat::Fabric1, Mat::Fabric2, Mat::Fabric0]);
+    round_patch(p, ICEBREAKER.0, ICEBREAKER.1, 7.0, Mat::Fabric2);
+    // Warm light pools: the sun is low and the tents are shaded.
+    for (x, z) in [
+        (-21.0, -22.0),
+        (0.0, -27.0),
+        (18.0, -27.0),
+        (0.0, 20.0),
+        (28.0, 22.0),
+        (-40.0, 0.0),
+    ] {
+        p.light(v(x, 3.2, z), Color::srgb(1.0, 0.8, 0.55), 380_000.0);
+    }
+    // The hotel is the venue; it says so, loudly.
+    p.sign(
+        v(-48.85, 12.6, 0.0),
+        Face::PosX.yaw(),
+        11.0,
+        Sign::OffsiteWelcome,
+    );
 }
 
 fn buffet(p: &mut Plan) {
@@ -444,6 +699,18 @@ fn trees(p: &mut Plan) {
             Mat::Bark,
         );
         p.prim(PrimKind::Sphere, v(x, 5.2, z), v(5.0, 4.4, 5.0), Mat::Leaf);
+        p.prim(
+            PrimKind::Sphere,
+            v(x + 1.4, 4.4, z - 0.8),
+            v(3.4, 3.0, 3.4),
+            Mat::LeafDark,
+        );
+        p.prim(
+            PrimKind::Sphere,
+            v(x - 1.2, 6.2, z + 0.9),
+            v(3.2, 2.8, 3.2),
+            Mat::Leaf,
+        );
     }
 }
 
@@ -467,6 +734,7 @@ pub fn build() -> FloorLayout {
     karaoke(&mut p);
     exit_gate(&mut p);
     trees(&mut p);
+    garden(&mut p);
     for z in [-17.5, 0.5, 19.5] {
         string_lights(&mut p, -34.0, 34.0, z);
     }

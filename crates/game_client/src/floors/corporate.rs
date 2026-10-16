@@ -13,6 +13,10 @@
 
 use super::kit::*;
 use super::layout::{FloorKind, FloorLayout, Theme, assemble, yaw_towards};
+use super::offsite::{
+    balloons, beams, bunting, chair_to, cove, floor_patch, plant_pair, round_patch, wall_dress,
+    wall_prop,
+};
 use super::props::{
     cubicle, long_table, mini_fridge, printer, sad_plant, server_rack, water_cooler,
 };
@@ -102,6 +106,218 @@ fn desk_with_screen(p: &mut Plan, x: f32, z: f32, yaw: f32) {
     });
 }
 
+/// Wainscot, crown and a cove strip: what separates a meeting room from a box with a ceiling.
+fn room_dress(p: &mut Plan, dado: Mat, rail: Mat, cove_mat: Mat) {
+    wall_dress(p, dado, rail, Mat::Trim);
+    cove(p, cove_mat);
+}
+
+/// A coloured pool of light, for rooms whose mood is one colour (the lights() helper is white).
+fn glow(p: &mut Plan, x: f32, z: f32, color: Color) {
+    p.light(v(x, 3.3, z), color, 300_000.0);
+}
+
+fn review_dress(p: &mut Plan) {
+    room_dress(p, Mat::Wood, Mat::Gold, Mat::Candle);
+    beams(p, -6.0, 6.0, -7.0, 7.0, 4.0, Mat::Wood);
+    // Rug under the table; no pendant lamp, it would hide the rating scale from the player.
+    p.prop_scaled(&RUG, v(0.0, 0.0, -1.0), 0.0, false, 1.6);
+    // Waiting chairs along the wall, and a water jug on the credenza for the moral support.
+    for (x, z) in [(-5.5, -4.8), (-4.0, -5.4), (5.2, -4.4), (6.2, 1.5)] {
+        chair_to(p, x, z, 0.0, -1.0);
+    }
+    wall_prop(p, &CABINET_TV, -4.0, 6.9, true);
+    p.prop(
+        &TV,
+        v(-4.0, CABINET_TV.size[1] * FURNITURE_SCALE, 6.45),
+        PI,
+        false,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(-5.2, 1.3, 6.4),
+        v(0.3, 0.5, 0.3),
+        Mat::Water,
+    );
+    // Bookshelves of binders, a window onto the skyline, motivation in frames.
+    wall_prop(p, &BOOKCASE_CLOSED_WIDE, 6.0, -6.9, true);
+    p.window_near(-5.5, -7.0, Vec2::new(3.0, 1.5), Tex::Skyline, Mat::Trim);
+    p.poster_near(8.0, 4.5, 2.2, Vec2::new(1.2, 1.5), Tex::Synergy);
+    p.poster_near(-8.0, 3.0, 2.3, Vec2::new(1.3, 1.5), Tex::PosterPie);
+    p.poster_near(8.0, -4.5, 2.2, Vec2::new(1.2, 1.5), Tex::Wellness);
+    p.prop(&LAMP_FLOOR, v(7.0, 0.0, 6.0), 0.0, true);
+}
+
+fn reorg_dress(p: &mut Plan) {
+    room_dress(p, Mat::Trim, Mat::Metal, Mat::Cold);
+    beams(p, -12.0, 12.0, -10.0, 10.0, 6.0, Mat::Metal);
+    for x in [-1.0, 3.0, 8.0] {
+        p.window_near(x, 10.0, Vec2::new(3.0, 1.6), Tex::Skyline, Mat::Trim);
+    }
+    // Filing cabinets and a plant at every corner: the only things the reorg left in place.
+    for (x, z) in [(-13.8, -9.0), (-13.8, 9.0), (13.8, -9.0), (13.8, 9.0)] {
+        plant_pair(p, x * 0.93, z * 0.93);
+    }
+    for z in [-8.0, 8.0] {
+        wall_prop(p, &BOOKCASE_CLOSED, -14.0, z, true);
+    }
+    wall_prop(p, &BOOKCASE_OPEN, 14.0, -8.0, true);
+    p.prop(&TRASHCAN, v(-12.8, 0.0, 9.0), 0.0, false);
+    p.prop(&COAT_RACK, v(-12.6, 0.0, 3.0), 0.0, true);
+    for (x, z, tex) in [
+        (-8.0, 10.0, Tex::Roadmap),
+        (-11.0, -10.0, Tex::Gantt),
+        (3.0, -10.0, Tex::Standup),
+        (14.0, 6.0, Tex::PosterBars),
+    ] {
+        p.poster_near(x, z, 2.3, Vec2::new(2.2, 1.3), tex);
+    }
+    // Moving boxes: half the floor is already somewhere else.
+    for (x, z, yaw) in [
+        (-13.0, 6.8, 0.4),
+        (-12.4, 7.6, 1.1),
+        (12.8, -8.2, 0.2),
+        (13.2, -7.4, 0.9),
+    ] {
+        p.prop(&BOX_CLOSED, v(x, 0.0, z), yaw, false);
+    }
+}
+
+fn migration_dress(p: &mut Plan) {
+    room_dress(p, Mat::Dark, Mat::Metal, Mat::Cold);
+    // Cable tray along the ceiling and cords down to both terminals.
+    wall_band_cable(p);
+    for (a, b) in [
+        ((-4.0, -5.0), (-7.0, -0.8)),
+        ((4.0, -5.0), (7.0, -0.8)),
+        ((-4.0, -5.0), (4.0, -5.0)),
+    ] {
+        let (dx, dz) = (b.0 - a.0, b.1 - a.1);
+        p.slab(
+            v((a.0 + b.0) / 2.0, 0.02, (a.1 + b.1) / 2.0),
+            (-dz).atan2(dx),
+            v((dx * dx + dz * dz).sqrt(), 0.03, 0.07),
+            Mat::Cable,
+        );
+    }
+    floor_patch(p, 0.0, -4.6, 0.0, 11.0, 2.4, Mat::Dark);
+    server_rack(p, -1.4, -5.2, 0.0);
+    server_rack(p, 1.4, -5.2, 0.0);
+    // Old side: beige desk, a chair with a worn seat, a retro poster. New side: a plant and a TV.
+    p.prop(&CHAIR_DESK, v(-5.6, 0.0, 1.8), -FRAC_PI_2, false);
+    p.poster_near(-9.0, 3.5, 2.2, Vec2::new(1.2, 1.5), Tex::TurnItOff);
+    p.poster_near(-9.0, -3.5, 2.0, Vec2::new(1.2, 1.5), Tex::Cobweb);
+    p.poster_near(9.0, -3.5, 2.2, Vec2::new(1.2, 1.5), Tex::NextAgent);
+    p.poster_near(9.0, 3.5, 2.2, Vec2::new(1.2, 1.5), Tex::StickyPass);
+    plant_pair(p, 8.2, 5.0);
+    round_patch(p, 7.0, 0.0, 3.2, Mat::Cold);
+    round_patch(p, -7.0, 0.0, 3.2, Mat::Hot);
+    glow(p, -6.5, 0.0, Color::srgb(1.0, 0.7, 0.35));
+    glow(p, 6.5, 0.0, Color::srgb(0.5, 0.8, 1.0));
+}
+
+/// Cable tray high on the walls: a dark band with a bright cable on it.
+fn wall_band_cable(p: &mut Plan) {
+    super::offsite::wall_band(p, Mat::Dark, H - 1.0, H - 0.8, 0.1);
+    super::offsite::wall_band(p, Mat::Cable, H - 0.95, H - 0.9, 0.12);
+}
+
+fn hackathon_dress(p: &mut Plan) {
+    room_dress(p, Mat::Dark, Mat::Hot, Mat::Hot);
+    beams(p, -10.0, 10.0, -10.0, 10.0, 5.0, Mat::Metal);
+    // Stage truss, speaker stacks and footlights.
+    p.boxed(v(0.0, 4.0, -7.0), v(10.0, 0.18, 0.18), Mat::Metal, false);
+    for x in [-4.0, -1.3, 1.3, 4.0] {
+        p.boxed(v(x, 3.85, -7.0), v(0.4, 0.22, 0.4), Mat::LightPanel, false);
+    }
+    for s in [-1.0, 1.0] {
+        p.boxed(v(s * 5.6, 1.1, -8.4), v(0.9, 2.2, 0.9), Mat::Dark, false);
+        p.boxed(v(s * 5.6, 0.9, -7.93), v(0.7, 0.8, 0.04), Mat::Metal, false);
+        p.boxed(v(s * 5.0, 0.4, -6.4), v(0.8, 0.8, 0.5), Mat::Dark, false);
+    }
+    for k in 0..8 {
+        p.prim(
+            PrimKind::Sphere,
+            v(-3.5 + k as f32, 0.3, -6.65),
+            v(0.14, 0.1, 0.14),
+            Mat::NeonYellow,
+        );
+    }
+    // Energy-drink pyramid by the south fridges, sleeping bags, cables, beanbags.
+    for row in 0..3 {
+        for k in 0..(4 - row) {
+            p.prim(
+                PrimKind::Cylinder,
+                v(
+                    -8.0 + k as f32 * 0.24 + row as f32 * 0.12,
+                    0.1 + row as f32 * 0.2,
+                    9.4,
+                ),
+                v(0.18, 0.2, 0.18),
+                [Mat::NeonYellow, Mat::LedGreen, Mat::NeonPink][(k + row) % 3],
+            );
+        }
+    }
+    for (x, z, yaw) in [(-9.0, 1.0, 0.2), (9.0, 1.0, -0.2)] {
+        p.slab(v(x, 0.08, z), yaw, v(0.9, 0.16, 2.0), Mat::Fabric1);
+    }
+    for (x, z) in [(-1.5, 1.5), (1.5, 1.5)] {
+        floor_patch(p, x, z + 1.5, 0.0, 2.8, 0.1, Mat::Cable);
+    }
+    beanbag_pair(p);
+    p.poster_near(-12.0, -6.0, 2.4, Vec2::new(1.8, 1.2), Tex::Leaderboard);
+    p.poster_near(12.0, -6.0, 2.4, Vec2::new(1.8, 1.2), Tex::DemoScreen);
+    p.poster_near(6.0, 10.0, 2.2, Vec2::new(1.6, 1.1), Tex::PizzaBox);
+    balloons(
+        p,
+        11.0,
+        -7.5,
+        [Mat::NeonYellow, Mat::NeonPink, Mat::NeonCyan],
+    );
+    glow(p, 0.0, -8.0, Color::srgb(1.0, 0.6, 0.3));
+}
+
+fn beanbag_pair(p: &mut Plan) {
+    super::props::beanbag(p, -10.6, -0.4, Mat::BeanA);
+    super::props::beanbag(p, 10.6, -0.4, Mat::BeanB);
+}
+
+fn openspace_dress(p: &mut Plan) {
+    room_dress(p, Mat::Trim, Mat::White, Mat::Cold);
+    beams(p, -12.0, 12.0, -11.0, 11.0, 6.0, Mat::Trim);
+    floor_patch(p, 0.0, 0.0, 0.0, 5.4, 4.2, Mat::Fabric1);
+    for x in [-9.0, -4.0, 5.0] {
+        p.window_near(x, 11.0, Vec2::new(3.0, 1.6), Tex::Skyline, Mat::Trim);
+    }
+    wall_prop(p, &BOOKCASE_CLOSED_WIDE, -14.0, 7.0, true);
+    wall_prop(p, &BOOKCASE_OPEN, 14.0, 7.0, true);
+    p.prop(
+        &COFFEE_MACHINE,
+        v(13.6, SIDE_TABLE.size[1] * FURNITURE_SCALE, -6.0),
+        -FRAC_PI_2,
+        false,
+    );
+    p.prop(&SIDE_TABLE, v(13.6, 0.0, -6.0), -FRAC_PI_2, false);
+    plant_pair(p, 12.5, 10.0);
+    plant_pair(p, -12.5, -10.0);
+    for (x, z, tex) in [
+        (-6.0, -11.0, Tex::Standup),
+        (6.0, -11.0, Tex::Kpi),
+        (-14.0, 8.0, Tex::Wellness),
+        (14.0, 2.0, Tex::Roadmap),
+    ] {
+        p.poster_near(x, z, 2.3, Vec2::new(1.5, 1.3), tex);
+    }
+    p.sign_near(0.0, 11.0, 3.2, 3.0, Sign::ScrumBoard);
+    bunting(
+        p,
+        (-6.0, -4.0),
+        (6.0, -4.0),
+        3.7,
+        [Mat::Fabric0, Mat::Fabric1, Mat::Fabric2],
+    );
+}
+
 /// Meeting room 4B: a table, two chairs, the rating scale on the screen, a wall clock. Roomy
 /// enough for the camera to sit behind you and still show the manager over your shoulder.
 fn review() -> FloorLayout {
@@ -109,6 +325,7 @@ fn review() -> FloorLayout {
     p.fp.pod(rounded_rect(pt(0.0, 0.0), 8.0, 7.0, 0.6, 0.0), Mat::Wall);
     p.route = vec![pt(0.0, 4.0), pt(0.0, -4.0)];
     p.build_walls();
+    review_dress(&mut p);
     p.prop(&TABLE, v(0.0, 0.0, -1.0), 0.0, true);
     p.prop(&CHAIR_MODERN, v(0.0, 0.0, -3.3), 0.0, false);
     p.prop(&CHAIR_MODERN, v(0.7, 0.0, 0.9), PI + 0.4, false);
@@ -147,6 +364,7 @@ fn reorg() -> FloorLayout {
     p.fp.pod(rounded_rect(pt(0.0, 0.0), 14.0, 10.0, 1.0, 0.0), Mat::Wall);
     p.route = vec![pt(-10.0, 0.0), pt(10.0, 0.0)];
     p.build_walls();
+    reorg_dress(&mut p);
     for x in [-10.0, -6.0] {
         p.window_near(x, -10.0, Vec2::new(3.2, 1.6), Tex::Skyline, Mat::Trim);
     }
@@ -203,6 +421,7 @@ fn migration() -> FloorLayout {
     p.fp.pod(rounded_rect(pt(0.0, 0.0), 9.0, 6.0, 0.8, 0.0), Mat::Wall);
     p.route = vec![pt(-6.0, 0.0), pt(6.0, 0.0)];
     p.build_walls();
+    migration_dress(&mut p);
     // The old terminal: a beige tower, a CRT with a green screen, a sticky note on top.
     p.boxed(v(-7.7, 0.4, 0.0), v(1.2, 0.8, 2.2), Mat::Beige, true);
     p.boxed(v(-7.8, 1.15, 0.0), v(0.7, 0.6, 0.7), Mat::Beige, false);
@@ -256,6 +475,7 @@ fn hackathon() -> FloorLayout {
     p.fp.pod(rounded_rect(pt(0.0, 0.0), 12.0, 10.0, 1.0, 0.0), Mat::Wall);
     p.route = vec![pt(0.0, 6.0), pt(0.0, -6.0)];
     p.build_walls();
+    hackathon_dress(&mut p);
     // The stage: low enough to step onto, the demo screen behind it.
     p.boxed(v(0.0, 0.12, -8.3), v(9.0, 0.24, 3.2), Mat::Dark, true);
     p.sign_near(0.0, -10.0, 2.5, 4.4, Sign::HackStage);
@@ -331,6 +551,7 @@ fn openspace() -> FloorLayout {
     p.fp.pod(rounded_rect(pt(0.0, 0.0), 14.0, 11.0, 1.0, 0.0), Mat::Wall);
     p.route = vec![pt(-10.0, 0.0), pt(10.0, 0.0)];
     p.build_walls();
+    openspace_dress(&mut p);
     // The pod: two desks facing two, a low divider down the middle.
     for (x, z, yaw) in [
         (-0.9, -0.5, PI),

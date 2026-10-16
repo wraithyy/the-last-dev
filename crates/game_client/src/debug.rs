@@ -12,6 +12,7 @@
 //!   playable, see `game.rs` (also `WOW_QUESTS`, `WOW_UNLOCK_ALL`); works with `WOW_TOPDOWN`
 //!   (140 frames the whole campus) and `WOW_PLAYER_AT=x,z,yaw`.
 //! - `WOW_JIRA=1`, `WOW_MAP=1`: open the `~/jira` log or the map at start.
+//! - `WOW_KILL_NEAREST=<secs>` (+ `WOW_LOOT_ADD=a|b`, `WOW_KILL_CALM=1` kills the whole room): corpse for loot shots.
 //! - `WOW_KILL_BOSS=<secs>`: the zone boss dies (as a player kill) that many seconds in.
 //! - `WOW_BOSS_PCT=<pct>@<secs>`: the zone boss drops to that HP percent at that time (phase shots).
 //! - `WOW_FPS=1`: log average frame time and drawn mesh count every 3 s (vsync caps the rate, so read the ms).
@@ -24,7 +25,7 @@
 //! - `WOW_CAM_DIST=<m>`: start with the camera zoomed to that distance; `WOW_CAM_PITCH=<deg>` tilts it.
 //! - `WOW_GIVE_ITEMS=1`: grant a sample set of trophies at start (stacks included).
 //! - `WOW_TROPHIES=1`: open the `~/trophies` window at start.
-//! - `WOW_LOOT_DEMO=1`: show the loot window and log lines for three sample items (display only; see `hud/feed.rs`).
+//! - `WOW_LOOT_DEMO=1`: show the loot window and log lines for three sample items (display only; see `hud/loot.rs`); `WOW_AUTO_LOOT=0|1` overrides the Auto Loot setting.
 //! - `WOW_COFFEE=<secs>`: drain mana to 30 and start a Coffee Break that many seconds in (1 if not a number).
 //! - `WOW_AUTORUN=1`: hold "forward" so animation and camera can be checked without input.
 //! - `WOW_METER_MODE=0|1|2`, `WOW_METER_SCOPE=overall`: initial `~/metrics` mode and scope (open it with `WOW_KEYS=t:KeyK`).
@@ -232,6 +233,19 @@ impl Plugin for DebugPlugin {
                         && sim.0.debug_kill(id)
                     {
                         *corpse = Some(id);
+                        // `WOW_KILL_CALM=1`: the rest of the room dies too, so nothing fights back
+                        // and the loot window is not closed by combat in a screenshot.
+                        if env::var_os("WOW_KILL_CALM").is_some() {
+                            let rest: Vec<_> = sim
+                                .0
+                                .units()
+                                .filter(|u| u.hostile && u.alive && !u.boss)
+                                .map(|u| u.id)
+                                .collect();
+                            for other in rest {
+                                sim.0.debug_kill(other);
+                            }
+                        }
                         // Step up to the corpse so `WOW_LOOT` is in reach.
                         body.teleport(Vec3::new(at.x + 1.2, at.y, at.z + 1.2));
                     }

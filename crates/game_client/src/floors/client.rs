@@ -4,11 +4,11 @@
 
 use super::kit::*;
 use super::layout::{FloorKind, FloorLayout, Theme, assemble, yaw_towards};
-use super::props::{long_table, printer};
+use super::props::{long_table, printer, water_cooler};
 use super::shape::{rounded_rect, stroke};
 use super::themes::{ceiling_lights, pt, v};
 use bevy::prelude::*;
-use std::f32::consts::PI;
+use std::f32::consts::{FRAC_PI_2, PI};
 
 pub const ZONE: &str = "client/1";
 
@@ -36,6 +36,21 @@ fn empty_desk(p: &mut Plan, i: usize, x: f32, z: f32) {
     p.prop(&DESK, v(x, 0.0, z), 0.0, true);
     p.prop(&SCREEN, v(x, top, back + 0.2), 0.0, false);
     p.prop(&KEYBOARD, v(x, top, back + 0.62), 0.0, false);
+    // Phone in the same spot on every desk, and a note on every other monitor.
+    p.boxed(
+        v(x + 0.62, top + 0.05, z + 0.0),
+        v(0.2, 0.1, 0.2),
+        Mat::Dark,
+        false,
+    );
+    if i.is_multiple_of(2) {
+        p.boxed(
+            v(x + 0.2, top + 0.2, back + 0.34),
+            v(0.07, 0.07, 0.005),
+            Mat::Yellow,
+            false,
+        );
+    }
     let skew = [0.35, -0.25, 0.1, -0.4][i % 4];
     p.prop(&CHAIR_MODERN, v(x + 0.1, 0.0, z + 0.95), PI + skew, false);
 }
@@ -135,7 +150,10 @@ pub fn build() -> FloorLayout {
     p.sign_near(42.5, -2.0, 2.4, 3.6, Sign::ClientRoom);
     dead_plant(&mut p, 40.0, 8.0);
 
+    client_dressing(&mut p);
     ceiling_lights(&mut p);
+    // One panel has been out since the last audit.
+    p.boxed(v(8.0, H - 0.045, 8.0), v(1.3, 0.01, 0.7), Mat::Dark, false);
     for (x, z) in [
         (-34.0, -3.0),
         (-34.0, 4.0),
@@ -180,6 +198,189 @@ pub fn build() -> FloorLayout {
         p,
         theme(),
     )
+}
+
+/// A framed, dusty print of "Untitled No. 3", the same on every wall.
+fn art_print(p: &mut Plan, x: f32, z: f32) {
+    p.poster_near(x, z, 2.1, Vec2::new(1.3, 0.98), Tex::CorpArt);
+}
+
+/// Half-drawn blinds over a grey day.
+fn blinds(p: &mut Plan, x: f32, z: f32) {
+    p.poster_near(x, z, 2.1, Vec2::new(3.0, 2.0), Tex::Blinds);
+}
+
+/// The coffee machine that has been broken since the merger: a puddle, a queue of empty cups
+/// and a ticket number.
+fn broken_coffee(p: &mut Plan, x: f32, z: f32) {
+    let top = SIDE_TABLE.size[1] * FURNITURE_SCALE;
+    p.prop(&SIDE_TABLE, v(x, 0.0, z), -FRAC_PI_2, true);
+    p.prop(&COFFEE_MACHINE, v(x, top, z), -FRAC_PI_2, false);
+    p.boxed(
+        v(x - 0.28, top + 0.3, z - 0.1),
+        v(0.04, 0.05, 0.05),
+        Mat::LedRed,
+        false,
+    );
+    for k in 0..3 {
+        p.prim(
+            PrimKind::Cylinder,
+            v(x - 0.15, top + 0.07, z + 0.45 + k as f32 * 0.17),
+            v(0.1, 0.14, 0.1),
+            Mat::White,
+        );
+    }
+    p.prim(
+        PrimKind::Cylinder,
+        v(x - 0.9, 0.006, z - 0.1),
+        v(1.0, 0.012, 1.0),
+        Mat::Bark,
+    );
+    p.sign_near(x + 0.6, z, 2.0, 1.3, Sign::ClientCoffee);
+}
+
+fn client_dressing(p: &mut Plan) {
+    // Corporate wainscot and chair rail, the same on every wall.
+    p.pieces.push(Piece::Run {
+        segs: p.walls.clone(),
+        mat: Mat::Fabric2,
+        y0: 0.2,
+        y1: 0.95,
+        inset: 0.015,
+    });
+    p.pieces.push(Piece::Run {
+        segs: p.walls.clone(),
+        mat: Mat::Trim,
+        y0: 0.95,
+        y1: 1.0,
+        inset: 0.03,
+    });
+    // The one carpet tile that came from another batch (tiles are 2 m on the 2 m grid).
+    p.slab(v(-5.0, 0.012, 3.0), 0.0, v(2.0, 0.024, 2.0), Mat::Fabric2);
+
+    // Lobby: the front desk gets a screen turned to the receptionist, a bell and a badge tray.
+    p.prop(&SCREEN, v(-35.2, 1.15, -5.85), PI, false);
+    p.prim(
+        PrimKind::Cylinder,
+        v(-32.8, 1.19, -5.2),
+        v(0.12, 0.06, 0.12),
+        Mat::Gold,
+    );
+    p.boxed(v(-33.6, 1.17, -5.2), v(0.3, 0.04, 0.2), Mat::Paper, false);
+    p.boxed(v(-34.0, 0.01, -3.4), v(2.4, 0.02, 1.2), Mat::Fabric0, false);
+    p.prop(&COFFEE_TABLE, v(-35.9, 0.0, 5.4), 0.0, true);
+    for (dx, dy) in [(-0.2, 0.0), (0.15, 0.03)] {
+        p.boxed(
+            v(
+                -35.9 + dx,
+                COFFEE_TABLE.size[1] * FURNITURE_SCALE + 0.02 + dy,
+                5.4,
+            ),
+            v(0.3, 0.02, 0.22),
+            Mat::Paper,
+            false,
+        );
+    }
+    p.prop(&SIDE_TABLE, v(-39.6, 0.0, 7.7), PI, true);
+    p.prop(
+        &LAMP_TABLE,
+        v(-39.6, SIDE_TABLE.size[1] * FURNITURE_SCALE, 7.7),
+        0.0,
+        false,
+    );
+    water_cooler(p, -26.8, 6.6);
+    art_print(p, -42.0, 5.4);
+    p.sign_near(-42.0, 5.4, 1.2, 0.9, Sign::ClientPlaque);
+    blinds(p, -39.5, -9.0);
+    p.sign_near(-30.0, 9.5, 2.3, 2.6, Sign::ClientValues);
+    p.sign_near(-26.0, -5.5, 2.3, 2.0, Sign::ClientEvac);
+
+    // Corridors: an extinguisher on each, checked in 2016.
+    for (x, z) in [(-25.5, -2.75), (23.0, 2.75)] {
+        p.prim(
+            PrimKind::Cylinder,
+            v(x, 0.35, z),
+            v(0.2, 0.7, 0.2),
+            Mat::Red,
+        );
+    }
+
+    // Hall: blinds and prints at an even pitch, filing cabinets in the corners, the kitchenette.
+    for (x, z) in [(-12.0, -16.0), (12.0, -16.0), (15.0, 16.0), (-15.0, 16.0)] {
+        blinds(p, x, z);
+    }
+    for z in [-9.0, 9.0] {
+        blinds(p, -20.0, z);
+    }
+    blinds(p, 20.0, -9.0);
+    for x in [-6.5, 6.5] {
+        art_print(p, x, -16.0);
+    }
+    for x in [-4.5, 4.5] {
+        art_print(p, x, 16.0);
+    }
+    for z in [-5.5, 5.5] {
+        art_print(p, -20.0, z);
+    }
+    art_print(p, 20.0, -5.5);
+    for x in [-18.6, -17.4, -16.2, 16.2, 17.4, 18.6] {
+        p.boxed(v(x, 0.65, -15.5), v(0.55, 1.3, 0.6), Mat::Metal, true);
+    }
+    // Low partitions between the desks of each row, so the rows read as rows.
+    for z in [-12.0, -7.5, 7.5, 12.0] {
+        for x in [-16.2, -12.6, -9.0, -5.4, 5.4, 9.0, 12.6, 16.2] {
+            p.boxed(v(x, 0.55, z - 0.2), v(0.05, 1.1, 0.9), Mat::Fabric1, false);
+        }
+    }
+    p.prop(&FRIDGE, v(19.35, 0.0, 9.6), -FRAC_PI_2, true);
+    broken_coffee(p, 19.45, 6.4);
+
+    // Meeting room: jug, glasses, conference phone, a dead screen and a flipchart.
+    let top = TABLE.size[1] * FURNITURE_SCALE;
+    p.prim(
+        PrimKind::Cylinder,
+        v(34.0, top + 0.15, -2.0),
+        v(0.14, 0.3, 0.14),
+        Mat::Water,
+    );
+    for k in 0..4 {
+        p.prim(
+            PrimKind::Cylinder,
+            v(
+                33.2 + k as f32 * 0.45,
+                top + 0.05,
+                -1.8 + (k % 2) as f32 * 0.3,
+            ),
+            v(0.07, 0.1, 0.07),
+            Mat::Glass,
+        );
+    }
+    p.boxed(
+        v(35.6, top + 0.025, -2.0),
+        v(0.32, 0.05, 0.32),
+        Mat::Dark,
+        false,
+    );
+    p.prop(&CABINET_TV, v(41.5, 0.0, 6.0), -FRAC_PI_2, true);
+    p.prop(
+        &TV,
+        v(41.5, CABINET_TV.size[1] * FURNITURE_SCALE, 6.0),
+        -FRAC_PI_2,
+        false,
+    );
+    p.boxed(v(28.0, 0.9, -8.6), v(0.8, 1.8, 0.05), Mat::Board, true);
+    for dx in [-0.35, 0.35] {
+        p.boxed(
+            v(28.0 + dx, 0.45, -8.55),
+            v(0.04, 0.9, 0.04),
+            Mat::Metal,
+            false,
+        );
+    }
+    blinds(p, 33.0, -10.0);
+    blinds(p, 39.5, -10.0);
+    art_print(p, 30.0, 10.0);
+    art_print(p, 38.0, 10.0);
 }
 
 #[cfg(test)]

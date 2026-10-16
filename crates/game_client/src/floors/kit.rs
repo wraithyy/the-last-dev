@@ -295,6 +295,20 @@ pub enum Tex {
     Misc,
     TurnItOff,
     NextAgent,
+    // data center: rack faces and the all-red NOC dashboards
+    RackBlades,
+    RackPatch,
+    RackDrives,
+    RackBack,
+    RackScorched,
+    RackBackHot,
+    NocGraph,
+    NocAlerts,
+    NocRegions,
+    /// Venetian blinds, half drawn, over a flat grey day (client office).
+    Blinds,
+    /// The corporate art print: beige abstraction, dusty.
+    CorpArt,
     Sign(Sign),
 }
 
@@ -332,6 +346,14 @@ pub enum Sign {
     Uptime,
     DoNotUnplug,
     ThisIsFine,
+    AiTraining,
+    Kubernetes,
+    Mainframe,
+    PowerStrip,
+    Rack42,
+    NoFood,
+    RackFire,
+    Escort,
     TempWarning,
     ToCampus,
     ToDataCenter2,
@@ -419,6 +441,19 @@ pub enum Sign {
     HackPizza,
     OpenQuiet,
     OpenCollab,
+    // innovation lab and client office dressing
+    HypeWall,
+    Kombucha,
+    MoveFast,
+    AgiRoom,
+    ProtoGraveyard,
+    DemoDay,
+    RobotArm,
+    LabNda,
+    ClientValues,
+    ClientCoffee,
+    ClientPlaque,
+    ClientEvac,
 }
 
 #[derive(Clone, Debug)]

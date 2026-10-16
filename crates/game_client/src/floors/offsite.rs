@@ -6,7 +6,7 @@
 use super::kit::*;
 use super::layout::{FloorKind, FloorLayout, Theme, assemble};
 use super::props::{beanbag, long_table, lounge};
-use super::shape::{blob, rounded_rect, stroke};
+use super::shape::{Seg, blob, rounded_rect, stroke};
 use super::themes::{ceiling_lights, pt, runner, v};
 use super::zones::{ZoneCast, cast_zone};
 use bevy::prelude::*;
@@ -77,7 +77,7 @@ fn theme(level: u8) -> Theme {
             trim: c(0.3, 0.2, 0.13),
             accent: LinearRgba::rgb(0.3, 2.2, 3.0),
             fabric: [c(0.12, 0.35, 0.5), c(0.85, 0.55, 0.25), c(0.9, 0.85, 0.7)],
-            floor: FloorKind::Gloss([0.85, 0.62, 0.42]),
+            floor: FloorKind::Gloss([0.92, 0.86, 0.74]),
             fog: c(0.74, 0.84, 0.93),
             ambient: c(0.9, 0.92, 1.0),
             ambient_brightness: 800.0,
@@ -101,6 +101,191 @@ fn theme(level: u8) -> Theme {
     }
 }
 
+// ------------------------------------------------------------------ raid dressing kit
+// Shared by the other raid and minigame venues (vibecon, teambuilding, corporate), so every
+// room gets the same wall, light and furniture vocabulary as the tower instead of bare boxes.
+
+/// Band along every opaque wall (dado, rail, crown, cove light). Insets above 0.03 stay clear of
+/// the trim and accent runs `build_walls` already lays at 0.02.
+pub(super) fn wall_band(p: &mut Plan, mat: Mat, y0: f32, y1: f32, inset: f32) {
+    let segs: Vec<Seg> = p
+        .walls
+        .iter()
+        .filter(|s| s.mat != Mat::Glass)
+        .copied()
+        .collect();
+    if !segs.is_empty() {
+        p.pieces.push(Piece::Run {
+            segs,
+            mat,
+            y0,
+            y1,
+            inset,
+        });
+    }
+}
+
+/// Dado panelling, a rail on top and a crown moulding: the walls stop being one flat colour.
+pub(super) fn wall_dress(p: &mut Plan, dado: Mat, rail: Mat, crown: Mat) {
+    wall_band(p, dado, 0.2, 1.05, 0.04);
+    wall_band(p, rail, 1.05, 1.13, 0.06);
+    wall_band(p, crown, H - 0.32, H, 0.06);
+}
+
+/// Glowing cove strip under the crown: cheap mood lighting that costs no real light.
+pub(super) fn cove(p: &mut Plan, mat: Mat) {
+    wall_band(p, mat, H - 0.42, H - 0.36, 0.09);
+}
+
+/// Flat pilaster against the nearest wall, gold base and capital.
+pub(super) fn pilaster(p: &mut Plan, x: f32, z: f32, mat: Mat) {
+    let Some((at, n)) = p.wall_near(x, z) else {
+        return;
+    };
+    let yaw = n.x.atan2(n.y);
+    let c = at + n * 0.17;
+    p.framed(v(c.x, 0.0, c.y), yaw, |p| {
+        p.boxed(v(0.0, H / 2.0, 0.0), v(0.7, H, 0.34), mat, false);
+        p.boxed(v(0.0, 0.18, 0.04), v(0.9, 0.36, 0.42), Mat::Gold, false);
+        p.boxed(v(0.0, H - 0.4, 0.04), v(0.9, 0.3, 0.42), Mat::Gold, false);
+    });
+}
+
+/// Furniture flush against the nearest wall, front facing into the room.
+pub(super) fn wall_prop(p: &mut Plan, model: &'static Model, x: f32, z: f32, solid: bool) {
+    let Some((at, n)) = p.wall_near(x, z) else {
+        return;
+    };
+    let c = at + n * (model.size[2] * FURNITURE_SCALE / 2.0 + 0.06);
+    p.prop(model, v(c.x, 0.0, c.y), n.x.atan2(n.y), solid);
+}
+
+/// Chair at (x, z) turned to face (tx, tz). Visual and seat only, never a blocker.
+pub(super) fn chair_to(p: &mut Plan, x: f32, z: f32, tx: f32, tz: f32) {
+    p.prop(&CHAIR_MODERN, v(x, 0.0, z), (tx - x).atan2(tz - z), false);
+}
+
+/// `n` chairs on a circle round (cx, cz), all facing the middle.
+pub(super) fn ring_chairs(p: &mut Plan, cx: f32, cz: f32, r: f32, n: usize, phase: f32) {
+    for k in 0..n {
+        let a = phase + k as f32 * TAU / n as f32;
+        chair_to(p, cx + r * a.cos(), cz + r * a.sin(), cx, cz);
+    }
+}
+
+/// Flat colour patch on the carpet (rug, dance floor, lawn path); below the runners' 0.02.
+pub(super) fn floor_patch(p: &mut Plan, x: f32, z: f32, yaw: f32, w: f32, d: f32, mat: Mat) {
+    p.slab(v(x, 0.005, z), yaw, v(w, 0.01, d), mat);
+}
+
+pub(super) fn round_patch(p: &mut Plan, x: f32, z: f32, dia: f32, mat: Mat) {
+    p.prim(PrimKind::Cylinder, v(x, 0.005, z), v(dia, 0.01, dia), mat);
+}
+
+/// Bunting between two points: alternating flags on a sagging line.
+pub(super) fn bunting(p: &mut Plan, a: (f32, f32), b: (f32, f32), y: f32, flags: [Mat; 3]) {
+    let (dx, dz) = (b.0 - a.0, b.1 - a.1);
+    let len = (dx * dx + dz * dz).sqrt();
+    let n = (len / 0.7) as usize;
+    let yaw = (-dz).atan2(dx);
+    for k in 0..=n {
+        let t = k as f32 / n.max(1) as f32;
+        let sag = 0.5 * (t * PI).sin();
+        p.slab(
+            v(a.0 + dx * t, y - sag - 0.14, a.1 + dz * t),
+            yaw,
+            v(0.26, 0.2, 0.02),
+            flags[k % 3],
+        );
+    }
+}
+
+/// Bunch of balloons on strings tied to a weight.
+pub(super) fn balloons(p: &mut Plan, x: f32, z: f32, mats: [Mat; 3]) {
+    p.prim(
+        PrimKind::Cylinder,
+        v(x, 0.06, z),
+        v(0.3, 0.12, 0.3),
+        Mat::Dark,
+    );
+    for (k, (dx, dz, h)) in [(0.0, 0.0, 2.3), (0.3, 0.1, 2.0), (-0.25, 0.2, 2.15)]
+        .into_iter()
+        .enumerate()
+    {
+        p.boxed(
+            v(x + dx / 2.0, h / 2.0, z + dz / 2.0),
+            v(0.012, h, 0.012),
+            Mat::Paper,
+            false,
+        );
+        p.prim(
+            PrimKind::Sphere,
+            v(x + dx, h + 0.25, z + dz),
+            v(0.5, 0.6, 0.5),
+            mats[k % 3],
+        );
+    }
+}
+
+/// Dark crossbeams under the ceiling, only where the footprint holds them, so a flat tile lid
+/// reads as an architectural ceiling. Visual only.
+pub(super) fn beams(p: &mut Plan, x0: f32, x1: f32, z0: f32, z1: f32, step: f32, mat: Mat) {
+    let mut x = x0;
+    while x <= x1 {
+        let mut z = z0;
+        while z < z1 {
+            let (a, b) = (pt(x, z), pt(x, z + 2.0));
+            if p.fp.contains(a) && p.fp.contains(b) && p.fp.contains(pt(x, z + 1.0)) {
+                p.boxed(v(x, H - 0.16, z + 1.0), v(0.28, 0.28, 2.0), mat, false);
+            }
+            z += 2.0;
+        }
+        x += step;
+    }
+}
+
+/// Stepped round dais: marble body, gold ring, optional inlay.
+pub(super) fn dais(p: &mut Plan, x: f32, z: f32, dia: f32, inlay: Mat) {
+    p.prim(
+        PrimKind::Cylinder,
+        v(x, 0.07, z),
+        v(dia + 0.5, 0.14, dia + 0.5),
+        Mat::Gold,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(x, 0.09, z),
+        v(dia, 0.18, dia),
+        Mat::MarbleDark,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(x, 0.185, z),
+        v(dia * 0.72, 0.01, dia * 0.72),
+        inlay,
+    );
+}
+
+/// Tall pot plant with a bushier cousin beside it.
+pub(super) fn plant_pair(p: &mut Plan, x: f32, z: f32) {
+    p.prop(&POTTED_PLANT, v(x, 0.0, z), 0.0, true);
+    p.prop_scaled(&POTTED_PLANT, v(x + 0.55, 0.0, z + 0.2), 1.3, false, 0.8);
+}
+
+/// Piano-style black upright: body, lid, bench. Solid.
+pub(super) fn grand_piano(p: &mut Plan, x: f32, z: f32, yaw: f32) {
+    p.framed(v(x, 0.0, z), yaw, |p| {
+        p.boxed(v(0.0, 0.95, 0.0), v(2.8, 0.22, 1.7), Mat::Dark, false);
+        for (sx, sz) in [(-1.2, -0.65), (1.2, -0.65), (-1.2, 0.65)] {
+            p.boxed(v(sx, 0.42, sz), v(0.12, 0.84, 0.12), Mat::Dark, false);
+        }
+        p.boxed(v(-0.2, 1.1, 0.0), v(2.4, 0.04, 1.5), Mat::Chrome, false);
+        p.boxed(v(0.0, 1.02, 0.85), v(1.6, 0.06, 0.3), Mat::White, false);
+        p.boxed(v(0.0, 0.5, 1.7), v(1.3, 0.1, 0.5), Mat::Wood, false);
+    });
+    p.block(v(x, 0.75, z), v(2.8, 1.5, 1.8));
+}
+
 // ------------------------------------------------------------------ shared props
 
 /// Banquet table: cloth drum, centrepiece candle and six chairs.
@@ -119,12 +304,20 @@ fn round_table(p: &mut Plan, x: f32, z: f32, cloth: Mat, chair: Mat) {
         Mat::Candle,
     );
     p.block(v(x, 0.5, z), v(2.6, 1.0, 2.6));
+    ring_chairs(p, x, z, 2.0, 6, 0.3);
+    // Place settings: plate, napkin fan in the table's cloth colour.
     for k in 0..6 {
         let a = k as f32 * TAU / 6.0 + 0.3;
+        p.prim(
+            PrimKind::Cylinder,
+            v(x + 1.0 * a.cos(), 0.81, z + 1.0 * a.sin()),
+            v(0.32, 0.015, 0.32),
+            Mat::White,
+        );
         p.slab(
-            v(x + 2.0 * a.cos(), 0.45, z + 2.0 * a.sin()),
+            v(x + 1.0 * a.cos(), 0.84, z + 1.0 * a.sin()),
             -a,
-            v(0.5, 0.9, 0.5),
+            v(0.1, 0.02, 0.2),
             chair,
         );
     }
@@ -240,6 +433,9 @@ fn lobby(p: &mut Plan) -> Theme {
         pt(36.0, 0.0),
     ];
     p.build_walls();
+    wall_dress(p, Mat::Wood, Mat::Gold, Mat::Trim);
+    cove(p, Mat::Candle);
+    lobby_dress(p);
 
     // Red carpet from the revolving door to the icebreaker stage.
     runner(
@@ -327,14 +523,18 @@ fn lobby(p: &mut Plan) -> Theme {
     p.sign_near(-24.0, 39.8, 2.6, 3.0, Sign::OffsiteBar);
 
     // Icebreaker stage: a ring of chairs nobody wants to sit in, a gold dais, a lectern.
-    p.boxed(v(38.0, 0.15, 0.0), v(8.0, 0.3, 8.0), Mat::Gold, false);
-    for k in 0..10 {
-        let a = k as f32 * TAU / 10.0 + 0.2;
-        p.slab(
-            v(38.0 + 6.2 * a.cos(), 0.45, 6.2 * a.sin()),
-            -a,
-            v(0.5, 0.9, 0.5),
-            Mat::Fabric2,
+    dais(p, 38.0, 0.0, 8.0, Mat::Fabric0);
+    ring_chairs(p, 38.0, 0.0, 6.2, 10, 0.2);
+    for z in [-12.5, 12.5] {
+        p.boxed(v(49.0, 2.25, z), v(1.0, 4.5, 3.0), Mat::Fabric0, false);
+    }
+    p.boxed(v(44.0, 4.05, 0.0), v(0.2, 0.2, 16.0), Mat::Metal, false);
+    for k in 0..5 {
+        p.boxed(
+            v(44.0, 3.9, -6.0 + k as f32 * 3.0),
+            v(0.4, 0.2, 0.4),
+            Mat::LightPanel,
+            false,
         );
     }
     p.boxed(v(46.0, 0.55, 0.0), v(0.8, 1.1, 1.2), Mat::Wood, true);
@@ -371,6 +571,109 @@ fn lobby(p: &mut Plan) -> Theme {
     theme(1)
 }
 
+/// Lobby furniture and architecture beyond the first pass: pilasters, a fountain with the
+/// synergy ice sculpture, a piano nobody plays, luggage, brochures and festive clutter.
+fn lobby_dress(p: &mut Plan) {
+    for x in [-33.0, -27.0, -21.0, -2.0, 4.0] {
+        pilaster(p, x, -19.9, Mat::Marble);
+        pilaster(p, x, 19.9, Mat::Marble);
+    }
+    for z in [-10.0, 10.0] {
+        pilaster(p, 49.9, z, Mat::Marble);
+    }
+    beams(p, -28.0, 4.0, -20.0, 20.0, 8.0, Mat::Trim);
+    // Fountain with the company logo carved in ice, melting on schedule.
+    let (fx, fz) = (-14.0, -9.0);
+    p.prim(
+        PrimKind::Cylinder,
+        v(fx, 0.3, fz),
+        v(4.6, 0.6, 4.6),
+        Mat::Marble,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(fx, 0.61, fz),
+        v(4.0, 0.03, 4.0),
+        Mat::Water,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(fx, 0.9, fz),
+        v(1.0, 0.6, 1.0),
+        Mat::MarbleDark,
+    );
+    p.prim(PrimKind::Cone, v(fx, 2.0, fz), v(1.0, 2.2, 1.0), Mat::Glass);
+    for k in 0..4 {
+        let a = k as f32 * FRAC_PI_2 + 0.8;
+        p.prim(
+            PrimKind::Cone,
+            v(fx + 0.9 * a.cos(), 1.2, fz + 0.9 * a.sin()),
+            v(0.35, 1.3, 0.35),
+            Mat::Glass,
+        );
+    }
+    p.block(v(fx, 0.5, fz), v(4.6, 1.0, 4.6));
+    p.boxed(v(fx, 0.35, fz + 3.0), v(0.9, 0.7, 0.3), Mat::Dark, false);
+    p.panel(
+        v(fx, 0.55, fz + 3.16),
+        0.0,
+        Vec2::new(0.7, 0.45),
+        Tex::Synergy,
+    );
+    // Piano corner.
+    floor_patch(p, -21.0, 12.0, 0.0, 6.0, 4.4, Mat::Fabric1);
+    grand_piano(p, -21.0, 12.0, 0.0);
+    plant_pair(p, -25.5, 15.5);
+    // Reading wall.
+    for x in [-30.0, -26.0] {
+        wall_prop(p, &BOOKCASE_CLOSED_WIDE, x, 19.9, true);
+    }
+    p.poster_near(-12.0, 19.9, 2.3, Vec2::new(1.4, 1.8), Tex::Wellness);
+    p.poster_near(2.0, 19.9, 2.3, Vec2::new(1.8, 1.4), Tex::Family);
+    p.poster_near(-31.0, -19.9, 2.3, Vec2::new(1.6, 1.4), Tex::Standup);
+    // Luggage by the revolving door: gold cart, suitcases, one lanyard-tagged cardboard box.
+    p.boxed(v(-55.0, 0.15, 5.0), v(1.6, 0.1, 1.0), Mat::Gold, false);
+    p.boxed(v(-55.0, 1.2, 5.45), v(1.6, 2.2, 0.05), Mat::Gold, false);
+    for (k, m) in [Mat::BeanA, Mat::BeanB, Mat::Cardboard]
+        .into_iter()
+        .enumerate()
+    {
+        p.boxed(
+            v(-55.6 + k as f32 * 0.6, 0.55, 5.0),
+            v(0.5, 0.7, 0.35),
+            m,
+            false,
+        );
+    }
+    p.block(v(-55.0, 0.6, 5.0), v(1.7, 1.2, 1.1));
+    bunting(
+        p,
+        (-32.0, -6.0),
+        (-2.0, -6.0),
+        3.7,
+        [Mat::Fabric0, Mat::Fabric1, Mat::Gold],
+    );
+    bunting(
+        p,
+        (-32.0, 6.0),
+        (-2.0, 6.0),
+        3.7,
+        [Mat::Fabric1, Mat::Gold, Mat::Fabric0],
+    );
+    // Confetti left over from the last all-hands, round the icebreaker stage.
+    for k in 0..28 {
+        let (a, r) = (k as f32 * 2.399, 5.0 + (k as f32 * 1.7).sin().abs() * 5.5);
+        p.slab(
+            v(38.0 + r * a.cos(), 0.025, r * a.sin()),
+            a,
+            v(0.16, 0.01, 0.1),
+            [Mat::NeonPink, Mat::NeonYellow, Mat::NeonCyan, Mat::Gold][k % 4],
+        );
+    }
+    balloons(p, 46.0, -9.0, [Mat::Fabric0, Mat::Gold, Mat::Fabric1]);
+    balloons(p, 46.0, 9.0, [Mat::Fabric1, Mat::Fabric0, Mat::Gold]);
+}
+
 // ------------------------------------------------------------------ offsite/2: breakout rooms
 
 fn breakout(p: &mut Plan) -> Theme {
@@ -395,6 +698,9 @@ fn breakout(p: &mut Plan) -> Theme {
         pt(14.0, 0.0),
     ];
     p.build_walls();
+    wall_dress(p, Mat::Fabric0, Mat::White, Mat::Trim);
+    cove(p, Mat::NeonCyan);
+    breakout_dress(p);
 
     // Corridor: teal carpet, a sign by every room entrance.
     runner(
@@ -507,6 +813,189 @@ fn breakout(p: &mut Plan) -> Theme {
         },
     );
     theme(2)
+}
+
+/// Breakout hall: lounge corners, a coffee wall, project boards and a ceiling grid.
+fn breakout_dress(p: &mut Plan) {
+    beams(p, -4.0, 40.0, -24.0, 24.0, 8.0, Mat::Trim);
+    round_patch(p, 24.0, 0.0, 15.0, Mat::Fabric2);
+    for (x, z, yaw) in [
+        (12.0, -13.0, 0.0),
+        (12.0, 13.0, PI),
+        (36.0, -14.0, 0.0),
+        (36.0, 14.0, PI),
+    ] {
+        lounge(p, x, z, yaw, true);
+    }
+    // Coffee wall with a fridge nobody restocks.
+    wall_prop(p, &SIDE_TABLE, 20.0, -24.1, true);
+    p.prop(
+        &COFFEE_MACHINE,
+        v(20.0, SIDE_TABLE.size[1] * FURNITURE_SCALE, -23.5),
+        0.0,
+        false,
+    );
+    wall_prop(p, &FRIDGE, 15.0, -24.1, true);
+    wall_prop(p, &TV, 30.0, 23.9, false);
+    for (x, z, tex, w, h) in [
+        (6.0, -24.0, Tex::Roadmap, 3.0, 1.5),
+        (28.0, -24.0, Tex::Gantt, 2.6, 1.6),
+        (6.0, 24.0, Tex::Flowchart, 3.0, 1.5),
+        (38.0, 24.0, Tex::Kpi, 1.8, 1.2),
+        (41.0, 0.0, Tex::Suggestions, 1.4, 1.8),
+    ] {
+        p.poster_near(x, z, 2.2, Vec2::new(w, h), tex);
+    }
+    // Corridor ends: a plant and a notice board.
+    plant_pair(p, -56.0, 5.0);
+    p.poster_near(-8.0, 3.0, 2.2, Vec2::new(1.6, 1.2), Tex::Standup);
+    bunting(
+        p,
+        (6.0, -10.0),
+        (6.0, 10.0),
+        3.8,
+        [Mat::Fabric0, Mat::Fabric1, Mat::Fabric2],
+    );
+}
+
+/// Terrace: pergola over the boardwalk, parasols, loungers by the water, palms, a staged keynote.
+fn terrace_dress(p: &mut Plan) {
+    // Pergola over the boardwalk west end.
+    for x in [-58.0, -50.0] {
+        for z in [-3.2, 3.2] {
+            p.boxed(v(x, 1.6, z), v(0.25, 3.2, 0.25), Mat::Wood, false);
+        }
+        p.boxed(v(x, 3.25, 0.0), v(0.3, 0.2, 7.2), Mat::Wood, false);
+    }
+    for k in 0..9 {
+        p.boxed(
+            v(-59.0 + k as f32 * 1.1, 3.4, 0.0),
+            v(0.12, 0.12, 7.6),
+            Mat::Bark,
+            false,
+        );
+    }
+    // Parasols on the cocktail tables.
+    for (x, z, m) in [
+        (-38.0, 12.0, Mat::Fabric0),
+        (-30.0, 14.5, Mat::Fabric1),
+        (-20.0, 13.0, Mat::Fabric2),
+        (-8.0, 13.0, Mat::Fabric0),
+        (22.0, 23.5, Mat::Fabric1),
+        (34.0, 23.5, Mat::Fabric2),
+        (46.0, 23.5, Mat::Fabric0),
+    ] {
+        p.prim(
+            PrimKind::Cylinder,
+            v(x, 1.6, z),
+            v(0.05, 3.2, 0.05),
+            Mat::Metal,
+        );
+        p.prim(PrimKind::Cone, v(x, 3.15, z), v(2.4, 0.55, 2.4), m);
+    }
+    // Sun loungers along the south balustrade.
+    for k in 0..4 {
+        let x = 24.0 + k as f32 * 4.0;
+        p.prop(&LOUNGE_CHAIR_RELAX, v(x, 0.0, 22.2), PI, false);
+    }
+    // Palms: leaning trunk, a crown of fronds.
+    for (x, z) in [
+        (-62.0, -9.0),
+        (-62.0, 9.0),
+        (66.0, -22.0),
+        (66.0, 22.0),
+        (-4.0, 22.0),
+        (-4.0, -22.0),
+    ] {
+        for k in 0..6 {
+            let a = k as f32 * TAU / 6.0;
+            p.slab(
+                v(x + 0.9 * a.cos(), 4.6, z + 0.9 * a.sin()),
+                -a,
+                v(2.2, 0.06, 0.5),
+                Mat::Leaf,
+            );
+        }
+        p.prim(
+            PrimKind::Cylinder,
+            v(x, 2.2, z),
+            v(0.4, 4.4, 0.4),
+            Mat::Bark,
+        );
+        p.prim(PrimKind::Sphere, v(x, 4.5, z), v(0.8, 0.6, 0.8), Mat::Bark);
+    }
+    // Keynote stage: wood fascia and steps, truss with lamps, speaker stacks, curtains.
+    p.boxed(v(54.9, 0.1, 0.0), v(0.1, 0.2, 20.0), Mat::Wood, false);
+    p.boxed(v(54.0, 0.06, 0.0), v(1.6, 0.12, 4.0), Mat::Wood, false);
+    p.boxed(v(62.0, 5.2, 0.0), v(0.3, 0.3, 20.0), Mat::Metal, false);
+    for k in 0..7 {
+        p.boxed(
+            v(62.0, 4.95, -9.0 + k as f32 * 3.0),
+            v(0.5, 0.25, 0.5),
+            Mat::LightPanel,
+            false,
+        );
+    }
+    for z in [-10.0, 10.0] {
+        p.boxed(v(62.0, 2.6, z), v(0.3, 5.2, 0.3), Mat::Metal, false);
+        p.boxed(v(65.0, 1.3, z * 0.9), v(1.4, 2.6, 1.2), Mat::Dark, true);
+        p.boxed(v(64.28, 1.0, z * 0.9), v(0.04, 1.2, 1.0), Mat::Metal, false);
+    }
+    for z in [-6.0, 6.0] {
+        p.boxed(v(66.2, 2.8, z * 1.2), v(0.3, 5.6, 3.0), Mat::Fabric0, false);
+    }
+    p.poster_near(-62.0, -4.0, 2.4, Vec2::new(1.4, 1.8), Tex::Wellness);
+    // Lanterns on the balustrade.
+    for k in 0..8 {
+        p.prim(
+            PrimKind::Sphere,
+            v(-30.0 + k as f32 * 10.0, 1.15, 24.9),
+            v(0.3, 0.4, 0.3),
+            Mat::Candle,
+        );
+    }
+}
+
+/// Ballroom: pilasters and drapes round the walls, a parquet floor, gold beams, the stage staged.
+fn ballroom_dress(p: &mut Plan) {
+    for x in [-30.0, -20.0, -10.0, 0.0, 10.0, 20.0, 28.0] {
+        pilaster(p, x, -27.9, Mat::Gold);
+        pilaster(p, x, 27.9, Mat::Gold);
+    }
+    for x in [-24.0, -12.0, 4.0, 22.0] {
+        for s in [-1.0, 1.0] {
+            p.boxed(v(x, 2.0, s * 27.6), v(2.6, 4.0, 0.12), Mat::Fabric1, false);
+        }
+    }
+    beams(p, -34.0, 30.0, -28.0, 28.0, 8.0, Mat::Dark);
+    floor_patch(p, 14.0, 0.0, 0.0, 12.0, 14.0, Mat::Wood);
+    floor_patch(p, -12.0, 0.0, 0.0, 30.0, 10.0, Mat::Fabric2);
+    // Stage: steps, footlights, speaker stacks.
+    for k in 0..3 {
+        p.boxed(
+            v(27.6 - k as f32 * 0.5, 0.04 + k as f32 * 0.04, 0.0),
+            v(0.5, 0.08 + k as f32 * 0.08, 6.0),
+            Mat::MarbleDark,
+            false,
+        );
+    }
+    for k in 0..12 {
+        p.prim(
+            PrimKind::Sphere,
+            v(28.1, 0.3, -11.0 + k as f32 * 2.0),
+            v(0.2, 0.12, 0.2),
+            Mat::Candle,
+        );
+    }
+    for z in [-9.0, 9.0] {
+        p.boxed(v(40.0, 1.3, z), v(1.1, 2.6, 1.0), Mat::Dark, true);
+    }
+    p.poster_near(-8.0, -27.9, 2.2, Vec2::new(1.6, 1.2), Tex::PraiseModel);
+    p.poster_near(8.0, 27.9, 2.2, Vec2::new(1.6, 1.2), Tex::Family);
+    p.poster_near(-24.0, 27.9, 2.2, Vec2::new(1.8, 1.2), Tex::CloseDeals);
+    for (x, z) in [(-45.0, -6.0), (-45.0, 6.0)] {
+        plant_pair(p, x, z);
+    }
 }
 
 // ------------------------------------------------------------------ offsite/3: terrace
@@ -685,6 +1174,7 @@ fn terrace(p: &mut Plan) -> Theme {
         );
     }
 
+    terrace_dress(p);
     for (x, z, c, i) in [
         (-52.0, 0.0, Color::srgb(1.0, 0.85, 0.65), 380_000.0),
         (-30.0, 0.0, Color::srgb(1.0, 0.8, 0.6), 380_000.0),
@@ -726,6 +1216,9 @@ fn ballroom(p: &mut Plan) -> Theme {
         pt(24.0, -8.0),
     ];
     p.build_walls();
+    wall_dress(p, Mat::Wood, Mat::Gold, Mat::Gold);
+    cove(p, Mat::Candle);
+    ballroom_dress(p);
 
     // Gold-edged carpet through the foyer and between the tables.
     runner(

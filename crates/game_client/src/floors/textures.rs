@@ -11,6 +11,8 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
 type Rgb = [u8; 3];
 
+mod dc_art;
+
 pub fn matte(color: Color) -> StandardMaterial {
     StandardMaterial {
         base_color: color,
@@ -146,6 +148,8 @@ fn unlit(tex: Tex) -> bool {
                 | Sign::Billboard
                 | Sign::InnovationNeon
                 | Sign::NocBoard
+                | Sign::AiTraining
+                | Sign::RackFire
                 | Sign::Uptime
                 | Sign::TempWarning
                 | Sign::Printing
@@ -162,7 +166,10 @@ fn unlit(tex: Tex) -> bool {
                 | Sign::VibeConAfterparty
                 | Sign::VibeConFireside
                 | Sign::VibeConKeynote,
-        ) | Tex::DaysCounter
+        ) | Tex::NocGraph
+            | Tex::NocAlerts
+            | Tex::NocRegions
+            | Tex::DaysCounter
             | Tex::CloseDeals
             | Tex::ChatbotFace
             | Tex::Skyline
@@ -724,6 +731,14 @@ fn sign_spec(s: Sign) -> SignSpec {
             [90, 255, 140],
             [255, 200, 80],
         ),
+        Sign::AiTraining
+        | Sign::Kubernetes
+        | Sign::Mainframe
+        | Sign::PowerStrip
+        | Sign::Rack42
+        | Sign::NoFood
+        | Sign::RackFire
+        | Sign::Escort => dc_art::sign_spec(s),
         Sign::ColdAisle => sp(
             &["COLD AISLE", "BRING A JACKET"],
             [14, 40, 70],
@@ -1281,6 +1296,84 @@ fn sign_spec(s: Sign) -> SignSpec {
             [40, 50, 70],
             [60, 140, 220],
         ),
+        Sign::HypeWall => sp(
+            &["PIVOTS THIS QUARTER", "SEVEN", "(ALL ARE STRATEGIC)"],
+            [250, 244, 232],
+            [60, 60, 80],
+            [210, 60, 60],
+        ),
+        Sign::Kombucha => sp(
+            &["KOMBUCHA", "ON TAP", "NOW WITH AI"],
+            [30, 70, 50],
+            [240, 245, 220],
+            [250, 200, 70],
+        ),
+        Sign::MoveFast => sp(
+            &["MOVE FAST", "AND BREAK PROD"],
+            [14, 8, 24],
+            [255, 90, 210],
+            [90, 240, 255],
+        ),
+        Sign::AgiRoom => sp(
+            &["AGI ROOM", "PLEASE DO NOT", "KNOCK"],
+            [18, 22, 40],
+            [210, 220, 245],
+            [255, 90, 70],
+        ),
+        Sign::ProtoGraveyard => sp(
+            &["PROTOTYPE", "GRAVEYARD", "41 DEMOS, 0 SHIPPED"],
+            [40, 40, 46],
+            [210, 210, 215],
+            [230, 170, 70],
+        ),
+        Sign::DemoDay => sp(
+            &["DEMO DAY", "LIVE (PRERECORDED)"],
+            [60, 20, 40],
+            [255, 235, 200],
+            [250, 200, 70],
+        ),
+        Sign::RobotArm => sp(
+            &["ROBOT ARM V3", "AWAITING", "REQUIREMENTS"],
+            [236, 238, 244],
+            [50, 60, 80],
+            [210, 80, 40],
+        ),
+        Sign::LabNda => sp(
+            &["PLEASE SIGN", "THE NDA", "WE HAVE NOTHING"],
+            [236, 238, 244],
+            [50, 60, 80],
+            [210, 80, 40],
+        ),
+        Sign::ClientValues => sp(
+            &[
+                "OUR VALUES",
+                "PROCESS",
+                "ACCOUNTABILITY",
+                "COMPLIANCE",
+                "SEE POLICY 4.2.1",
+            ],
+            [214, 208, 192],
+            [64, 64, 72],
+            [120, 120, 126],
+        ),
+        Sign::ClientCoffee => sp(
+            &["OUT OF ORDER", "SEE TICKET 40412"],
+            [226, 222, 208],
+            [70, 70, 76],
+            [150, 60, 50],
+        ),
+        Sign::ClientPlaque => sp(
+            &["UNTITLED NO. 3", "LOAN FROM FACILITIES"],
+            [150, 150, 154],
+            [232, 228, 214],
+            [190, 186, 174],
+        ),
+        Sign::ClientEvac => sp(
+            &["ASSEMBLY POINT", "THE LOBBY", "(ALSO CLOSED)"],
+            [204, 200, 188],
+            [70, 70, 76],
+            [70, 130, 80],
+        ),
     }
 }
 
@@ -1331,6 +1424,48 @@ pub fn tex_image(tex: Tex) -> Image {
 fn draw(tex: Tex) -> Canvas {
     match tex {
         Tex::Sign(s) => draw_sign(s),
+        Tex::Blinds => {
+            let mut c = Canvas::new(96, 64, [206, 210, 212]);
+            // Slats down to two thirds, each with a shadowed lower edge; one hangs crooked.
+            for k in 0..11 {
+                let y = 2 + k * 4;
+                c.rect(2, y, 92, 3, [200, 192, 176]);
+                c.rect(2, y + 3, 92, 1, [146, 138, 122]);
+            }
+            c.line((2.0, 22.0), (93.0, 25.0), [146, 138, 122]);
+            c.rect(2, 46, 92, 2, [176, 168, 152]);
+            c.rect(88, 46, 1, 12, [120, 116, 104]);
+            c.rect(86, 58, 5, 3, [120, 116, 104]);
+            c.frame(0, 0, 96, 64, 2, [110, 108, 100]);
+            c
+        }
+        Tex::CorpArt => {
+            let mut c = Canvas::new(64, 48, [224, 218, 202]);
+            c.rect(6, 6, 52, 36, [236, 230, 216]);
+            c.rect(10, 22, 30, 16, [188, 168, 128]);
+            c.rect(30, 10, 22, 14, [128, 146, 156]);
+            c.disc(46.0, 30.0, 6.0, [150, 124, 100]);
+            c.rect(10, 18, 44, 1, [110, 110, 110]);
+            // Dust on the glass.
+            for i in 0..20u32 {
+                c.set(
+                    (hash(i, 2) * 64.0) as i32,
+                    (hash(i, 8) * 48.0) as i32,
+                    [244, 242, 236],
+                );
+            }
+            c.frame(0, 0, 64, 48, 2, [120, 114, 104]);
+            c
+        }
+        Tex::RackBlades
+        | Tex::RackPatch
+        | Tex::RackDrives
+        | Tex::RackBack
+        | Tex::RackScorched
+        | Tex::RackBackHot
+        | Tex::NocGraph
+        | Tex::NocAlerts
+        | Tex::NocRegions => dc_art::draw(tex),
         Tex::PosterBars => {
             let mut c = Canvas::new(64, 80, [22, 46, 92]);
             for i in 0..5 {

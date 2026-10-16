@@ -11,6 +11,7 @@ mod feed;
 mod frames;
 mod hovertip;
 mod logs;
+mod loot;
 mod map;
 mod meter;
 mod minimap;
