@@ -2686,7 +2686,7 @@
                 (item: "Pasted Chat Transcript", chance_pct: 40),
                 (item: "Reply Sent to the Wrong Thread", chance_pct: 20),
                 (item: "Regenerated Response (v7)", chance_pct: 10),
-                (item: "Worthless Governance Token", chance_pct: 20, quest: Some("rug_pull_insurance")),
+                (item: "Worthless Governance Token", chance_pct: 100, quest: Some("rug_pull_insurance")),
                 (item: "Meat Proxy's Lost Badge", chance_pct: 20),
             ],
             ai: Some((
@@ -2739,7 +2739,7 @@
             loot: [
                 (item: "Unreviewed Pull Request", chance_pct: 35),
                 (item: "final_final_v3_actually_works.zip", chance_pct: 15),
-                (item: "Hardcoded API Key", chance_pct: 80, quest: Some("secrets_in_the_repo")),
+                (item: "Hardcoded API Key", chance_pct: 100, quest: Some("secrets_in_the_repo")),
                 (item: "Junior's Bookmarked Tutorial", chance_pct: 20),
             ],
             ai: Some((
@@ -2771,7 +2771,7 @@
             max_hp: 70, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_combat: 0,
             xp_reward: 28,
-            loot: [(item: "Accepted Suggestion", chance_pct: 25), (item: "Hardcoded API Key", chance_pct: 25, quest: Some("secrets_in_the_repo"))],
+            loot: [(item: "Accepted Suggestion", chance_pct: 25), (item: "Hardcoded API Key", chance_pct: 100, quest: Some("secrets_in_the_repo"))],
             ai: Some((
                 aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.0, melee_ms: 1200,
                 melee_damage: 4, chase_speed_mps: 7.0, respawn_ms: 60000,
@@ -2864,7 +2864,7 @@
             max_hp: 320, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_combat: 0,
             xp_reward: 60,
-            loot: [(item: "Burndown Chart (Flat)", chance_pct: 30), (item: "Sticky Note: 'Blocker?'", chance_pct: 30), (item: "Stand-up Talking Stick", chance_pct: 70, quest: Some("talking_stick"))],
+            loot: [(item: "Burndown Chart (Flat)", chance_pct: 30), (item: "Sticky Note: 'Blocker?'", chance_pct: 30), (item: "Stand-up Talking Stick", chance_pct: 100, quest: Some("talking_stick"))],
             ai: Some((
                 aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 12, chase_speed_mps: 5.5, respawn_ms: 60000,
@@ -3085,7 +3085,7 @@
             max_hp: 420, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_combat: 0,
             xp_reward: 75,
-            loot: [(item: "Signed Contract for a Feature That Doesn't Exist", chance_pct: 30), (item: "Verbal Commitment (Notarized)", chance_pct: 60, quest: Some("quota_attainment"))],
+            loot: [(item: "Signed Contract for a Feature That Doesn't Exist", chance_pct: 30), (item: "Verbal Commitment (Notarized)", chance_pct: 100, quest: Some("quota_attainment"))],
             ai: Some((
                 aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 14, chase_speed_mps: 5.5, respawn_ms: 60000,
@@ -3116,7 +3116,7 @@
             max_hp: 380, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_combat: 0,
             xp_reward: 70,
-            loot: [(item: "Fruit Basket (Corporate)", chance_pct: 35), (item: "Verbal Commitment (Notarized)", chance_pct: 45, quest: Some("quota_attainment"))],
+            loot: [(item: "Fruit Basket (Corporate)", chance_pct: 35), (item: "Verbal Commitment (Notarized)", chance_pct: 100, quest: Some("quota_attainment"))],
             ai: Some((
                 aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 10, chase_speed_mps: 5.5, respawn_ms: 60000,
@@ -3315,7 +3315,7 @@
             max_hp: 520, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_combat: 0,
             xp_reward: 90,
-            loot: [(item: "Gantt Chart, All Red", chance_pct: 30), (item: "Gantt Chart (Pure Fiction)", chance_pct: 75, quest: Some("gantt_chart_recovery"))],
+            loot: [(item: "Gantt Chart, All Red", chance_pct: 30), (item: "Gantt Chart (Pure Fiction)", chance_pct: 100, quest: Some("gantt_chart_recovery"))],
             ai: Some((
                 aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 16, chase_speed_mps: 5.5, respawn_ms: 60000,
@@ -3346,7 +3346,7 @@
             max_hp: 540, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_combat: 0,
             xp_reward: 90,
-            loot: [(item: "Backlog Item from 2021", chance_pct: 30), (item: "Gantt Chart (Pure Fiction)", chance_pct: 50, quest: Some("gantt_chart_recovery"))],
+            loot: [(item: "Backlog Item from 2021", chance_pct: 30), (item: "Gantt Chart (Pure Fiction)", chance_pct: 100, quest: Some("gantt_chart_recovery"))],
             ai: Some((
                 aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 17, chase_speed_mps: 5.5, respawn_ms: 60000,
@@ -3612,7 +3612,7 @@
             max_hp: 620, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_combat: 0,
             xp_reward: 100,
-            loot: [(item: "Expired GPU Credits", chance_pct: 35), (item: "Whitepaper (3 Pages, 2 Typos)", chance_pct: 25), (item: "Worthless Governance Token", chance_pct: 80, quest: Some("rug_pull_insurance"))],
+            loot: [(item: "Expired GPU Credits", chance_pct: 35), (item: "Whitepaper (3 Pages, 2 Typos)", chance_pct: 25), (item: "Worthless Governance Token", chance_pct: 100, quest: Some("rug_pull_insurance"))],
             ai: Some((
                 aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 21, chase_speed_mps: 6.0, respawn_ms: 60000,
@@ -3855,8 +3855,9 @@
             xp_reward: 32,
             loot: [
                 (item: "Access Badge", chance_pct: 75),
+                (item: "Access Badge", chance_pct: 100, quest: Some("badge_access_denied")),
                 (item: "Delivery Receipt: 'Left at Door'", chance_pct: 20),
-                (item: "Misdelivered Lunch Order", chance_pct: 60, quest: Some("lunch_order_recovery")),
+                (item: "Misdelivered Lunch Order", chance_pct: 100, quest: Some("lunch_order_recovery")),
                 (item: "Delivery Robot's Lost Burrito", chance_pct: 25),
             ],
             ai: Some((
@@ -3931,6 +3932,7 @@
             xp_reward: 30,
             loot: [
                 (item: "Oat Milk Prompt", chance_pct: 65),
+                (item: "Oat Milk Prompt", chance_pct: 100, quest: Some("coffee_run")),
                 (item: "Branded Stress Ball", chance_pct: 20),
                 (item: "Ambassador Program T-Shirt Coupon", chance_pct: 25),
             ],
@@ -4001,7 +4003,7 @@
             max_hp: 450, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_combat: 0,
             xp_reward: 80,
-            loot: [(item: "Lost Rack Screw", chance_pct: 35), (item: "Overclocked Fan Blade", chance_pct: 70, quest: Some("bent_fan_blades"))],
+            loot: [(item: "Lost Rack Screw", chance_pct: 35), (item: "Overclocked Fan Blade", chance_pct: 100, quest: Some("bent_fan_blades"))],
             ai: Some((
                 aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 1500,
                 melee_damage: 10, chase_speed_mps: 5.0, respawn_ms: 60000,
@@ -4028,7 +4030,7 @@
             max_hp: 460, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_combat: 0,
             xp_reward: 85,
-            loot: [(item: "Token Invoice (Itemized)", chance_pct: 50)],
+            loot: [(item: "Token Invoice (Itemized)", chance_pct: 50), (item: "Token Invoice (Itemized)", chance_pct: 100, quest: Some("context_collapse"))],
             ai: Some((
                 aggro_m: 7.0, leash_m: 40.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 12, chase_speed_mps: 5.5, respawn_ms: 60000,
@@ -4294,7 +4296,7 @@
             max_hp: 620, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_combat: 0,
             xp_reward: 105,
-            loot: [(item: "Prompt Engineering Certificate (Self-Issued)", chance_pct: 35), (item: "Leaked System Prompt", chance_pct: 70, quest: Some("leaked_system_prompt"))],
+            loot: [(item: "Prompt Engineering Certificate (Self-Issued)", chance_pct: 35), (item: "Leaked System Prompt", chance_pct: 100, quest: Some("leaked_system_prompt"))],
             ai: Some((
                 aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
                 melee_damage: 15, chase_speed_mps: 5.5, respawn_ms: 60000,
@@ -6720,7 +6722,7 @@
             xp_reward: 95,
             loot: [
                 (item: "Core Dump (14 GB)", chance_pct: 30),
-                (item: "Unlabelled Backup Tape", chance_pct: 60, quest: Some("restore_from_backup")),
+                (item: "Unlabelled Backup Tape", chance_pct: 100, quest: Some("restore_from_backup")),
             ],
             ai: Some((
                 aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,

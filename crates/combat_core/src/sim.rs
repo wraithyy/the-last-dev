@@ -1755,7 +1755,18 @@ impl Sim {
                 let drop = match (&e.quest, owner) {
                     // Legacy floors drop the Legacy tier only; trophies stay in the campaign.
                     _ if legacy => false,
-                    (None, _) => self.loot_rng.chance_pct(e.chance_pct),
+                    // A quest rule for the same item replaces the chance roll (still rolled, so
+                    // the loot stream matches a run without the quest) instead of doubling it.
+                    (None, Some(p)) => {
+                        let hit = self.loot_rng.chance_pct(e.chance_pct);
+                        hit && !loot_table.iter().any(|g| {
+                            g.item == e.item
+                                && g.quest
+                                    .as_deref()
+                                    .is_some_and(|q| self.wants_quest_drop(p, q, &g.item))
+                        })
+                    }
+                    (None, None) => self.loot_rng.chance_pct(e.chance_pct),
                     // A sprint is quest-free: its floors' quest drops stay in the campaign.
                     (Some(_), _) if sprint => false,
                     (Some(q), Some(p)) => {

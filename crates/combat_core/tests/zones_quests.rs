@@ -1439,3 +1439,131 @@ impl T {
         self.accept("bl_access_rights");
     }
 }
+
+// ---- loot quests are finishable solo, fresh or cleared ----
+
+impl T {
+    /// Kills every living hostile trash unit of the zone (the boss stays, so the zone is not
+    /// "cleared" but its trash is all dead, like after a thorough run).
+    fn wipe_trash(&mut self) {
+        loop {
+            let next = self
+                .sim
+                .units()
+                .find(|u| u.alive && u.hostile && u.key != "vibe_coder" && !u.boss)
+                .map(|u| u.id);
+            match next {
+                Some(id) => self.kill(id),
+                None => return,
+            }
+        }
+    }
+
+    /// Accepts `quest` from `giver`, then kills and loots living sources until it is ready.
+    fn loot_quest_solo(&mut self, giver: &str, quest: &str, item: &str) {
+        self.talk_to(giver);
+        self.accept(quest);
+        let need = match self
+            .sim
+            .content()
+            .quest(quest)
+            .map(|q| q.objectives[0].clone())
+        {
+            Some(Objective::Loot(_, n)) => n,
+            other => panic!("not a loot quest: {other:?}"),
+        };
+        for _ in 0..40 {
+            if self.sim.quests().active[0].counts[0] >= need {
+                break;
+            }
+            let src = self
+                .sim
+                .units()
+                .find(|u| {
+                    u.alive
+                        && u.hostile
+                        && self
+                            .sim
+                            .content()
+                            .unit_def(&u.key)
+                            .is_some_and(|d| d.loot.iter().any(|l| l.item == item))
+                })
+                .map(|u| u.id);
+            let Some(id) = src else {
+                panic!(
+                    "{quest}: no living source left at {:?}",
+                    self.sim.quests().active[0].counts
+                )
+            };
+            self.kill(id);
+            let Some(at) = self.sim.unit(id).map(|u| u.pos) else {
+                panic!()
+            };
+            self.move_to(Vec3::new(at.x, 0.0, at.z + 1.0), 0.0);
+            self.sim.push(Command::Loot {
+                looter: self.p,
+                corpse: id,
+            });
+            self.tick();
+        }
+        assert_eq!(self.sim.quests().active[0].counts[0], need, "{quest} stuck");
+        self.talk_to(giver);
+        self.turn_in(quest);
+        assert!(self.sim.quests().completed.iter().any(|c| c == quest));
+    }
+}
+
+fn solo_loot_case(zone: &str, giver: &str, quest: &str, item: &str, cleared: bool) {
+    // Default drop rules and a level-appropriate fighter: no tweaks to chances, so this only
+    // passes when the shipped drops are guaranteed.
+    let mut t = t(6);
+    t.load(zone);
+    if cleared {
+        t.wipe_trash();
+    }
+    t.loot_quest_solo(giver, quest, item);
+}
+
+#[test]
+fn quota_attainment_finishes_solo_in_a_fresh_zone() {
+    solo_loot_case(
+        "tower/3",
+        "office_manager",
+        "quota_attainment",
+        "Verbal Commitment (Notarized)",
+        false,
+    );
+}
+
+#[test]
+fn quota_attainment_finishes_solo_in_a_cleared_zone() {
+    solo_loot_case(
+        "tower/3",
+        "office_manager",
+        "quota_attainment",
+        "Verbal Commitment (Notarized)",
+        true,
+    );
+}
+
+#[test]
+fn talking_stick_finishes_solo_in_a_fresh_zone() {
+    solo_loot_case(
+        "tower/2",
+        "facilities_manager",
+        "talking_stick",
+        "Stand-up Talking Stick",
+        false,
+    );
+}
+
+#[test]
+fn talking_stick_finishes_solo_in_a_cleared_zone() {
+    solo_loot_case(
+        "tower/2",
+        "facilities_manager",
+        "talking_stick",
+        "Stand-up Talking Stick",
+        true,
+    );
+}

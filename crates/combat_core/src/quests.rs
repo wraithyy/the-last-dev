@@ -191,6 +191,7 @@ impl Sim {
                 },
             );
         }
+        self.refill_quest_sources();
         self.check_unlocks();
     }
 

@@ -415,13 +415,16 @@ impl Sim {
 
     fn resolve_goal(&self, goal: &Goal, level: u8, salt: u64) -> (GoalSpec, u32) {
         let zone = self.work_zone(level);
+        let hostiles = self.content.zone_hostiles(&zone);
+        // Zone trash never respawns within a load, so a goal past the zone's headcount could
+        // never be finished in one pass.
         let kill_zone = |n: u32| {
             (
                 GoalSpec::Kill {
                     zone: Some(zone.clone()),
                     unit: None,
                 },
-                n,
+                n.min(hostiles.len() as u32),
             )
         };
         match goal {
@@ -444,13 +447,14 @@ impl Sim {
                             zone: Some(zone.clone()),
                             unit: Some((*u).clone()),
                         },
-                        *n,
+                        (*n).min(hostiles.iter().filter(|h| **h == u.as_str()).count() as u32),
                     ),
                     None => kill_zone(*n),
                 }
             }
             Goal::Elite(n) => (GoalSpec::Elite, *n),
-            Goal::Loot(n) => (GoalSpec::Loot, *n),
+            // Loot rolls are random; one corpse per hostile is the most a zone can promise.
+            Goal::Loot(n) => (GoalSpec::Loot, (*n).min(hostiles.len() as u32)),
             Goal::Props(n) => (GoalSpec::Props, *n),
             Goal::Output(n) => (GoalSpec::Output, n.saturating_mul(u32::from(level))),
             Goal::Sprint => {

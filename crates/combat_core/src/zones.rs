@@ -250,6 +250,7 @@ impl Sim {
             );
         }
         self.grow_packs();
+        self.refill_quest_sources();
         self.sprint_after_load();
         self.raid_after_load();
         if let Some((pos, yaw)) = graveyard {
@@ -310,6 +311,103 @@ impl Sim {
             }
         }
         for (def, pos, yaw, level, pack, slot) in spawns {
+            self.spawn(
+                def,
+                pos,
+                yaw,
+                SpawnOpts {
+                    level: Some(level),
+                    pack: Some(pack),
+                    respawns: false,
+                    summoner: None,
+                    floor_boss: false,
+                    zone_slot: Some(slot),
+                },
+            );
+        }
+    }
+
+    /// Brings back dead trash an active quest still depends on. Trash never respawns inside a
+    /// load, so clearing a zone before taking its quest would otherwise leave a Loot or
+    /// KillClean objective with no source until the zone resets. Only as many units come back
+    /// as the objective is short of, and only for sources with a guaranteed drop.
+    pub(crate) fn refill_quest_sources(&mut self) {
+        if self.sprint_active() || self.legacy_zone().is_some() || self.in_raid() {
+            return;
+        }
+        let Some(zone) = self.zone.clone() else {
+            return;
+        };
+        let mut demands: Vec<(Vec<String>, u32)> = Vec::new();
+        for pid in &self.players {
+            for q in &self.quests_of(*pid).active {
+                let Some(def) = self.content.quest(&q.id) else {
+                    continue;
+                };
+                for (o, c) in def.objectives.iter().zip(&q.counts) {
+                    let (keys, left) = match o {
+                        Objective::Loot(it, n) if c < n => {
+                            let keys = self
+                                .content
+                                .units
+                                .iter()
+                                .filter(|u| {
+                                    u.loot.iter().any(|l| {
+                                        l.item == *it
+                                            && l.chance_pct >= 100
+                                            && l.quest.as_deref() == Some(q.id.as_str())
+                                    })
+                                })
+                                .map(|u| u.key.clone())
+                                .collect();
+                            (keys, n - c)
+                        }
+                        Objective::KillClean(k, n) if c < n => (vec![k.clone()], n - c),
+                        _ => continue,
+                    };
+                    demands.push((keys, left));
+                }
+            }
+        }
+        let Some(z) = self.content.zone(&zone).cloned() else {
+            return;
+        };
+        let mut spawns = Vec::new();
+        for (keys, left) in demands {
+            let alive = self
+                .units
+                .iter()
+                .filter(|u| !u.despawned && u.state.alive && keys.contains(&u.state.key))
+                .count() as u32;
+            let mut missing = left.saturating_sub(alive);
+            let dead = self
+                .world
+                .zones
+                .get(&zone)
+                .map(|s| s.dead_trash.clone())
+                .unwrap_or_default();
+            let mut slot = 0;
+            for (p, rt) in z.packs.iter().zip(&self.zone_packs) {
+                let offsets = pack_offsets(p.units.len());
+                for (key, (dx, dz)) in p.units.iter().zip(offsets) {
+                    if missing > 0
+                        && dead.contains(&slot)
+                        && keys.contains(key)
+                        && !spawns.iter().any(|s: &(usize, _, _, _, _, _)| s.5 == slot)
+                        && let Ok(def) = self.def_index(key)
+                    {
+                        let pos = Vec3::new(rt.at.x + dx, rt.at.y, rt.at.z + dz);
+                        spawns.push((def, pos, rt.yaw, rt.level, rt.id, slot));
+                        missing -= 1;
+                    }
+                    slot += 1;
+                }
+            }
+        }
+        for (def, pos, yaw, level, pack, slot) in spawns {
+            if let Some(st) = self.world.zones.get_mut(&zone) {
+                st.dead_trash.remove(&slot);
+            }
             self.spawn(
                 def,
                 pos,

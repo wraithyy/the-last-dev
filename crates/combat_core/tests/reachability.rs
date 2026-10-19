@@ -1,0 +1,189 @@
+//! Every Kill, Loot and task goal must be finishable from what one fresh load of a zone
+//! guarantees. Trash never respawns inside a zone, so a count above the guaranteed supply is a
+//! quest nobody can finish.
+
+mod common;
+
+use combat_core::{Content, GoalSpec, Objective, QuestDef, Sim, Vec3};
+use common::*;
+
+/// Zones one quest may draw on. Quest text names "both halls" or "campus, tower, anywhere", so
+/// the data centre halls, the lab rooms and the HQ circuit (campus plus tower floors) each count
+/// as one area; the giver's area is the one that has to deliver.
+fn area(zone: &str) -> &str {
+    match zone.split('/').next().unwrap_or(zone) {
+        "campus" | "tower" => "hq",
+        other => other,
+    }
+}
+
+fn in_area<'a>(c: &'a Content, zone: &str) -> impl Iterator<Item = &'a str> {
+    let a = area(zone).to_string();
+    c.zones
+        .iter()
+        .filter(move |z| area(&z.id) == a)
+        .map(|z| z.id.as_str())
+}
+
+/// Copies of `item` that one pass of the area is certain to hand `quest`'s owner: units with a
+/// 100% rule that is either open to everyone or tied to this quest.
+fn loot_supply(c: &Content, zone: &str, item: &str, quest: &str) -> u32 {
+    in_area(c, zone)
+        .flat_map(|z| c.zone_hostiles(z))
+        .filter_map(|k| c.unit_def(k))
+        .filter(|u| {
+            u.loot.iter().any(|l| {
+                l.item == item
+                    && l.chance_pct >= 100
+                    && l.quest.as_deref().is_none_or(|q| q == quest)
+            })
+        })
+        .count() as u32
+}
+
+/// Hostiles of one kind in a single zone, rares included (the layouts carry their anchors).
+fn zone_kills(c: &Content, zone: &str, unit: &str) -> u32 {
+    let rares = c
+        .zone(zone)
+        .map_or(0, |z| z.rares.iter().filter(|r| r.unit == unit).count());
+    (c.zone_hostiles(zone).iter().filter(|k| **k == unit).count() + rares) as u32
+}
+
+fn kill_supply(c: &Content, zone: &str, unit: &str) -> u32 {
+    in_area(c, zone).map(|z| zone_kills(c, z, unit)).sum()
+}
+
+/// Best area for an objective whose sources are not in the giver's area (a quest that sends you
+/// elsewhere on purpose).
+fn best(c: &Content, f: impl Fn(&str) -> u32) -> u32 {
+    c.zones.iter().map(|z| f(&z.id)).max().unwrap_or(0)
+}
+
+/// Whether any unit of the giver's area could ever source the objective; if none can, the
+/// quest sends the player to another area on purpose and that area has to deliver.
+fn sourced_here(c: &Content, zone: &str, o: &Objective) -> bool {
+    in_area(c, zone).any(|z| match o {
+        Objective::Kill(k, _) | Objective::KillClean(k, _) => zone_kills(c, z, k) > 0,
+        Objective::Loot(it, _) => c
+            .zone_hostiles(z)
+            .into_iter()
+            .filter_map(|k| c.unit_def(k))
+            .any(|u| u.loot.iter().any(|l| l.item == *it)),
+        _ => false,
+    })
+}
+
+fn shortfalls(c: &Content, q: &QuestDef) -> Vec<String> {
+    let mut out = Vec::new();
+    let giver = q.giver.zone.as_str();
+    for o in &q.objectives {
+        let here = sourced_here(c, giver, o);
+        let (need, have, what) = match o {
+            Objective::Kill(k, n) | Objective::KillClean(k, n) => {
+                let have = match here {
+                    true => kill_supply(c, giver, k),
+                    false => best(c, |z| kill_supply(c, z, k)),
+                };
+                (*n, have, format!("kill {k}"))
+            }
+            Objective::Loot(it, n) => {
+                let have = match here {
+                    true => loot_supply(c, giver, it, &q.id),
+                    false => best(c, |z| loot_supply(c, z, it, &q.id)),
+                };
+                (*n, have, format!("loot {it}"))
+            }
+            _ => continue,
+        };
+        if have < need {
+            out.push(format!(
+                "{}: {what} needs {need}, the area guarantees {have}",
+                q.id
+            ));
+        }
+    }
+    out
+}
+
+#[test]
+fn every_quest_objective_is_reachable_from_guaranteed_sources() {
+    let c = content();
+    let bad: Vec<String> = c.quests.iter().flat_map(|q| shortfalls(&c, q)).collect();
+    assert!(
+        bad.is_empty(),
+        "unreachable objectives:\n{}",
+        bad.join("\n")
+    );
+}
+
+#[test]
+fn quest_only_drops_are_guaranteed() {
+    let c = content();
+    let bad: Vec<String> = c
+        .units
+        .iter()
+        .flat_map(|u| {
+            u.loot
+                .iter()
+                .filter(|l| l.quest.is_some() && l.chance_pct < 100)
+                .map(|l| format!("{} drops {} at {}%", u.key, l.item, l.chance_pct))
+        })
+        .collect();
+    assert!(
+        bad.is_empty(),
+        "quest drops that can miss on units that never respawn:\n{}",
+        bad.join("\n")
+    );
+}
+
+#[test]
+fn every_task_goal_fits_the_work_zone() {
+    let mut c = content();
+    // Every zone open, so each level's work zone is the one the player would really get.
+    for l in c.zones.iter_mut().flat_map(|z| z.links.iter_mut()) {
+        l.requires = None;
+    }
+    let top = c.max_level();
+    let mut bad = Vec::new();
+    // A new UTC day rotates the dailies, so sweep enough of them to meet every template.
+    for day in 0..60u64 {
+        for level in 1..=top {
+            let mut sim = Sim::new(c.clone(), 1);
+            sim.set_clock(day * 86_400 + 3_600);
+            let p = sim.spawn_player("fullstack", Vec3::new(0.0, 0.0, 0.0), 0.0);
+            sim.set_player_level(level);
+            let zone = sim.work_zone(level);
+            let board = sim.task_board(p);
+            for t in &board.tasks {
+                for g in &t.goals {
+                    let (have, what) = match &g.goal {
+                        GoalSpec::Kill { zone: z, unit } => {
+                            let z = z.as_deref().unwrap_or(&zone);
+                            let n = match unit {
+                                Some(u) => zone_kills(&c, z, u),
+                                None => c.zone_hostiles(z).len() as u32,
+                            };
+                            (n, format!("kill {unit:?} in {z}"))
+                        }
+                        // Loot rolls are random, so one corpse per hostile is the best bound.
+                        GoalSpec::Loot => (c.zone_hostiles(&zone).len() as u32, "loot".into()),
+                        _ => continue,
+                    };
+                    if have < g.need {
+                        bad.push(format!(
+                            "{} L{level}: {what} needs {}, zone has {have}",
+                            t.key, g.need
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    bad.sort();
+    bad.dedup();
+    assert!(
+        bad.is_empty(),
+        "task goals past the zone:\n{}",
+        bad.join("\n")
+    );
+}

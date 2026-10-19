@@ -55,7 +55,7 @@ struct RadarDot(usize);
 struct RadarGlyph(usize);
 #[derive(Component)]
 struct RadarArrow;
-/// The Company Calendar's icon on the campus, with a "!" while something is unplayed.
+/// The Company Calendar's icon on the campus, with a badge while there is news.
 #[derive(Component)]
 struct RadarCalendar;
 #[derive(Component)]
@@ -195,16 +195,20 @@ fn spawn_radar(
                         ..default()
                     },
                     BorderColor::all(Color::WHITE),
+                    // A badge on the icon's corner, not a "!" glyph: that one is the quest giver's
+                    // and a lone "!" beside the board read as a giver with nobody there.
                     children![(
                         RadarCalendarBang,
-                        label("!", 14.0),
-                        TextColor(super::GOLD),
                         Node {
                             position_type: PositionType::Absolute,
-                            left: px(CAL_PX - 1.0),
-                            top: px(-9),
+                            left: px(CAL_PX - 5.0),
+                            top: px(-4),
+                            width: px(7),
+                            height: px(7),
+                            border_radius: BorderRadius::MAX,
                             ..default()
                         },
+                        BackgroundColor(super::GOLD),
                     )],
                 ));
                 view.spawn((
@@ -273,7 +277,7 @@ enum Kind {
     Glyph(&'static str, Color),
 }
 
-/// Places the calendar icon where the board stands (campus only) and shows its "!".
+/// Places the calendar icon where the board stands (campus only) and shows its news badge.
 fn calendar_pin(
     flow: Res<GameFlow>,
     radar: Res<Radar>,
@@ -546,6 +550,44 @@ mod tests {
         assert_eq!(step_zoom(0, -1), 0);
         assert_eq!(step_zoom(DEFAULT_ZOOM, 1), DEFAULT_ZOOM + 1);
         assert_eq!(step_zoom(RADII.len() - 1, 1), RADII.len() - 1);
+    }
+
+    /// A giver marker is drawn on a sim unit, so a giver is only ever shown where its NPC spawns:
+    /// every quest giver and turn-in must be a friendly of its zone whose anchor the layout has,
+    /// and the calendar's own pin needs its prop anchor on the campus.
+    #[test]
+    fn every_quest_giver_has_an_npc_anchor_and_the_calendar_has_its_own() {
+        let content = combat_core::Content::from_ron(include_str!("../../../../content/game.ron"))
+            .unwrap_or_else(|e| panic!("content: {e}"));
+        let anchors = |zone: &str| {
+            build_zone(zone)
+                .unwrap_or_else(|| panic!("no layout for {zone}"))
+                .anchors
+                .iter()
+                .map(|a| a.0.to_string())
+                .collect::<Vec<_>>()
+        };
+        for q in &content.quests {
+            for g in [&q.giver, q.ender()] {
+                let z = content
+                    .zone(&g.zone)
+                    .unwrap_or_else(|| panic!("{}: unknown zone {}", q.id, g.zone));
+                let f = z
+                    .friendly
+                    .iter()
+                    .find(|f| f.unit == g.npc)
+                    .unwrap_or_else(|| panic!("{}: {} does not spawn in {}", q.id, g.npc, g.zone));
+                assert!(
+                    anchors(&g.zone).contains(&f.anchor),
+                    "{}: anchor {} of {} missing in the {} layout",
+                    q.id,
+                    f.anchor,
+                    g.npc,
+                    g.zone
+                );
+            }
+        }
+        assert!(anchors("campus").iter().any(|a| a == CALENDAR_ANCHOR));
     }
 
     #[test]

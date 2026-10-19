@@ -1212,6 +1212,25 @@ impl Content {
         self.zone(&format!("tower/{id}"))
     }
 
+    /// Keys of every hostile a fresh load of `zone` spawns: pack units, the boss and hostile
+    /// fixed spawns. Rares are left out because a layout without their anchor skips them.
+    pub fn zone_hostiles(&self, zone: &str) -> Vec<&str> {
+        let Some(z) = self.zone(zone) else {
+            return Vec::new();
+        };
+        z.packs
+            .iter()
+            .flat_map(|p| p.units.iter().map(String::as_str))
+            .chain(z.boss.iter().map(|b| b.unit.as_str()))
+            .chain(
+                z.friendly
+                    .iter()
+                    .map(|f| f.unit.as_str())
+                    .filter(|u| self.unit_def(u).is_some_and(|d| d.hostile)),
+            )
+            .collect()
+    }
+
     pub fn quest(&self, id: &str) -> Option<&QuestDef> {
         self.quests.iter().find(|q| q.id == id)
     }

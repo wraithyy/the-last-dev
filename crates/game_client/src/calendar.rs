@@ -55,8 +55,10 @@ pub struct CalendarState {
     /// One tracker line, shown once after reaching level 2.
     pub hint: Option<String>,
     hint_until: f32,
-    /// Something on the calendar was never played: the board gets a "!".
+    /// Something on the calendar was never played and not looked at today: the board gets a badge.
     pub news: bool,
+    /// UTC day the calendar was last opened; opening it is reading the news.
+    seen_day: Option<u32>,
     /// Best medals seen this session (online the save lives elsewhere).
     best: HashMap<String, Medal>,
     /// UTC day of the world clock, for `rotation` (0 while the clock is off, like the sim).
@@ -204,6 +206,7 @@ fn toggle(
     }
     if windows.calendar {
         st.hint = None;
+        st.seen_day = Some(st.day);
     }
 }
 
@@ -702,7 +705,13 @@ fn button(kind: CalButton, text: &str, primary: bool) -> impl Bundle {
     )
 }
 
-/// The board's "!": anything listed today that was never played or started.
+/// The board's badge stays off once today's listing was opened, so it cannot burn forever for
+/// a player who has seen everything and simply skips some games or chains.
+fn badge_lit(unplayed: bool, seen_day: Option<u32>, day: u32) -> bool {
+    unplayed && seen_day != Some(day)
+}
+
+/// The board's badge: anything listed today that was never played or started and not yet read.
 fn news(
     sim: SimView,
     offline: Res<CombatSim>,
@@ -730,8 +739,21 @@ fn news(
     let new_chain = chains
         .iter()
         .any(|c| c.status(sim.quests()) == ChainStatus::New);
-    let news = unplayed_game || new_chain;
+    let news = badge_lit(unplayed_game || new_chain, st.seen_day, day);
     if st.news != news {
         st.news = news;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::badge_lit;
+
+    #[test]
+    fn the_badge_goes_out_once_today_is_read_and_returns_tomorrow() {
+        assert!(badge_lit(true, None, 5));
+        assert!(!badge_lit(true, Some(5), 5));
+        assert!(badge_lit(true, Some(5), 6));
+        assert!(!badge_lit(false, None, 5));
     }
 }
