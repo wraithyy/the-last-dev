@@ -119,7 +119,6 @@
   kbd { font: 600 0.8rem var(--mono); padding: 3px 8px; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: var(--r-sm); background: var(--surface); white-space: nowrap; }
 
   .gallery { display: grid; gap: 24px; margin-top: 40px; }
-  @media (min-width: 768px) { .gallery { grid-template-columns: 1fr 1fr; } }
   .gallery figure { margin: 0; }
   .gallery img, .roles-shot img { border: 1px solid var(--line); border-radius: var(--r-md); width: 100%; }
 
@@ -157,9 +156,6 @@
   .stack dt { font: 700 0.95rem var(--mono); }
   .stack dd { margin: 0; color: var(--muted); }
 
-  .me { display: grid; gap: 32px; align-items: start; }
-  @media (min-width: 768px) { .me { grid-template-columns: 160px 1fr; gap: 48px; } }
-  .avatar { border-radius: var(--r-md); border: 1px solid var(--line); }
   .quote { font: 600 1.1rem var(--mono); border-left: 2px solid var(--accent); padding-left: 20px; margin: 28px 0 0; max-width: 46ch; }
 
   .coffee { text-align: center; padding-block: 96px 120px; display: grid; justify-items: center; }

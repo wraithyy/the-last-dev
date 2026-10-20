@@ -11,7 +11,6 @@ import roles from '../assets/shots/roles.png';
 import rolesStage from '../assets/shots/roles-stage.png';
 import campus from '../assets/shots/campus.png';
 import jira from '../assets/shots/jira.png';
-import ceo from '../assets/shots/ceo.png';
 
 const GAME = `${BASE}play/`;
 const COFFEE = 'https://buymeacoffee.com/wraithyy';
@@ -77,7 +76,7 @@ const stack = [
   { name: 'WebAssembly', why: 'wasm-bindgen and wasm-opt ship the native build to the browser.' },
   { name: 'axum + tokio', why: 'Optional co-op server over WebSockets, hosted on Render.' },
   { name: 'Service worker', why: 'Offline-first PWA. Online co-op is opt-in, never required.' },
-  // TODO(josef): confirm this describes how you actually used it.
+  // TODO(wraithy): confirm this describes how you actually used it.
   { name: 'Claude Code', why: 'Pair programmer. Reviewed by a human, which is the joke.' },
 ];
 ---
@@ -238,16 +237,12 @@ the-last-dev-server --bind 127.0.0.1:7777</code></pre>
 
     <section id="screens" class="section reveal">
       <div class="wrap">
-        <h2>Screens from the open space</h2>
+        <h2>Inside the open space</h2>
       </div>
       <div class="wrap gallery">
         <figure>
-          <Image src={jira} alt="The in-game Jira quest log next to the AI-Native Intern" widths={[640, 1280]} sizes="(min-width: 768px) 50vw, 100vw" />
+          <Image src={jira} alt="The in-game Jira quest log next to the AI-Native Intern" widths={[800, 1280]} sizes="(min-width: 1200px) 1136px, 100vw" />
           <figcaption>Quests are Jira tickets. Velocity: whatever the dashboard needs.</figcaption>
-        </figure>
-        <figure>
-          <Image src={ceo} alt="Boss fight against the CEO under a sign reading Days since last AI pivot" widths={[640, 1280]} sizes="(min-width: 768px) 50vw, 100vw" />
-          <figcaption>The CEO, phase two. Days since last AI pivot: zero.</figcaption>
         </figure>
       </div>
     </section>
@@ -282,12 +277,11 @@ the-last-dev-server --bind 127.0.0.1:7777</code></pre>
       <p class="muted small">Original game. No Blizzard assets, code, text or data. Music and sound credits live in the repo.</p>
     </section>
 
-    <section id="me" class="wrap section me reveal">
-      <img class="avatar" src="https://avatars.githubusercontent.com/u/40492790?v=4" alt="Josef Kvapil" width="160" height="160" loading="lazy" />
+    <section id="me" class="wrap section reveal">
       <div>
-        <h2>Hi, I'm Josef.</h2>
+        <h2>Hi, I'm Wraithy.</h2>
         <p class="body">Frontend architect from Liberec with 10+ years of React and TypeScript. I architect frontend platforms that other teams build on. The Last Dev is a side project in Rust, a game about the thing my industry keeps trying to replace us with.</p>
-        <!-- TODO(josef): your own "why I made this" story, two or three sentences. -->
+        <!-- TODO(wraithy): your own "why I made this" story, two or three sentences. -->
         <p class="quote">AI speeds me up; it doesn't steer. Vibecoding is not engineering.</p>
         <div class="ctas">
           <a class="btn btn-ghost" href="https://jkvapil.cz">jkvapil.cz<Fragment set:html={arrow} /></a>
