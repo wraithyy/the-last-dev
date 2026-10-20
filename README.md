@@ -90,6 +90,22 @@ scripts/              check.sh, build-web.sh, serve-web.sh
 docs/                 plan, version choices, known limitations
 ```
 
+## Releasing
+
+The game version lives once, in `[workspace.package] version` in `Cargo.toml`; every crate, the Esc
+menu and the landing page read it from there. Changes go under `## [Unreleased]` in
+[CHANGELOG.md](CHANGELOG.md) as they land. While in 0.x, a minor version adds content and a patch only
+fixes things. To release:
+
+1. Bump `version` in `Cargo.toml` and run `cargo check` so `Cargo.lock` follows.
+2. In `CHANGELOG.md`, rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`, add a fresh empty
+   `[Unreleased]` above it and update the compare links at the bottom.
+3. Commit, then `git tag vX.Y.Z && git push origin main vX.Y.Z`.
+
+The Release workflow checks that the tag matches `Cargo.toml` and creates the GitHub Release from that
+changelog section (`scripts/release-notes.sh X.Y.Z` prints it locally). The push to `main` redeploys
+the site, including the [changelog page](https://wraithyy.github.io/the-last-dev/changelog/).
+
 ## Versions and browser constraints
 
 - Rust 1.96.1, Bevy 0.19.1 (features `3d`, `ui`), wasm-bindgen 0.2.129. Rationale in [docs/PLAN.md](docs/PLAN.md).

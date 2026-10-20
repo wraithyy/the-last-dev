@@ -423,20 +423,32 @@ fn spawn_ui(mut commands: Commands) {
             ..default()
         },
         GlobalZIndex(51),
-        children![(
-            Button,
-            ToggleText(Ctl::Open),
-            Node {
-                margin: UiRect::right(px(320)),
-                padding: UiRect::axes(px(14), px(5)),
-                border: UiRect::all(px(2)),
-                border_radius: BorderRadius::all(px(5)),
-                ..default()
-            },
-            BorderColor::all(KEY_RIM),
-            vgrad(KEY_TOP_HI, KEY_TOP),
-            children![label("~/settings", 16.0)],
-        )],
+        children![
+            (
+                Button,
+                ToggleText(Ctl::Open),
+                Node {
+                    margin: UiRect::right(px(320)),
+                    padding: UiRect::axes(px(14), px(5)),
+                    border: UiRect::all(px(2)),
+                    border_radius: BorderRadius::all(px(5)),
+                    ..default()
+                },
+                BorderColor::all(KEY_RIM),
+                vgrad(KEY_TOP_HI, KEY_TOP),
+                children![label("~/settings", 16.0)],
+            ),
+            // Players quote this in bug reports; co-op also needs matching builds.
+            (
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: px(44),
+                    ..default()
+                },
+                label(concat!("The Last Dev v", env!("CARGO_PKG_VERSION")), 11.0),
+                TextColor(DIM),
+            ),
+        ],
     ));
     commands.spawn((
         FpsText,

@@ -1,0 +1,62 @@
+---
+import '@fontsource-variable/geist';
+import '@fontsource-variable/jetbrains-mono';
+import '../styles/site.css';
+import play from '@phosphor-icons/core/assets/regular/play.svg?raw';
+import { BASE, REPO, VERSION } from '../version';
+
+interface Props {
+  title?: string;
+  description?: string;
+  ogImage?: string;
+}
+const {
+  title = 'The Last Dev',
+  description = 'A free satirical browser RPG with classic MMO combat, set in an office that replaced everyone with AI.',
+  ogImage,
+} = Astro.props;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    {ogImage && <meta property="og:image" content={ogImage} />}
+    <link rel="icon" href={`${BASE}favicon.png`} />
+    <link rel="apple-touch-icon" href={`${BASE}apple-touch-icon.png`} />
+    <script is:inline>
+      // The game used to live at this URL with an offline service worker; drop it so the landing is never served stale.
+      navigator.serviceWorker?.getRegistrations().then((regs) => regs
+        .filter((r) => !new URL(r.scope).pathname.endsWith('/play/'))
+        .forEach((r) => r.unregister()));
+    </script>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="wrap nav-inner">
+        <a class="logo" href={BASE}>the-last-dev</a>
+        <nav aria-label="Sections">
+          <a href={`${BASE}#game`}>Game</a>
+          <a href={`${BASE}#roles`}>Roles</a>
+          <a href={`${BASE}#controls`}>Controls</a>
+          <a href={`${BASE}#coop`}>Co-op</a>
+          <a href={`${BASE}#me`}>About me</a>
+        </nav>
+        <a class="btn btn-primary btn-sm" href={`${BASE}#arcade`}><Fragment set:html={play} />Play now</a>
+      </div>
+    </header>
+
+    <main id="top">
+      <slot />
+    </main>
+
+    <footer class="wrap footer">
+      <span>The Last Dev <a href={`${BASE}changelog/`}>v{VERSION}</a>. MIT or Apache-2.0.</span>
+      <a href={REPO}>github.com/wraithyy/the-last-dev</a>
+    </footer>
+  </body>
+</html>
