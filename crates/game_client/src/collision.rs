@@ -2,7 +2,7 @@
 
 use crate::config::{FLOOR_HALF_X, FLOOR_HALF_Z, PLAYER_HEIGHT, PLAYER_RADIUS, STEP_HEIGHT};
 use bevy::math::Vec3;
-use combat_core::{Aabb, Vec3 as CVec3};
+use combat_core::{Aabb, Terrain, Vec3 as CVec3};
 
 pub fn to_core(v: Vec3) -> CVec3 {
     CVec3::new(v.x, v.y, v.z)
@@ -28,25 +28,22 @@ fn blocks(pos: Vec3, b: &Aabb) -> bool {
     overlaps_xz(pos, b) && b.max.y > pos.y + STEP_HEIGHT && b.min.y < pos.y + PLAYER_HEIGHT
 }
 
-/// Height of the walkable surface under the feet (floor or a prop top).
-pub fn ground_height(pos: Vec3, colliders: &[Aabb]) -> f32 {
+/// Height of the walkable surface under the feet (the ground or a prop top).
+pub fn ground_height(pos: Vec3, colliders: &[Aabb], terrain: &Terrain) -> f32 {
     colliders
         .iter()
         .filter(|b| overlaps_xz(pos, b) && b.max.y <= pos.y + STEP_HEIGHT)
         .map(|b| b.max.y)
-        .fold(0.0, f32::max)
+        .fold(terrain.height(pos.x, pos.z), f32::max)
 }
 
 /// A teleport target the sim chose without checking walls: the closest point on the way
 /// back towards `from` where the player fits (falls back to `from`).
-pub fn nearest_free(target: Vec3, from: Vec3, colliders: &[Aabb]) -> Vec3 {
+pub fn nearest_free(target: Vec3, from: Vec3, colliders: &[Aabb], terrain: &Terrain) -> Vec3 {
     let (limit_x, limit_z) = (FLOOR_HALF_X - PLAYER_RADIUS, FLOOR_HALF_Z - PLAYER_RADIUS);
     let clamp = |p: Vec3| {
-        Vec3::new(
-            p.x.clamp(-limit_x, limit_x),
-            0.0,
-            p.z.clamp(-limit_z, limit_z),
-        )
+        let (x, z) = (p.x.clamp(-limit_x, limit_x), p.z.clamp(-limit_z, limit_z));
+        Vec3::new(x, terrain.height(x, z), z)
     };
     let (target, from) = (clamp(target), clamp(from));
     let steps = (target.distance(from) / 0.25).ceil().max(1.0) as u32;
@@ -94,17 +91,39 @@ mod tests {
 
     #[test]
     fn teleport_into_a_wall_backs_off_towards_the_origin() {
-        let p = nearest_free(Vec3::new(0.0, 0.0, -5.0), Vec3::new(0.0, 0.0, 0.0), &wall());
+        let flat = Terrain::default();
+        let p = nearest_free(
+            Vec3::new(0.0, 0.0, -5.0),
+            Vec3::new(0.0, 0.0, 0.0),
+            &wall(),
+            &flat,
+        );
         assert!(p.z > -4.5 + PLAYER_RADIUS - 0.3 && p.z <= -4.0, "{p}");
         let free = Vec3::new(3.0, 0.0, 2.0);
-        assert_eq!(nearest_free(free, Vec3::ZERO, &wall()), free);
+        assert_eq!(nearest_free(free, Vec3::ZERO, &wall(), &flat), free);
     }
 
     #[test]
     fn low_prop_is_steppable_high_prop_is_ground_when_above() {
         let desk = vec![aabb(Vec3::new(0.0, 0.375, 0.0), Vec3::new(2.0, 0.75, 2.0))];
-        assert_eq!(ground_height(Vec3::new(0.0, 0.9, 0.0), &desk), 0.75);
-        assert_eq!(ground_height(Vec3::new(0.0, 0.0, 0.0), &desk), 0.0);
+        let flat = Terrain::default();
+        assert_eq!(ground_height(Vec3::new(0.0, 0.9, 0.0), &desk, &flat), 0.75);
+        assert_eq!(ground_height(Vec3::new(0.0, 0.0, 0.0), &desk, &flat), 0.0);
         assert!(blocks(Vec3::new(0.0, 0.0, 0.0), &desk[0]));
+    }
+
+    #[test]
+    fn the_ground_rises_under_a_hill_and_a_teleport_lands_on_it() {
+        let hill = Terrain {
+            features: vec![combat_core::TerrainFeature::Hill {
+                x: 0.0,
+                z: 0.0,
+                r: 10.0,
+                h: 4.0,
+            }],
+        };
+        assert_eq!(ground_height(Vec3::new(0.0, 4.0, 0.0), &[], &hill), 4.0);
+        let p = nearest_free(Vec3::new(0.0, 0.0, 0.0), Vec3::ZERO, &[], &hill);
+        assert_eq!(p.y, 4.0);
     }
 }

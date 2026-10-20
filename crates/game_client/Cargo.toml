@@ -9,7 +9,7 @@ license.workspace = true
 combat_core = { path = "../combat_core" }
 net_proto = { path = "../net_proto" }
 # 3d + ui + OGG audio only (no 2d, no other codecs); default_platform already enables webgl2.
-bevy = { version = "=0.19.1", default-features = false, features = ["3d", "ui", "bevy_audio", "vorbis"] }
+bevy = { version = "=0.19.1", default-features = false, features = ["3d", "ui", "bevy_audio", "vorbis", "custom_cursor"] }
 
 # Native co-op transport: sync websocket on its own thread; ws:// only (LAN target), no TLS stack.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

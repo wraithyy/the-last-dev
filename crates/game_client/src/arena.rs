@@ -12,6 +12,11 @@ use combat_core::Aabb;
 #[derive(Resource, Default)]
 pub struct Colliders(pub Vec<Aabb>);
 
+/// Ground height of the loaded zone (flat indoors); the floors module sets it with the
+/// colliders. The same function the sim and the server use.
+#[derive(Resource, Default)]
+pub struct Ground(pub combat_core::Terrain);
+
 /// One flat piece of floor decor (rug, carpet runner, mat): a corpse lying on it must rest on
 /// its top face instead of sinking into it.
 #[derive(Clone, Copy, Debug)]
@@ -70,6 +75,7 @@ pub struct ArenaPlugin;
 impl Plugin for ArenaPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Colliders>()
+            .init_resource::<Ground>()
             .init_resource::<FlatDecor>()
             .init_resource::<CameraCeiling>()
             .insert_resource(GlobalAmbientLight {

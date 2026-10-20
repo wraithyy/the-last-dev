@@ -101,6 +101,7 @@ fn fake_server_round_trip_keeps_networld_in_step() {
     let you = sim.spawn_player("fullstack", to_core(intern_at), 0.0);
     let bob = sim.spawn_player("fullstack", to_core(intern_at), 0.0);
     let anchors = |n: &str| layout.anchor(n).map(|(p, y)| (to_core(p), y));
+    sim.set_zone_terrain("campus", layout.terrain.clone());
     if let Err(e) = sim.load_zone("campus", &anchors, layout.blockers.clone()) {
         panic!("load_zone: {e:?}");
     }
@@ -146,11 +147,18 @@ fn fake_server_round_trip_keeps_networld_in_step() {
         .find(|u| u.key == "intern")
         .map(|u| u.id)
         .unwrap_or_default();
+    // The intern's first ticket is handed out in Car Park P3; on the campus he has the next one.
+    sim.debug_set_quest("onboarding", QuestStatus::Done);
     let quest = sim
         .content()
         .quests
         .iter()
-        .find(|q| q.giver.npc == "intern" && q.requires.is_none() && q.level_min <= 1)
+        .find(|q| {
+            q.giver.npc == "intern"
+                && q.giver.zone == "campus"
+                && q.requires.as_deref() == Some("onboarding")
+                && q.level_min <= 1
+        })
         .map(|q| q.id.clone())
         .unwrap_or_default();
     let mut mob = 0;
@@ -274,6 +282,7 @@ fn campus_room() -> (Sim, EntityId, EntityId, NetWorld) {
     let you = sim.spawn_player("fullstack", to_core(spawn), 0.0);
     let bob = sim.spawn_player("fullstack", to_core(spawn), 0.0);
     let anchors = |n: &str| layout.anchor(n).map(|(p, y)| (to_core(p), y));
+    sim.set_zone_terrain("campus", layout.terrain.clone());
     if let Err(e) = sim.load_zone("campus", &anchors, layout.blockers.clone()) {
         panic!("load_zone: {e:?}");
     }

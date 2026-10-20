@@ -20,6 +20,10 @@ const FLOOR_RGBA: [u8; 4] = [38, 44, 58, 235];
 const WALL_RGBA: [u8; 4] = [120, 150, 190, 255];
 /// Furniture, buildings and racks: everything that blocks movement.
 const BLOCK_RGBA: [u8; 4] = [70, 84, 108, 255];
+/// Outdoors: roads and car parks, footpaths and plazas, water.
+const ROAD_RGBA: [u8; 4] = [92, 96, 104, 255];
+const PATH_RGBA: [u8; 4] = [66, 74, 86, 255];
+const WATER_RGBA: [u8; 4] = [52, 118, 178, 255];
 const OPEN: Color = Color::srgb(0.4, 1.0, 0.5);
 const LOCKED: Color = Color::srgb(1.0, 0.42, 0.36);
 const QUEST: Color = Color::srgb(1.0, 0.9, 0.2);
@@ -185,6 +189,12 @@ pub(super) fn rasterise(layout: &FloorLayout) -> (Image, Vec2, f32) {
             }
         }
     }
+    let ground: Vec<_> = ground_marks(layout).collect();
+    for (mark, c) in &ground {
+        if *c != WATER_RGBA {
+            fill_mark(&mut put, mark, lo, px_scale, *c);
+        }
+    }
     for b in &layout.blockers {
         let (a, c) = (
             (Vec2::new(b.min.x, b.min.z) - lo) * px_scale,
@@ -194,6 +204,12 @@ pub(super) fn rasterise(layout: &FloorLayout) -> (Image, Vec2, f32) {
             for x in a.x.floor() as i64..c.x.ceil() as i64 {
                 put(x, y, BLOCK_RGBA);
             }
+        }
+    }
+    // Water goes over the invisible river and lake blockers, so it reads as water.
+    for (mark, c) in &ground {
+        if *c == WATER_RGBA {
+            fill_mark(&mut put, mark, lo, px_scale, *c);
         }
     }
     for s in layout.footprint.walls() {
@@ -218,6 +234,92 @@ pub(super) fn rasterise(layout: &FloorLayout) -> (Image, Vec2, f32) {
         RenderAssetUsages::RENDER_WORLD,
     );
     (img, lo, scale)
+}
+
+/// A flat piece of ground worth drawing on the map: centre, half extents, yaw, round.
+struct Mark {
+    center: Vec2,
+    half: Vec2,
+    yaw: f32,
+    round: bool,
+}
+
+/// Roads, paths and water of an outdoor layout, from its flat pieces.
+fn ground_marks(layout: &FloorLayout) -> impl Iterator<Item = (Mark, [u8; 4])> + '_ {
+    use crate::floors::kit_for_map::{Mat, Piece, PrimKind};
+    let color = |m: Mat, flat: bool| match m {
+        Mat::Asphalt => Some(ROAD_RGBA),
+        Mat::Water | Mat::Lake => Some(WATER_RGBA),
+        Mat::Sand | Mat::Concrete if flat => Some(PATH_RGBA),
+        _ => None,
+    };
+    layout.pieces.iter().filter_map(move |p| {
+        if !layout.outdoor {
+            return None;
+        }
+        let (center, size, yaw, mat, round) = match p {
+            Piece::Box {
+                center, size, mat, ..
+            } => (*center, *size, 0.0, *mat, false),
+            Piece::Slab {
+                center,
+                size,
+                yaw,
+                mat,
+                ..
+            } => (*center, *size, *yaw, *mat, false),
+            Piece::Prim {
+                kind: PrimKind::Cylinder,
+                center,
+                size,
+                mat,
+                ..
+            } => (*center, *size, 0.0, *mat, true),
+            _ => return None,
+        };
+        // Only ground cover: thin, and big enough to matter at map scale.
+        let flat = size.y <= 0.15 && size.x.max(size.z) >= 2.0;
+        let c = color(mat, flat).filter(|_| size.y <= 0.15 || mat == Mat::Lake)?;
+        Some((
+            Mark {
+                center: Vec2::new(center.x, center.z),
+                half: Vec2::new(size.x, size.z) / 2.0,
+                yaw,
+                round,
+            },
+            c,
+        ))
+    })
+}
+
+fn fill_mark(
+    put: &mut impl FnMut(i64, i64, [u8; 4]),
+    m: &Mark,
+    lo: Vec2,
+    px_scale: f32,
+    c: [u8; 4],
+) {
+    let r = m.half.length();
+    let (a, b) = (
+        (m.center - Vec2::splat(r) - lo) * px_scale,
+        (m.center + Vec2::splat(r) - lo) * px_scale,
+    );
+    let (s, co) = m.yaw.sin_cos();
+    for y in a.y.floor() as i64..b.y.ceil() as i64 {
+        for x in a.x.floor() as i64..b.x.ceil() as i64 {
+            let w = Vec2::new(x as f32 + 0.5, y as f32 + 0.5) / px_scale + lo - m.center;
+            let inside = if m.round {
+                (w / m.half.max(Vec2::splat(0.01))).length_squared() <= 1.0
+            } else {
+                // Slab yaw is `Quat::from_rotation_y`: local x runs along (cos, -sin).
+                let l = Vec2::new(w.x * co - w.y * s, w.x * s + w.y * co);
+                l.x.abs() <= m.half.x && l.y.abs() <= m.half.y
+            };
+            if inside {
+                put(x, y, c);
+            }
+        }
+    }
 }
 
 /// Zone graph from the campus outward: (depth, zone id) in walk order.

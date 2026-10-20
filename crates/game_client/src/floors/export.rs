@@ -32,7 +32,7 @@ fn aabb(out: &mut String, b: &Aabb) {
 /// Must match `game::arrival`: in front of the door back to `from`, clear of its trigger.
 fn arrival(layout: &FloorLayout, door: Vec3, yaw: f32) -> Vec3 {
     let facing = Quat::from_rotation_y(yaw) * Vec3::NEG_Z;
-    nearest_free(door + facing * 2.6, door, &layout.blockers)
+    nearest_free(door + facing * 2.6, door, &layout.blockers, &layout.terrain)
 }
 
 fn zone(out: &mut String, l: &FloorLayout) {
@@ -70,7 +70,11 @@ fn zone(out: &mut String, l: &FloorLayout) {
         bv3(out, arrival(l, *pos, *yaw));
         let _ = writeln!(out, ", {yaw:?}),");
     }
-    out.push_str("        ],\n    ),\n");
+    out.push_str("        ],\n");
+    if !l.terrain.is_flat() {
+        let _ = writeln!(out, "        terrain: {},", l.terrain.to_ron());
+    }
+    out.push_str("    ),\n");
 }
 
 fn render() -> String {

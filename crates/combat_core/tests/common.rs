@@ -541,6 +541,7 @@ pub fn wall(z: f32) -> Aabb {
 pub struct Geo {
     pub anchors: std::collections::HashMap<String, (Vec3, f32)>,
     pub blockers: Vec<Aabb>,
+    pub terrain: combat_core::Terrain,
 }
 
 #[derive(serde::Deserialize)]
@@ -548,6 +549,8 @@ struct RawGeo {
     id: String,
     anchors: Vec<(String, [f32; 3], f32)>,
     blockers: Vec<([f32; 3], [f32; 3])>,
+    #[serde(default)]
+    terrain: combat_core::Terrain,
 }
 
 /// Every zone of the shipped geometry, by id.
@@ -573,6 +576,7 @@ pub fn geometry() -> std::collections::HashMap<String, Geo> {
                         max: v(max),
                     })
                     .collect(),
+                terrain: z.terrain,
             };
             (z.id, geo)
         })

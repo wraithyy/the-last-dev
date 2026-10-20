@@ -7,8 +7,8 @@ pub const WINDOW_TITLE: &str = "The Last Dev";
 // Floors (metres). Outlines are free-form (see floors/shape.rs); every floor fits inside
 // [-FLOOR_HALF_X, FLOOR_HALF_X] x [-FLOOR_HALF_Z, FLOOR_HALF_Z], which is also the generous
 // outer clamp that collision keeps as a safety net behind the walls.
-pub const FLOOR_HALF_X: f32 = 112.0;
-pub const FLOOR_HALF_Z: f32 = 82.0;
+pub const FLOOR_HALF_X: f32 = 234.0;
+pub const FLOOR_HALF_Z: f32 = 168.0;
 /// Also the ceiling height: the ceiling slab sits on top of the walls.
 pub const WALL_HEIGHT: f32 = 4.5;
 
@@ -35,6 +35,8 @@ pub const MODEL_NATIVE_HEIGHT: f32 = 3.2;
 pub const PLAYER_MODEL_SCALE: f32 = PLAYER_HEIGHT / MODEL_NATIVE_HEIGHT;
 /// Tolerance for "standing on the ground" when deciding if a jump is allowed.
 pub const GROUND_EPSILON: f32 = 1e-3;
+/// A grounded body follows the terrain down this far per step instead of falling.
+pub const SLOPE_SNAP: f32 = 0.5;
 
 // Camera
 /// Bisection steps for camera clipping (precision = arm length / 2^steps).

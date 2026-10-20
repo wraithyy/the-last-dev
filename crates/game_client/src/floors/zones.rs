@@ -2,6 +2,7 @@
 //! organic floor builders; the campus, data centers and lab have their own modules.
 
 use super::campus;
+use super::carpark;
 use super::client;
 use super::corporate;
 use super::datacenter;
@@ -18,8 +19,9 @@ use combat_core::Aabb;
 
 /// Every zone id of the contract, in a stable order.
 #[allow(dead_code)] // contract surface; the tests iterate it
-pub const ZONE_IDS: [&str; 19] = [
+pub const ZONE_IDS: [&str; 20] = [
     "campus",
+    carpark::ZONE,
     "tower/1",
     "tower/2",
     "tower/3",
@@ -44,6 +46,7 @@ pub const ZONE_IDS: [&str; 19] = [
 pub fn build_zone(id: &str) -> Option<FloorLayout> {
     match id {
         "campus" => Some(campus::build()),
+        carpark::ZONE => Some(carpark::build()),
         "datacenter/1" => Some(datacenter::build(1)),
         "datacenter/2" => Some(datacenter::build(2)),
         "lab/1" => Some(lab::build(1)),
@@ -175,6 +178,7 @@ mod tests {
         r.extend((1..=npcs).map(|i| format!("npc_{i}")));
         let doors: &[&str] = match id {
             "campus" => &[
+                "door:parking_p3",
                 "door:tower/1",
                 "door:datacenter/1",
                 "door:lab/1",
@@ -184,6 +188,7 @@ mod tests {
             "tower/1" | "tower/2" | "tower/3" | "tower/4" => {
                 &["door:campus", "elevator", "elevator_exit"]
             }
+            carpark::ZONE => &["door:campus"],
             "datacenter/1" => &["door:campus", "door:datacenter/2"],
             "datacenter/2" => &["door:datacenter/1", "door:campus"],
             "lab/1" => &["door:campus", "door:lab/2"],
@@ -346,7 +351,8 @@ mod tests {
     fn blocker_budget_and_the_route_is_walkable() {
         for id in ZONE_IDS {
             let l = zone(id);
-            let budget = if id == "campus" { 800 } else { 600 };
+            // The campus is a town now; still a few AABB tests per step for movement.
+            let budget = if id == "campus" { 1800 } else { 600 };
             assert!(
                 l.blockers.len() < budget,
                 "{id}: {} blockers",

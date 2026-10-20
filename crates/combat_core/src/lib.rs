@@ -32,6 +32,7 @@ pub mod talents;
 pub mod targeting;
 pub mod teambuilding;
 mod telegraph;
+pub mod terrain;
 pub mod time;
 pub mod types;
 mod wander;
@@ -89,6 +90,7 @@ pub use teambuilding::{
     ObjectiveDef, Patrol, PatrolPose, ScoreDef, TeambuildingDef, WatcherDef, WatcherKind,
 };
 pub use telegraph::{TelegraphShape, TelegraphView};
+pub use terrain::{Feature as TerrainFeature, Terrain};
 pub use time::{FixedStepper, TICK_HZ, Tick, ms_to_ticks, ticks_to_ms};
 pub use types::{
     AiState, Audience, AuraEnd, AuraView, Career, CastError, CastView, Command, CooldownView,

@@ -62,6 +62,7 @@ impl W {
             panic!("no geometry for {zone}")
         };
         let anchors = |n: &str| g.anchors.get(n).copied();
+        self.sim.set_zone_terrain(zone, g.terrain.clone());
         if let Err(e) = self.sim.load_zone(zone, &anchors, g.blockers.clone()) {
             panic!("load_zone {zone}: {e}");
         }
@@ -623,4 +624,20 @@ fn campaign_zones_mix_objective_kinds_and_keep_drop_quests_a_minority() {
             kinds.len()
         );
     }
+}
+
+#[test]
+fn the_hybrid_worker_badge_goes_to_the_enforcer_who_then_counts_desks() {
+    let mut w = world("campus", 1);
+    w.accept("hybrid_worker", "coffee_badging");
+    w.talk("rto_enforcer");
+    assert_eq!(w.sim.quest_status("coffee_badging"), QuestStatus::Ready);
+    w.turn_in("coffee_badging");
+    w.accept("rto_enforcer", "desk_census");
+    for k in 1..=3 {
+        w.stand_at(&format!("prop:rto_desk_{k}"));
+        w.secs(2);
+    }
+    assert_eq!(w.sim.quest_status("desk_census"), QuestStatus::Ready);
+    w.turn_in("desk_census");
 }

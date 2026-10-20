@@ -329,7 +329,10 @@ fn arrival(layout: &FloorLayout, from: Option<&str>) -> (Vec3, f32) {
     match door {
         Some((pos, yaw)) => {
             let facing = Quat::from_rotation_y(yaw) * Vec3::NEG_Z;
-            (nearest_free(pos + facing * 2.6, pos, &layout.blockers), yaw)
+            (
+                nearest_free(pos + facing * 2.6, pos, &layout.blockers, &layout.terrain),
+                yaw,
+            )
         }
         None => layout
             .anchor("player_spawn")
@@ -361,6 +364,9 @@ fn enter_zone(
         return;
     };
     let anchors = |name: &str| layout.anchor(name).map(|(p, yaw)| (to_core(p), yaw));
+    if net.is_none() {
+        sim.0.set_zone_terrain(&req.zone, layout.terrain.clone());
+    }
     // Online the server has already loaded the zone; only the client side follows.
     if net.is_none()
         && let Err(err) = sim
@@ -379,7 +385,7 @@ fn enter_zone(
     let first_load = !std::mem::replace(&mut *first, true);
     let (spawn, spawn_yaw) = arrival(&layout, req.from.as_deref());
     let (pos, yaw, cam_offset) = match debug_player_at().filter(|_| first_load) {
-        Some((x, z, yaw, cam)) => (Vec3::new(x, 0.0, z), yaw, cam),
+        Some((x, z, yaw, cam)) => (Vec3::new(x, layout.terrain.height(x, z), z), yaw, cam),
         None => (spawn, spawn_yaw, 0.0),
     };
     body.teleport_facing(pos, yaw);
@@ -451,6 +457,7 @@ fn enter_zone(
 fn zone_tagline(id: &str) -> &'static str {
     match id {
         "campus" => "Badge in. The AI has already rejected your expense report.",
+        "parking_p3" => "Car Park P3. The campus is 2.4 km north. The shuttle is a rumour.",
         "tower/1" => "Where the vibes are immaculate and the tests are optional.",
         "tower/2" => "This meeting could have been an email. The email could have been nothing.",
         "tower/3" => "Selling features we have not built to customers we do not have.",
@@ -475,6 +482,7 @@ fn zone_tagline(id: &str) -> &'static str {
         "migration/1" => "Twenty tickets, two tools, one Friday.",
         "hackathon/1" => "Twenty-four hours to build what the roadmap could not.",
         "openspace/1" => "Collaboration happens spontaneously. Constantly. At your desk.",
+        "home/1" => "Flexible working: the work is flexible, the hours are not.",
         _ => "A new quarter begins. Same OKRs.",
     }
 }

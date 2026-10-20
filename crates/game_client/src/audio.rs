@@ -17,7 +17,9 @@ use crate::presentation::PresentEvent;
 use bevy::audio::Volume;
 use bevy::input::touch::Touches;
 use bevy::prelude::*;
-use combat_core::{CastError, Content, Effect, EntityId, Event, SpellId, distance};
+use combat_core::{
+    CastError, Content, Effect, EntityId, Event, Medal, PropKind, School, SpellId, distance,
+};
 use std::collections::HashMap;
 
 /// Sound effects farther than this from the player are inaudible.
@@ -65,6 +67,30 @@ enum Snd {
     Heal,
     Stun,
     Summon,
+    UiClick,
+    UiHover,
+    WindowOpen,
+    WindowClose,
+    QuestAccept,
+    QuestDone,
+    Kudos,
+    Promotion,
+    Interrupt,
+    Telegraph,
+    Block,
+    Scooter,
+    Shuttle,
+    CoffeeMachine,
+    Printer,
+    Vending,
+    MedalBronze,
+    MedalSilver,
+    MedalGold,
+    CastArcane,
+    CastPhysical,
+    VoiceLevelUp,
+    VoiceGameOver,
+    VoiceFlawless,
 }
 
 struct Def {
@@ -269,6 +295,128 @@ static TABLE: &[Def] = &[
     def(Snd::Heal, &["audio/sfx/heal.ogg"], 0.45, 0.3, true),
     def(Snd::Stun, &["audio/sfx/stun.ogg"], 0.6, 0.3, true),
     def(Snd::Summon, &["audio/sfx/summon.ogg"], 0.5, 0.1, true),
+    def(Snd::UiClick, &["audio/sfx/ui_click.ogg"], 0.4, 0.05, true),
+    // Quiet and rate-limited: a sweep across a button row must not machine-gun.
+    def(Snd::UiHover, &["audio/sfx/ui_hover.ogg"], 0.12, 0.08, true),
+    def(
+        Snd::WindowOpen,
+        &["audio/sfx/window_open.ogg"],
+        0.4,
+        0.2,
+        true,
+    ),
+    def(
+        Snd::WindowClose,
+        &["audio/sfx/window_close.ogg"],
+        0.35,
+        0.2,
+        true,
+    ),
+    def(
+        Snd::QuestAccept,
+        &["audio/sfx/quest_accept.ogg"],
+        0.5,
+        0.3,
+        false,
+    ),
+    def(
+        Snd::QuestDone,
+        &["audio/sfx/quest_done.ogg"],
+        0.55,
+        0.3,
+        false,
+    ),
+    def(Snd::Kudos, &["audio/sfx/kudos.ogg"], 0.35, 0.4, false),
+    def(
+        Snd::Promotion,
+        &["audio/sfx/promotion.ogg"],
+        0.55,
+        0.5,
+        false,
+    ),
+    def(
+        Snd::Interrupt,
+        &["audio/sfx/interrupt.ogg"],
+        0.55,
+        0.2,
+        true,
+    ),
+    def(
+        Snd::Telegraph,
+        &["audio/sfx/telegraph.ogg"],
+        0.35,
+        0.6,
+        false,
+    ),
+    def(Snd::Block, &["audio/sfx/block.ogg"], 0.5, 0.15, true),
+    def(Snd::Scooter, &["audio/sfx/scooter.ogg"], 0.4, 0.5, true),
+    def(Snd::Shuttle, &["audio/sfx/shuttle.ogg"], 0.45, 0.5, true),
+    def(
+        Snd::CoffeeMachine,
+        &["audio/sfx/coffee_machine.ogg"],
+        0.45,
+        0.5,
+        true,
+    ),
+    def(Snd::Printer, &["audio/sfx/printer.ogg"], 0.35, 0.5, true),
+    def(Snd::Vending, &["audio/sfx/vending.ogg"], 0.5, 0.3, true),
+    def(
+        Snd::MedalBronze,
+        &["audio/sfx/medal_bronze.ogg"],
+        0.55,
+        0.5,
+        false,
+    ),
+    def(
+        Snd::MedalSilver,
+        &["audio/sfx/medal_silver.ogg"],
+        0.55,
+        0.5,
+        false,
+    ),
+    def(
+        Snd::MedalGold,
+        &["audio/sfx/medal_gold.ogg"],
+        0.6,
+        0.5,
+        false,
+    ),
+    def(
+        Snd::CastArcane,
+        &["audio/sfx/cast_arcane.ogg"],
+        0.4,
+        0.1,
+        true,
+    ),
+    def(
+        Snd::CastPhysical,
+        &["audio/sfx/cast_physical.ogg"],
+        0.4,
+        0.1,
+        true,
+    ),
+    // Voice lines are rare punchlines, so they sit a little under the jingles.
+    def(
+        Snd::VoiceLevelUp,
+        &["audio/sfx/voice_level_up.ogg"],
+        0.5,
+        2.0,
+        false,
+    ),
+    def(
+        Snd::VoiceGameOver,
+        &["audio/sfx/voice_game_over.ogg"],
+        0.55,
+        2.0,
+        false,
+    ),
+    def(
+        Snd::VoiceFlawless,
+        &["audio/sfx/voice_flawless.ogg"],
+        0.55,
+        2.0,
+        false,
+    ),
 ];
 
 struct SpellSfx {
@@ -620,10 +768,31 @@ fn ui_sfx(
     paused: Res<Paused>,
     flow: Res<GameFlow>,
     trophies: Res<TrophiesOpen>,
+    buttons: Query<&Interaction, (With<Button>, Changed<Interaction>)>,
     mut was_open: Local<bool>,
     mut was_victory: Local<bool>,
+    mut was_paused: Local<bool>,
     mut out: MessageWriter<Sfx>,
 ) {
+    for i in &buttons {
+        match i {
+            Interaction::Pressed => {
+                out.write(Sfx::new(Snd::UiClick));
+            }
+            Interaction::Hovered => {
+                out.write(Sfx::new(Snd::UiHover));
+            }
+            Interaction::None => {}
+        }
+    }
+    if paused.0 != *was_paused {
+        *was_paused = paused.0;
+        out.write(Sfx::new(if paused.0 {
+            Snd::WindowOpen
+        } else {
+            Snd::WindowClose
+        }));
+    }
     if !paused.0 && !flow.input_locked() && action_pressed(&binds, &keys) {
         out.write(Sfx::new(Snd::Key));
     }
@@ -639,6 +808,25 @@ fn ui_sfx(
         out.write(Sfx::new(Snd::Victory));
     }
     *was_victory = flow.victory;
+}
+
+fn school_cast(school: School) -> Snd {
+    match school {
+        School::Arcane => Snd::CastArcane,
+        School::Physical => Snd::CastPhysical,
+    }
+}
+
+/// Sound of using a prop; props without a distinct one stay silent beyond their chat line.
+fn prop_sfx(kind: PropKind) -> Option<Snd> {
+    match kind {
+        PropKind::Coffee => Some(Snd::CoffeeMachine),
+        PropKind::Printer => Some(Snd::Printer),
+        PropKind::Vending => Some(Snd::Vending),
+        PropKind::Scooter => Some(Snd::Scooter),
+        PropKind::ShuttleStop => Some(Snd::Shuttle),
+        _ => None,
+    }
 }
 
 /// 1 at the player, fading to 0 at `HEARD_M`; quadratic so far sounds die off quickly.
@@ -669,6 +857,7 @@ fn combat_sfx(
     sim: SimView,
     mut out: MessageWriter<Sfx>,
     mut first_floor: Local<bool>,
+    mut sp_seen: Local<Option<u32>>,
 ) {
     let sim = &*sim;
     let Some(player) = sim.player() else {
@@ -687,8 +876,17 @@ fn combat_sfx(
                 out.write(Sfx::new(Snd::CastHum).gain(near(*caster)));
             }
             Event::CastSucceeded { caster, spell, .. } if *caster == player => {
-                if let Some(s) = spell_sfx(*spell).filter(|s| !s.on_start) {
-                    out.write(Sfx::new(s.snd));
+                match spell_sfx(*spell) {
+                    Some(s) if !s.on_start => {
+                        out.write(Sfx::new(s.snd));
+                    }
+                    Some(_) => {}
+                    // Spells without their own clip get one per school.
+                    None => {
+                        if let Some(d) = sim.content().spell(*spell) {
+                            out.write(Sfx::new(school_cast(d.school)));
+                        }
+                    }
                 }
             }
             Event::CastSucceeded { caster, .. } => {
@@ -699,6 +897,12 @@ fn combat_sfx(
                 if *caster == player && *reason != CastError::OnGcd =>
             {
                 out.write(Sfx::new(Snd::Error));
+            }
+            Event::CastInterrupted { caster, .. } => {
+                out.write(Sfx::new(Snd::Interrupt).gain(near(*caster)));
+            }
+            Event::TelegraphStarted { source, .. } => {
+                out.write(Sfx::new(Snd::Telegraph).gain(near(*source).max(0.5)));
             }
             Event::MeleeSwing { attacker, .. } if *attacker == player => {
                 out.write(Sfx::new(Snd::Tick));
@@ -716,12 +920,47 @@ fn combat_sfx(
             }
             Event::Death { unit, .. } if *unit == player => {
                 out.write(Sfx::new(Snd::Death));
+                out.write(Sfx::new(Snd::VoiceGameOver).after(0.9));
             }
             Event::Looted { looter, .. } if *looter == player => {
                 out.write(Sfx::new(Snd::Loot));
             }
             Event::LevelUp { unit, .. } if *unit == player => {
                 out.write(Sfx::new(Snd::LevelUp));
+                out.write(Sfx::new(Snd::VoiceLevelUp).after(0.7));
+            }
+            Event::TalentsChanged { unit, .. } if *unit == player => {
+                out.write(Sfx::new(Snd::Promotion));
+            }
+            Event::QuestAccepted { .. } => {
+                out.write(Sfx::new(Snd::QuestAccept));
+            }
+            Event::Bag { unit, sp, .. } if *unit == player => {
+                // The first Bag is the opening balance, not a gain.
+                if sp_seen.is_some_and(|old| *sp > old) {
+                    out.write(Sfx::new(Snd::Kudos).after(0.15));
+                }
+                *sp_seen = Some(*sp);
+            }
+            Event::Interacted { unit, prop, .. } if *unit == player => {
+                if let Some(snd) = sim.content().prop(prop).and_then(|d| prop_sfx(d.kind)) {
+                    out.write(Sfx::new(snd));
+                }
+            }
+            Event::MinigameEnded { result } if result.unit == player => {
+                match result.medal.filter(|_| !result.quit) {
+                    Some(Medal::Gold) => {
+                        out.write(Sfx::new(Snd::MedalGold));
+                        out.write(Sfx::new(Snd::VoiceFlawless).after(0.9));
+                    }
+                    Some(Medal::Silver) => {
+                        out.write(Sfx::new(Snd::MedalSilver));
+                    }
+                    Some(Medal::Bronze) => {
+                        out.write(Sfx::new(Snd::MedalBronze));
+                    }
+                    None => {}
+                }
             }
             // Staged after the fanfare so the two do not mask each other.
             Event::SpellLearned { unit, .. } if *unit == player => {
@@ -736,7 +975,7 @@ fn combat_sfx(
                 }
             }
             Event::QuestCompleted { .. } => {
-                out.write(Sfx::new(Snd::SpellLearned));
+                out.write(Sfx::new(Snd::QuestDone));
             }
             Event::ZoneLoaded { .. } => {
                 // The first load happens at startup, long before any gesture.
@@ -757,10 +996,14 @@ fn combat_sfx(
                 spell,
                 crit,
                 amount,
+                absorbed,
                 ..
             } if *amount > 0 => {
                 if *target == player {
                     out.write(Sfx::new(Snd::HitPlayer).gain(near(*source)));
+                    if *absorbed > 0 {
+                        out.write(Sfx::new(Snd::Block).gain(near(*source)));
+                    }
                 } else if *source == player {
                     let hit = if is_periodic(sim.content(), *spell) {
                         Sfx::new(Snd::Tick).gain(0.7)

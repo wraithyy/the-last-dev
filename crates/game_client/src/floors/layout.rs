@@ -78,6 +78,8 @@ pub struct FloorLayout {
     pub seats: Vec<crate::seat::SeatSpot>,
     /// Wall and ceiling height; big halls are taller than `WALL_HEIGHT` so the camera has room.
     pub ceiling: f32,
+    /// Ground height (flat indoors); pieces, blockers and anchors already stand on it.
+    pub terrain: combat_core::Terrain,
 }
 
 /// Zone layouts are floor layouts; the alias is the contract name.
@@ -218,6 +220,7 @@ pub fn assemble(
     let mut plan = plan;
     super::office::place(zone, &mut plan);
     super::quest_spots::place(zone, &mut plan);
+    drape(&mut plan);
     let ceiling = plan.top();
     let Plan {
         pieces,
@@ -226,6 +229,7 @@ pub fn assemble(
         route,
         props,
         seats,
+        terrain,
         ..
     } = plan;
     FloorLayout {
@@ -245,6 +249,41 @@ pub fn assemble(
         props,
         seats,
         ceiling,
+        terrain,
+    }
+}
+
+/// Builders place everything as if the ground were flat; this sets each piece, blocker, anchor,
+/// prop and seat down on the terrain under its centre. Big flat pieces belong on flat ground.
+fn drape(plan: &mut Plan) {
+    if plan.terrain.is_flat() {
+        return;
+    }
+    let t = plan.terrain.clone();
+    let lift = |p: &mut Vec3| p.y += t.height(p.x, p.z);
+    for piece in &mut plan.pieces {
+        match piece {
+            Piece::Box { center, .. }
+            | Piece::Slab { center, .. }
+            | Piece::Prim { center, .. }
+            | Piece::Panel { center, .. } => lift(center),
+            Piece::Prop { pos, .. } | Piece::Light { pos, .. } => lift(pos),
+            Piece::Block(b) => {
+                let h = t.height((b.min.x + b.max.x) / 2.0, (b.min.z + b.max.z) / 2.0);
+                b.min.y += h;
+                b.max.y += h;
+            }
+            Piece::Run { .. } | Piece::Cap { .. } => {}
+        }
+    }
+    for a in &mut plan.anchors {
+        lift(&mut a.pos);
+    }
+    for (_, p) in &mut plan.props {
+        lift(p);
+    }
+    for s in &mut plan.seats {
+        lift(&mut s.pos);
     }
 }
 
@@ -546,10 +585,12 @@ mod tests {
 
     #[test]
     fn referenced_furniture_files_exist() {
-        let dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/models/furniture");
-        for m in super::super::kit::ALL_MODELS {
-            assert!(dir.join(format!("{}.glb", m.file)).exists(), "{}", m.file);
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        for m in super::super::kit::ALL_MODELS
+            .iter()
+            .chain(super::super::models::ALL.iter())
+        {
+            assert!(dir.join(m.path()).exists(), "{}", m.path());
         }
     }
 

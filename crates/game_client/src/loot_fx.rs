@@ -10,11 +10,12 @@ use crate::input::{MouseState, Paused};
 use crate::nameplates::{PlateLootTag, PlateName};
 use crate::player::{Player, PlayerBody};
 use crate::targeting::{Target, pick_unit};
+use crate::touch::TouchMode;
 use crate::units::Unit;
 use bevy::prelude::*;
-use bevy::window::{PrimaryWindow, SystemCursorIcon};
+use bevy::window::{CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow};
 use combat_core::{CORPSE_EMPTY_MS, CORPSE_LOOT_MS, EntityId, Event, TICK_HZ, ms_to_ticks};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 pub const GOLD: Color = Color::srgb(1.0, 0.82, 0.25);
 const SPARKLE_CAP: usize = 40;
@@ -35,7 +36,8 @@ const CORPSE_CLEARANCE: f32 = 0.015;
 
 /// Height a corpse at `pos` rests at: on top of the rug or carpet under it, not inside it.
 fn rest_lift(decor: &FlatDecor, pos: Vec3) -> f32 {
-    decor.top_near(pos, CORPSE_RADIUS) + CORPSE_CLEARANCE
+    // Decor tops are absolute; the corpse already lies on the ground at `pos.y`.
+    (decor.top_near(pos, CORPSE_RADIUS) - pos.y).max(0.0) + CORPSE_CLEARANCE
 }
 
 /// This player's view of a corpse's timer, mirroring the sim's `refresh_corpse`: 3 minutes
@@ -85,7 +87,7 @@ pub struct LootFxPlugin;
 impl Plugin for LootFxPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<EmptyCorpses>()
-            .add_systems(Startup, setup)
+            .add_systems(Startup, (setup, load_cursors))
             .add_systems(
                 Update,
                 (
@@ -302,17 +304,69 @@ enum Hover {
     Ui,
     Hostile,
     Friendly,
+    Prop,
     Corpse { in_reach: bool },
 }
 
-fn cursor_for(h: Hover) -> SystemCursorIcon {
-    match h {
-        Hover::Nothing => SystemCursorIcon::Default,
-        Hover::Ui | Hover::Friendly => SystemCursorIcon::Pointer,
-        Hover::Hostile => SystemCursorIcon::Crosshair,
-        Hover::Corpse { in_reach: true } => SystemCursorIcon::Grab,
-        Hover::Corpse { in_reach: false } => SystemCursorIcon::NotAllowed,
+/// The Kenney cursor shown for a hover (assets/cursors).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+enum Pointer {
+    Normal,
+    Ui,
+    Talk,
+    Loot,
+    Attack,
+    Use,
+    NotAllowed,
+}
+
+impl Pointer {
+    const ALL: [Pointer; 7] = [
+        Pointer::Normal,
+        Pointer::Ui,
+        Pointer::Talk,
+        Pointer::Loot,
+        Pointer::Attack,
+        Pointer::Use,
+        Pointer::NotAllowed,
+    ];
+
+    /// File under assets/ and the hotspot in its 32x32 pixels (the arrow tip or the glyph centre).
+    fn art(self) -> (&'static str, (u16, u16)) {
+        match self {
+            Pointer::Normal => ("cursors/pointer_a.png", (9, 7)),
+            Pointer::Ui => ("cursors/hand_point.png", (11, 4)),
+            Pointer::Talk => ("cursors/message_dots_round.png", (16, 16)),
+            Pointer::Loot => ("cursors/hand_open.png", (16, 16)),
+            Pointer::Attack => ("cursors/tool_sword_a.png", (5, 5)),
+            Pointer::Use => ("cursors/cursor_cogs.png", (4, 3)),
+            Pointer::NotAllowed => ("cursors/cursor_disabled.png", (2, 2)),
+        }
     }
+}
+
+fn cursor_for(h: Hover) -> Pointer {
+    match h {
+        Hover::Nothing => Pointer::Normal,
+        Hover::Ui => Pointer::Ui,
+        Hover::Friendly => Pointer::Talk,
+        Hover::Hostile => Pointer::Attack,
+        Hover::Prop => Pointer::Use,
+        Hover::Corpse { in_reach: true } => Pointer::Loot,
+        Hover::Corpse { in_reach: false } => Pointer::NotAllowed,
+    }
+}
+
+#[derive(Resource)]
+struct Pointers(HashMap<Pointer, Handle<Image>>);
+
+fn load_cursors(mut commands: Commands, assets: Res<AssetServer>) {
+    commands.insert_resource(Pointers(
+        Pointer::ALL
+            .iter()
+            .map(|p| (*p, assets.load(p.art().0)))
+            .collect(),
+    ));
 }
 
 fn hover_cursor(
@@ -330,8 +384,13 @@ fn hover_cursor(
     units: Query<(Entity, &Transform, &Unit)>,
     sims: Query<&SimUnit>,
     (prop, props): (Res<crate::office::PropHover>, Res<crate::office::Props>),
-    mut state: Local<(Option<Vec2>, f32, Option<SystemCursorIcon>)>,
+    (pointers, images, touch): (Res<Pointers>, Res<Assets<Image>>, Res<TouchMode>),
+    mut state: Local<(Option<Vec2>, f32, Option<Pointer>)>,
 ) {
+    // Fingers have no pointer to draw.
+    if touch.active {
+        return;
+    }
     let (win_entity, win) = *window;
     // While steering the pointer is locked and hidden; leave the icon alone.
     if mouse.right || mouse.left {
@@ -372,16 +431,25 @@ fn hover_cursor(
                 Some(p) if p.kind == combat_core::PropKind::Pickup => Hover::Corpse {
                     in_reach: p.stand.distance(player.pos) <= p.reach,
                 },
-                Some(_) => Hover::Friendly,
+                Some(_) => Hover::Prop,
                 None => Hover::Nothing,
             }),
     };
-    let icon = cursor_for(hover);
-    if state.2 != Some(icon) {
-        state.2 = Some(icon);
+    let pointer = cursor_for(hover);
+    if state.2 != Some(pointer) {
+        let Some(handle) = pointers.0.get(&pointer).filter(|h| images.contains(h.id())) else {
+            // Not decoded yet: keep the OS arrow and retry on the next pick.
+            state.0 = None;
+            return;
+        };
+        state.2 = Some(pointer);
         commands
             .entity(win_entity)
-            .insert(bevy::window::CursorIcon::from(icon));
+            .insert(CursorIcon::Custom(CustomCursor::Image(CustomCursorImage {
+                handle: handle.clone(),
+                hotspot: pointer.art().1,
+                ..default()
+            })));
     }
 }
 
@@ -391,13 +459,29 @@ mod tests {
 
     #[test]
     fn hover_maps_to_expected_cursor() {
-        use SystemCursorIcon::*;
-        assert_eq!(cursor_for(Hover::Nothing), Default);
-        assert_eq!(cursor_for(Hover::Ui), Pointer);
-        assert_eq!(cursor_for(Hover::Friendly), Pointer);
-        assert_eq!(cursor_for(Hover::Hostile), Crosshair);
-        assert_eq!(cursor_for(Hover::Corpse { in_reach: true }), Grab);
+        use Pointer::*;
+        assert_eq!(cursor_for(Hover::Nothing), Normal);
+        assert_eq!(cursor_for(Hover::Ui), Ui);
+        assert_eq!(cursor_for(Hover::Friendly), Talk);
+        assert_eq!(cursor_for(Hover::Hostile), Attack);
+        assert_eq!(cursor_for(Hover::Prop), Use);
+        assert_eq!(cursor_for(Hover::Corpse { in_reach: true }), Loot);
         assert_eq!(cursor_for(Hover::Corpse { in_reach: false }), NotAllowed);
+    }
+
+    #[test]
+    fn every_pointer_has_a_distinct_existing_image_with_its_hotspot_inside() {
+        let mut seen = HashSet::new();
+        for p in Pointer::ALL {
+            let (file, (x, y)) = p.art();
+            assert!(seen.insert(file), "{file} reused");
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../assets")
+                .join(file);
+            assert!(path.exists(), "{file}");
+            // Cursor Pack PNGs are 32x32; a hotspot outside makes winit reject the cursor.
+            assert!(x < 32 && y < 32, "{file}");
+        }
     }
 
     #[test]

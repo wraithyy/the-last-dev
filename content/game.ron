@@ -1469,6 +1469,74 @@
             effect: Damage(base: 10, coefficient_pct: 0),
             extra_effects: [Knockback(strength_m: 6.0)],
         ),
+        // ---- Car Park P3 and the newer campus districts ----
+        (
+            id: 1620, name: "Wheel Clamp", icon: "padlock", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "You were parked in a parking space. That is a violation of the parking space.",
+            effect: Damage(base: 8, coefficient_pct: 0),
+        ),
+        (
+            id: 1621, name: "Rate Your Experience (1-10)", icon: "wellness_survey", school: Arcane,
+            range_m: 25.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            description: "Forty questions about the last forty seconds. Interrupt it at question one.",
+            effect: Damage(base: 16, coefficient_pct: 0),
+        ),
+        (
+            id: 1622, name: "Exit Only", icon: "block_all", school: Physical,
+            range_m: 20.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The arm comes down. It does not care whether you are a car.",
+            effect: Damage(base: 22, coefficient_pct: 0),
+            telegraph: Some((shape: Line(length_m: 10.0, width_m: 2.5), delay_ms: 1800, label: "Barrier arm: lowering on you")),
+        ),
+        (
+            id: 1623, name: "Let's Rewrite It From Scratch", icon: "new_framework", school: Arcane,
+            range_m: 30.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            description: "Six months, a new language, no tests. Interrupt the proposal before it is approved.",
+            effect: Damage(base: 50, coefficient_pct: 0),
+        ),
+        (
+            id: 1624, name: "Undocumented Behaviour", icon: "stack_trace", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Nobody knows what it does. Everybody knows not to stand there.",
+            effect: Damage(base: 36, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 3.5), delay_ms: 2000, label: "Undocumented behaviour: it was always like this")),
+        ),
+        (
+            id: 1625, name: "Community Fee", icon: "coins", school: Physical,
+            range_m: 6.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "For the shared kombucha tap. It has been empty since launch.",
+            effect: Damage(base: 22, coefficient_pct: 0),
+        ),
+        (
+            id: 1626, name: "Calendar Block", icon: "calendar", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Your next free slot is in March. You are standing in it.",
+            effect: Damage(base: 42, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 4.0), delay_ms: 2000, label: "Calendar block: 'Focus time (do not book)'")),
+        ),
+        (
+            id: 1627, name: "Escorted Off the Premises", icon: "access_badge", school: Physical,
+            range_m: 6.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Politely, firmly, and with your badge already deactivated.",
+            effect: Damage(base: 24, coefficient_pct: 0),
+            extra_effects: [Knockback(strength_m: 6.0)],
+        ),
+        (
+            id: 1628, name: "Severance Package", icon: "parachute", school: Physical,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Eighteen months' pay, a press release and a crater where the team was.",
+            effect: Damage(base: 140, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 6.0), delay_ms: 2500, at: Caster, label: "Severance package: everyone near it is let go")),
+        ),
+        (
+            id: 1629, name: "Soft Landing", icon: "parachute", school: Arcane,
+            range_m: 0.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            target: Caster,
+            description: "The board approves a soft landing. Interrupt it before the vote passes.",
+            effect: Heal(base: 400, coefficient_pct: 0),
+        ),
 
         // ---- data center ----
         (
@@ -5028,6 +5096,435 @@
                 ],
             ),
         ),
+        // ---- Car Park P3 (level 1): where new hires start ----
+        (
+            key: "clamp_drone", name: "Parking Enforcement Drone", title: "Clamps First, Asks Never", level: 1, hostile: true,
+            max_hp: 150, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 28,
+            loot: [
+                (item: "Penalty Notice (Laminated)", chance_pct: 30),
+            ],
+            ai: Some((
+                aggro_m: 6.0, leash_m: 30.0, melee_range_m: 2.5, melee_ms: 2200,
+                melee_damage: 5, chase_speed_mps: 4.5, respawn_ms: 45000,
+                abilities: [
+                    (spell: 1620, cooldown_min_ms: 9000, cooldown_max_ms: 12000, initial_ms: Some((2000, 4000)),
+                        yells: [
+                            "Violation: vehicle detected in vehicle area.",
+                            "Your permit is valid. Your permit is also clamped.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "*bzzt* Unregistered pedestrian. Applying clamp.",
+                    "This bay is reserved for people who arrived at 06:30.",
+                ],
+                death: ["*rotor stops* Appeal... window... closed..."],
+            ),
+        ),
+        (
+            key: "survey_ambusher", name: "Onboarding Survey Ambusher", title: "Just Five Quick Questions", level: 1, hostile: true,
+            max_hp: 170, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 30,
+            loot: [
+                (item: "Unsolicited Feedback Form", chance_pct: 100, quest: Some("p3_feedback_loop")),
+                (item: "Clipboard of Good Intentions", chance_pct: 25),
+            ],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 30.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 5, chase_speed_mps: 5.0, respawn_ms: 45000,
+                abilities: [
+                    (spell: 1621, cooldown_min_ms: 10000, cooldown_max_ms: 13000, initial_ms: Some((2000, 3000)),
+                        yells: [
+                            "On a scale of one to ten, how onboarded do you feel?",
+                            "Would you recommend this car park to a friend?",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Hi! Do you have a minute? You have a minute. I checked your calendar.",
+                    "Your first impression matters to us. Please rate it now.",
+                ],
+                death: [
+                    "Response... recorded... as neutral...",
+                    "Thank you... for your... feedback...",
+                ],
+            ),
+        ),
+        (
+            key: "exit_barrier", name: "The Exit Barrier", title: "Gatekeeper of P3", level: 2, hostile: true,
+            elite: true,
+            max_hp: 900, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 140,
+            loot: [(item: "Exit Ticket (Validated)", chance_pct: 100)],
+            ai: Some((
+                // Waits beside the road like every barrier: it only bites the ones who argue.
+                aggro_m: 0.0, leash_m: 20.0, melee_range_m: 3.0, melee_ms: 2400,
+                melee_damage: 9, chase_speed_mps: 3.0, respawn_ms: 90000,
+                abilities: [
+                    (spell: 1622, cooldown_min_ms: 8000, cooldown_max_ms: 10000, initial_ms: Some((3000, 4000)),
+                        yells: [
+                            "Please insert ticket. Ticket not recognised. Please insert yourself.",
+                            "Exit only. Entry also only. Mostly only.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Ticket not valid. Have you tried a different car?",
+                    "The campus is that way. You are this way. I am in the way.",
+                ],
+                death: [
+                    "Barrier... raised... have a... productive day...",
+                    "Lost ticket fee... waived... this once...",
+                ],
+            ),
+        ),
+        (
+            key: "badge_clerk", name: "Badge Office Clerk", title: "Now Serving Number 3", level: 3, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Number 4,112? We're on 3. Sit down. There are no chairs.",
+                    "Your badge photo is final. Smile now or be sad on every door for eleven years.",
+                    "The badge opens the car park. The car park opens nothing.",
+                ],
+                ambient_ms: 30000,
+                ambient: [
+                    "Now serving: number 3. Number 3 left in 2021.",
+                    "The badge printer is warming up. It has been warming up since the merger.",
+                    "Lanyards are a separate request. The kiosk sells them. I don't ask questions.",
+                ],
+            ),
+        ),
+        (
+            key: "p3_attendant", name: "Dale, Car Park Attendant", title: "Twenty-Two Years in P3", level: 4, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "They automated my job in 2019. The drones still need me to explain the rules to them.",
+                    "The campus is up the ramp. Two point four kilometres. Wellness, they call it.",
+                    "Shuttle? Suspended. Since the reorg. Which reorg? Yes.",
+                ],
+                ambient_ms: 32000,
+                ambient: [
+                    "Every morning the executives park by the door. Every morning you park here.",
+                    "The ticket machine takes coins, cards and hope. Mostly hope.",
+                    "That barrier has a personality now. Somebody gave it machine learning.",
+                ],
+            ),
+        ),
+        (
+            key: "lanyard_vendor", name: "Lanyard Kiosk Vendor", title: "Cash Only, Card Reader Decorative", level: 3, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "First day? Lanyard, coffee, ibuprofen. In that order, trust me.",
+                    "That one is the premium lanyard. It is the same lanyard. It feels premium.",
+                ],
+                ambient_ms: 34000,
+                ambient: [
+                    "Lanyards! Get your lanyards! Now with a clip that breaks in week two!",
+                    "The coffee machine is self-service. The self is you. The service is optional.",
+                ],
+            ),
+        ),
+        // ---- Old Campus (4-5): the 1998 buildings and the Legacy Systems Depot ----
+        (
+            key: "rewrite_evangelist", name: "Rewrite Evangelist", title: "This Time It Will Be Clean", level: 4, hostile: true,
+            max_hp: 380, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 66,
+            loot: [(item: "Architecture Diagram (Aspirational)", chance_pct: 25)],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 11, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1623, cooldown_min_ms: 11000, cooldown_max_ms: 14000, initial_ms: Some((2000, 4000)),
+                        yells: [
+                            "Nobody understands this code, so we delete it. That's understanding.",
+                            "Six months. Tops. Same features, better vibes.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Legacy code! Stand back, I've read a blog post!",
+                    "The old system works, sure. But does it spark joy?",
+                ],
+                death: [
+                    "The rewrite... was 90 percent... done...",
+                    "We'll... keep both... systems... forever...",
+                ],
+            ),
+        ),
+        (
+            key: "legacy_daemon", name: "Legacy Daemon", title: "PID 1, Since 1998", level: 4, hostile: true,
+            max_hp: 420, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 68,
+            loot: [
+                (item: "Printed Runbook (1998)", chance_pct: 100, quest: Some("ol_tribal_knowledge")),
+                (item: "Floppy Disk Labelled 'DO NOT'", chance_pct: 20),
+            ],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2200,
+                melee_damage: 12, chase_speed_mps: 4.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1624, cooldown_min_ms: 10000, cooldown_max_ms: 13000, initial_ms: Some((3000, 5000)),
+                        yells: [
+                            "Restarting. Restarting. Restarting since the dot-com crash.",
+                            "Cron job 0 3 * * *: smite visitor.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: ["Process detected. Process is you. Killing process."],
+                death: ["Segmentation fault (core dumped on you)"],
+            ),
+        ),
+        // ---- Co-Living Commons (4): the commuter strip ----
+        (
+            key: "coliving_curator", name: "Co-Living Community Curator", title: "Rent Due Weekly, Vibes Daily", level: 4, hostile: true,
+            max_hp: 380, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 66,
+            loot: [
+                (item: "House Rules (Fourteen Pages)", chance_pct: 100, quest: Some("cl_house_rules")),
+                (item: "Kombucha Tap Token", chance_pct: 25),
+            ],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 11, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1625, cooldown_min_ms: 9000, cooldown_max_ms: 12000, initial_ms: Some((2000, 4000)),
+                        yells: [
+                            "Community fee! It's for the community. I am the community.",
+                            "Your container has a view. The view is another container.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Hey neighbour! You're behind on the shared-living charter.",
+                    "Quiet hours are from never to never. We're a vibrant community.",
+                ],
+                death: [
+                    "Your deposit... is non-refundable...",
+                    "Leave... a review... five stars...",
+                ],
+            ),
+        ),
+        // ---- Executive Hill (5): the board's villa ----
+        (
+            key: "estate_security", name: "Estate Security", title: "Discreet, Expensive, Armed With an NDA", level: 5, hostile: true,
+            max_hp: 440, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 76,
+            loot: [(item: "Signed NDA (Unread)", chance_pct: 25)],
+            ai: Some((
+                aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 14, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1627, cooldown_min_ms: 9000, cooldown_max_ms: 12000, initial_ms: Some((2000, 4000)),
+                        yells: [
+                            "Sir, this is a private hill.",
+                            "The board is in session. You were never here.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "Employees are welcome on Executive Hill. On the brochure.",
+                    "Badge level insufficient. Salary band insufficient.",
+                ],
+                death: ["Incident... will be... handled... internally..."],
+            ),
+        ),
+        (
+            key: "exec_assistant_bot", name: "Executive Assistant Bot", title: "Guards the Calendar With Its Life", level: 5, hostile: true,
+            max_hp: 360, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 74,
+            loot: [(item: "Board Retreat Agenda", chance_pct: 100, quest: Some("vh_board_retreat"))],
+            ai: Some((
+                aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 10, chase_speed_mps: 6.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1626, cooldown_min_ms: 9000, cooldown_max_ms: 12000, initial_ms: Some((2000, 4000)),
+                        yells: [
+                            "The executive has no availability. You are now unavailable too.",
+                            "Declined. Declined. Tentative. Declined.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: ["You don't have a meeting. I can tell. You look like a person without a meeting."],
+                death: ["Rescheduling... indefinitely..."],
+            ),
+        ),
+        (
+            key: "golden_parachute", name: "The Golden Parachute", title: "Fails Upward, Lands Softly", level: 10, hostile: true,
+            elite: true,
+            max_hp: 2900, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 460,
+            loot: [(item: "Golden Parachute Ripcord", chance_pct: 100)],
+            ai: Some((
+                aggro_m: 9.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 24, chase_speed_mps: 5.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1628, cooldown_min_ms: 12000, cooldown_max_ms: 15000, initial_ms: Some((4000, 5000)),
+                        target: Caster,
+                        yells: [
+                            "I take full responsibility. Here is your share of it.",
+                            "Restructuring! Everyone within six metres is restructured!",
+                        ]),
+                    (spell: 1629, cooldown_min_ms: 20000, cooldown_max_ms: 24000, initial_ms: Some((9000, 10000)),
+                        yells: ["The board has approved my exit package. Again."]),
+                ],
+            )),
+            yells: (
+                aggro: [
+                    "I left three companies in ruins. They gave me a bonus each time.",
+                    "You want my job? You'd need to fail much bigger.",
+                ],
+                death: [
+                    "I'll... join the board... of your next company...",
+                    "My lawyers... will be... in touch... with a speaking fee...",
+                ],
+            ),
+        ),
+        // ---- Givers and regulars of the newer districts ----
+        (
+            key: "legacy_archivist", name: "Legacy Systems Archivist", title: "Knows Where the Bodies Are Commented Out", level: 6, hostile: false,
+            max_hp: 300, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Payroll still runs on the mainframe in that shed. Don't tell the cloud team, they think they migrated it.",
+                    "Every rewrite starts here and ends here. I keep a guest book.",
+                ],
+                ambient_ms: 30000,
+                ambient: [
+                    "Building 1 was the whole company once. Now it's where chairs go to die.",
+                    "If you hear the depot humming, that's the old ERP. It's fine. It's been fine since 1998.",
+                    "The founders' garage up on the terrace was rented by the hour. So was the vision.",
+                ],
+            ),
+        ),
+        (
+            key: "coliving_resident", name: "Taylor, Co-Living Resident", title: "Commute: Forty Seconds", level: 4, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "I live in a container so I can be in the office in forty seconds. The office is remote-first.",
+                    "Rent includes 'community'. The community is a Slack channel about the dishwasher.",
+                ],
+                ambient_ms: 30000,
+                ambient: [
+                    "Bus 9 runs every forty minutes. I've never seen it. I've seen a photo.",
+                    "My container has a smart lock. It locked me out for low engagement.",
+                    "The houses across the lane? People who commute in from forty seconds further.",
+                ],
+            ),
+        ),
+        (
+            key: "villa_steward", name: "Villa Steward", title: "Polishes the Golden Statue Daily", level: 6, hostile: false,
+            max_hp: 300, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "The board offsite has been in session since 2015. They fly in by helicopter to approve the parking at P3.",
+                    "The pool is an infinity pool. The view is the overflow lot, forever.",
+                ],
+                ambient_ms: 30000,
+                ambient: [
+                    "Executive Hill is open to all employees. It says so on the gate. The gate is closed.",
+                    "The statue is called Shareholder Value. It is gold-plated. Like the rest of the hill.",
+                ],
+            ),
+        ),
+        (
+            key: "founder_guide", name: "Founders' Tour Guide", title: "Heritage Storyteller (Contract)", level: 3, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "In this garage two founders had an idea. Then a lawyer had a better one.",
+                    "The statue shows them holding the first laptop. It is a replica. They sold the original.",
+                ],
+                ambient_ms: 26000,
+                ambient: [
+                    "Welcome to the Founders' Terrace! Mind the step, it is our heritage.",
+                    "The garage was rented by the hour. The founders still invoice for it.",
+                    "Please don't touch the founders. Legal asked.",
+                ],
+            ),
+        ),
+        (
+            key: "villa_guard", name: "Gatehouse Guard", title: "Salary Band Inspector", level: 5, hostile: false,
+            max_hp: 300, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: ["You can look. Looking is free. Looking longer than ten seconds is billed."],
+                ambient_ms: 30000,
+                ambient: [
+                    "Helicopter at four. Clear the helipad of anyone below director.",
+                    "The private road is private. The hill is private. The air is under review.",
+                ],
+            ),
+        ),
+        (
+            key: "bus_driver", name: "Bus 9 Driver", title: "On a Break Since Q2", level: 3, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: Some(Chatting),
+            yells: (
+                talk: ["The bus is self-driving now. I'm here in case it has feelings."],
+                ambient_ms: 28000,
+                ambient: [
+                    "Next departure: when the app says so. The app says 'soon'.",
+                    "The campus loop takes forty minutes. Walking takes twenty. Don't tell anyone.",
+                ],
+            ),
+        ),
+        (
+            key: "gate_guard", name: "South Gate Guard", title: "Badge Readers Are in Beta", level: 3, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "From P3? Welcome. Food trucks up the boulevard, HQ at the top. The barriers are decorative.",
+                    "The badge readers log everyone as 'tailgating'. Including me. Including the readers.",
+                ],
+                ambient_ms: 26000,
+                ambient: [
+                    "Welcome to Synergy Campus. Please badge in. Please badge out. Please stop asking why.",
+                    "New hire? Walk straight up the boulevard. Don't make eye contact with the brand ambassadors.",
+                    "Executive parking is at the door. Yours is at P3. That's the org chart, in asphalt.",
+                ],
+            ),
+        ),
         // World event waves (`live.events`): summoned, so they pay through the event, not loot.
         (
             key: "pizza_vulture", name: "Pizza-Seeking Middle Manager", title: "Just Grabbing One Slice", level: 1, hostile: true,
@@ -6491,6 +6988,62 @@
             max_hp: 100, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_combat: 0,
             xp_reward: 0, loot: [], ai: None,
+        ),
+        (
+            key: "home_cat", name: "Mochi", title: "Senior Keyboard Inspector", level: 10, hostile: false,
+            max_hp: 100, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "*sits on the exact key you need*",
+                    "*stares at the webcam until the client asks whose cat that is*",
+                    "*knocks your headset off the desk, maintaining eye contact*",
+                ],
+            ),
+        ),
+        // ---- Campus: the hybrid worker by the cafe and the RTO enforcer at the tower door ----
+        (
+            key: "hybrid_worker", name: "Hybrid Worker", title: "In for the Coffee", level: 1, hostile: false,
+            max_hp: 100, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "I'm in on Tuesdays. Tuesdays from 09:12 to 09:20. The flat white takes six of those.",
+                    "The badge reader logs me in, the barista logs me out. In the dashboard that's a full day.",
+                    "My car's still running in the visitor bay. It's a hybrid too. Half office, half driveway.",
+                    "Collaboration? I nodded at a colleague by the milk. We aligned on oat.",
+                    "I have a standing desk at home. It stands in the corner, under the laundry.",
+                ],
+                ambient_ms: 36000,
+                ambient: [
+                    "One oat flat white, extra hot, to go. Very to go.",
+                    "Swipe, sip, leave. The commute is longer than the visit.",
+                    "I'd stay for lunch, but I've been yellow on Teams for four minutes.",
+                ],
+            ),
+        ),
+        (
+            key: "rto_enforcer", name: "Return-to-Office Enforcer", title: "Counts Desks, Not Work", level: 1, hostile: false,
+            max_hp: 100, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Badge, please. Not to check who you are. To check how often you are.",
+                    "We have 400 desks for 600 people and an attendance target of 110 percent. The maths is a Q3 problem.",
+                    "I count the desks every morning. Yesterday there were 401. Someone is building desks. I will find them.",
+                    "Swiping in and leaving after one coffee is 'coffee badging'. Swiping in and staying is called 'being Kevin'.",
+                    "The CEO comes in on Wednesdays to see that everyone else comes in. The rest of the week he works from a boat.",
+                ],
+                ambient_ms: 34000,
+                ambient: [
+                    "Lanyards visible, please. Smiles optional. Swipes mandatory.",
+                    "Tailgating is theft. Of attendance data.",
+                    "Three days a week, minimum. Your choice of days. My spreadsheet.",
+                ],
+            ),
         ),
         // ---- World: hidden NPCs (world.rs secrets; no ambient lines so they stay hidden) ----
         (
@@ -8475,6 +9028,29 @@
          description: "Taken from the only campus resident with no line manager. It still judges you."),
         (name: "Golden Groundbreaking Shovel", icon: "gear_trophy", bonus: (spell_power: 8),
          description: "Used once, in 2018, for a photo. Has broken more ground since you took it."),
+        // ---- Car Park P3 and the newer campus districts ----
+        (name: "Penalty Notice (Laminated)", icon: "junk_ticket", bonus: (max_hp: 3),
+         description: "Fine: 40 euros. Offence: parking. Location: the car park."),
+        (name: "Unsolicited Feedback Form", icon: "wellness_survey", bonus: (max_mana: 4),
+         description: "Question 1: How likely are you to fill in question 2?"),
+        (name: "Clipboard of Good Intentions", icon: "sticky", bonus: (max_hp: 4),
+         description: "Every survey starts here. None of them end anywhere."),
+        (name: "Exit Ticket (Validated)", icon: "access_badge", bonus: (haste_pct: 1),
+         description: "Proof you left P3. Frame it. Nobody else ever has."),
+        (name: "Architecture Diagram (Aspirational)", icon: "org_chart", bonus: (spell_power: 3),
+         description: "Twelve boxes, forty arrows, zero of them exist."),
+        (name: "Printed Runbook (1998)", icon: "manifesto", bonus: (max_mana: 6),
+         description: "Step 4: 'call Gary'. Gary retired in 2006. Step 5 is a coffee stain."),
+        (name: "Floppy Disk Labelled 'DO NOT'", icon: "zip_file", bonus: (crit_pct: 1.0),
+         description: "Contains the only copy of the payroll config. Do not."),
+        (name: "House Rules (Fourteen Pages)", icon: "contract", bonus: (max_hp: 8),
+         description: "Rule 1: community first. Rule 14: rent first."),
+        (name: "Kombucha Tap Token", icon: "coins", bonus: (mana_regen: 1),
+         description: "For the shared tap. The tap has been empty since the launch party."),
+        (name: "Signed NDA (Unread)", icon: "padlock", bonus: (max_hp: 10),
+         description: "You agreed not to describe the hill. Nobody would believe you anyway."),
+        (name: "Board Retreat Agenda", icon: "calendar", bonus: (spell_power: 4),
+         description: "09:00 Vision. 10:00 Helicopter. 11:00 Approve P3 parking fees. 12:00 Lunch."),
         (name: "Free Pizza Slice (Defended)", icon: "pizza", bonus: (max_hp: 10),
          description: "Pineapple, cold, and yours. You fought management for it. Worth it."),
         // ---- data center ----
@@ -8719,13 +9295,32 @@
                 (anchor: "pack_30", units: ["site_foreman", "site_foreman"], level: Some(5)),
                 (anchor: "pack_31", units: ["survey_drone", "survey_drone", "site_foreman"], level: Some(5)),
                 (anchor: "pack_32", units: ["site_foreman", "survey_drone"], level: Some(5)),
+                // The bigger campus: Old Campus 4-5, Co-Living Commons 4, Executive Hill 5, the
+                // boulevard by the South Gate 1 (players walking in from Car Park P3), the
+                // Overflow Lot 2.
+                (anchor: "pack_33", units: ["rewrite_evangelist", "legacy_daemon"], level: Some(4)),
+                (anchor: "pack_34", units: ["legacy_daemon", "legacy_daemon"], level: Some(4)),
+                (anchor: "pack_35", units: ["rewrite_evangelist", "rewrite_evangelist"], level: Some(5)),
+                (anchor: "pack_36", units: ["legacy_daemon", "rewrite_evangelist", "legacy_daemon"], level: Some(5)),
+                (anchor: "pack_37", units: ["coliving_curator", "rto_commuter"], level: Some(4)),
+                (anchor: "pack_38", units: ["coliving_curator", "coliving_curator"], level: Some(4)),
+                (anchor: "pack_39", units: ["rto_commuter", "coliving_curator", "rto_commuter"], level: Some(4)),
+                (anchor: "pack_40", units: ["estate_security", "exec_assistant_bot"], level: Some(5)),
+                (anchor: "pack_41", units: ["exec_assistant_bot", "exec_assistant_bot"], level: Some(5)),
+                (anchor: "pack_42", units: ["estate_security", "estate_security", "exec_assistant_bot"], level: Some(5)),
+                (anchor: "pack_43", units: ["delivery_robot", "unpaid_ambassador"], level: Some(1)),
+                (anchor: "pack_44", units: ["unpaid_ambassador", "delivery_robot"], level: Some(1)),
+                (anchor: "pack_45", units: ["scooter_exec", "delivery_robot"], level: Some(2)),
+                (anchor: "pack_46", units: ["delivery_robot", "scooter_exec", "delivery_robot"], level: Some(2)),
             ],
-            // District rares: the Unicorn at the end of Incubator Street (5, elite), and two
-            // level-10 spots for groups: the goose at the lake and the architect of the new HQ.
+            // District rares: the Unicorn at the end of Incubator Street (5, elite), and three
+            // level-10 spots for groups: the goose at the lake, the architect of the new HQ and
+            // the golden parachute by the villa pool.
             rares: [
                 (anchor: "rare_unicorn", unit: "unicorn_founder"),
                 (anchor: "rare_goose", unit: "the_goose"),
                 (anchor: "rare_architect", unit: "hq_architect"),
+                (anchor: "rare_parachute", unit: "golden_parachute"),
             ],
             friendly: [
                 (anchor: "npc_1", unit: "intern"),
@@ -8733,9 +9328,9 @@
                 (anchor: "npc_3", unit: "barista"),
                 (anchor: "npc_4", unit: "smoking_corner_dev"),
                 (anchor: "npc_5", unit: "procurement_officer"),
-                // Onboarding corner by the parking lot (the "First Day" tutorial).
+                // The "First Day" tutorial lives in Car Park P3 now; on the campus the HR bot runs
+                // the reception kiosk and the colleague has found a bench.
                 (anchor: "npc_hr", unit: "hr_onboarding_bot"),
-                (anchor: "npc_dummy", unit: "training_dummy"),
                 (anchor: "npc_colleague", unit: "burnt_out_colleague"),
                 // Body Leasing easter egg: the vendor's account manager between the plaza and the annex.
                 (anchor: "npc_am", unit: "bl_account_manager"),
@@ -8758,8 +9353,21 @@
                 (anchor: "npc_gym", unit: "wellness_clerk"),
                 (anchor: "npc_parking", unit: "parking_attendant"),
                 (anchor: "npc_site", unit: "construction_liaison"),
+                // Hybrid work, both ends of it: in for the coffee, and the man counting it.
+                (anchor: "npc_hybrid", unit: "hybrid_worker"),
+                (anchor: "npc_enforcer", unit: "rto_enforcer"),
+                // Givers of the newer districts, and the regulars who explain them.
+                (anchor: "npc_archivist", unit: "legacy_archivist"),
+                (anchor: "npc_resident", unit: "coliving_resident"),
+                (anchor: "npc_steward", unit: "villa_steward"),
+                (anchor: "npc_founder_guide", unit: "founder_guide"),
+                (anchor: "npc_villa_guard", unit: "villa_guard"),
+                (anchor: "npc_bus_driver", unit: "bus_driver"),
+                (anchor: "npc_gate_guard", unit: "gate_guard"),
             ],
             links: [
+                // The South Gate road down to Car Park P3, where new hires start.
+                (anchor: "door:parking_p3", to: "parking_p3"),
                 (anchor: "door:tower/1", to: "tower/1"),
                 (anchor: "door:datacenter/1", to: "datacenter/1", requires: Some(ZoneCleared("tower/3"))),
                 (anchor: "door:lab/1", to: "lab/1", requires: Some(BossKilled("ceo"))),
@@ -8769,6 +9377,31 @@
                 // VibeCon registration on the east lawn: opens with everyone at level 10 (raid.rs).
                 (anchor: "door:vibecon/1", to: "vibecon/1"),
             ],
+        ),
+        // Car Park P3: every new hire starts here, 2.4 km of asphalt from the campus. The
+        // "First Day" tutorial, five short tickets, the lanyard kiosk, and the Exit Barrier at the
+        // top of the ramp. The gate is never locked: skipping onboarding is also a career path.
+        (
+            id: "parking_p3", name: "Car Park P3", kind: Outdoor, level_range: (1, 1), scooters: true,
+            packs: [
+                (anchor: "pack_1", units: ["clamp_drone", "clamp_drone"]),
+                (anchor: "pack_2", units: ["clamp_drone", "survey_ambusher"]),
+                (anchor: "pack_3", units: ["survey_ambusher", "clamp_drone"]),
+                (anchor: "pack_4", units: ["clamp_drone", "clamp_drone"]),
+                (anchor: "pack_5", units: ["survey_ambusher", "survey_ambusher"]),
+                (anchor: "pack_6", units: ["clamp_drone", "survey_ambusher"]),
+            ],
+            boss: Some((anchor: "boss", unit: "exit_barrier")),
+            friendly: [
+                (anchor: "npc_1", unit: "intern"),
+                (anchor: "npc_hr", unit: "hr_onboarding_bot"),
+                (anchor: "npc_dummy", unit: "training_dummy"),
+                (anchor: "npc_colleague", unit: "burnt_out_colleague"),
+                (anchor: "npc_badge", unit: "badge_clerk"),
+                (anchor: "npc_attendant", unit: "p3_attendant"),
+                (anchor: "npc_vendor", unit: "lanyard_vendor"),
+            ],
+            links: [(anchor: "door:campus", to: "campus")],
         ),
         (
             id: "tower/1", name: "Open Space", kind: Indoor, level_range: (1, 2),
@@ -9023,6 +9656,11 @@
                 (anchor: "route:warden:0", unit: "os_warden"),
             ],
         ),
+        (
+            id: "home/1", name: "Stay Green: Your Apartment", kind: Indoor, level_range: (1, 1),
+            packs: [],
+            friendly: [(anchor: "cat_bed", unit: "home_cat")],
+        ),
         // ---- raid: All-Hands Offsite (raid.rs). The campus door opens with everyone at level
         // 10; each later room opens once its predecessor's boss fell (for good). ----
         (
@@ -9161,12 +9799,13 @@
         // ---- Campus (levels 1-2): intern, Facilities Guy, Barista, Smoking-Corner Dev ----
         (
             id: "onboarding", name: "Onboarding",
-            giver: (npc: "intern", zone: "campus"),
-            text: "Hi! I'm your onboarding buddy. The AI assigned me to you, and you to me, and it thinks we're both interns. Step one: introduce yourself to Facilities. He's by the badge reader. He's been by the badge reader since the badge reader got AI.",
-            progress_text: "The onboarding chatbot says Facilities is 'a valued stakeholder'. He's the guy with the ladder.",
-            done_text: "You talked to a human, in person, on purpose? I'll log it as a 'synchronous alignment touchpoint'. Welcome aboard!",
+            giver: (npc: "intern", zone: "parking_p3"),
+            turn_in: Some((npc: "intern", zone: "campus")),
+            text: "Hi! I'm your onboarding buddy. The AI assigned me to you, and you to me, and it thinks we're both interns. Step one: get to the actual campus. Up the ramp, through the gate, up the boulevard. Step two: introduce yourself to Facilities, he's by the badge reader. I'll meet you at the arrival spot. I'm taking the shuttle. Ha. Joke.",
+            progress_text: "Leave P3 by the gate at the top of the ramp, walk up Synergy Boulevard to HQ and talk to the Facilities Guy by the reception. The intern waits by the executive car park.",
+            done_text: "You walked the whole way? And talked to a human, in person, on purpose? I'll log it as a 'synchronous alignment touchpoint'. Welcome to the campus!",
             objectives: [Talk("facilities_guy")],
-            reward: (xp: 40),
+            reward: (xp: 60),
         ),
         (
             id: "badge_access_denied", name: "Badge Access Denied",
@@ -9802,12 +10441,60 @@
         // ---- onboarding ("First Day"): handed out by the HR bot at the parking lot ----
         (
             id: "mandatory_compliance", name: "Mandatory Compliance Training",
-            giver: (npc: "hr_onboarding_bot", zone: "campus"),
+            giver: (npc: "hr_onboarding_bot", zone: "parking_p3"),
             text: "Welcome, new resource! Before you touch production, please complete Mandatory Compliance Training. The training is a dummy. That is not a metaphor. Please defeat it. Completion is tracked. Learning is optional.",
-            progress_text: "The Mandatory Training Dummy is by the plaza. It plays a video. You may interrupt it. HR may not.",
+            progress_text: "The Mandatory Training Dummy stands by your car in P3. It plays a video. You may interrupt it. HR may not.",
             done_text: "Certificate issued! You are now compliant. The AI has updated your profile to 'onboarded', your laptop to 'pending' and your manager to 'unknown'. The intern will show you the rest. He has been here two days. He is senior now.",
             objectives: [Kill("training_dummy", 1)],
             reward: (xp: 30),
+        ),
+        // ---- Car Park P3 (level 1): short tickets on the way to the gate ----
+        (
+            id: "p3_badge_photo", name: "Badge Photo", open_world: true,
+            giver: (npc: "badge_clerk", zone: "parking_p3"),
+            text: "Number 4,112? Fine, I'll take you now, nobody else is coming. Badge photo in the booth. One shot, no retakes, it's on every door you open for the next eleven years. Then wait while the printer warms up. It's been warming up since the merger.",
+            progress_text: "The photo booth stands beside the Badge Office. Then wait for the printer.",
+            done_text: "Here's your badge. You look surprised in it. Everyone does. It opens the car park. It opens nothing else. Welcome.",
+            objectives: [Interact("badge_photo_booth", 1), Wait(zone: "parking_p3", label: "Badge printing (printer warming up since the merger)", secs: 15)],
+            reward: (xp: 50),
+        ),
+        (
+            id: "p3_feedback_loop", name: "Feedback Loop", open_world: true,
+            giver: (npc: "badge_clerk", zone: "parking_p3"),
+            requires: Some("p3_badge_photo"),
+            text: "The Onboarding Survey Ambushers have found the car park. They ask new hires to rate their onboarding before the onboarding starts. Take three of them out of the loop and bring me the forms. I need them for my own survey about the surveys.",
+            progress_text: "Survey Ambushers lurk between the rows with clipboards. Interrupt their questionnaire if you can. Each carries an Unsolicited Feedback Form.",
+            done_text: "Three forms. All ten out of ten, filled in by the AI on your behalf. Feedback received. Feedback ignored. The loop is closed.",
+            objectives: [Kill("survey_ambusher", 3), Loot("Unsolicited Feedback Form", 3)],
+            reward: (xp: 80),
+        ),
+        (
+            id: "p3_pay_and_display", name: "Pay and Display", open_world: true,
+            giver: (npc: "p3_attendant", zone: "parking_p3"),
+            text: "Twenty-two years I ran this car park. Then they bought Parking Enforcement Drones. They clamp everything. My car. Your car. A shopping trolley. Me, once. Bring four of them down. Gently, they're leased.",
+            progress_text: "Parking Enforcement Drones hover over the rows of P3, clamping anything that stands still.",
+            done_text: "Four drones grounded. The lease company will send an invoice and two more drones. Thank you anyway. The clamp on your car? Oh, that's mine. Old habits.",
+            objectives: [Kill("clamp_drone", 4)],
+            reward: (xp: 60),
+        ),
+        (
+            id: "p3_lost_lanyards", name: "Lost Lanyards", open_world: true,
+            giver: (npc: "lanyard_vendor", zone: "parking_p3"),
+            text: "Three new hires quit on the walk to the gate last week. Each dropped their lanyard on the way out. Bring them back and I can sell them again. Circular economy. It's on my sustainability report.",
+            progress_text: "Three lost lanyards lie somewhere between the rows of P3.",
+            done_text: "Three lanyards, slightly used, very premium. I'll sell one back to you for the price of four. That's the first-day discount.",
+            objectives: [Collect("lost_lanyard", 3)],
+            reward: (xp: 50),
+        ),
+        (
+            id: "p3_raise_the_barrier", name: "Raise the Barrier", open_world: true,
+            giver: (npc: "p3_attendant", zone: "parking_p3"),
+            requires: Some("p3_pay_and_display"),
+            text: "The Exit Barrier at the top of the ramp got machine learning in the last upgrade. Now it decides who deserves to leave. It decided nobody does. Walk past it and it waits. Argue with it and it fights. I say argue. It's an elite, so be ready.",
+            progress_text: "The Exit Barrier stands beside the gate at the top of the exit ramp. It only fights the ones who start it. Elite.",
+            done_text: "Barrier raised. First time since the upgrade. The campus is up the road, two point four kilometres. Don't look back. Nobody comes back to P3. Except me. Every morning.",
+            objectives: [Kill("exit_barrier", 1)],
+            reward: (xp: 120, gear_tier: 1),
         ),
         // ---- Body Leasing easter egg: nothing happens, and it is billable ----
         (
@@ -9957,6 +10644,25 @@
             done_text: "He drove ninety minutes to join a call he could have joined from bed. He says the coffee is better here. It's the same supplier. It's the despair that's fresher. I've logged that as 'enjoys the office coffee'. Here, your desk for Thursday.",
             objectives: [Talk("burnt_out_colleague")],
             reward: (xp: 50, sp: 8, rep: Some(("HR", 50)), trophy: Some("Hot-Desk Booking Confirmation")),
+        ),
+        // ---- Hybrid work side quests: the Hybrid Worker by the cafe, the Enforcer at the tower ----
+        (
+            id: "coffee_badging", name: "Coffee Badging",
+            giver: (npc: "hybrid_worker", zone: "campus"),
+            text: "Favour? My badge has to touch the reader at the tower or the dashboard marks me 'remote' and my manager gets a little red dot. I already have my coffee, so I'm basically done here. Take my badge to the enforcer at the tower door and let him scan it. If he asks, I'm 'in a focus room'.",
+            progress_text: "My badge, the enforcer, the tower door. He's the one counting desks out loud.",
+            done_text: "He scanned it? Brilliant. That's three office days this month, two of them yours. I'd buy you a coffee, but I'm already in the car.",
+            objectives: [Deliver(item: "Hybrid Worker's Badge", npc: "rto_enforcer")],
+            reward: (xp: 40, sp: 5),
+        ),
+        (
+            id: "desk_census", name: "Desk Census",
+            giver: (npc: "rto_enforcer", zone: "campus"),
+            text: "Leadership needs the desk count by ten. The official number is 400. The floor plan says 380. The booking app says 'unlimited'. Facilities put overflow desks on the lawn west of the tower. Stand at three of them and count each one. Count slowly. Counting is the job.",
+            progress_text: "Three overflow desks on the lawn west of the tower. Stand at each one, facing it, for a second.",
+            done_text: "Three desks. One laptop jiggling its own mouse, one cold flat white, one 'Reserved: Leadership (Wednesdays)'. That makes 403. Leadership will be thrilled, then confused, then they'll book a meeting room to discuss it. There are none.",
+            objectives: [Inspect("rto_desk", 3)],
+            reward: (xp: 60, sp: 10, rep: Some(("HR", 40))),
         ),
         (
             id: "th_question", name: "Town Hall: Submit a Question",
@@ -10443,6 +11149,137 @@
             objectives: [Kill("hq_architect", 1)],
             reward: (xp: 2600, sp: 60, gear_tier: 5, rep: Some(("Engineering", 120))),
         ),
+        // Old Campus (4-5): the Legacy Systems Archivist at the depot docks.
+        (
+            id: "ol_stop_the_rewrite", name: "Stop the Rewrite", open_world: true, level_min: 4,
+            giver: (npc: "legacy_archivist", zone: "campus"),
+            text: "Rewrite Evangelists are loose in the Old Campus. They want to replace the payroll mainframe with 'something modern' by Friday. The last team that tried is still in Building 1, in a sense. Stop four of them before one of them opens a pull request.",
+            progress_text: "Rewrite Evangelists roam between Building 1, the Founders' Terrace and the depot. Interrupt the proposal if you can.",
+            done_text: "Four rewrites cancelled. The mainframe hummed. I think that was gratitude. It might have been a fan bearing.",
+            objectives: [Kill("rewrite_evangelist", 4)],
+            reward: (xp: 240, sp: 12),
+        ),
+        (
+            id: "ol_tribal_knowledge", name: "Tribal Knowledge", open_world: true, level_min: 4,
+            giver: (npc: "legacy_archivist", zone: "campus"),
+            text: "The only documentation for the depot is printed. In 1998. The Legacy Daemons carry the pages around because nobody ever told them to stop. Bring me four runbooks before the cleaning robot files them under 'recycling'.",
+            progress_text: "Legacy Daemons haunt the Old Campus. Each one keeps a Printed Runbook (1998) somewhere in its process table.",
+            done_text: "Four runbooks. Page one: 'If it breaks, call Gary.' Gary retired. I'm Gary now. Congratulations, you're Gary's backup.",
+            objectives: [Loot("Printed Runbook (1998)", 4)],
+            reward: (xp: 240, sp: 12),
+        ),
+        // Co-Living Commons (4): Taylor at the Bus 9 stop.
+        (
+            id: "cl_house_rules", name: "House Rules", open_world: true, level_min: 4,
+            giver: (npc: "coliving_resident", zone: "campus"),
+            text: "The Community Curators fine us for 'low community energy'. That's every resident who sleeps. They carry the House Rules on them, fourteen pages each. Get three copies so we can finally read what we agreed to.",
+            progress_text: "Community Curators work the pods along the commuter lane. Each carries the House Rules (Fourteen Pages).",
+            done_text: "Page nine: 'residents may not use the word home.' Page ten: 'see page nine.' Thanks. I'll pin these next to the dishwasher rota nobody follows.",
+            objectives: [Loot("House Rules (Fourteen Pages)", 3)],
+            reward: (xp: 230, sp: 12),
+        ),
+        (
+            id: "cl_last_mile", name: "The Last Mile", open_world: true, level_min: 4,
+            giver: (npc: "coliving_resident", zone: "campus"),
+            requires: Some("cl_house_rules"),
+            text: "The Return-to-Office Commuters block the lane every morning so they can be seen commuting. I live forty seconds from my desk and it takes me an hour. Clear three of them, then try the community fridge. You'll need it.",
+            progress_text: "Return-to-Office Commuters crowd the Co-Living lane. Then the Community Fridge by the pods.",
+            done_text: "Forty seconds! I'm early! For a meeting that was moved to tomorrow! Well. The fridge thanks you. It's the only thing here that does.",
+            objectives: [Kill("rto_commuter", 3), Interact("community_fridge", 1)],
+            reward: (xp: 250, sp: 14),
+        ),
+        // Executive Hill (5): the steward at the foot of the private road.
+        (
+            id: "vh_board_retreat", name: "Board Retreat", open_world: true, level_min: 5,
+            giver: (npc: "villa_steward", zone: "campus"),
+            text: "The board's agenda for the retreat is on the hill, carried by Executive Assistant Bots that think you need an appointment to breathe. Bring me three agendas. I want to know which item is me.",
+            progress_text: "Executive Assistant Bots and Estate Security patrol the hilltop round the villa. Each bot carries a Board Retreat Agenda.",
+            done_text: "Item 11: 'Sell the hill to ourselves, lease it back.' Item 12: 'Steward: automate?' Thank you. I'll be polishing my CV with the statue rag.",
+            objectives: [Loot("Board Retreat Agenda", 3), Kill("estate_security", 2)],
+            reward: (xp: 320, sp: 16, gear_tier: 3),
+        ),
+        (
+            id: "vh_parachute", name: "Fail Upward", open_world: true, level_min: 9, group: true,
+            giver: (npc: "villa_steward", zone: "campus"),
+            text: "The Golden Parachute lives by the pool. He ran three companies into the ground and the board gave him this hill as a thank-you. Level ten, elite. If he starts a Soft Landing, interrupt it, or the board approves it and he's back on his feet.",
+            progress_text: "The Golden Parachute lounges behind the villa on Executive Hill. Level 10, elite. Group recommended.",
+            done_text: "He's gone. The board has already appointed him to a new board. Still: this hill is quieter now. The statue looks almost humble.",
+            objectives: [Kill("golden_parachute", 1)],
+            reward: (xp: 2600, sp: 60, gear_tier: 5),
+        ),
+        // Breadcrumbs: each district's giver sends you on to the next one, so the campus reads
+        // as a path (gate, food trucks, park, Incubator Street, Co-Living, station, Old Campus,
+        // construction site, Executive Hill).
+        (
+            id: "bc_to_the_park", name: "Touch Grass", open_world: true, level_min: 2,
+            giver: (npc: "food_truck_owner", zone: "campus"),
+            turn_in: Some((npc: "park_ranger", zone: "campus")),
+            text: "You've been fighting spreadsheets at lunch for a week. The Park Ranger in Wellness Park asked for help. West along the ring road, over the creek bridge. Go touch grass. It's in your wellness plan.",
+            progress_text: "The Park Ranger stands at the park entrance by the creek bridge on the south ring road.",
+            done_text: "Ah, the food truck sent you. Good. Out here the managers jog at you. Watch your back. And your pace.",
+            objectives: [Talk("park_ranger")],
+            reward: (xp: 60),
+        ),
+        (
+            id: "bc_to_the_incubator", name: "Pre-Revenue", open_world: true, level_min: 3,
+            giver: (npc: "park_ranger", zone: "campus"),
+            turn_in: Some((npc: "incubator_manager", zone: "campus")),
+            text: "The Incubator Manager keeps calling me about 'synergies with nature'. I'm a ranger. I have no synergies. Go east past HQ to Incubator Street and tell her I'm pre-revenue too.",
+            progress_text: "Incubator Street runs north-south east of HQ. The manager stands by the pitch whiteboard.",
+            done_text: "The ranger sent you? Love that. Organic growth. Welcome to Incubator Street, where nobody earns money but everybody is worth billions.",
+            objectives: [Talk("incubator_manager")],
+            reward: (xp: 80),
+        ),
+        (
+            id: "bc_to_coliving", name: "Live Where You Work", open_world: true, level_min: 4,
+            giver: (npc: "incubator_manager", zone: "campus"),
+            turn_in: Some((npc: "coliving_resident", zone: "campus")),
+            text: "Our founders live in the Co-Living Commons, further east down the commuter lane, so they never stop working. One of the residents keeps complaining. Taylor. At the bus stop. Go listen, then tell them it's a feature.",
+            progress_text: "The Co-Living Commons line the commuter lane on the east edge. Taylor waits at the Bus 9 stop.",
+            done_text: "The incubator sent you? Of course. They're my landlord, my employer and my neighbour. I'm thinking of filing a complaint with myself.",
+            objectives: [Talk("coliving_resident")],
+            reward: (xp: 90),
+        ),
+        (
+            id: "bc_to_the_station", name: "Rush Hour", open_world: true, level_min: 4,
+            giver: (npc: "coliving_resident", zone: "campus"),
+            turn_in: Some((npc: "parking_attendant", zone: "campus")),
+            text: "The Parking Attendant up at the station garage is the only person who knows when anything arrives. North up the lane, then west along the railway road. Ask him when Bus 9 comes. He'll laugh. Then he'll give you work.",
+            progress_text: "Garage & Station sit on the railway in the north-east. The attendant stands at the surface lot gate.",
+            done_text: "Bus 9? Ha. Nobody's seen it. While you're here, the valets have opinions about you. Want to change them?",
+            objectives: [Talk("parking_attendant")],
+            reward: (xp: 90),
+        ),
+        (
+            id: "bc_to_old_campus", name: "Where It All Began", open_world: true, level_min: 4,
+            giver: (npc: "parking_attendant", zone: "campus"),
+            turn_in: Some((npc: "legacy_archivist", zone: "campus")),
+            text: "West along the railway road is the Old Campus. Building 1, the depot, the mainframe nobody admits exists. The Archivist at the depot docks needs someone who doesn't want to rewrite anything. That's a rare skill. You have it.",
+            progress_text: "Follow the railway road west to the Legacy Systems Depot. The Archivist waits at the loading docks.",
+            done_text: "You didn't once say 'microservices' on the way in. I can tell. You're hired. Unofficially. That's how everything works here.",
+            objectives: [Talk("legacy_archivist")],
+            reward: (xp: 100),
+        ),
+        (
+            id: "bc_to_the_site", name: "Opening Soon", open_world: true, level_min: 5,
+            giver: (npc: "legacy_archivist", zone: "campus"),
+            turn_in: Some((npc: "construction_liaison", zone: "campus")),
+            text: "Over the creek to the west is the New HQ, opening 2019. Its liaison asked me for the original floor plans. I told her they're on a floppy disk. She cried. Go be her friend. Bring patience, not the disk.",
+            progress_text: "Cross Liquidity Creek on the railway road bridge. The Construction Liaison stands by the site gate on the north ring road.",
+            done_text: "The Archivist sent you? Then you know about the disk. Don't. Just help me get something built before the next press release.",
+            objectives: [Talk("construction_liaison")],
+            reward: (xp: 110),
+        ),
+        (
+            id: "bc_to_the_hill", name: "Executive Presence", open_world: true, level_min: 5,
+            giver: (npc: "construction_liaison", zone: "campus"),
+            turn_in: Some((npc: "villa_steward", zone: "campus")),
+            text: "The board approved the site's budget from their villa on Executive Hill, in the south-east, past the gym. The steward there knows when they're awake. Ask him to put my funding request on the agenda. Below the helicopter.",
+            progress_text: "Executive Hill rises in the south-east corner. The steward waits at the foot of the private road, at the end of the commuter lane.",
+            done_text: "A funding request from the site. I'll file it with the others. In the pool. Since you climbed all this way, there's work.",
+            objectives: [Talk("villa_steward")],
+            reward: (xp: 120),
+        ),
     ],
     // ---- Economy: gear, Story Points, vendors (combat_core economy.rs, docs/FORMULAS.md Gear) ----
     // Gear stats are derived from slot, rarity, item level and role (FORMULAS.md); authored here
@@ -10707,6 +11544,9 @@
             (name: "Noise-Cancelling Headphones (Decorative)", icon: "gear_headset", slot: Headgear, rarity: Epic, ilvl: 10, source: Minigame,
              visual: (color: (0.16, 0.16, 0.2), style: 2),
              description: "Gold, Open-Space Focus. They cancel nothing. Wearing them cancels the people. Mostly."),
+            (name: "Webcam Hoodie (Sweatpants Implied)", icon: "gear_hoodie", slot: Hoodie, rarity: Epic, ilvl: 10, source: Minigame,
+             visual: (color: (0.35, 0.55, 0.42), style: 2),
+             description: "Gold, Stay Green. Business from the collarbone up. Below the frame: sweatpants, slippers and no plan to change."),
             (name: "Wellness Program Lanyard", icon: "wellness", slot: Lanyard, rarity: Rare, ilvl: 10, role: Some(Healer),
              visual: (color: (0.5, 0.9, 0.7), style: 1),
              description: "Tracks your steps, your sleep and your sentiment. Reports all three to HR."),
@@ -12170,6 +13010,14 @@
              description: "Companion. Use to adopt. Silver, Teambuilding. Three canapes, one mystery skewer, forty napkins."),
         ],
         vendors: [
+            // Car Park P3's only shop: the basics for a first day, at first-day prices.
+            (unit: "lanyard_vendor", title: "~/lanyard_kiosk  (cash only)",
+             greeting: "Lanyards, coffee, painkillers. Everything a new hire needs except a reason.",
+             stock: [
+                 "Ibuprofen", "Energy Drink", "Cold Brew", "Leftover Catering Sandwich",
+                 "Lanyard With Every Badge You Were Ever Issued", "Visitor Badge You Never Returned",
+                 "Sticky Note: 'Fix Later'",
+             ]),
             (unit: "procurement_officer", title: "~/procurement  (delivery 3-6 weeks)",
              greeting: "Welcome to Procurement. Fill in form P-12, wait for approval, then I sell it to you right now anyway.",
              stock: [
@@ -12303,12 +13151,50 @@
             (key: "company_calendar", name: "Company Calendar", zone: "campus", kind: Calendar, reach_m: 4.0),
             (key: "office_dog", name: "Biscuit, the Office Dog", zone: "campus", kind: Dog, reach_m: 3.0, cooldown_ms: 2000, calm: Some((100, 120000))),
             // ---- campus districts (open world) ----
-            // The shuttle loop (fast travel): plaza, park, construction site, station, Incubator Street.
+            // The shuttle loop (fast travel), round the campus: plaza, park, construction site,
+            // Old Campus, station, Co-Living Commons, Incubator Street, Executive Hill, South Gate.
             (key: "shuttle_plaza", name: "Shuttle Stop: HQ Plaza", zone: "campus", kind: ShuttleStop, reach_m: 3.5, cooldown_ms: 3000, to: "shuttle_park"),
             (key: "shuttle_park", name: "Shuttle Stop: Wellness Park", zone: "campus", kind: ShuttleStop, reach_m: 3.5, cooldown_ms: 3000, to: "shuttle_site"),
-            (key: "shuttle_site", name: "Shuttle Stop: New HQ (Opening 2019)", zone: "campus", kind: ShuttleStop, reach_m: 3.5, cooldown_ms: 3000, to: "shuttle_station"),
-            (key: "shuttle_station", name: "Shuttle Stop: Campus Station", zone: "campus", kind: ShuttleStop, reach_m: 3.5, cooldown_ms: 3000, to: "shuttle_incubator"),
-            (key: "shuttle_incubator", name: "Shuttle Stop: Incubator Street", zone: "campus", kind: ShuttleStop, reach_m: 3.5, cooldown_ms: 3000, to: "shuttle_plaza"),
+            (key: "shuttle_site", name: "Shuttle Stop: New HQ (Opening 2019)", zone: "campus", kind: ShuttleStop, reach_m: 3.5, cooldown_ms: 3000, to: "shuttle_oldcampus"),
+            (key: "shuttle_oldcampus", name: "Shuttle Stop: Old Campus", zone: "campus", kind: ShuttleStop, reach_m: 3.5, cooldown_ms: 3000, to: "shuttle_station"),
+            (key: "shuttle_station", name: "Shuttle Stop: Campus Station", zone: "campus", kind: ShuttleStop, reach_m: 3.5, cooldown_ms: 3000, to: "shuttle_commuter"),
+            (key: "shuttle_commuter", name: "Shuttle Stop: Co-Living Commons", zone: "campus", kind: ShuttleStop, reach_m: 3.5, cooldown_ms: 3000, to: "shuttle_incubator"),
+            (key: "shuttle_incubator", name: "Shuttle Stop: Incubator Street", zone: "campus", kind: ShuttleStop, reach_m: 3.5, cooldown_ms: 3000, to: "shuttle_villa"),
+            (key: "shuttle_villa", name: "Shuttle Stop: Executive Hill (Staff Entrance)", zone: "campus", kind: ShuttleStop, reach_m: 3.5, cooldown_ms: 3000, to: "shuttle_gate"),
+            (key: "shuttle_gate", name: "Shuttle Stop: South Gate", zone: "campus", kind: ShuttleStop, reach_m: 3.5, cooldown_ms: 3000, to: "shuttle_plaza"),
+            (key: "scooter_8", name: "Shared E-Scooter", zone: "campus", kind: Scooter, reach_m: 3.0, cooldown_ms: 2000, respawn_ms: 60000),
+            (key: "scooter_9", name: "Shared E-Scooter", zone: "campus", kind: Scooter, reach_m: 3.0, cooldown_ms: 2000, respawn_ms: 60000),
+            (key: "scooter_10", name: "Shared E-Scooter", zone: "campus", kind: Scooter, reach_m: 3.0, cooldown_ms: 2000, respawn_ms: 60000),
+            (key: "scooter_11", name: "Shared E-Scooter", zone: "campus", kind: Scooter, reach_m: 3.0, cooldown_ms: 2000, respawn_ms: 60000),
+            (key: "scooter_12", name: "Shared E-Scooter", zone: "campus", kind: Scooter, reach_m: 3.0, cooldown_ms: 2000, respawn_ms: 60000),
+            (key: "legacy_terminal", name: "Mainframe Console (Green Screen)", zone: "campus", kind: Billboard, reach_m: 4.0, lines: [
+                "'READY.' It has been ready since 1998. Nobody has asked it anything since 2006.",
+                "Payroll batch job 1 of 1: running. Started: 03:00, 14 March 1999.",
+                "It asks for a password. The password is on a sticky note on the console. It is 'password'.",
+            ]),
+            (key: "community_fridge", name: "Community Fridge (Labels Mandatory)", zone: "campus", kind: Coffee, cooldown_ms: 4000,
+             auras: [("fresh_brew", 60000)], action: "Take something (labelled)", lines: [
+                "Every item is labelled 'DO NOT TAKE'. You take a yoghurt labelled 'DO NOT TAKE (Taylor)'.",
+                "A note: 'Whoever ate my lunch: the community saw you.' The community is a camera.",
+            ]),
+            // ---- Car Park P3 ----
+            (key: "badge_photo_booth", name: "Badge Photo Booth", zone: "parking_p3", kind: Music, reach_m: 3.0, cooldown_ms: 3000,
+             action: "Smile (one shot, no retakes)", lines: [
+                "FLASH. You blinked. The booth says 'perfect'. It is on every door for eleven years.",
+                "FLASH. You look like a hostage. The booth saves it as 'approved'.",
+            ]),
+            (key: "p3_ticket_machine", name: "Pay-and-Display Machine", zone: "parking_p3", kind: Billboard, reach_m: 4.0, lines: [
+                "'Employee rate: 9 euros a day. Thank you for your loyalty.'",
+                "Accepted: coins. Not accepted: coins. Card reader: decorative.",
+            ]),
+            (key: "p3_coffee", name: "Self-Service Coffee (Lukewarm)", zone: "parking_p3", kind: Coffee,
+             auras: [("fresh_brew", 90000)], fail_pct: 20, cooldown_ms: 3000),
+            (key: "p3_lanyard_1", name: "Lost Lanyard", zone: "parking_p3", kind: Pickup, tag: "lost_lanyard", reach_m: 2.5,
+             lines: ["A lanyard with a badge that says 'Day 1'. On the back, in pen: 'Day 1 (last)'."]),
+            (key: "p3_lanyard_2", name: "Lost Lanyard", zone: "parking_p3", kind: Pickup, tag: "lost_lanyard", reach_m: 2.5,
+             lines: ["This one still has the welcome sticker: 'You matter!' Somebody crossed out 'matter'."]),
+            (key: "p3_lanyard_3", name: "Lost Lanyard", zone: "parking_p3", kind: Pickup, tag: "lost_lanyard", reach_m: 2.5,
+             lines: ["Lanyard, slightly chewed. The drones got to it first."]),
             (key: "scooter_5", name: "Shared E-Scooter", zone: "campus", kind: Scooter, reach_m: 3.0, cooldown_ms: 2000, respawn_ms: 60000),
             (key: "scooter_6", name: "Shared E-Scooter", zone: "campus", kind: Scooter, reach_m: 3.0, cooldown_ms: 2000, respawn_ms: 60000),
             (key: "scooter_7", name: "Shared E-Scooter", zone: "campus", kind: Scooter, reach_m: 3.0, cooldown_ms: 2000, respawn_ms: 60000),
@@ -12380,6 +13266,13 @@
                 "The crane plays hold music. Even the crane is in a meeting.",
             ]),
             (key: "lake_bench", name: "Lakeside Bench", zone: "campus", kind: Bench, reach_m: 3.0, calm: Some((60, 120000))),
+            // Desk Census: overflow hot desks on the lawn west of the tower.
+            (key: "rto_desk_1", name: "Overflow Hot Desk", zone: "campus", kind: Inspect, tag: "rto_desk", reach_m: 3.0,
+             lines: ["A desk on the grass. The laptop on it moves its own mouse in perfect circles. Nobody is here. Status: green."]),
+            (key: "rto_desk_2", name: "Overflow Hot Desk", zone: "campus", kind: Inspect, tag: "rto_desk", reach_m: 3.0,
+             lines: ["A cold oat flat white and a badge-shaped ring in the condensation. Someone was here for six minutes."]),
+            (key: "rto_desk_3", name: "Overflow Hot Desk", zone: "campus", kind: Inspect, tag: "rto_desk", reach_m: 3.0,
+             lines: ["'RESERVED: LEADERSHIP (WEDNESDAYS)'. It's Thursday. The reservation is still very much in force."]),
             // ---- tower ----
             (key: "coffee_open_space", name: "Office Coffee Machine", zone: "tower/1", kind: Coffee,
              auras: [("fresh_brew", 120000)], fail_pct: 10, cooldown_ms: 3000, calm: Some((60, 120000))),
@@ -12706,6 +13599,10 @@
              text: "Sixty uninterrupted seconds in an open-plan office. Facilities is studying your desk.",
              hint: "Gold at Open-Space Focus: never interrupted.",
              trigger: Event("focus_gold"), sp: 40),
+            (key: "status_green", name: "Status Green", title: "Camera Off, Status Green",
+             text: "Three minutes of a working day at home, mostly green. The laundry got hung. The cat got moved. Work did not come up.",
+             hint: "Silver or better at Stay Green, on the Company Calendar.",
+             trigger: Event("stay_green_title"), sp: 30),
             (key: "exceeds_expectations", name: "Exceeds Expectations", title: "Exceeds Expectations",
              text: "Delivered a Sprint Goal with a Board Meeting in it. Your rating: 'meets expectations'.",
              hint: "Some Sprint Goals come with a title. Some weeks.",
@@ -13079,6 +13976,9 @@
                 (anchor: "night_8", unit: "deadline_wraith"),
                 (anchor: "night_9", unit: "sleep_deprived_contractor"),
                 (anchor: "night_10", unit: "deadline_wraith"),
+                // The bigger campus: the Old Campus sidings and the Co-Living lane.
+                (anchor: "night_11", unit: "sleep_deprived_contractor"),
+                (anchor: "night_12", unit: "deadline_wraith"),
             ],
             ambient: [
                 ("barista", [
@@ -14251,6 +15151,144 @@
                  ]),
             ],
         )),
+    ), (
+        key: "stay_green",
+        name: "Stay Green",
+        blurb: "Work from home. Mostly from the home part.",
+        zone: "home/1",
+        length: "~3 min",
+        limit_s: 210,
+        department: "HR",
+        hint: "Keep your Teams status green. The cat, the laundry and the neighbour have other plans.",
+        how: "A working day at home in three minutes. At the laptop your status stays green; away from it the meter drains and you go yellow, which brings your manager's 'quick question?'. Hang the laundry and open the door for the courier in person, lift the cat off the keyboard, mute for the drilling and unmute when the call says you're on mute. The mouse jiggler holds your status while you're away, but IT scans for it now and then. Keys 1-4 or the buttons.",
+        medals: [
+            (name: "Technically Online", rep: 60, relief: 80),
+            (name: "Present in Spirit", min_score: 1000, rep: 120, relief: 140, event: Some("stay_green_title")),
+            (name: "Camera Off, Status Green", min_score: 1350, flawless: true, rep: 200, relief: 200,
+             items: ["Webcam Hoodie (Sweatpants Implied)"], event: Some("stay_green_title")),
+        ],
+        stay_green: Some((
+            desk_m: 1.8,
+            goal_ms: 180000,
+            yellow_at: 50,
+            rise_per_s: 30.0,
+            decay_per_s: 12.0,
+            jiggler_ms: 12000,
+            jiggler_rest_ms: 20000,
+            ping_ms: 3000,
+            reply_ms: 10000,
+            scan_warn_ms: 6000,
+            it_scans_s: [62, 120],
+            actions: ["Mouse jiggler", "Lift the cat", "Mute", "Unmute", "Reply \"Sure!\""],
+            schedule: [
+                (12, "cat"), (25, "laundry"), (45, "drill"), (58, "courier"), (80, "on_mute"),
+                (95, "cat"), (110, "laundry"), (130, "courier"), (150, "drill"), (162, "on_mute"),
+                (172, "cat"),
+            ],
+            chores: [
+                (key: "cat", name: "Cat on the keyboard", fix: Pet, deadline_ms: 7000,
+                 start: [
+                     "The cat sits on your keyboard. Teams thinks you are typing furiously.",
+                     "The cat is back on the keyboard, drafting a reply to Legal.",
+                     "The cat lies across the trackpad and opens 41 tabs.",
+                 ],
+                 done: [
+                     "Cat relocated. It will be back. It always is.",
+                     "You lift the cat. It looks at you the way Finance looks at a taxi receipt.",
+                     "Cat removed. It sends you a calendar invite: 'Sync re: lap'.",
+                 ],
+                 missed: [
+                     "The cat sent 'jjjjjjjjjjjj;;;;' to #exec-announcements. Three thumbs-up and a 'great energy'.",
+                     "The cat accepted a meeting on your behalf. Saturday, 07:00, recurring.",
+                     "The cat replied-all. Facilities now has your home address.",
+                 ]),
+                (key: "laundry", name: "Washer done: hang the laundry", fix: Go("laundry", 3500), deadline_ms: 30000,
+                 start: [
+                     "The washing machine plays its little song. Hang it now or it smells like a basement by noon.",
+                     "The washer beeps again. It has the persistence of a recruiter on LinkedIn.",
+                 ],
+                 done: [
+                     "Laundry hung. Your one call-worthy shirt is the wet one.",
+                     "Laundry hung. A sock is missing. Probably reorganised into another team.",
+                 ],
+                 missed: [
+                     "The laundry sat too long. It now smells like the office fridge.",
+                     "Your one presentable shirt is damp and smells of regret. Camera stays off.",
+                 ]),
+                (key: "courier", name: "Courier at the door", fix: Go("door", 2000), deadline_ms: 15000,
+                 start: [
+                     "Doorbell! A courier. He'll wait exactly as long as it takes to fill in 'Sorry we missed you'.",
+                     "Doorbell again. A parcel for the neighbour. You are the building's mailroom now.",
+                 ],
+                 done: [
+                     "Parcel signed for. It's the ergonomic footrest you expensed in March.",
+                     "You take the neighbour's parcel. It's heavy and it hums. Probably a smart kettle.",
+                 ],
+                 missed: [
+                     "'Sorry we missed you.' The note was filled in before he rang.",
+                     "The parcel is now at a depot 40 km away, open Tuesdays from 10:00 to 10:15.",
+                 ]),
+                (key: "drill", name: "Neighbour drilling: mute!", fix: Mute, deadline_ms: 6000,
+                 start: [
+                     "The neighbour starts drilling. During the all-hands. Into the wall behind your head.",
+                     "BRRRRRRT. The neighbour is putting up a second shelf. For the first shelf.",
+                 ],
+                 done: [
+                     "Muted. The all-hands goes on without hearing the drill, or you.",
+                     "Muted in time. The CFO says 'headwinds' over a silence that is entirely yours.",
+                 ],
+                 missed: [
+                     "The whole all-hands heard the drill. The CEO asks if you're 'building something'. Applause.",
+                     "Two hundred people heard the drill. Someone in the chat asks if that's the layoffs.",
+                 ]),
+                (key: "on_mute", name: "\"You're on mute\"", fix: Unmute, deadline_ms: 8000,
+                 start: [
+                     "\"Sorry, I think you're on mute.\" Your name, in the important call. Everyone waits.",
+                     "\"You're on mute.\" It's the client. They asked you something twenty seconds ago.",
+                 ],
+                 done: [
+                     "Unmuted: 'Sorry, can you hear me now?' They can. They wish they couldn't.",
+                     "Unmuted. You say 'agreed, let's take it offline'. It answers every question.",
+                 ],
+                 missed: [
+                     "They moved on. Your silence was minuted as 'agreed to own it'.",
+                     "\"Let's circle back once their audio works.\" They never circle back. You own the migration now.",
+                 ]),
+            ],
+            manager: "Your manager",
+            question: [
+                "Quick question? Saw you went yellow. All good?",
+                "Quick question! No rush. Within the next ten seconds.",
+                "Quick question? Just checking you're still... with us.",
+            ],
+            answered: [
+                "You reply 'Sure! What's up?' in seconds. The question was 'are you there?'. Crisis averted.",
+                "'Sure!' He reacts with a thumbs-up. Trust restored for forty minutes.",
+                "Instant reply. He was testing your response time. You passed. He seems disappointed.",
+            ],
+            ignored: [
+                "No reply. He books a 1:1 titled 'Availability'. Thirty minutes, five of them yours.",
+                "Unanswered. Your summary in the next skip-level: 'hard to reach'.",
+                "Silence. He forwards the thread to HR with the word 'FYI'.",
+            ],
+            went_yellow: [
+                "Your status turns yellow. Somewhere, a manager feels a disturbance.",
+                "Yellow again. Teams has told everyone you are Away. His dashboard flickers.",
+            ],
+            scan_warn: "IT security scan",
+            scan_clear: [
+                "IT scanned your laptop: no jiggler. You are, technically, a model employee.",
+                "IT scan clean. They found 600 open tabs and decided not to ask.",
+            ],
+            scan_caught: [
+                "IT: 'Unusual mouse movement: perfect circles, three hours, no clicks.' Jiggler off. You're Away.",
+                "IT caught the jiggler again. You've been enrolled in the 'productivity insights' pilot.",
+            ],
+            away: "You're away from the laptop. Teams is counting.",
+            quiet: "Nothing on fire. Move the mouse meaningfully.",
+            done: "17:00. You log off, still green. You produced nothing, attended everything, and nobody can prove otherwise.",
+            score: (per_green_s: 6, per_chore: 40, per_miss: 100, per_detect: 150, per_reply: 20, per_ignore: 150),
+        )),
     )],
     // ---- Company Calendar (E5, calendar.rs): the one board for side activities ----
     // Minigames list here by `minigames` key: a key without a MinigameDef reads "Coming soon"
@@ -14276,6 +15314,9 @@
              rewards: [Rep, Trophy, Title, Gear]),
             (key: "open_space_focus", name: "Open-Space Focus",
              blurb: "Sixty seconds of deep work. Someone has \"got a minute\".", length: "~3 min",
+             rewards: [Rep, Relief, Title, Gear]),
+            (key: "stay_green", name: "Stay Green",
+             blurb: "Work from home. Mostly from the home part.", length: "~3 min",
              rewards: [Rep, Relief, Title, Gear]),
         ],
         chains: [

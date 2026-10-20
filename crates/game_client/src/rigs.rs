@@ -153,8 +153,10 @@ fn parts(kind: &str) -> Vec<Part> {
         "agi_beta" => agi_beta(),
         "drone" => drone(),
         "goose" => goose(),
+        "cat" => cat(),
         "pizza" => pizza(),
         "espresso_cart" => espresso_cart(),
+        "parking_barrier" => parking_barrier(),
         k if k.starts_with("pet_") => pet(&k[4..]),
         _ => vec![Part::cube(
             [0.0, 0.5, 0.0],
@@ -162,6 +164,31 @@ fn parts(kind: &str) -> Vec<Part> {
             [1.0, 0.0, 1.0],
         )],
     }
+}
+
+/// The Exit Barrier of Car Park P3: a striped post with a ticket slot, a red eye and a long
+/// arm held across your way out.
+fn parking_barrier() -> Vec<Part> {
+    const STRIPE: [f32; 3] = [0.95, 0.75, 0.05];
+    let mut v = vec![
+        Part::cube([0.0, 0.6, 0.0], [0.7, 1.2, 0.6], STRIPE),
+        Part::cube([0.0, 1.25, 0.0], [0.75, 0.1, 0.65], DARK),
+        Part::cube([0.0, 0.9, -0.31], [0.4, 0.08, 0.02], DARK),
+        Part::ball([0.0, 1.45, -0.2], 0.22, [1.0, 0.1, 0.08]).glow(3.0),
+    ];
+    for k in 0..5 {
+        let color = if k % 2 == 0 {
+            [0.95, 0.95, 0.95]
+        } else {
+            [0.9, 0.12, 0.1]
+        };
+        v.push(Part::cube(
+            [0.5 + k as f32 * 0.6, 1.05, 0.0],
+            [0.6, 0.12, 0.12],
+            color,
+        ));
+    }
+    v
 }
 
 /// Small wheeled box carrying a parcel, with a screen face that is very sure of itself.
@@ -677,6 +704,32 @@ fn goose() -> Vec<Part> {
         Part::cube([-0.15, 0.02, 0.05], [0.18, 0.03, 0.22], ORANGE),
         Part::cube([0.15, 0.02, 0.05], [0.18, 0.03, 0.22], ORANGE),
     ]
+}
+
+/// Mochi, the home office cat: a ginger loaf with a raised tail. Faces -Z like every unit.
+fn cat() -> Vec<Part> {
+    const GINGER: [f32; 3] = [0.9, 0.55, 0.22];
+    const CREAM: [f32; 3] = [0.98, 0.9, 0.78];
+    const PINK: [f32; 3] = [1.0, 0.6, 0.65];
+    let mut v = vec![
+        Part::new(Shape::Sphere, [0.0, 0.3, 0.05], [0.42, 0.36, 0.75], GINGER),
+        Part::ball([0.0, 0.3, -0.24], 0.3, CREAM),
+        Part::ball([0.0, 0.55, -0.36], 0.36, GINGER),
+        Part::ball([0.0, 0.5, -0.52], 0.14, CREAM),
+        Part::ball([0.0, 0.53, -0.56], 0.04, PINK),
+        Part::ball([-0.08, 0.6, -0.52], 0.06, [0.4, 0.9, 0.35]).glow(0.6),
+        Part::ball([0.08, 0.6, -0.52], 0.06, [0.4, 0.9, 0.35]).glow(0.6),
+        Part::cyl([0.0, 0.5, 0.5], 0.07, 0.55, GINGER).rot([25.0, 0.0, 0.0]),
+    ];
+    for x in [-0.11, 0.11] {
+        v.push(
+            Part::cube([x, 0.75, -0.36], [0.09, 0.13, 0.04], GINGER).rot([0.0, 0.0, -x * 200.0]),
+        );
+    }
+    for (x, z) in [(-0.12, -0.2), (0.12, -0.2), (-0.12, 0.28), (0.12, 0.28)] {
+        v.push(Part::cyl([x, 0.08, z], 0.09, 0.16, CREAM));
+    }
+    v
 }
 
 /// The free pizza: three open boxes on a folding table.

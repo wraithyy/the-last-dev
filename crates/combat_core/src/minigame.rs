@@ -102,6 +102,8 @@ pub struct MinigameDef {
     pub hackathon: Option<crate::corporate::hackathon::HackathonDef>,
     #[serde(default)]
     pub focus: Option<crate::corporate::focus::FocusDef>,
+    #[serde(default)]
+    pub stay_green: Option<crate::corporate::stay_green::StayGreenDef>,
 }
 
 /// The rules block of a minigame.
@@ -113,6 +115,7 @@ pub enum Rules<'a> {
     Migration(&'a crate::corporate::migration::MigrationDef),
     Hackathon(&'a crate::corporate::hackathon::HackathonDef),
     Focus(&'a crate::corporate::focus::FocusDef),
+    StayGreen(&'a crate::corporate::stay_green::StayGreenDef),
 }
 
 impl MinigameDef {
@@ -138,6 +141,7 @@ impl MinigameDef {
         v.extend(self.migration.as_ref().map(Rules::Migration));
         v.extend(self.hackathon.as_ref().map(Rules::Hackathon));
         v.extend(self.focus.as_ref().map(Rules::Focus));
+        v.extend(self.stay_green.as_ref().map(Rules::StayGreen));
         v
     }
 
@@ -195,6 +199,7 @@ pub(crate) fn validate(c: &Content) -> Result<(), ContentError> {
             [Rules::Migration(r)] => r.validate()?,
             [Rules::Hackathon(r)] => r.validate()?,
             [Rules::Focus(r)] => r.validate(c)?,
+            [Rules::StayGreen(r)] => r.validate()?,
             [] => return bad(format!("{}: no rules", m.key)),
             _ => return bad(format!("{}: more than one rules block", m.key)),
         }
@@ -287,6 +292,7 @@ pub(crate) enum GameRun {
     Migration(crate::corporate::migration::Run),
     Hackathon(crate::corporate::hackathon::Run),
     Focus(crate::corporate::focus::Run),
+    StayGreen(crate::corporate::stay_green::Run),
 }
 
 impl GameRun {
@@ -299,6 +305,7 @@ impl GameRun {
             GameRun::Migration(r) => r.tallies(),
             GameRun::Hackathon(r) => r.tallies(),
             GameRun::Focus(r) => r.tallies(),
+            GameRun::StayGreen(r) => r.tallies(),
         }
     }
 }

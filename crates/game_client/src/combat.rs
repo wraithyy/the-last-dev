@@ -308,7 +308,7 @@ fn tick_sim(
     mut net: Option<ResMut<NetWorld>>,
     client: Res<NetClient>,
     paused: Res<Paused>,
-    colliders: Res<Colliders>,
+    (colliders, ground): (Res<Colliders>, Res<crate::arena::Ground>),
     target: Res<Target>,
     mut shake: ResMut<CameraShake>,
     mut last_pos: Local<Option<Vec3>>,
@@ -422,7 +422,7 @@ fn tick_sim(
             // The sim does not check walls for teleports; keep the body out of them.
             Event::Teleported { unit, pos } if *unit == player_id => {
                 let from = body.pos;
-                body.teleport(nearest_free(v3(*pos), from, &colliders.0));
+                body.teleport(nearest_free(v3(*pos), from, &colliders.0, &ground.0));
             }
             _ => {}
         }

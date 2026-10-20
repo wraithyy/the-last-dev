@@ -1,8 +1,8 @@
-//! The outdoor hub: a generic corporate campus, 220 x 160 m. The core (140 x 100 m) has the
-//! arrival parking lot, a cafeteria pavilion, a smoking corner, the reception plaza and three
-//! building facades (tower, data center, innovation lab); the open-world districts around it
-//! are in `districts.rs`. Buildings are single large blockers; the entrances are the door
-//! anchors. Everything is primitives so it stays light on WebGL2.
+//! The outdoor hub: a corporate campus town, 464 x 332 m. The HQ core (140 x 100 m) has the
+//! executive car park, a cafeteria pavilion, a smoking corner, the reception plaza and the
+//! building facades (tower, data center, innovation lab, client annex); the districts around
+//! it are in `districts.rs` and `frontier.rs`. Buildings are single large blockers; the
+//! entrances are the door anchors. Everything is primitives so it stays light on WebGL2.
 
 use super::kit::*;
 use super::layout::{FloorKind, FloorLayout, Theme, assemble, yaw_towards};
@@ -12,8 +12,8 @@ use super::themes::{pt, route_point_near, runner, v};
 use bevy::prelude::*;
 use std::f32::consts::{FRAC_PI_2, PI};
 
-pub const HALF_X: f32 = 110.0;
-pub const HALF_Z: f32 = 80.0;
+pub const HALF_X: f32 = 232.0;
+pub const HALF_Z: f32 = 166.0;
 
 const SPAWN: (f32, f32) = (-23.0, 22.0);
 const GRAVEYARD: (f32, f32) = (-15.0, 28.5);
@@ -37,12 +37,6 @@ const NPCS: [(f32, f32); 6] = [
     (-9.0, 15.0),
 ];
 const PLAZA: (f32, f32) = (0.0, 2.0);
-/// The "First Day" onboarding corner between the arrival spot and the plaza.
-const ONBOARDING: [(&str, (f32, f32)); 3] = [
-    ("npc_hr", (-26.5, 18.0)),
-    ("npc_dummy", (-21.0, 11.5)),
-    ("npc_colleague", (-25.5, 13.5)),
-];
 
 pub(super) const TOWER: (Vec2, Vec3) = (Vec2::new(0.0, -36.0), Vec3::new(36.0, 26.0, 22.0));
 const DATA_CENTER: (Vec2, Vec3) = (Vec2::new(54.0, -8.0), Vec3::new(24.0, 11.0, 30.0));
@@ -54,7 +48,7 @@ const ACCOUNT_MANAGER: (f32, f32) = (25.0, -5.5);
 /// the leaver at the smoking corner, Security at the tower path, the RTO lead by the bike
 /// rack and Internal Comms on the plaza. Each looks at the point after it.
 type Xz = (f32, f32);
-const CHAIN_NPCS: [(&str, Xz, Xz); 8] = [
+const CHAIN_NPCS: [(&str, Xz, Xz); 10] = [
     ("npc_expense", (-25.5, 8.0), (-12.0, 8.0)),
     ("npc_exit", (43.5, 23.0), (46.0, 26.0)),
     ("npc_security", (-4.5, -18.5), (0.0, -10.0)),
@@ -65,6 +59,16 @@ const CHAIN_NPCS: [(&str, Xz, Xz); 8] = [
     ("npc_oncall", (-24.0, -6.5), (-28.0, -9.0)),
     // Flaky Tests: QA by the car park, where the delivery robots do their rounds.
     ("npc_qa", (-34.0, 27.0), (-45.0, 41.0)),
+    // Hybrid work: the worker at the west end of the cafe counter, coffee first; the enforcer
+    // beside the tower door, where the badges are.
+    ("npc_hybrid", (-39.6, 9.4), (-36.0, 7.8)),
+    ("npc_enforcer", (9.0, -22.0), (2.0, -17.0)),
+];
+/// Desk Census: overflow hot desks on the lawn west of the tower (desk centre; you stand south).
+const OVERFLOW_DESKS: [(&str, Xz); 3] = [
+    ("prop:rto_desk_1", (-24.0, -21.0)),
+    ("prop:rto_desk_2", (-29.0, -24.0)),
+    ("prop:rto_desk_3", (-33.0, -20.0)),
 ];
 pub(super) const LAB: (Vec2, Vec3) = (Vec2::new(-50.0, -36.0), Vec3::new(26.0, 9.0, 22.0));
 
@@ -88,6 +92,7 @@ fn theme() -> Theme {
 
 pub fn build() -> FloorLayout {
     let mut p = Plan::default();
+    p.terrain = super::districts::terrain();
     p.fp.pod(
         rounded_rect(Vec2::ZERO, HALF_X, HALF_Z, 1.0, 0.0),
         Mat::Wall,
@@ -125,6 +130,7 @@ pub fn build() -> FloorLayout {
     graveyard(&mut p);
     lawn(&mut p);
     ambient_props(&mut p);
+    overflow_desks(&mut p);
     super::districts::build(&mut p);
 
     let door = |n: usize| doors[n].1;
@@ -172,30 +178,38 @@ pub fn build() -> FloorLayout {
         let at = v(x, 0.0, z);
         p.anchor(name, at, yaw_towards(at, v(lx, 0.0, lz)));
     }
-    for (name, (x, z)) in ONBOARDING {
-        let at = v(x, 0.0, z);
-        p.anchor(name, at, yaw_towards(at, spawn));
-    }
     for (name, (pos, yaw)) in doors {
         p.anchor(name, pos, yaw);
     }
     assemble("campus", 0, "Synergy Campus", true, p, theme())
 }
 
-/// Far lawn under the fog, plus the lighter inner lawn borders.
+/// Far lawn under the fog, all round the campus: inside the hedge the terrain mesh is the
+/// ground (a slab there would cover the creek bed).
 fn ground(p: &mut Plan) {
-    p.slab(v(0.0, -0.06, 0.0), 0.0, v(900.0, 0.1, 900.0), Mat::LeafDark);
+    let (w, d) = (900.0, 900.0);
+    let (hx, hz) = (HALF_X + 1.0, HALF_Z + 1.0);
+    for (x, z, sx, sz) in [
+        (0.0, -(hz + d) / 2.0 - hz / 2.0, w, d - hz),
+        (0.0, (hz + d) / 2.0 + hz / 2.0, w, d - hz),
+        (-(hx + w) / 2.0 - hx / 2.0, 0.0, w - hx, 2.0 * hz),
+        ((hx + w) / 2.0 + hx / 2.0, 0.0, w - hx, 2.0 * hz),
+    ] {
+        p.slab(v(x, -0.06, z), 0.0, v(sx, 0.1, sz), Mat::LeafDark);
+    }
 }
 
 fn perimeter(p: &mut Plan) {
     for (x, z, sx, sz) in [
-        (0.0, -HALF_Z - 0.5, 2.0 * HALF_X + 4.0, 1.0),
-        (0.0, HALF_Z + 0.5, 2.0 * HALF_X + 4.0, 1.0),
+        (0.0, -HALF_Z - 0.5, 2.0 * HALF_X + 2.0, 1.0),
+        (0.0, HALF_Z + 0.5, 2.0 * HALF_X + 2.0, 1.0),
         (-HALF_X - 0.5, 0.0, 1.0, 2.0 * HALF_Z),
         (HALF_X + 0.5, 0.0, 1.0, 2.0 * HALF_Z),
     ] {
         p.boxed(v(x, 1.2, z), v(sx, 2.4, sz), Mat::LeafDark, true);
     }
+    // Executive parking really is at the door: everyone else parks in P3.
+    super::districts::signpost(p, -60.0, 18.5, true, 4.0, Sign::ExecParking);
 }
 
 /// Entrance anchor in front of the facade centre: 1.8 m out, facing away from the wall.
@@ -490,30 +504,17 @@ fn parking_lot(p: &mut Plan) {
     p.boxed(v(-43.0, 0.8, 19.5), v(0.15, 1.6, 0.15), Mat::Metal, false);
 }
 
-/// Simple car: body and cabin slabs, box wheels, one collider.
+/// A parked car (`models::car`), its model picked from the old paint colour.
 pub(super) fn car(p: &mut Plan, x: f32, z: f32, along_x: bool, mat: Mat) {
-    let yaw = if along_x { 0.0 } else { FRAC_PI_2 };
-    let rot = |lx: f32, lz: f32| {
-        let (s, c) = yaw.sin_cos();
-        (x + lx * c + lz * s, z - lx * s + lz * c)
+    let paint = match mat {
+        Mat::CarBlue => 0,
+        Mat::CarRed => 1,
+        Mat::CarWhite => 2,
+        Mat::CarTeal => 3,
+        Mat::Yellow => 4,
+        _ => 5,
     };
-    p.slab(v(x, 0.62, z), yaw, v(4.4, 0.7, 1.8), mat);
-    let (cx, cz) = rot(-0.2, 0.0);
-    p.slab(v(cx, 1.2, cz), yaw, v(2.4, 0.55, 1.6), Mat::Facade);
-    for (lx, lz) in [(1.4, 0.85), (1.4, -0.85), (-1.4, 0.85), (-1.4, -0.85)] {
-        let (wx, wz) = rot(lx, lz);
-        p.slab(v(wx, 0.3, wz), yaw, v(0.75, 0.6, 0.25), Mat::Tire);
-    }
-    for lz in [-0.6, 0.6] {
-        let (hx, hz) = rot(2.2, lz);
-        p.slab(v(hx, 0.7, hz), yaw, v(0.06, 0.15, 0.3), Mat::NeonYellow);
-    }
-    let size = if along_x {
-        v(4.4, 1.5, 1.8)
-    } else {
-        v(1.8, 1.5, 4.4)
-    };
-    p.block(v(x, 0.75, z), size);
+    super::models::car(p, x, z, along_x, paint);
 }
 
 /// The "AI-powered" car: parked across three bays, with a lidar dome and its own opinions.
@@ -597,6 +598,26 @@ fn pavilion(p: &mut Plan) {
         }
     }
     p.sign(v(cx - 7.05, 1.8, cz + 3.0), FRAC_PI_2, 2.2, Sign::NoFeed);
+}
+
+/// Three desks on the grass for the attendance target: one with a jiggling laptop, one with a
+/// cold coffee, one reserved for leadership on Wednesdays.
+fn overflow_desks(p: &mut Plan) {
+    let top = DESK.size[1] * FURNITURE_SCALE;
+    for (k, (anchor, (x, z))) in OVERFLOW_DESKS.into_iter().enumerate() {
+        p.prop(&DESK, v(x, 0.0, z), PI, true);
+        match k {
+            0 => p.prop(&LAPTOP, v(x, top, z), PI, false),
+            1 => p.prim(
+                PrimKind::Cylinder,
+                v(x + 0.3, top + 0.07, z),
+                v(0.12, 0.14, 0.12),
+                Mat::White,
+            ),
+            _ => p.boxed(v(x, top + 0.18, z), v(0.5, 0.36, 0.03), Mat::Paper, false),
+        }
+        p.interactable(anchor, v(x, 1.0, z), v(x, 0.0, z + 1.5));
+    }
 }
 
 fn smoking_corner(p: &mut Plan) {
@@ -1087,6 +1108,7 @@ fn trees(p: &mut Plan, doors: &[(&'static str, (Vec3, f32))]) {
     let keep_clear: Vec<Vec2> = PACKS
         .iter()
         .chain(NPCS.iter())
+        .chain(OVERFLOW_DESKS.iter().map(|(_, xz)| xz))
         .chain([SPAWN, GRAVEYARD].iter())
         .map(|&(x, z)| pt(x, z))
         .chain(doors.iter().map(|(_, (pos, _))| pt(pos.x, pos.z)))
@@ -1099,45 +1121,26 @@ fn trees(p: &mut Plan, doors: &[(&'static str, (Vec3, f32))]) {
         if !off_route || keep_clear.iter().any(|a| a.distance(q) < 6.0) {
             return;
         }
-        p.prim(
-            PrimKind::Cylinder,
-            v(x, 1.1, z),
-            v(0.5, 2.2, 0.5),
-            Mat::Bark,
-        );
-        if pine {
-            p.prim(
-                PrimKind::Cone,
-                v(x, 3.0 + size, z),
-                v(size * 1.2, size * 2.4, size * 1.2),
-                Mat::LeafDark,
-            );
-        } else {
-            p.prim(
-                PrimKind::Sphere,
-                v(x, 3.1 + size * 0.5, z),
-                v(size * 1.5, size * 1.3, size * 1.5),
-                Mat::Leaf,
-            );
-        }
-        p.block(v(x, 1.5, z), v(0.7, 3.0, 0.7));
+        super::models::tree(p, x, z, pine, size);
     };
-    // A belt around the edge (sparser than the core lawns: it is mostly fog from the
-    // middle) plus clumps in the lawns between buildings and in the districts.
-    for i in 0..27 {
-        let x = -106.0 + i as f32 * 8.2;
-        // The construction site and the railway own the north edge, the step board the south.
-        if (-43.0..38.0).contains(&x) {
-            tree(p, x, -78.5, i % 2 == 0, 1.5 + (i % 3) as f32 * 0.2);
+    // A belt around the edge (sparse: it is mostly fog from the middle) plus clumps in the
+    // lawns between buildings and in the districts.
+    for i in 0..40 {
+        let x = -226.0 + i as f32 * 11.6;
+        // The construction site and the railway own the north edge; the gate opens the south.
+        if !(-120.0..232.0).contains(&x) {
+            tree(p, x, -163.0, i % 2 == 0, 1.5 + (i % 3) as f32 * 0.2);
         }
-        if !(84.0..100.0).contains(&(x + 3.0)) {
-            tree(p, x + 3.0, 78.5, i % 2 == 1, 1.6);
+        if !(-20.0..20.0).contains(&(x + 4.0)) && !(176.0..232.0).contains(&(x + 4.0)) {
+            tree(p, x + 4.0, 163.0, i % 2 == 1, 1.6);
         }
     }
-    for i in 0..19 {
-        let z = -72.0 + i as f32 * 8.0;
-        tree(p, -108.5, z, i % 2 == 0, 1.6);
-        tree(p, 108.5, z, i % 2 == 1, 1.7);
+    for i in 0..29 {
+        let z = -158.0 + i as f32 * 11.2;
+        tree(p, -229.0, z, i % 2 == 0, 1.6);
+        if !(118.0..166.0).contains(&z) {
+            tree(p, 229.0, z, i % 2 == 1, 1.7);
+        }
     }
     for (x, z, pine) in super::districts::TREES {
         tree(p, x, z, pine, 1.7);
@@ -1156,5 +1159,29 @@ fn trees(p: &mut Plan, doors: &[(&'static str, (Vec3, f32))]) {
         (-12.0, -22.0, false),
     ] {
         tree(p, x, z, pine, 1.8);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_hybrid_work_npcs_keep_their_distance_from_other_givers() {
+        let l = super::build();
+        for me in ["npc_hybrid", "npc_enforcer"] {
+            let at = l.pos(me);
+            for (name, p, _) in &l.anchors {
+                let gap = match name {
+                    n if n.starts_with("npc_") || n.starts_with("door:") => 5.0,
+                    // Props only need room to stand at them (the hybrid worker lives by the coffee).
+                    n if n.starts_with("prop:") => 2.0,
+                    _ => continue,
+                };
+                if *name == me {
+                    continue;
+                }
+                let d = at.distance(*p);
+                assert!(d >= gap, "{me} only {d:.1} m from {name}");
+            }
+        }
     }
 }

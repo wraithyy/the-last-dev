@@ -115,6 +115,9 @@ pub(crate) struct Unit {
     pub last_player_hit: Option<(u32, School)>,
     pub wander: Wander,
     pub nav: NavAgent,
+    /// Height above the terrain this unit keeps while it moves (a seated NPC's 0.5 m); set on
+    /// its first tick on uneven ground.
+    pub(crate) ground_off: Option<f32>,
     /// Index into `Content::classes` for players; `None` for everyone else.
     pub class: Option<usize>,
     /// Player HP once per second, newest first (Revert Commit looks back in it).
@@ -218,6 +221,9 @@ pub struct Sim {
     pub(crate) minigame: crate::minigame::MinigameState,
     /// Defend waves and telegraph hits for `KillClean` (`quests.rs`).
     pub(crate) quest_rt: crate::quests::QuestRt,
+    /// Ground of the loaded zone, and of every zone a loader registered (`terrain.rs`).
+    pub(crate) terrain: crate::terrain::Terrain,
+    pub(crate) zone_terrains: BTreeMap<String, crate::terrain::Terrain>,
 }
 
 impl Sim {
@@ -253,6 +259,8 @@ impl Sim {
             raid: Default::default(),
             minigame: Default::default(),
             quest_rt: Default::default(),
+            terrain: Default::default(),
+            zone_terrains: BTreeMap::new(),
         }
     }
 
@@ -488,6 +496,7 @@ impl Sim {
             last_player_hit: None,
             wander: Wander::new(self.seed, id),
             nav: NavAgent::default(),
+            ground_off: None,
             class: None,
             hp_hist: [0; HP_HIST_LEN],
             combat_since: 0,
@@ -707,6 +716,7 @@ impl Sim {
         self.update_burnout();
         self.update_pets();
         self.update_corpses();
+        self.follow_ground();
         self.flush_yells();
         self.sync_views();
     }

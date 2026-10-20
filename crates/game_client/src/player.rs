@@ -1,7 +1,7 @@
 //! Senior Engineer: fixed-step movement simulation plus interpolated rendering.
 
 use crate::anim::{Character, ModelKind};
-use crate::arena::Colliders;
+use crate::arena::{Colliders, Ground};
 use crate::collision::{ground_height, slide};
 use crate::config::*;
 use crate::input::PlayerInput;
@@ -117,10 +117,12 @@ fn spawn_player(mut commands: Commands) {
     ));
 }
 
+#[allow(clippy::too_many_arguments)] // Bevy system parameters
 fn simulate(
     time: Res<Time>,
     mut input: ResMut<PlayerInput>,
     colliders: Res<Colliders>,
+    ground: Res<Ground>,
     speed: Res<MoveSpeed>,
     reversed: Res<ControlsReversed>,
     mut sneak: ResMut<Sneak>,
@@ -164,12 +166,18 @@ fn simulate(
         body.knock = Vec3::ZERO;
     }
 
-    let ground = ground_height(body.pos, &colliders.0);
+    // Walking downhill keeps the feet on the ground instead of skipping off every step.
+    let grounded = body.vy == 0.0;
+    let ground = ground_height(body.pos, &colliders.0, &ground.0);
     if input.jump {
         input.jump = false;
         if body.pos.y <= ground + GROUND_EPSILON {
             body.vy = JUMP_SPEED;
         }
+    }
+    if grounded && body.vy == 0.0 && body.pos.y > ground && body.pos.y - ground <= SLOPE_SNAP {
+        body.pos.y = ground;
+        return;
     }
     body.vy -= GRAVITY * dt;
     body.pos.y += body.vy * dt;

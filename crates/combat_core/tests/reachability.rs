@@ -248,3 +248,20 @@ fn every_interactive_objective_has_its_props_units_and_anchors() {
         bad.join("\n")
     );
 }
+
+/// The hybrid-work side quests rely on the interactive checks above (a placed enforcer and
+/// three anchored desks); this pins that they are the kind those checks cover.
+#[test]
+fn the_hybrid_work_quests_are_interactive_and_covered() {
+    let c = content();
+    for id in ["coffee_badging", "desk_census"] {
+        let q = c.quests.iter().find(|q| q.id == id);
+        assert!(
+            q.is_some_and(|q| q
+                .objectives
+                .iter()
+                .all(|o| matches!(o, Objective::Deliver { .. } | Objective::Inspect(..)))),
+            "{id}"
+        );
+    }
+}

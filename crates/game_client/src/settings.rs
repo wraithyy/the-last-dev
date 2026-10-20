@@ -320,6 +320,10 @@ impl Plugin for SettingsPlugin {
         if let Ok(v) = std::env::var("WOW_AUTO_LOOT") {
             settings.auto_loot = v.trim() == "1";
         }
+        // QA: perf screenshots with the readout on, without touching the stored settings.
+        if std::env::var_os("WOW_SHOW_FPS").is_some() {
+            settings.show_fps = true;
+        }
         let open = std::env::var_os("WOW_SETTINGS").is_some();
         app.insert_resource(palette(settings.colorblind))
             .insert_resource(settings)

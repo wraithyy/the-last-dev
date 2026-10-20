@@ -199,6 +199,7 @@ fn the_calendar_lists_every_minigame_and_chain_with_rotation_off() {
         "Tool Migration",
         "Hackathon",
         "Open-Space Focus",
+        "Stay Green",
     ] {
         assert!(names.contains(&want), "{want} missing from {names:?}");
     }

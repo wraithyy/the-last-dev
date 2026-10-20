@@ -37,15 +37,11 @@ fn secret_seated(p: &mut Plan, anchor: &'static str, x: f32, z: f32, look: (f32,
 
 /// Parked e-scooters anyone can borrow; the office module draws them (they vanish when
 /// borrowed), so the campus builder leaves these four spots empty.
-pub const CAMPUS_SCOOTERS: [(&str, f32, f32); 7] = [
+pub const CAMPUS_SCOOTERS: [(&str, f32, f32); 4] = [
     ("prop:scooter_1", -20.0, 17.5),
     ("prop:scooter_2", 4.0, 8.0),
     ("prop:scooter_3", 18.0, -2.0),
     ("prop:scooter_4", 3.5, -17.0),
-    // At the district shuttle stops: park, station, Incubator Street.
-    ("prop:scooter_5", -76.0, 21.5),
-    ("prop:scooter_6", 55.5, -58.0),
-    ("prop:scooter_7", 77.0, 36.0),
 ];
 
 pub fn place(zone: &str, p: &mut Plan) {
@@ -304,6 +300,7 @@ fn company_calendar(p: &mut Plan) {
         "door:migration/1",
         "door:hackathon/1",
         "door:openspace/1",
+        "door:home/1",
     ] {
         p.anchor(door, v(x, 0.0, z + 2.2), 0.0);
     }
@@ -573,8 +570,9 @@ mod tests {
             let Some(l) = build_zone(zone) else { continue };
             for s in &l.seats {
                 n += 1;
+                let ground = l.terrain.height(s.pos.x, s.pos.z);
                 assert!(
-                    (s.pos.y - crate::seat::SEAT_TOP).abs() < 0.03,
+                    (s.pos.y - ground - crate::seat::SEAT_TOP).abs() < 0.03,
                     "{zone}: seat at {} is {} m high",
                     s.pos,
                     s.pos.y

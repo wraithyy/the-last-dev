@@ -120,6 +120,20 @@ fn v3(p: combat_core::Vec3) -> Vec3 {
     Vec3::new(p.x, p.y, p.z)
 }
 
+/// On a slope a flat decal would sink into the uphill side: rest it on the highest ground
+/// around its centre instead.
+fn on_ground(t: &combat_core::Terrain, p: Vec3) -> Vec3 {
+    if t.is_flat() {
+        return p;
+    }
+    let r = 2.5;
+    let top = [(0.0, 0.0), (r, 0.0), (-r, 0.0), (0.0, r), (0.0, -r)]
+        .into_iter()
+        .map(|(dx, dz)| t.surface(p.x + dx, p.z + dz))
+        .fold(f32::MIN, f32::max);
+    Vec3::new(p.x, top.max(p.y), p.z)
+}
+
 /// Lays a flat 2D mesh on the floor with its local +Y along the telegraph facing (a sim yaw).
 fn ground(pos: Vec3, facing: f32, lift: f32) -> Transform {
     Transform::from_translation(pos + Vec3::Y * lift)
@@ -183,6 +197,7 @@ fn spawn_decals(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut decals: Query<&mut Decal>,
     pal: Res<crate::settings::Palette>,
+    terrain: Res<crate::arena::Ground>,
 ) {
     // Danger and safe-spot colours follow the colourblind palette.
     let (danger, safe) = (pal.danger, pal.safe);
@@ -204,7 +219,7 @@ fn spawn_decals(
                     .and_then(|s| s.telegraph.clone());
                 let split = def.as_ref().is_some_and(|d| d.split);
                 let color = if split { SHARE } else { danger };
-                let pos = v3(*pos);
+                let pos = on_ground(&terrain.0, v3(*pos));
                 // Stacked decals each get their own height so they do not z-fight.
                 let lift = 0.03 + (id % 8) as f32 * 0.004;
                 let (edge_mesh, fill_mesh, edge_tf) = match *shape {

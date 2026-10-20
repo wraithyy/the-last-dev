@@ -30,6 +30,8 @@ use combat_core::{Effect, EntityId, Event, QuestStatus, Role, SpellId, SpellTarg
 use steps::{Ctx, STEPS, Signal, Step, Tutorial, Window};
 
 pub const QUEST: &str = "mandatory_compliance";
+/// Every new hire starts in Car Park P3, where the First Day corner is.
+pub const STARTER: &str = crate::floors::carpark::ZONE;
 const DUMMY: &str = "training_dummy";
 const COLLEAGUE: &str = "burnt_out_colleague";
 const INTERN: &str = "intern";
@@ -76,6 +78,8 @@ pub struct Onboarding {
     run: Option<Run>,
     /// Ask to (re)start once the conditions allow it.
     want: bool,
+    /// The new-hire trip to P3 was asked for (once per class load).
+    redirected: bool,
 }
 
 impl Onboarding {
@@ -84,6 +88,7 @@ impl Onboarding {
         self.pending = pending;
         self.run = None;
         self.want = pending;
+        self.redirected = false;
     }
 }
 
@@ -208,6 +213,7 @@ fn start_and_stop(
     cam: Single<&OrbitCamera>,
     skip: Query<&Interaction, (Changed<Interaction>, With<SkipButton>)>,
     mut banners: MessageWriter<Banner>,
+    mut enter: MessageWriter<EnterZone>,
 ) {
     // Co-op skips it: the server owns that world and the group would wait on one player.
     if mode.is_online() {
@@ -225,7 +231,18 @@ fn start_and_stop(
         });
         return;
     }
-    if onb.want && onb.run.is_none() && flow.zone == "campus" && !flow.input_locked() {
+    // A new hire who woke up on the campus (the default start) is sent to P3 first, once.
+    if onb.want && onb.run.is_none() && !flow.zone.is_empty() && flow.zone != STARTER {
+        if sends_new_hire_to_p3(&onb, &flow.zone, flow.input_locked()) {
+            onb.redirected = true;
+            enter.write(EnterZone {
+                zone: STARTER.into(),
+                from: None,
+            });
+        }
+        return;
+    }
+    if onb.want && onb.run.is_none() && flow.zone == STARTER && !flow.input_locked() {
         let Some(p) = sim.0.player() else { return };
         onb.run = new_run(&sim, p, touch.active, &body, &cam);
         onb.want = false;
@@ -241,6 +258,17 @@ fn start_and_stop(
             color: Color::srgb(0.4, 1.0, 0.5),
         });
     }
+}
+
+/// A new hire (onboarding due, not running yet) anywhere but P3 is sent there, once per class
+/// load; the caller has already left co-op out (the server owns that world).
+fn sends_new_hire_to_p3(onb: &Onboarding, zone: &str, locked: bool) -> bool {
+    onb.want
+        && onb.run.is_none()
+        && !zone.is_empty()
+        && zone != STARTER
+        && !locked
+        && !onb.redirected
 }
 
 /// Turns this frame's input, state and sim events into step signals.
@@ -263,8 +291,8 @@ fn observe(
         talked.clear();
         return;
     };
-    // Only the campus corner exists for it; elsewhere it waits.
-    if flow.zone != "campus" {
+    // Only the P3 corner exists for it; elsewhere it waits.
+    if flow.zone != STARTER {
         events.clear();
         talked.clear();
         return;
@@ -658,7 +686,7 @@ fn panel(
     )>,
     mut cells: Query<(&ProgressCell, &mut BackgroundColor)>,
 ) {
-    let show = onb.run.is_some() && flow.zone == "campus" && !flow.input_locked();
+    let show = onb.run.is_some() && flow.zone == STARTER && !flow.input_locked();
     let want = if show { Display::Flex } else { Display::None };
     if root.display != want {
         root.display = want;
@@ -717,7 +745,7 @@ fn highlight(
     mut spots: Query<(Entity, &Spot, Option<&mut Outline>)>,
 ) {
     let want = match (onb.run.as_ref(), sim.0.player()) {
-        (Some(run), Some(p)) if flow.zone == "campus" => spot_for(&sim, p, &run.tut, touch.active),
+        (Some(run), Some(p)) if flow.zone == STARTER => spot_for(&sim, p, &run.tut, touch.active),
         _ => None,
     };
     let pulse = 0.55 + 0.45 * (time.elapsed_secs() * 5.0).sin();
@@ -754,9 +782,9 @@ fn replay_menu(
     if show && button.iter().any(|i| *i == Interaction::Pressed) {
         onb.run = None;
         onb.want = true;
-        // Reloading the campus respawns the dummy and puts the player at the arrival spot.
+        // Reloading P3 respawns the dummy and puts the player at the arrival spot.
         enter.write(EnterZone {
-            zone: "campus".into(),
+            zone: STARTER.into(),
             from: None,
         });
         paused.0 = false;
@@ -768,5 +796,26 @@ fn hold_night(onb: Res<Onboarding>, mut sim: ResMut<CombatSim>) {
     let hold = onb.run.is_some() || onb.want;
     if sim.0.is_night_held() != hold {
         sim.0.set_hold_night(hold);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_new_hire_starts_in_car_park_p3() {
+        let mut onb = Onboarding::default();
+        onb.class_loaded(true);
+        assert!(sends_new_hire_to_p3(&onb, "campus", false));
+        // Not during a fade, never twice, and not once they are there.
+        assert!(!sends_new_hire_to_p3(&onb, "campus", true));
+        assert!(!sends_new_hire_to_p3(&onb, STARTER, false));
+        onb.redirected = true;
+        assert!(!sends_new_hire_to_p3(&onb, "campus", false));
+        // A returning player (save says onboarding is done) stays where they are.
+        onb.class_loaded(false);
+        assert!(!sends_new_hire_to_p3(&onb, "campus", false));
+        assert_eq!(STARTER, "parking_p3");
     }
 }

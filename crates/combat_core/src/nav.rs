@@ -112,10 +112,16 @@ impl PartialOrd for Node {
 }
 
 impl Nav {
-    pub(crate) fn build(blockers: &[Aabb]) -> Nav {
+    pub(crate) fn build(blockers: &[Aabb], terrain: &crate::terrain::Terrain) -> Nav {
+        // On uneven ground a box counts by its height above the ground it stands on.
+        let ground =
+            |b: &Aabb| terrain.height((b.min.x + b.max.x) / 2.0, (b.min.z + b.max.z) / 2.0);
         let inflated: Vec<Aabb> = blockers
             .iter()
-            .filter(|b| b.max.y > SOLID_MIN_Y && b.min.y < SOLID_MAX_Y)
+            .filter(|b| {
+                let g = ground(b);
+                b.max.y - g > SOLID_MIN_Y && b.min.y - g < SOLID_MAX_Y
+            })
             .map(|b| Aabb {
                 min: Vec3::new(b.min.x - NAV_RADIUS_M, -1e4, b.min.z - NAV_RADIUS_M),
                 max: Vec3::new(b.max.x + NAV_RADIUS_M, 1e4, b.max.z + NAV_RADIUS_M),
@@ -347,7 +353,7 @@ fn search(
 
 impl Sim {
     pub(crate) fn rebuild_nav(&mut self) {
-        self.nav = Nav::build(&self.blockers);
+        self.nav = Nav::build(&self.blockers, &self.terrain);
         for u in &mut self.units {
             u.nav.reset();
         }

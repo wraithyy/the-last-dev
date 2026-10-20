@@ -1299,8 +1299,12 @@ fn campus_chain(class: &'static str) {
         "content_moderation",
     ];
     for seed in [7, 42, 1234] {
-        let mut bot = Bot::new_as(class, "campus", 1, seed);
+        // New hires start in Car Park P3: the intern hands out the onboarding ticket there and
+        // closes it on the campus.
+        let mut bot = Bot::new_as(class, "parking_p3", 1, seed);
         bot.looting = true;
+        bot.visit_givers("parking_p3", &["onboarding"]);
+        bot.leave_and_return("campus", "parking_p3");
         let mut rounds = 0;
         while rounds < 6 && !bot.report.died {
             rounds += 1;

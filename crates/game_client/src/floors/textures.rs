@@ -142,6 +142,12 @@ pub fn material(mat: Mat, t: &Theme) -> StandardMaterial {
             perceptual_roughness: 0.2,
             ..default()
         },
+        Mat::Lake => StandardMaterial {
+            base_color: c(0.13, 0.33, 0.46),
+            metallic: 0.25,
+            perceptual_roughness: 0.1,
+            ..default()
+        },
     }
 }
 
@@ -1474,6 +1480,184 @@ fn sign_spec(s: Sign) -> SignSpec {
         ),
         Sign::HardHat => sp(
             &["HARD HAT AREA", "LEADERSHIP EXEMPT"],
+            [250, 200, 40],
+            [20, 20, 20],
+            [180, 30, 30],
+        ),
+        Sign::Creek => sp(
+            &["LIQUIDITY CREEK", "RUNS DRY IN Q4", "NO SWIMMING"],
+            [30, 70, 110],
+            [230, 245, 255],
+            [255, 220, 90],
+        ),
+        Sign::JoggingLoop => sp(
+            &[
+                "JOGGING LOOP 2.1 KM",
+                "YOUR PACE IS SHARED",
+                "WITH YOUR MANAGER",
+            ],
+            [40, 90, 60],
+            [240, 250, 240],
+            [255, 230, 120],
+        ),
+        Sign::OverflowLot => sp(
+            &["OVERFLOW LOT B", "FULL SINCE 2022", "TRY CAR PARK P3"],
+            [30, 34, 40],
+            [230, 232, 236],
+            [250, 180, 60],
+        ),
+        Sign::OldCampus => sp(
+            &["OLD CAMPUS", "EST. 1998", "LEGACY: DO NOT REWRITE"],
+            [90, 40, 30],
+            [245, 230, 210],
+            [255, 200, 90],
+        ),
+        Sign::LegacyDepot => sp(
+            &[
+                "LEGACY SYSTEMS DEPOT",
+                "IT WORKS. NOBODY",
+                "KNOWS WHY. DO NOT TOUCH",
+            ],
+            [60, 40, 30],
+            [240, 225, 200],
+            [255, 170, 60],
+        ),
+        Sign::Building1 => sp(
+            &["BUILDING 1", "WHERE IT ALL BEGAN", "NOW: STORAGE"],
+            [70, 30, 25],
+            [240, 228, 210],
+            [230, 200, 120],
+        ),
+        Sign::FoundersTerrace => sp(
+            &[
+                "FOUNDERS TERRACE",
+                "THE ORIGINAL GARAGE",
+                "(RENTED. BY THE HOUR)",
+            ],
+            [40, 40, 50],
+            [240, 236, 220],
+            [255, 210, 90],
+        ),
+        Sign::CoLiving => sp(
+            &[
+                "CO-LIVING COMMONS",
+                "COMMUTE: 40 SECONDS",
+                "RENT: ALL OF IT",
+            ],
+            [30, 60, 70],
+            [235, 248, 250],
+            [255, 200, 120],
+        ),
+        Sign::Bus9 => sp(
+            &["BUS 9  CAMPUS LOOP", "EVERY 40 MIN", "(IN THEORY)"],
+            [20, 60, 120],
+            [240, 245, 255],
+            [255, 220, 90],
+        ),
+        Sign::ExecHill => sp(
+            &["EXECUTIVE HILL", "PRIVATE ROAD", "VISION HOLDERS ONLY"],
+            [20, 20, 24],
+            [235, 215, 150],
+            [255, 240, 200],
+        ),
+        Sign::Villa => sp(
+            &["THE RETREAT", "BOARD OFFSITE", "IN SESSION SINCE 2015"],
+            [245, 245, 240],
+            [40, 40, 48],
+            [180, 140, 40],
+        ),
+        Sign::SouthGate => sp(
+            &["SYNERGY CAMPUS", "SOUTH GATE", "TAILGATING IS TRACKED"],
+            [20, 40, 70],
+            [240, 245, 255],
+            [120, 220, 255],
+        ),
+        Sign::ToCarPark => sp(
+            &["CAR PARK P3", "2.4 KM THAT WAY", "SHUTTLE: CANCELLED"],
+            [30, 34, 40],
+            [235, 238, 242],
+            [255, 200, 70],
+        ),
+        Sign::Boulevard => sp(
+            &[
+                "SYNERGY BOULEVARD",
+                "NO CARS. NO BIKES.",
+                "VIBES: ENCOURAGED",
+            ],
+            [40, 40, 70],
+            [240, 240, 255],
+            [255, 120, 220],
+        ),
+        Sign::ExecParking => sp(
+            &[
+                "EXECUTIVE PARKING",
+                "RESERVED FOR VISION",
+                "VIOLATORS PROMOTED",
+            ],
+            [20, 20, 24],
+            [235, 215, 150],
+            [255, 90, 80],
+        ),
+        Sign::Padel => sp(
+            &["LEADERSHIP PADEL", "BOOKED UNTIL 2031"],
+            [20, 60, 120],
+            [240, 248, 255],
+            [255, 230, 90],
+        ),
+        Sign::LunchLawn => sp(
+            &["LUNCH LAWN", "EAT AT YOUR DESK", "THIS IS A DESK"],
+            [40, 90, 40],
+            [245, 250, 235],
+            [255, 220, 90],
+        ),
+        Sign::WeWash => sp(
+            &["WEWASH", "LAUNDRY AS A SERVICE", "SPIN CYCLE: SERIES A"],
+            [245, 245, 250],
+            [40, 60, 120],
+            [220, 60, 140],
+        ),
+        Sign::CarParkP3 => sp(
+            &["CAR PARK P3", "EMPLOYEE PARKING", "CAMPUS: 2.4 KM NORTH"],
+            [30, 34, 40],
+            [235, 238, 242],
+            [255, 200, 70],
+        ),
+        Sign::BadgeOffice => sp(
+            &["BADGE OFFICE", "NOW SERVING: 3", "YOU ARE: 4112"],
+            [200, 200, 195],
+            [30, 40, 60],
+            [200, 40, 40],
+        ),
+        Sign::PayDisplay => sp(
+            &[
+                "PAY AND DISPLAY",
+                "EMPLOYEES TOO",
+                "THANK YOU FOR YOUR LOYALTY",
+            ],
+            [20, 70, 140],
+            [240, 245, 255],
+            [255, 220, 90],
+        ),
+        Sign::P3Shuttle => sp(
+            &["P3 SHUTTLE", "SUSPENDED", "SINCE THE LAST REORG"],
+            [20, 90, 130],
+            [240, 248, 255],
+            [255, 90, 80],
+        ),
+        Sign::ToCampusGate => sp(
+            &["TO CAMPUS", "WALKING IS WELLNESS", "(MANDATORY)"],
+            [30, 120, 60],
+            [245, 250, 245],
+            [255, 230, 120],
+        ),
+        Sign::FirstDay => sp(
+            &["FIRST DAY?", "ONBOARDING THIS WAY", "SMILE FOR THE BADGE"],
+            [220, 90, 40],
+            [255, 245, 230],
+            [255, 230, 120],
+        ),
+        Sign::ClampWarning => sp(
+            &["WHEEL CLAMPING", "IN OPERATION", "BY THE CLAMP DRONES"],
             [250, 200, 40],
             [20, 20, 20],
             [180, 30, 30],

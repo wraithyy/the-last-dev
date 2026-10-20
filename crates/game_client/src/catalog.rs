@@ -794,6 +794,244 @@ static TABLE: &[(&str, UnitVisual)] = &[
         ),
     ),
     // ---- campus districts (open world)
+    // ---- Car Park P3 and the newer campus districts
+    (
+        "clamp_drone",
+        v(
+            "prim/drone",
+            1.0,
+            "Parking Enforcement Drone",
+            "<Clamps First>",
+            &[],
+        ),
+    ),
+    (
+        "survey_ambusher",
+        v(
+            CASUAL_F,
+            1.7,
+            "Survey Ambusher",
+            "<Just Five Questions>",
+            &[
+                paint("Shirt", 0.95, 0.6, 0.15),
+                paint("Pants", 0.2, 0.22, 0.3),
+                paint("Hair", 0.55, 0.3, 0.15),
+            ],
+        ),
+    ),
+    (
+        "exit_barrier",
+        v(
+            "prim/parking_barrier",
+            1.4,
+            "The Exit Barrier",
+            "<Gatekeeper of P3>",
+            &[],
+        ),
+    ),
+    (
+        "badge_clerk",
+        v(
+            CASUAL_F,
+            1.68,
+            "Badge Office Clerk",
+            "<Now Serving 3>",
+            &[
+                paint("Shirt", 0.6, 0.62, 0.66),
+                paint("Pants", 0.15, 0.15, 0.2),
+                paint("Hair", 0.3, 0.3, 0.32),
+            ],
+        ),
+    ),
+    (
+        "p3_attendant",
+        v(
+            WORKER,
+            1.8,
+            "Dale",
+            "<Car Park Attendant>",
+            &[
+                paint("Shirt", 0.95, 0.75, 0.1),
+                paint("Pants", 0.2, 0.22, 0.3),
+            ],
+        ),
+    ),
+    (
+        "lanyard_vendor",
+        v(
+            CASUAL2,
+            1.78,
+            "Lanyard Vendor",
+            "<Cash Only>",
+            &[
+                paint("Shirt", 0.2, 0.55, 0.9),
+                paint("Pants", 0.25, 0.2, 0.15),
+            ],
+        ),
+    ),
+    (
+        "rewrite_evangelist",
+        v(
+            CASUAL2,
+            1.82,
+            "Rewrite Evangelist",
+            "<This Time It Will Be Clean>",
+            &[
+                paint("Shirt", 0.85, 0.35, 0.1),
+                paint("Pants", 0.12, 0.12, 0.14),
+                paint("Hair", 0.1, 0.1, 0.1),
+            ],
+        ),
+    ),
+    (
+        "legacy_daemon",
+        v(
+            CASUAL_M,
+            1.75,
+            "Legacy Daemon",
+            "<PID 1, Since 1998>",
+            &[
+                paint("Shirt", 0.2, 0.45, 0.25),
+                paint("Pants", 0.3, 0.3, 0.32),
+                paint("Skin", 0.7, 0.75, 0.7),
+            ],
+        ),
+    ),
+    (
+        "coliving_curator",
+        v(
+            CASUAL3,
+            1.8,
+            "Community Curator",
+            "<Rent Due Weekly>",
+            &[
+                paint("Shirt", 0.95, 0.5, 0.6),
+                paint("Pants", 0.85, 0.82, 0.75),
+            ],
+        ),
+    ),
+    (
+        "estate_security",
+        v(
+            SUIT_M,
+            1.92,
+            "Estate Security",
+            "<Armed With an NDA>",
+            &[
+                paint("Black", 0.06, 0.06, 0.07),
+                paint("Shirt", 0.1, 0.1, 0.12),
+            ],
+        ),
+    ),
+    (
+        "exec_assistant_bot",
+        v(
+            "prim/delivery_robot",
+            1.1,
+            "Executive Assistant Bot",
+            "<Guards the Calendar>",
+            &[],
+        ),
+    ),
+    (
+        "golden_parachute",
+        v(
+            SUIT_M_BALD,
+            2.1,
+            "The Golden Parachute",
+            "<Fails Upward>",
+            &[
+                paint("Black", 0.75, 0.6, 0.15),
+                paint("Shirt", 0.98, 0.95, 0.85),
+            ],
+        ),
+    ),
+    (
+        "legacy_archivist",
+        v(
+            DOC_F,
+            1.68,
+            "Legacy Systems Archivist",
+            "<Knows Where It Is Commented Out>",
+            &[paint("Shirt", 0.45, 0.35, 0.3)],
+        ),
+    ),
+    (
+        "coliving_resident",
+        v(
+            CASUAL_F,
+            1.7,
+            "Taylor",
+            "<Commute: 40 Seconds>",
+            &[
+                paint("Shirt", 0.3, 0.75, 0.65),
+                paint("Pants", 0.25, 0.25, 0.3),
+                paint("Hair", 0.15, 0.1, 0.08),
+            ],
+        ),
+    ),
+    (
+        "villa_steward",
+        v(
+            SUIT_F,
+            1.75,
+            "Villa Steward",
+            "<Polishes the Statue>",
+            &[paint("Black", 0.9, 0.9, 0.92)],
+        ),
+    ),
+    (
+        "founder_guide",
+        v(
+            CASUAL3,
+            1.78,
+            "Founders' Tour Guide",
+            "<Heritage Storyteller>",
+            &[
+                paint("Shirt", 0.9, 0.75, 0.3),
+                paint("Pants", 0.2, 0.25, 0.35),
+            ],
+        ),
+    ),
+    (
+        "villa_guard",
+        v(
+            SUIT_M,
+            1.9,
+            "Gatehouse Guard",
+            "<Salary Band Inspector>",
+            &[
+                paint("Black", 0.12, 0.12, 0.14),
+                paint("Shirt", 0.92, 0.92, 0.95),
+            ],
+        ),
+    ),
+    (
+        "bus_driver",
+        v(
+            WORKER,
+            1.8,
+            "Bus 9 Driver",
+            "<On a Break Since Q2>",
+            &[
+                paint("Shirt", 0.2, 0.35, 0.7),
+                paint("Pants", 0.2, 0.2, 0.25),
+            ],
+        ),
+    ),
+    (
+        "gate_guard",
+        v(
+            WORKER,
+            1.82,
+            "South Gate Guard",
+            "<Badge Readers in Beta>",
+            &[
+                paint("Shirt", 0.15, 0.2, 0.35),
+                paint("Pants", 0.12, 0.12, 0.16),
+            ],
+        ),
+    ),
     (
         "lunch_optimizer",
         v(
@@ -1122,6 +1360,37 @@ static TABLE: &[(&str, UnitVisual)] = &[
                 paint("Shirt", 0.85, 0.85, 0.85),
             ],
         ),
+    ),
+    (
+        "hybrid_worker",
+        v(
+            CASUAL_F,
+            1.72,
+            "Hybrid Worker",
+            "<In for the Coffee>",
+            &[
+                paint("Shirt", 0.95, 0.88, 0.7),
+                paint("Pants", 0.25, 0.3, 0.42),
+                paint("Hair", 0.2, 0.14, 0.1),
+            ],
+        ),
+    ),
+    (
+        "rto_enforcer",
+        v(
+            SUIT_M_BALD,
+            1.84,
+            "Return-to-Office Enforcer",
+            "<Counts Desks, Not Work>",
+            &[
+                paint("Black", 0.18, 0.2, 0.26),
+                paint("Shirt", 0.92, 0.93, 0.96),
+            ],
+        ),
+    ),
+    (
+        "home_cat",
+        v("prim/cat", 0.6, "Mochi", "<Senior Keyboard Inspector>", &[]),
     ),
     (
         "construction_liaison",

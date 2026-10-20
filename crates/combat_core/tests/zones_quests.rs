@@ -95,6 +95,15 @@ impl T {
         self.tick();
     }
 
+    /// New hires get the onboarding ticket from the intern in Car Park P3, then walk up to
+    /// the campus.
+    fn onboard(&mut self) {
+        self.load("parking_p3");
+        self.talk_to("intern");
+        self.accept("onboarding");
+        self.load("campus");
+    }
+
     fn move_to(&mut self, pos: Vec3, yaw: f32) {
         self.sim.push(Command::PlayerMoved {
             pos,
@@ -234,8 +243,8 @@ fn load_zone_spawns_the_campus_and_reports_its_links() {
     });
     assert_eq!(
         hostiles,
-        16 + districts,
-        "8 packs, no boss, the onboarding dummy, the districts"
+        15 + districts,
+        "8 packs, no boss, the districts (the onboarding dummy lives in Car Park P3)"
     );
     for key in ["intern", "facilities_guy", "barista", "smoking_corner_dev"] {
         assert!(t.sim.units().any(|u| u.key == key && !u.hostile), "{key}");
@@ -243,6 +252,7 @@ fn load_zone_spawns_the_campus_and_reports_its_links() {
     assert_eq!(
         links(&t.sim, "campus"),
         [
+            ("parking_p3".to_string(), true),
             ("tower/1".to_string(), true),
             ("datacenter/1".to_string(), false),
             ("lab/1".to_string(), false),
@@ -285,7 +295,7 @@ fn clearing_tower_3_unlocks_the_data_center_and_the_next_floor() {
     assert!(dc.is_some() && next.is_some());
     assert!(t.sim.zone_cleared("tower/3"));
     assert_eq!(
-        links(&t.sim, "campus")[1],
+        links(&t.sim, "campus")[2],
         ("datacenter/1".to_string(), true)
     );
     assert_eq!(
@@ -395,13 +405,19 @@ fn onboarding_accept_progress_ready_turn_in() {
     // Too far from the intern: ignored.
     t.accept("onboarding");
     assert_eq!(t.sim.quest_status("onboarding"), QuestStatus::Available);
+    // The campus intern has nothing to give a new hire: the ticket comes from P3.
+    t.talk_to("intern");
+    t.accept("onboarding");
+    assert_eq!(t.sim.quest_status("onboarding"), QuestStatus::Available);
 
+    t.load("parking_p3");
     t.talk_to("intern");
     assert!(
-        t.has(|e| matches!(e, Event::QuestOffered { quests, .. } if quests == &["onboarding"]))
+        t.has(|e| matches!(e, Event::QuestOffered { quests, .. } if quests.iter().any(|q| q == "onboarding")))
     );
     t.accept("onboarding");
     assert!(t.has(|e| matches!(e, Event::QuestAccepted { quest } if quest == "onboarding")));
+    t.load("campus");
     assert_eq!(t.sim.quest_status("onboarding"), QuestStatus::Active);
     // Turning in early does nothing.
     t.turn_in("onboarding");
@@ -414,8 +430,11 @@ fn onboarding_accept_progress_ready_turn_in() {
     )));
     assert!(t.has(|e| matches!(e, Event::QuestReady { quest } if quest == "onboarding")));
     assert_eq!(t.sim.quest_status("onboarding"), QuestStatus::Ready);
-    // Ready quests are turned in at the giver, not here.
-    t.turn_in("onboarding");
+    // Ready quests are turned in at the intern, not here.
+    t.quest_cmd(Command::TurnInQuest {
+        quest: "onboarding".into(),
+        choice: 0,
+    });
     assert_eq!(t.sim.quest_status("onboarding"), QuestStatus::Ready);
 
     t.log.clear();
@@ -431,12 +450,12 @@ fn onboarding_accept_progress_ready_turn_in() {
     let xp = t
         .log
         .iter()
-        .position(|e| matches!(e, Event::XpGained { amount: 40, .. }));
+        .position(|e| matches!(e, Event::XpGained { amount: 60, .. }));
     assert!(done.is_some() && done < xp);
     assert_eq!(t.sim.quest_status("onboarding"), QuestStatus::Done);
     assert_eq!(t.sim.quests().completed, ["onboarding"]);
     assert!(t.sim.quests().active.is_empty());
-    assert_eq!(t.sim.unit(t.p).map(|u| u.xp), Some(40));
+    assert_eq!(t.sim.unit(t.p).map(|u| u.xp), Some(60));
     // The chain opens; level-gated quests stay locked.
     assert_eq!(
         t.sim.quest_status("badge_access_denied"),
@@ -482,8 +501,7 @@ fn kill_credit_counts_only_matching_units_and_caps_at_need() {
     // Fire Exit Strategy needs onboarding first.
     t.accept("fire_exit_strategy");
     assert!(t.sim.quests().active.is_empty());
-    t.talk_to("intern");
-    t.accept("onboarding");
+    t.onboard();
     t.talk_to("facilities_guy");
     t.talk_to("intern");
     t.turn_in("onboarding");
@@ -779,7 +797,8 @@ fn area(zone: &str) -> &str {
 
 /// Campaign order of the zones (`playthrough.rs` WORLD_ORDER); 0 for zones off the path.
 fn campaign_rank(zone: &str) -> usize {
-    const ORDER: [&str; 10] = [
+    const ORDER: [&str; 11] = [
+        "parking_p3",
         "campus",
         "tower/1",
         "tower/2",
@@ -802,7 +821,10 @@ fn every_quest_is_given_where_its_work_happens() {
         if q.is_breadcrumb() {
             // A breadcrumb points at the next zone's giver, who also takes it.
             let to = &q.ender().zone;
-            assert_ne!(*to, q.giver.zone, "{}: breadcrumb to its own zone", q.id);
+            // Open-world breadcrumbs lead from one campus district's giver to the next.
+            if !q.open_world {
+                assert_ne!(*to, q.giver.zone, "{}: breadcrumb to its own zone", q.id);
+            }
             for o in &q.objectives {
                 assert_eq!(c.objective_zones(o), [to.as_str()], "{}", q.id);
             }
@@ -1015,8 +1037,7 @@ fn a_gear_reward_waits_for_a_free_bag_slot() {
 fn a_breadcrumb_is_turned_in_at_the_next_zones_giver() {
     let mut t = t(5);
     t.load("campus");
-    t.talk_to("intern");
-    t.accept("onboarding");
+    t.onboard();
     t.talk_to("facilities_guy");
     t.talk_to("intern");
     t.turn_in("onboarding");

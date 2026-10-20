@@ -5,15 +5,19 @@
 //! cast side by side on a bare stage instead.
 
 mod campus;
+pub mod carpark;
 mod client;
 pub mod corporate;
 mod datacenter;
 mod districts;
+mod dressing;
 #[cfg(test)]
 mod export;
+mod frontier;
 mod kit;
 mod lab;
 mod layout;
+mod models;
 mod office;
 mod offsite;
 mod props;
@@ -33,6 +37,11 @@ pub use layout::{FloorLayout, elevator_exit_trigger};
 pub use textures::{icon_image, z_image};
 pub use zones::{build_zone, door_trigger};
 
+/// Piece types the map draws roads and water from.
+pub mod kit_for_map {
+    pub use super::kit::{Mat, Piece, PrimKind};
+}
+
 /// The desk kit the Reorg moves around at run time (`minigame.rs`).
 pub mod furniture {
     pub use super::kit::{DESK, KEYBOARD, SCREEN};
@@ -48,8 +57,7 @@ pub fn spawn_model(
     yaw: f32,
 ) -> Entity {
     let s = FURNITURE_SCALE;
-    let scene = assets
-        .load(GltfAssetLabel::Scene(0).from_asset(format!("models/furniture/{}.glb", model.file)));
+    let scene = assets.load(GltfAssetLabel::Scene(0).from_asset(model.path()));
     let offset = Vec3::new(
         -(model.lo[0] + model.size[0] / 2.0),
         0.0,
@@ -74,7 +82,7 @@ pub fn model_size(model: &kit::Model) -> Vec3 {
     Vec3::from(model.size) * FURNITURE_SCALE
 }
 
-use crate::arena::{Colliders, FlatDecor};
+use crate::arena::{Colliders, FlatDecor, Ground};
 use crate::config::WALL_HEIGHT;
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::VisibilityRange;
@@ -246,6 +254,7 @@ fn load_floor(
     assets: Res<AssetServer>,
     mut colliders: ResMut<Colliders>,
     mut decor: ResMut<FlatDecor>,
+    mut ground: ResMut<Ground>,
     mut look: Look,
     mut blink: ResMut<BlinkMats>,
     bare: Option<Res<BareStage>>,
@@ -294,6 +303,7 @@ fn load_floor(
         layout.blockers.clone()
     };
     decor.0 = layout::flat_decor(&layout.pieces);
+    ground.0 = layout.terrain.clone();
 
     let runs = layout.footprint.floor_runs();
     let floor = materials.add(StandardMaterial {
@@ -307,9 +317,14 @@ fn load_floor(
         ..default()
     });
     // Own meshes (not the shared unit cube) so the floor and ceiling UVs tile in metres.
+    let floor_mesh = if layout.terrain.is_flat() {
+        flat_mesh(&runs, 0.0, true)
+    } else {
+        terrain_mesh(&runs, &layout.terrain)
+    };
     commands.spawn((
         FloorEntity,
-        Mesh3d(meshes.add(flat_mesh(&runs, 0.0, true))),
+        Mesh3d(meshes.add(floor_mesh)),
         MeshMaterial3d(floor),
     ));
     // Ceiling is single-sided (culled from above, so the overview camera sees through it).
@@ -394,10 +409,7 @@ fn load_floor(
                 ..
             } => {
                 let s = FURNITURE_SCALE * scale;
-                let scene = assets.load(
-                    GltfAssetLabel::Scene(0)
-                        .from_asset(format!("models/furniture/{}.glb", model.file)),
-                );
+                let scene = assets.load(GltfAssetLabel::Scene(0).from_asset(model.path()));
                 let offset = Vec3::new(
                     -(model.lo[0] + model.size[0] / 2.0),
                     0.0,
@@ -463,13 +475,14 @@ fn load_floor(
                 yaw,
                 size,
                 mat,
+                pitch,
             } => {
                 let mut e = commands.spawn((
                     FloorEntity,
                     Mesh3d(unit_cube.clone()),
                     MeshMaterial3d(get_mat(&mut mats, &mut materials, t, *mat)),
                     Transform::from_translation(*center)
-                        .with_rotation(Quat::from_rotation_y(*yaw))
+                        .with_rotation(Quat::from_rotation_y(*yaw) * Quat::from_rotation_z(*pitch))
                         .with_scale(*size),
                 ));
                 finish(&mut e, *size, Some(*mat));
@@ -586,6 +599,51 @@ fn flat_mesh(runs: &[(f32, f32, f32, f32)], y: f32, up: bool) -> Mesh {
         [0.0, -1.0, 0.0]
     };
     let normals = vec![n; pos.len()];
+    mesh_from(pos, normals, uv, idx)
+}
+
+/// Grid size of the ground mesh: fine enough for the river banks and plaza ramps, coarse
+/// enough to stay one cheap draw call on WebGL2.
+const TERRAIN_CELL_M: f32 = 3.0;
+
+/// The ground over the bounds of the floor runs as one height-mapped grid (UVs in metres, like
+/// `flat_mesh`). It follows `Terrain::surface`, so river beds stay open under the bridges.
+fn terrain_mesh(runs: &[(f32, f32, f32, f32)], t: &combat_core::Terrain) -> Mesh {
+    let (mut x0, mut x1, mut z0, mut z1) = (f32::MAX, f32::MIN, f32::MAX, f32::MIN);
+    for &(a, b, c, d) in runs {
+        (x0, x1, z0, z1) = (x0.min(a), x1.max(b), z0.min(c), z1.max(d));
+    }
+    if x0 > x1 {
+        return flat_mesh(runs, 0.0, true);
+    }
+    let nx = ((x1 - x0) / TERRAIN_CELL_M).ceil().max(1.0) as u32;
+    let nz = ((z1 - z0) / TERRAIN_CELL_M).ceil().max(1.0) as u32;
+    let (sx, sz) = ((x1 - x0) / nx as f32, (z1 - z0) / nz as f32);
+    let (mut pos, mut normals, mut uv) = (Vec::new(), Vec::new(), Vec::new());
+    for j in 0..=nz {
+        for i in 0..=nx {
+            let (x, z) = (x0 + i as f32 * sx, z0 + j as f32 * sz);
+            pos.push([x, t.surface(x, z), z]);
+            let e = 0.75;
+            let n = Vec3::new(
+                t.surface(x - e, z) - t.surface(x + e, z),
+                2.0 * e,
+                t.surface(x, z - e) - t.surface(x, z + e),
+            )
+            .normalize_or(Vec3::Y);
+            normals.push(n.to_array());
+            uv.push([x, z]);
+        }
+    }
+    let row = nx + 1;
+    let mut idx = Vec::with_capacity((nx * nz * 6) as usize);
+    for j in 0..nz {
+        for i in 0..nx {
+            let a = j * row + i;
+            let (b, c, d) = (a + row, a + row + 1, a + 1);
+            idx.extend([a, b, c, a, c, d]);
+        }
+    }
     mesh_from(pos, normals, uv, idx)
 }
 

@@ -22,6 +22,8 @@ pub const FURNITURE_SCALE: f32 = 2.4;
 /// The model front is +Z.
 #[derive(Debug)]
 pub struct Model {
+    /// Folder under `assets/models/` (the pack).
+    pub dir: &'static str,
     pub file: &'static str,
     /// Minimum x and z of the box.
     pub lo: [f32; 2],
@@ -31,7 +33,26 @@ pub struct Model {
 
 impl Model {
     const fn new(file: &'static str, lo: [f32; 2], size: [f32; 3]) -> Self {
-        Self { file, lo, size }
+        Self {
+            dir: "furniture",
+            file,
+            lo,
+            size,
+        }
+    }
+
+    /// A model from another Kenney pack (`floors::models`).
+    pub const fn kit(dir: &'static str, file: &'static str, lo: [f32; 2], size: [f32; 3]) -> Self {
+        Self {
+            dir,
+            file,
+            lo,
+            size,
+        }
+    }
+
+    pub fn path(&self) -> String {
+        format!("models/{}/{}.glb", self.dir, self.file)
     }
 }
 
@@ -250,6 +271,8 @@ pub enum Mat {
     Sand,
     /// Office windows: dark glass by day, lit after dusk (`live::daynight` drives the glow).
     Window,
+    /// Deep water (lake, river): darker and glossier than the plaza pond's `Water`.
+    Lake,
 }
 
 /// Procedurally drawn textures (see `textures.rs`); several carry short text
@@ -472,6 +495,32 @@ pub enum Sign {
     TruckMenu,
     PitchBooth,
     HardHat,
+    // The bigger campus (`districts.rs`, `frontier.rs`) and Car Park P3 (`carpark.rs`).
+    Creek,
+    JoggingLoop,
+    OverflowLot,
+    OldCampus,
+    LegacyDepot,
+    Building1,
+    FoundersTerrace,
+    CoLiving,
+    Bus9,
+    ExecHill,
+    Villa,
+    SouthGate,
+    ToCarPark,
+    Boulevard,
+    ExecParking,
+    Padel,
+    LunchLawn,
+    WeWash,
+    CarParkP3,
+    BadgeOffice,
+    PayDisplay,
+    P3Shuttle,
+    ToCampusGate,
+    FirstDay,
+    ClampWarning,
 }
 
 #[derive(Clone, Debug)]
@@ -510,6 +559,8 @@ pub enum Piece {
         yaw: f32,
         size: Vec3,
         mat: Mat,
+        /// Tilt about the local Z axis (raises local +X): ramps on sloped ground.
+        pitch: f32,
     },
     /// Vertical band along curved walls, `inset` metres in front of the wall face.
     Run {
@@ -597,6 +648,8 @@ pub struct Plan {
     pub seats: Vec<SeatSpot>,
     /// Wall and ceiling height for big halls; 0 keeps the standard `H`.
     pub ceiling: f32,
+    /// Uneven ground (outdoor zones); `assemble` sets everything placed on it down on it.
+    pub terrain: combat_core::Terrain,
     frame: Vec<(Vec3, f32)>,
 }
 
@@ -792,11 +845,17 @@ impl Plan {
     }
 
     pub fn slab(&mut self, center: Vec3, yaw: f32, size: Vec3, mat: Mat) {
+        self.slab_pitched(center, yaw, 0.0, size, mat);
+    }
+
+    /// A slab tilted along its length (local X), for road on a ramp.
+    pub fn slab_pitched(&mut self, center: Vec3, yaw: f32, pitch: f32, size: Vec3, mat: Mat) {
         self.pieces.push(Piece::Slab {
             center,
             yaw,
             size,
             mat,
+            pitch,
         });
     }
 

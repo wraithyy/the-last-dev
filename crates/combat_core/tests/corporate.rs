@@ -1168,3 +1168,279 @@ fn an_open_space_group_defends_on_its_own_and_adds_up() {
     assert!(rb.catches > 0 && ra.catches == 0);
     assert_eq!(r[1].group_score, r[0].score + r[1].score);
 }
+
+// ---- Stay Green ----
+
+use combat_core::corporate::stay_green::{LAYOUT_CAT, LAYOUT_JIGGLER, LAYOUT_MUTED};
+
+const DESK: (f32, f32) = (0.0, 0.0);
+const LAUNDRY: (f32, f32) = (6.0, 0.0);
+const DOOR: (f32, f32) = (-10.0, 0.0);
+
+fn home_venue() -> Anchors {
+    Box::new(|n: &str| match n {
+        "player_spawn" | "graveyard" => at(0.0, 0.5),
+        "desk" => at(DESK.0, DESK.1),
+        "laundry" => at(LAUNDRY.0, LAUNDRY.1),
+        "door" => at(DOOR.0, DOOR.1),
+        "cat_bed" => at(3.0, 3.0),
+        "cat_desk" => at(0.3, -0.3),
+        _ => None,
+    })
+}
+
+fn green_view(sim: &Sim, p: EntityId) -> (u8, String) {
+    let v = view(sim, p);
+    let g = v.gauges.first().cloned().unwrap_or_default();
+    (g.value, g.label)
+}
+
+/// A diligent home worker reading only the HUD: desk chores from the laptop, walk chores in
+/// person (the bits say which station waits), no jiggler.
+fn diligent(sim: &mut Sim, p: EntityId) -> Vec<Event> {
+    let Some(v) = sim.minigame_view(p).cloned() else {
+        return run(sim, 1);
+    };
+    let text = v.card.as_ref().map(|c| c.text.clone()).unwrap_or_default();
+    let muted = v.layout & LAYOUT_MUTED != 0;
+    let mut out = Vec::new();
+    let tap = |sim: &mut Sim, option: u8| {
+        sim.apply_as(p, Command::MinigamePick { seq: 1, option });
+    };
+    move_to(sim, p, DESK.0, DESK.1);
+    if v.layout & LAYOUT_CAT != 0 {
+        tap(sim, 1);
+    }
+    if (text.contains("drilling") && !muted) || (text.contains("on mute") && muted) {
+        tap(sim, 2);
+    }
+    if text.contains("Quick question") {
+        tap(sim, 3);
+    }
+    let station = [LAUNDRY, DOOR]
+        .into_iter()
+        .enumerate()
+        .find(|(k, _)| v.layout & (1 << k) != 0);
+    if let Some((_, (x, z))) = station {
+        move_to(sim, p, x, z);
+    }
+    out.extend(sim.tick());
+    out
+}
+
+fn play(sim: &mut Sim, p: EntityId, ticks: u32) -> Vec<Event> {
+    let mut out = Vec::new();
+    for _ in 0..ticks {
+        if !ended(&out).is_empty() {
+            break;
+        }
+        out.extend(diligent(sim, p));
+    }
+    out
+}
+
+#[test]
+fn stay_green_starts_green_with_the_laptop_card() {
+    let (mut sim, ids) = on_campus(1);
+    let p = ids[0];
+    let events = enter(&mut sim, p, "stay_green", &home_venue());
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, Event::MinigameStarted { key, .. } if key == "stay_green"))
+    );
+    hold(&mut sim, p, 0.0, 0.0, SECOND);
+    let v = view(&sim, p);
+    let card = v.card.clone().unwrap_or_default();
+    assert_eq!(card.options.len(), 4);
+    assert!(card.options[0].starts_with("Mouse jiggler"), "{card:?}");
+    assert_eq!(card.options[2], "Mute");
+    assert!(v.lines[0].starts_with("Status: Available"), "{:?}", v.lines);
+    assert_eq!(green_view(&sim, p), (100, "Teams: Available".into()));
+}
+
+#[test]
+fn away_from_the_laptop_the_status_decays_and_the_manager_asks() {
+    let (mut sim, ids) = on_campus(1);
+    let p = ids[0];
+    enter(&mut sim, p, "stay_green", &home_venue());
+    let events = hold(&mut sim, p, 20.0, 20.0, 6 * SECOND);
+    let (value, label) = green_view(&sim, p);
+    assert!(value < 50, "{value}");
+    assert_eq!(label, "Teams: Away");
+    assert!(
+        notes(&events, p)
+            .iter()
+            .any(|n| n.0.contains("status turns yellow")),
+        "{:?}",
+        notes(&events, p)
+    );
+    // The question comes a moment later and waits for a reply nobody gives.
+    let events = hold(&mut sim, p, 20.0, 20.0, 4 * SECOND);
+    assert!(
+        notes(&events, p)
+            .iter()
+            .any(|n| n.0.starts_with("Your manager: \"Quick question"))
+    );
+    let events = hold(&mut sim, p, 20.0, 20.0, 11 * SECOND);
+    assert!(!notes(&events, p).is_empty());
+    assert!(view(&sim, p).catches >= 1, "the ignored question counts");
+    // Back at the laptop the meter climbs again.
+    hold(&mut sim, p, 0.0, 0.0, 3 * SECOND);
+    assert_eq!(green_view(&sim, p).1, "Teams: Available");
+}
+
+#[test]
+fn chores_arrive_on_schedule_and_are_done_or_missed() {
+    let (mut sim, ids) = on_campus(1);
+    let p = ids[0];
+    enter(&mut sim, p, "stay_green", &home_venue());
+    hold(&mut sim, p, 0.0, 0.0, 13 * SECOND);
+    let v = view(&sim, p);
+    assert!(
+        v.layout & LAYOUT_CAT != 0,
+        "the cat sits on the keyboard at 12 s"
+    );
+    let cat = sim
+        .units()
+        .find(|u| u.key == "home_cat")
+        .map(|u| (u.pos.x, u.pos.z));
+    assert_eq!(cat, Some((0.3, -0.3)), "the cat moved onto the desk");
+    // Lifting the cat from across the flat does nothing.
+    move_to(&mut sim, p, 20.0, 20.0);
+    run(&mut sim, 1);
+    let events = pick(&mut sim, p, 1);
+    assert!(notes(&events, p).iter().any(|n| !n.1));
+    let events = hold(&mut sim, p, 0.0, 0.0, 1);
+    assert!(events.is_empty() || view(&sim, p).collected == 0);
+    let events = pick(&mut sim, p, 1);
+    assert!(notes(&events, p).iter().any(|n| n.1));
+    assert_eq!(view(&sim, p).collected, 1);
+    // At 46 s the laundry (25 s) and the drill (45 s) both wait; muting solves the drill.
+    hold(&mut sim, p, 0.0, 0.0, 33 * SECOND);
+    let v = view(&sim, p);
+    let text = v.card.as_ref().map(|c| c.text.clone()).unwrap_or_default();
+    assert!(
+        text.contains("drilling") && text.contains("laundry"),
+        "{text}"
+    );
+    assert!(v.layout & 1 != 0, "the laundry station is marked");
+    pick(&mut sim, p, 2);
+    run(&mut sim, 1);
+    let v = view(&sim, p);
+    assert!(v.layout & LAYOUT_MUTED != 0);
+    assert_eq!(
+        v.card.map(|c| c.options[2].clone()).as_deref(),
+        Some("Unmute")
+    );
+    assert_eq!(view(&sim, p).collected, 2);
+    // Ignoring the laundry past its 30 s deadline misses it.
+    let events = hold(&mut sim, p, 0.0, 0.0, 10 * SECOND);
+    assert!(
+        notes(&events, p)
+            .iter()
+            .any(|n| !n.1 && n.0.contains("laundry")),
+        "{:?}",
+        notes(&events, p)
+    );
+    assert_eq!(view(&sim, p).catches, 1);
+}
+
+#[test]
+fn the_jiggler_holds_the_status_until_it_scans() {
+    let (mut sim, ids) = on_campus(1);
+    let p = ids[0];
+    enter(&mut sim, p, "stay_green", &home_venue());
+    hold(&mut sim, p, 0.0, 0.0, 57 * SECOND);
+    let v = view(&sim, p);
+    assert!(
+        v.card
+            .as_ref()
+            .is_some_and(|c| c.text.contains("IT security scan in")),
+        "the 62 s scan is announced: {:?}",
+        v.card
+    );
+    pick(&mut sim, p, 0);
+    assert!(view(&sim, p).layout & LAYOUT_JIGGLER != 0);
+    hold(&mut sim, p, 20.0, 20.0, 4 * SECOND);
+    assert_eq!(
+        green_view(&sim, p).0,
+        100,
+        "the jiggler holds the meter away"
+    );
+    let events = hold(&mut sim, p, 20.0, 20.0, 3 * SECOND);
+    let n = notes(&events, p);
+    assert!(n.iter().any(|x| !x.1 && x.0.starts_with("IT:")), "{n:?}");
+    let v = view(&sim, p);
+    assert!(v.lines[1].ends_with("IT flags 1"), "{:?}", v.lines);
+    assert_eq!(green_view(&sim, p).1, "Teams: Away");
+    assert!(v.layout & LAYOUT_JIGGLER == 0);
+    assert!(n.iter().any(|x| x.0.contains("yellow")), "{n:?}");
+}
+
+#[test]
+fn a_clean_green_day_takes_gold_the_title_and_the_hoodie_once() {
+    let (mut sim, ids) = on_campus(1);
+    let p = ids[0];
+    enter(&mut sim, p, "stay_green", &home_venue());
+    let events = play(&mut sim, p, 200 * SECOND);
+    let r = ended(&events);
+    assert_eq!(r.len(), 1, "{:?}", notes(&events, p));
+    assert_eq!(r[0].catches, 0, "{:?}", notes(&events, p));
+    assert!(r[0].collected >= 10, "{:?}", r[0]);
+    assert_eq!(r[0].medal, Some(Medal::Gold), "{:?}", r[0]);
+    assert!(
+        r[0].summary.starts_with("Green for 180 of 180 s"),
+        "{}",
+        r[0].summary
+    );
+    assert_eq!(
+        r[0].items,
+        vec!["Webcam Hoodie (Sweatpants Implied)".to_string()]
+    );
+    assert!(has_achievement(&sim, p, "status_green"));
+    back_to_campus(&mut sim);
+    enter(&mut sim, p, "stay_green", &home_venue());
+    let again = ended(&play(&mut sim, p, 200 * SECOND));
+    assert_eq!(again[0].medal, Some(Medal::Gold));
+    assert!(again[0].items.is_empty());
+    assert_eq!(bag_count(&sim, p, "Webcam Hoodie (Sweatpants Implied)"), 1);
+}
+
+#[test]
+fn a_day_of_ignored_chores_still_ends_with_a_lower_medal() {
+    let (mut sim, ids) = on_campus(1);
+    let p = ids[0];
+    enter(&mut sim, p, "stay_green", &home_venue());
+    let r = ended(&hold(&mut sim, p, 0.0, 0.0, 200 * SECOND));
+    assert_eq!(r.len(), 1);
+    assert!(r[0].catches >= 8, "{:?}", r[0]);
+    assert!(r[0].medal.is_some_and(|m| m < Medal::Gold), "{:?}", r[0]);
+}
+
+#[test]
+fn a_home_office_group_adds_up() {
+    let (mut sim, ids) = on_campus(2);
+    let (a, b) = (ids[0], ids[1]);
+    enter(&mut sim, a, "stay_green", &home_venue());
+    // A does the chores; B sits at the laptop and ignores the flat.
+    let mut events = Vec::new();
+    for _ in 0..200 * SECOND {
+        if ended(&events).len() == 2 {
+            break;
+        }
+        move_to(&mut sim, b, 0.5, 0.0);
+        events.extend(diligent(&mut sim, a));
+    }
+    let r = ended(&events);
+    assert_eq!(r.len(), 2);
+    let (ra, rb) = if r[0].unit == a {
+        (&r[0], &r[1])
+    } else {
+        (&r[1], &r[0])
+    };
+    assert!(!ra.quit && !rb.quit);
+    assert!(ra.score > rb.score, "{} vs {}", ra.score, rb.score);
+    assert!(rb.catches > ra.catches);
+    assert_eq!(r[1].group_score, r[0].score + r[1].score);
+}

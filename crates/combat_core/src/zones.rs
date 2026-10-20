@@ -230,6 +230,7 @@ impl Sim {
                 s.yaw = yaw;
             }
         }
+        self.terrain = self.zone_terrains.get(id).cloned().unwrap_or_default();
         self.blockers = blockers;
         self.rebuild_nav();
         if let Some(prev) = self.zone.take().filter(|p| p != id) {

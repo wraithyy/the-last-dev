@@ -1,6 +1,6 @@
 //! The Company Calendar's minigames (E5 task 5.1), on the `minigame.rs` frame: Performance
 //! Review (`review`), Reorg (`reorg`), Tool Migration (`migration`), Hackathon (`hackathon`)
-//! and Open-Space Focus (`focus`). Each member plays their own run and the group score adds
+//! Open-Space Focus (`focus`) and Stay Green (`stay_green`). Each member plays their own run and the group score adds
 //! up, as in Teambuilding. Decisions go through one choice card (`Card`, answered with
 //! `Command::MinigamePick`), progress through the header's lines and gauges, and moments
 //! through routed notes; the venues are small zones with friendly units.
@@ -10,6 +10,7 @@ pub mod hackathon;
 pub mod migration;
 pub mod reorg;
 pub mod review;
+pub mod stay_green;
 
 use crate::geom::Vec3;
 use crate::minigame::{GameRun, MinigameView, Rules};
@@ -28,6 +29,7 @@ pub(crate) enum Stage {
     Migration(migration::Stage),
     Hackathon(hackathon::Stage),
     Focus(focus::Stage),
+    StayGreen(stay_green::Stage),
 }
 
 /// What a game asks the frame to do for one run.
@@ -84,6 +86,7 @@ pub(crate) fn view(
             r.view(d, s, now, base)
         }
         (GameRun::Focus(r), Rules::Focus(d), Stage::Focus(s)) => r.view(d, s, now, base),
+        (GameRun::StayGreen(r), Rules::StayGreen(d), _) => r.view(d, base),
         _ => base,
     }
 }
@@ -168,6 +171,14 @@ impl Sim {
                     make: Box::new(|_| GameRun::Focus(focus::Run::default())),
                 }
             }
+            Rules::StayGreen(r) => none(
+                Box::new(|_| GameRun::StayGreen(stay_green::Run::default())),
+                Stage::StayGreen(stay_green::Stage::resolve(
+                    r,
+                    anchors,
+                    self.first_unit("home_cat"),
+                )?),
+            ),
         })
     }
 
@@ -199,6 +210,7 @@ impl Sim {
             Some(Rules::Migration(_)) => self.update_migration(),
             Some(Rules::Hackathon(_)) => self.update_hackathon(),
             Some(Rules::Focus(_)) => self.update_focus(),
+            Some(Rules::StayGreen(_)) => self.update_stay_green(),
             Some(Rules::Teambuilding(_)) | None => {}
         }
     }
@@ -219,6 +231,7 @@ impl Sim {
             Some(Rules::Migration(_)) => self.migration_pick(actor, seq, option),
             Some(Rules::Hackathon(_)) => self.hackathon_pick(actor, seq, option),
             Some(Rules::Focus(_)) => self.focus_pick(actor, seq, option),
+            Some(Rules::StayGreen(_)) => self.stay_green_pick(actor, seq, option),
             Some(Rules::Teambuilding(_)) | None => Vec::new(),
         };
         self.apply_fx(actor, fx);
@@ -239,6 +252,7 @@ impl Sim {
             (GameRun::Migration(r), Some(Rules::Migration(d))) => r.summary(d),
             (GameRun::Hackathon(r), Some(Rules::Hackathon(d))) => r.summary(d),
             (GameRun::Focus(r), Some(Rules::Focus(d))) => r.summary(d),
+            (GameRun::StayGreen(r), Some(Rules::StayGreen(d))) => r.summary(d),
             _ => String::new(),
         }
     }

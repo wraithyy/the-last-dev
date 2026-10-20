@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use combat_core::{Aabb, Content, Sim, Vec3};
+use combat_core::{Aabb, Content, Sim, Terrain, Vec3};
 use serde::Deserialize;
 
 const EMBEDDED_CONTENT: &str = include_str!("../../../content/game.ron");
@@ -18,12 +18,13 @@ const EMBEDDED_GEOMETRY: &str = include_str!("../../../content/zone_geometry.ron
 const STEP_HEIGHT: f32 = 0.3;
 const BODY_HEIGHT: f32 = 1.8;
 /// Every layout fits in this rectangle (game_client `FLOOR_HALF_X/Z`).
-const HALF_X: f32 = 112.0;
-const HALF_Z: f32 = 82.0;
+const HALF_X: f32 = 234.0;
+const HALF_Z: f32 = 168.0;
 const BOUNDS_MARGIN: f32 = 1.0;
-/// The server owns height: zones are flat floors at y = 0, so a claimed y only has to fit the
-/// jump arc (`JUMP_SPEED^2 / 2 GRAVITY` = 1.28 m in the client) plus slack. A larger window
-/// would let a client lift itself over walls, because blockers are tested at the claimed y.
+/// The server owns height: a claimed y is measured from the zone's ground (`Terrain`, flat
+/// y = 0 indoors) and only has to fit the jump arc (`JUMP_SPEED^2 / 2 GRAVITY` = 1.28 m in the
+/// client) plus slack. A larger window would let a client lift itself over walls, because
+/// blockers are tested at the claimed y.
 const MAX_Y: f32 = 1.5;
 const MIN_Y: f32 = -0.1;
 /// Boxes shrink by this for the movement segment test, so sliding along a wall or rounding a
@@ -39,6 +40,8 @@ struct RawZone {
     blockers: Vec<(P3, P3)>,
     triggers: Vec<(String, P3, P3)>,
     arrivals: Vec<(String, P3, f32)>,
+    #[serde(default)]
+    terrain: Terrain,
 }
 
 fn v(p: P3) -> Vec3 {
@@ -60,6 +63,7 @@ pub struct ZoneGeom {
     arrivals: HashMap<String, (Vec3, f32)>,
     /// min x, max x, min z, max z
     bounds: [f32; 4],
+    pub terrain: Terrain,
 }
 
 impl ZoneGeom {
@@ -99,6 +103,7 @@ impl ZoneGeom {
                 .map(|(n, p, y)| (n, (v(p), y)))
                 .collect(),
             bounds,
+            terrain: r.terrain,
         }
     }
 
@@ -114,10 +119,16 @@ impl ZoneGeom {
         self.arrivals.get(from).copied()
     }
 
-    /// Inside the zone's walls and at a height a jump can reach from the floor.
+    /// Inside the zone's walls and at a height a jump can reach from the ground there.
     pub fn in_bounds(&self, p: Vec3) -> bool {
         let [x0, x1, z0, z1] = self.bounds;
-        (x0..=x1).contains(&p.x) && (z0..=z1).contains(&p.z) && (MIN_Y..=MAX_Y).contains(&p.y)
+        let above = p.y - self.ground(p.x, p.z);
+        (x0..=x1).contains(&p.x) && (z0..=z1).contains(&p.z) && (MIN_Y..=MAX_Y).contains(&above)
+    }
+
+    /// Walkable ground height, the same function the sim and the client use.
+    pub fn ground(&self, x: f32, z: f32) -> f32 {
+        self.terrain.height(x, z)
     }
 
     /// The feet point is inside a box the body cannot stand in. The client keeps its centre
@@ -233,6 +244,7 @@ impl World {
         arrival: Option<(Vec3, f32)>,
     ) -> Result<(), String> {
         let g = self.zone(zone).ok_or("no geometry")?;
+        sim.set_zone_terrain(zone, g.terrain.clone());
         let anchors = |name: &str| match (name, arrival) {
             ("player_spawn", Some(a)) => Some(a),
             _ => g.anchor(name),
@@ -294,6 +306,7 @@ mod tests {
             triggers: HashMap::new(),
             arrivals: HashMap::new(),
             bounds: [-10.0, 10.0, -10.0, 10.0],
+            terrain: Terrain::default(),
         };
         let p = |x: f32, z: f32| Vec3::new(x, 0.0, z);
         // Both ends are legal, the line between them is not.
@@ -308,6 +321,44 @@ mod tests {
         assert!(g.segment_blocked(p(-0.5, 0.0), air));
         assert!(segment_hits_xz(&wall, p(0.0, -9.0), p(0.0, 9.0), 0.0));
         assert!(!segment_hits_xz(&wall, p(0.3, -9.0), p(0.3, 9.0), 0.0));
+    }
+
+    #[test]
+    fn the_server_and_the_sim_agree_on_the_ground_and_heights_are_checked_against_it() {
+        let w = World::embedded().unwrap();
+        for zone in ["campus", "parking_p3"] {
+            let g = w.zone(zone).unwrap();
+            assert!(!g.terrain.is_flat(), "{zone} has terrain");
+            let mut sim = Sim::new(w.content.clone(), 1);
+            sim.spawn_player("fullstack", Vec3::new(0.0, 0.0, 0.0), 0.0);
+            w.load(&mut sim, zone, None).unwrap();
+            let [x0, x1, z0, z1] = g.bounds;
+            let mut uneven = 0;
+            for i in 0..=60 {
+                for j in 0..=60 {
+                    let x = x0 + (x1 - x0) * i as f32 / 60.0;
+                    let z = z0 + (z1 - z0) * j as f32 / 60.0;
+                    let (server, sim_y) = (g.ground(x, z), sim.ground_at(x, z));
+                    assert_eq!(server.to_bits(), sim_y.to_bits(), "{zone} at {x},{z}");
+                    uneven += usize::from(server.abs() > 0.5);
+                }
+            }
+            assert!(uneven > 10, "{zone}: only {uneven} raised samples");
+            // Every unit the sim placed stands on that ground (or on a seat above it).
+            sim.tick();
+            for u in sim.units().filter(|u| !u.hostile || u.alive) {
+                let ground = g.ground(u.pos.x, u.pos.z);
+                assert!(u.pos.y >= ground - 1e-3, "{zone}: {} below ground", u.key);
+            }
+        }
+        // Executive Hill: standing on top is legal, the same point at the datum is not.
+        let campus = w.zone("campus").unwrap();
+        let top = Vec3::new(203.0, campus.ground(203.0, 142.0), 142.0);
+        assert!(top.y > 6.0, "hilltop at {}", top.y);
+        assert!(campus.in_bounds(top));
+        assert!(campus.in_bounds(Vec3::new(top.x, top.y + 1.2, top.z)));
+        assert!(!campus.in_bounds(Vec3::new(top.x, 0.0, top.z)));
+        assert!(!campus.in_bounds(Vec3::new(top.x, top.y + 3.0, top.z)));
     }
 
     #[test]

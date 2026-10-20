@@ -16,6 +16,7 @@
 //! - `WOW_KILL_BOSS=<secs>`: the zone boss dies (as a player kill) that many seconds in.
 //! - `WOW_BOSS_PCT=<pct>@<secs>`: the zone boss drops to that HP percent at that time (phase shots).
 //! - `WOW_FPS=1`: log average frame time and drawn mesh count every 3 s (vsync caps the rate, so read the ms).
+//!   `WOW_SHOW_FPS=1` turns the on-screen FPS readout on for the run (settings.rs).
 //! - `WOW_HOVER_SLOT=<0-9>`: show that action slot's tooltip without a pointer.
 //!
 //! Floor, level and start-position hooks live in `game.rs`, the autofight bot in `combat.rs`.

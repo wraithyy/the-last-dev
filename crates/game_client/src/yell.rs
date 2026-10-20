@@ -57,11 +57,20 @@ struct BubbleBody;
 
 pub struct YellPlugin;
 
+/// A line said by something the sim does not know (the campus extras in `live::ambient`).
+#[derive(Message)]
+pub struct AmbientSay {
+    pub anchor: Entity,
+    pub head: f32,
+    pub text: String,
+}
+
 impl Plugin for YellPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.add_message::<AmbientSay>().add_systems(
             Update,
             (
+                spawn_ambient_bubbles,
                 spawn_bubbles,
                 place_bubbles.after(crate::nameplates::PlatePlacement),
             )
@@ -123,95 +132,161 @@ fn spawn_bubbles(
         } else {
             (0, BUBBLE_SECS_LONG)
         };
-        // Speech-bubble tail: a rotated square whose two outer edges carry the border.
-        let tail = commands
-            .spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    bottom: px(-TAIL_PX),
-                    left: percent(50),
-                    margin: UiRect::left(px(-6)),
-                    width: px(12),
-                    height: px(12),
-                    border: UiRect {
-                        right: px(2),
-                        bottom: px(2),
-                        ..default()
-                    },
+        let born = time.elapsed_secs();
+        spawn_bubble(
+            &mut commands,
+            Bubble {
+                sim: *unit,
+                anchor,
+                anchor_y,
+                trim,
+                priority,
+                life,
+                born,
+            },
+            text,
+        );
+    }
+}
+
+/// Who a bubble belongs to and how long it stays.
+struct Bubble {
+    sim: EntityId,
+    anchor: Entity,
+    anchor_y: f32,
+    trim: Color,
+    priority: u8,
+    life: f32,
+    born: f32,
+}
+
+fn spawn_bubble(commands: &mut Commands, b: Bubble, text: String) {
+    let Bubble {
+        sim,
+        anchor,
+        anchor_y,
+        trim,
+        priority,
+        life,
+        born,
+    } = b;
+    // Speech-bubble tail: a rotated square whose two outer edges carry the border.
+    let tail = commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                bottom: px(-TAIL_PX),
+                left: percent(50),
+                margin: UiRect::left(px(-6)),
+                width: px(12),
+                height: px(12),
+                border: UiRect {
+                    right: px(2),
+                    bottom: px(2),
                     ..default()
                 },
-                UiTransform::from_rotation(Rot2::degrees(45.0)),
-                BackgroundColor(BUBBLE_BG),
-                BorderColor::all(trim),
-            ))
-            .id();
-        // Grows when the bubble is pushed up, so the tail still reaches the unit.
-        let stem = commands
-            .spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    bottom: px(-TAIL_PX),
-                    left: percent(50),
-                    margin: UiRect::left(px(-1)),
-                    width: px(2),
-                    height: px(0),
-                    ..default()
-                },
-                BackgroundColor(trim),
-            ))
-            .id();
-        let text = commands
-            .spawn((
-                Text::new(text.clone()),
-                TextFont::from_font_size(14.0),
-                TextLayout::justify(Justify::Center),
-                TextColor(BUBBLE_TEXT),
-            ))
-            .id();
-        let body = commands
-            .spawn((
-                BubbleBody,
-                Node {
-                    padding: UiRect::axes(px(10), px(6)),
-                    border: UiRect::all(px(2)),
-                    border_radius: BorderRadius::all(px(6)),
-                    ..default()
-                },
-                BackgroundColor(BUBBLE_BG),
-                BorderColor::all(trim),
-                crate::hud::drop_shadow(),
-            ))
-            .add_children(&[stem, tail, text])
-            .id();
-        // The outer node has a fixed width so the centred bubble can wrap at BUBBLE_MAX_W.
-        commands
-            .spawn((
-                YellBubble {
-                    sim: *unit,
-                    anchor,
-                    anchor_y,
-                    age: 0.0,
-                    life,
-                    priority,
-                    born: time.elapsed_secs(),
-                    trim,
-                    offset: 0.0,
-                    placed: false,
-                    body,
-                    tail,
-                    text,
-                    stem,
-                },
-                Node {
-                    position_type: PositionType::Absolute,
-                    width: px(BUBBLE_MAX_W),
-                    justify_content: JustifyContent::Center,
-                    ..default()
-                },
-                Visibility::Hidden,
-                GlobalZIndex(12),
-            ))
-            .add_child(body);
+                ..default()
+            },
+            UiTransform::from_rotation(Rot2::degrees(45.0)),
+            BackgroundColor(BUBBLE_BG),
+            BorderColor::all(trim),
+        ))
+        .id();
+    // Grows when the bubble is pushed up, so the tail still reaches the unit.
+    let stem = commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                bottom: px(-TAIL_PX),
+                left: percent(50),
+                margin: UiRect::left(px(-1)),
+                width: px(2),
+                height: px(0),
+                ..default()
+            },
+            BackgroundColor(trim),
+        ))
+        .id();
+    let text = commands
+        .spawn((
+            Text::new(text.clone()),
+            TextFont::from_font_size(14.0),
+            TextLayout::justify(Justify::Center),
+            TextColor(BUBBLE_TEXT),
+        ))
+        .id();
+    let body = commands
+        .spawn((
+            BubbleBody,
+            Node {
+                padding: UiRect::axes(px(10), px(6)),
+                border: UiRect::all(px(2)),
+                border_radius: BorderRadius::all(px(6)),
+                ..default()
+            },
+            BackgroundColor(BUBBLE_BG),
+            BorderColor::all(trim),
+            crate::hud::drop_shadow(),
+        ))
+        .add_children(&[stem, tail, text])
+        .id();
+    // The outer node has a fixed width so the centred bubble can wrap at BUBBLE_MAX_W.
+    commands
+        .spawn((
+            YellBubble {
+                sim,
+                anchor,
+                anchor_y,
+                age: 0.0,
+                life,
+                priority,
+                born,
+                trim,
+                offset: 0.0,
+                placed: false,
+                body,
+                tail,
+                text,
+                stem,
+            },
+            Node {
+                position_type: PositionType::Absolute,
+                width: px(BUBBLE_MAX_W),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            Visibility::Hidden,
+            GlobalZIndex(12),
+        ))
+        .add_child(body);
+}
+
+/// Extras' lines: a short white bubble over their head, one per extra at a time.
+fn spawn_ambient_bubbles(
+    mut commands: Commands,
+    mut says: MessageReader<AmbientSay>,
+    time: Res<Time>,
+    old: Query<(Entity, &YellBubble)>,
+) {
+    for say in says.read() {
+        for (e, b) in &old {
+            if b.anchor == say.anchor {
+                commands.entity(e).despawn();
+            }
+        }
+        spawn_bubble(
+            &mut commands,
+            Bubble {
+                sim: 0,
+                anchor: say.anchor,
+                anchor_y: say.head + BUBBLE_HEAD_GAP,
+                trim: Color::srgb(0.55, 0.6, 0.68),
+                priority: 0,
+                life: BUBBLE_SECS_SHORT,
+                born: time.elapsed_secs(),
+            },
+            say.text.clone(),
+        );
     }
 }
 

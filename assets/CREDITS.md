@@ -39,6 +39,24 @@ The original License.txt is in assets/models/LICENSE-kenney.txt.
 |---|---|---|
 | assets/models/furniture/ | Kenney Furniture Kit 2.0 | https://kenney.nl/assets/furniture-kit |
 
+### Campus dressing (Kenney)
+
+CC0, by Kenney (www.kenney.nl). Each folder keeps its pack's original License.txt (and, where
+the models use it, the pack's Textures/colormap.png). Only the models the campus and Car Park P3
+place are included (`crates/game_client/src/floors/models.rs`).
+
+| Folder | Pack | Source |
+|---|---|---|
+| assets/models/city-kit-commercial/ | Kenney City Kit (Commercial) 2.1 | https://kenney.nl/assets/city-kit-commercial |
+| assets/models/city-kit-suburban/ | Kenney City Kit (Suburban) 2.0 | https://kenney.nl/assets/city-kit-suburban |
+| assets/models/city-kit-industrial/ | Kenney City Kit (Industrial) 2.0 | https://kenney.nl/assets/city-kit-industrial |
+| assets/models/car-kit/ | Kenney Car Kit | https://kenney.nl/assets/car-kit |
+| assets/models/nature-kit/ | Kenney Nature Kit | https://kenney.nl/assets/nature-kit |
+| assets/models/watercraft-pack/ | Kenney Watercraft Pack | https://kenney.nl/assets/watercraft-pack |
+| assets/models/train-kit/ | Kenney Train Kit | https://kenney.nl/assets/train-kit |
+| assets/models/food-kit/ | Kenney Food Kit | https://kenney.nl/assets/food-kit |
+| assets/models/factory-kit/ | Kenney Factory Kit 3.0 | https://kenney.nl/assets/factory-kit |
+
 Author: Kenney (https://www.kenney.nl).
 
 Used pieces, unmodified: bookcaseClosed, bookcaseClosedWide, bookcaseOpen, books, cardboardBoxClosed, chairDesk,
@@ -345,6 +363,13 @@ All audio is CC0 (https://creativecommons.org/publicdomain/zero/1.0/); attributi
 | Coins (loot), trophy window book open / close | RPG Audio, https://kenney.nl/assets/rpg-audio | Kenney | CC0 |
 | Elevator door, Guardrails and cast hum shield tones | Sci-Fi Sounds, https://kenney.nl/assets/sci-fi-sounds | Kenney | CC0 |
 | Level-up, floor-cleared and victory jingles | Music Jingles, https://kenney.nl/assets/music-jingles | Kenney | CC0 |
+| UI click, hover, window open / close (assets/audio/sfx/ui_*.ogg, window_*.ogg) | UI Audio, https://kenney.nl/assets/ui-audio (assets/audio/licenses/kenney-ui-audio.txt) | Kenney | CC0 |
+| Quest accept / complete, Kudos, promotion, telegraph warning, minigame medals, arcane-school cast | Digital Audio, https://kenney.nl/assets/digital-audio (assets/audio/licenses/kenney-digital-audio.txt) | Kenney | CC0 |
+| Block | Impact Sounds, https://kenney.nl/assets/impact-sounds (assets/audio/licenses/kenney-impact-sounds.txt) | Kenney | CC0 |
+| Coffee machine, vending latch, physical-school cast swish | RPG Audio, https://kenney.nl/assets/rpg-audio (assets/audio/licenses/kenney-rpg-audio.txt) | Kenney | CC0 |
+| Interrupt, scooter, shuttle, printer | Sci-Fi Sounds, https://kenney.nl/assets/sci-fi-sounds (assets/audio/licenses/kenney-sci-fi-sounds.txt) | Kenney | CC0 |
+| Level-up and game-over voice lines | Voiceover Pack, https://kenney.nl/assets/voiceover-pack (assets/audio/licenses/kenney-voiceover-pack.txt) | Kenney | CC0 |
+| Gold medal voice line | Voiceover Pack: Fighter, https://kenney.nl/assets/voiceover-pack-fighter (assets/audio/licenses/kenney-voiceover-pack-fighter.txt) | Kenney | CC0 |
 | Keycap clacks, typing burst | Keyboard Soundpack 1, https://opengameart.org/content/keyboard-soundpack-1-typing-and-single-keystrokes | unicaegames | CC0 |
 | Rubber Duck squeak | Squeak toy sounds, https://opengameart.org/content/squeak-toy-sounds | bart | CC0 |
 | Caffeine and Coffee Break sips | Liquid / bottle / drink set, https://opengameart.org/content/liquid-bottle-drink-set | qubodup | CC0 |
@@ -352,3 +377,18 @@ All audio is CC0 (https://creativecommons.org/publicdomain/zero/1.0/); attributi
 | Air-con ambience (low-passed) | 30 CC0 SFX loops, https://opengameart.org/content/30-cc0-sfx-loops | rubberduck | CC0 |
 | Exploration music (assets/audio/music/office_muzak.ogg) | Elevator Music, https://opengameart.org/content/elevator-music | Alex McCulloch (Pro Sensory) | CC0 |
 | Boss music (assets/audio/music/boss_battle.ogg) | Boss Battle Music (Epic Boss Battle, seamlessly looping), https://opengameart.org/content/boss-battle-music | Juhani Junkala (uploaded by SubspaceAudio) | CC0 |
+
+## Cursors
+
+Cursor Pack 1.1 by Kenney (https://kenney.nl/assets/cursor-pack), CC0 (https://creativecommons.org/publicdomain/zero/1.0/);
+the original licence is assets/cursors/License-kenney-cursor-pack.txt. Outline / Default PNGs, unmodified.
+
+| File | Used for |
+|---|---|
+| assets/cursors/pointer_a.png | normal pointer |
+| assets/cursors/hand_point.png | UI elements |
+| assets/cursors/message_dots_round.png | friendly NPC (talk) |
+| assets/cursors/hand_open.png | lootable corpse or quest pickup in reach (loot) |
+| assets/cursors/tool_sword_a.png | enemy (attack) |
+| assets/cursors/cursor_cogs.png | interactive prop (use) |
+| assets/cursors/cursor_disabled.png | out of reach / not allowed |

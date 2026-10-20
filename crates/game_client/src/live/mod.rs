@@ -12,6 +12,7 @@
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
+mod ambient;
 mod board;
 mod daynight;
 
@@ -108,7 +109,8 @@ pub struct LivePlugin;
 
 impl Plugin for LivePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<LiveState>()
+        app.add_plugins(ambient::plugin)
+            .init_resource::<LiveState>()
             .init_resource::<LiveTracker>()
             .init_resource::<DayNight>()
             .add_systems(Startup, (spawn_clock, board::spawn_window))

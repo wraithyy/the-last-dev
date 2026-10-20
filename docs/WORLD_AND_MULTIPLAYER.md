@@ -100,6 +100,21 @@ Determinism stays: quest progress is driven by sim events and needs no rng.
 - Not done: the Sales Tower and HR Annex buildings, fast travel, saving. See COMBAT_API.md (Zones,
   Quests) and KNOWN_LIMITATIONS.md.
 
+### Starter zone and terrain
+
+- `parking_p3` (Car Park P3, level 1) is where an offline new hire starts: the HR Onboarding Bot
+  tutorial runs there (skip and replay as before; replay re-enters P3), six starter tickets, a
+  vendor, the Exit Barrier boss on a raised deck, then the intern's `onboarding` breadcrumb leads
+  through the gate to the campus South Gate.
+- Online rooms still start on the campus (server `START_ZONE`) and joiners go to the group's zone:
+  the tutorial is offline only, and P3 stays reachable on foot through the South Gate for anyone who
+  wants the starter tickets.
+- The campus is 464 x 332 m in twelve districts. Ground height is analytic
+  (`combat_core::terrain::Terrain`: hills, mesas with ramps, a creek with bridges), exported per zone in
+  `content/zone_geometry.ron`; the sim, the server and the client all read the same `height(x, z)`, so
+  units, corpses, telegraphs and the server's movement checks follow the slopes. The wire format did
+  not change.
+
 ## Part 2: co-op multiplayer
 
 ### Requirement: offline first

@@ -762,6 +762,10 @@ fn demo_summary(m: &MinigameDef) -> (String, u32) {
             "60 s of deep work. Interrupted 0 times, deflected 9. You wrote one line of code.",
             1347,
         ),
+        Some(Rules::StayGreen(_)) => (
+            "Green for 180 of 180 s. 11 chores done, 0 missed, jiggler caught 0 times. Output: one thumbs-up emoji.",
+            1452,
+        ),
         _ => ("", 1792),
     };
     (line.to_string(), score)
@@ -1527,6 +1531,7 @@ fn flawless_rule(d: &MinigameDef) -> &'static str {
         Some(Rules::Migration(_)) => "no validation errors",
         Some(Rules::Hackathon(_)) => "focus never runs out",
         Some(Rules::Focus(_)) => "never interrupted",
+        Some(Rules::StayGreen(_)) => "never yellow",
         _ => "never caught",
     }
 }
@@ -1607,6 +1612,12 @@ fn venue_spots(d: &MinigameDef) -> (Vec<(String, SnackLook)>, Vec<String>, Optio
         ),
         // Where the next ticket goes: the old terminal, or the new one while carrying.
         Some(Rules::Migration(_)) => (Vec::new(), vec!["term_old".into(), "term_new".into()], None),
+        // The chores waiting in person: the laundry, the door.
+        Some(Rules::StayGreen(g)) => (
+            Vec::new(),
+            g.stations().into_iter().map(String::from).collect(),
+            None,
+        ),
         _ => (Vec::new(), Vec::new(), None),
     }
 }
@@ -1764,12 +1775,15 @@ fn venue_props(
     let t = time.elapsed_secs();
     let tb = d.teambuilding.as_ref();
     let done = view.map_or(0, |v| v.objectives);
-    let carrying = view.is_some_and(|v| v.layout & 1 != 0);
+    let layout = view.map_or(0, |v| v.layout);
+    let carrying = layout & 1 != 0;
     for (m, mut vis, mut tf) in &mut markers {
-        let hidden = match tb {
-            Some(_) => done & (1 << m.0) != 0,
+        let hidden = match d.rules() {
+            Some(Rules::Teambuilding(_)) => done & (1 << m.0) != 0,
+            // Stay Green: a station only while its chore waits.
+            Some(Rules::StayGreen(_)) => layout & (1 << m.0) == 0,
             // Migration: only the terminal the ticket goes to next.
-            None => (m.0 == 1) != carrying,
+            _ => (m.0 == 1) != carrying,
         };
         let want = if hidden || view.is_none() {
             Visibility::Hidden

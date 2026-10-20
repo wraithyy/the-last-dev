@@ -311,7 +311,7 @@ pub fn copy(t: &Tutorial, c: &Ctx) -> Option<Copy> {
                 "healer tip: heal a colleague",
                 pick(
                     format!(
-                        "Click the Burnt-Out Colleague (on the lawn by the HR bot) to target them, then cast {} ({}).",
+                        "Click the Burnt-Out Colleague (by the HR bot) to target them, then cast {} ({}).",
                         c.role_spell.0, c.role_spell.1
                     ),
                     &format!(
@@ -391,10 +391,10 @@ pub fn copy(t: &Tutorial, c: &Ctx) -> Option<Copy> {
             "meet your buddy",
             pick(
                 format!(
-                    "Talk to the AI-Native Intern ({}) by the arrival spot. He has your first real ticket.",
+                    "Talk to the AI-Native Intern ({}) by your car. He has your first real ticket, and the way to the campus.",
                     c.interact
                 ),
-                "Walk to the AI-Native Intern by the arrival spot and tap F. He has your first real ticket.",
+                "Walk to the AI-Native Intern by your car and tap F. He has your first real ticket, and the way to the campus.",
             ),
             "He has been here two days. That makes him senior.",
         ),

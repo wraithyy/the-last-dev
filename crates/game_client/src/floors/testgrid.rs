@@ -20,11 +20,14 @@ impl Grid {
         let w = (FLOOR_HALF_X * 2.0 / CELL) as usize;
         let h = (FLOOR_HALF_Z * 2.0 / CELL) as usize;
         let mut blocked = vec![false; w * h];
-        for b in layout
-            .blockers
-            .iter()
-            .filter(|b| b.max.y > 0.3 && b.min.y < 1.8)
-        {
+        let ground = |b: &combat_core::Aabb| {
+            let t = &layout.terrain;
+            t.height((b.min.x + b.max.x) / 2.0, (b.min.z + b.max.z) / 2.0)
+        };
+        for b in layout.blockers.iter().filter(|b| {
+            let g = ground(b);
+            b.max.y - g > 0.3 && b.min.y - g < 1.8
+        }) {
             let lo =
                 |v: f32, half: f32| (((v - PLAYER_RADIUS + half) / CELL).floor().max(0.0)) as usize;
             let hi = |v: f32, half: f32, n: usize| {
