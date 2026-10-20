@@ -34,10 +34,22 @@ jobs:
           # Optional co-op server prefilled in ~/coop (repo Settings > Variables > Actions).
           # Unset gives an empty string, which the client ignores.
           TLD_DEFAULT_SERVER: ${{ vars.TLD_DEFAULT_SERVER }}
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: site/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: site/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile && pnpm build
+        working-directory: site
+      # Landing page at the root, the game build under play/ (its service worker scopes itself there).
+      - run: cp -r site/dist _site && cp -r web _site/play
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: web
+          path: _site
 
   deploy:
     needs: build

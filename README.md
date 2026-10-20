@@ -2,7 +2,7 @@
 
 A satirical single-player 3D browser RPG with classic-MMO tab-target combat, set in a corporate office. It is an original game: no Blizzard assets, code, text or data.
 
-Play it: https://wraithyy.github.io/the-last-dev/
+Play it: https://wraithyy.github.io/the-last-dev/ (landing page with the game embedded; the bare game is at https://wraithyy.github.io/the-last-dev/play/)
 
 ## The satire
 
@@ -39,6 +39,7 @@ See [docs/PLAN.md](docs/PLAN.md), [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md), [d
 | Tests only | `cargo test --workspace` |
 | Browser build (release) | `./scripts/build-web.sh` (`--dev` for a faster debug build) |
 | Serve the browser build | `./scripts/serve-web.sh`, then open http://localhost:8080 |
+| Landing page (Astro, `site/`) | `cd site && pnpm install && pnpm dev`; Pages serves it at the root and the game under `play/` |
 
 ## Controls
 

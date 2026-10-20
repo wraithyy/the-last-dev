@@ -1,0 +1,513 @@
+---
+import '@fontsource-variable/geist';
+import '@fontsource-variable/jetbrains-mono';
+import { Image } from 'astro:assets';
+import coffee from '@phosphor-icons/core/assets/regular/coffee.svg?raw';
+import github from '@phosphor-icons/core/assets/regular/github-logo.svg?raw';
+import play from '@phosphor-icons/core/assets/regular/play.svg?raw';
+import arrow from '@phosphor-icons/core/assets/regular/arrow-up-right.svg?raw';
+import expand from '@phosphor-icons/core/assets/regular/corners-out.svg?raw';
+import roles from '../assets/shots/roles.png';
+import campus from '../assets/shots/campus.png';
+import jira from '../assets/shots/jira.png';
+import ceo from '../assets/shots/ceo.png';
+
+const BASE = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const GAME = `${BASE}play/`;
+const REPO = 'https://github.com/wraithyy/the-last-dev';
+const COFFEE = 'https://buymeacoffee.com/wraithyy';
+
+// Copy below is lifted from the game itself (content/game.ron, copy.rs), not written for the site.
+const route = [
+  { zone: 'Synergy Campus', lvl: '1-2', note: 'Outdoor hub. The shuttle bus is always late.' },
+  { zone: 'The Tower', lvl: '1-10', note: 'Open Space, Meeting Rooms, Sales, PMO, C-Level Penthouse.' },
+  { zone: 'Data Center', lvl: '6-8', note: 'Opens after floor 3. Keep cool.' },
+  { zone: 'Innovation Lab', lvl: '10', note: 'The AGI Prototype. It was a guy forwarding prompts.' },
+];
+
+const classes = [
+  {
+    name: 'Fullstack Engineer', role: 'Ranged',
+    text: 'Knows everything a little, gets blamed for all of it. Reviews, refactors and rolls back from 30 m away.',
+    abilities: 'Code Review, Refactor, Guardrails, Reject PR',
+  },
+  {
+    name: 'Frontend Developer', role: 'Melee',
+    text: 'Twelve frameworks this year, one div still a pixel off. Stacks Specificity up close, cashes it in with !important.',
+    abilities: 'Pixel Push, CSS Combo, !important',
+  },
+  {
+    name: 'Backend Engineer', role: 'Tank',
+    text: 'Nobody notices the API until it is down. Then only you. Taunts, rate-limits and soaks what the DPS keep pulling.',
+    abilities: 'Blocking Call, Rate Limiter, Who Touched Prod?',
+  },
+  {
+    name: 'DevOps Engineer', role: 'Healer',
+    text: 'Keeps prod alive at 3 a.m. so the AI can take credit at 9. Hotfixes, auto-scales and reverts your last five seconds.',
+    abilities: 'kill -9, Hotfix, SIGSTOP, Restart Pod',
+  },
+];
+
+const controls = [
+  { group: 'Move', keys: [['W A S D', 'run and turn'], ['Q E', 'strafe'], ['Space', 'jump'], ['Right mouse', 'steer camera']] },
+  { group: 'Fight', keys: [['Tab', 'next hostile target'], ['1 to 0', 'action bar spells'], ['F', 'talk, loot, open ticket']] },
+  { group: 'Office tools', keys: [['J', '~/jira quest log'], ['N', 'campus map'], ['B', '~/trophies'], ['Esc', 'menu and keybindings']] },
+];
+
+const tips = [
+  'The AI summarised this loading screen. The summary is 40% longer.',
+  'J opens your Jira. Nobody else will.',
+  'N opens the campus map, last updated by a human in 2021.',
+  'The chatbot rollout is "on track". The track is a circle.',
+  'If this screen takes too long, a consultant will be assigned to it.',
+  'Dying sends you to the graveyard, which HR renamed "the re-onboarding zone".',
+  'The board measures AI adoption in tokens burned. Please do not turn the lights off on your way out.',
+];
+
+const yells = [
+  { who: 'CEO', line: 'Team, big news: we are pivoting to AGI. Effective this sentence.' },
+  { who: 'CEO', line: "Let me share my vision. It's mostly the word 'agentic'." },
+  { who: 'AGI Prototype', line: 'According to a study I just invented, you lose.' },
+  { who: 'Fullstack Engineer', line: 'Why is the password in the README? Why is there a README?' },
+  { who: 'AGI Prototype', line: 'Beginning Alignment Training. Your feedback will be used against you.' },
+];
+
+const stack = [
+  { name: 'Rust', why: 'The whole thing: sim, client and server in one workspace.' },
+  { name: 'Bevy 0.19', why: '3D rendering, UI, audio. No engine editor, everything is code.' },
+  { name: 'WebAssembly', why: 'wasm-bindgen and wasm-opt ship the native build to the browser.' },
+  { name: 'axum + tokio', why: 'Optional co-op server over WebSockets, hosted on Render.' },
+  { name: 'Service worker', why: 'Offline-first PWA. Online co-op is opt-in, never required.' },
+  // TODO(josef): confirm this describes how you actually used it.
+  { name: 'Claude Code', why: 'Pair programmer. Reviewed by a human, which is the joke.' },
+];
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Last Dev</title>
+    <meta name="description" content="A free satirical browser RPG with classic MMO combat, set in an office that replaced everyone with AI." />
+    <meta property="og:title" content="The Last Dev" />
+    <meta property="og:description" content="Close Jira tickets, climb the office tower, unplug the AGI. Free in your browser." />
+    <meta property="og:image" content={new URL(roles.src, Astro.site).href} />
+    <link rel="icon" href={`${BASE}favicon.png`} />
+    <link rel="apple-touch-icon" href={`${BASE}apple-touch-icon.png`} />
+    <script is:inline>
+      // The game used to live at this URL with an offline service worker; drop it so the landing is never served stale.
+      navigator.serviceWorker?.getRegistrations().then((regs) => regs
+        .filter((r) => !new URL(r.scope).pathname.endsWith('/play/'))
+        .forEach((r) => r.unregister()));
+    </script>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="wrap nav-inner">
+        <a class="logo" href="#top">the-last-dev</a>
+        <nav aria-label="Sections">
+          <a href="#game">Game</a>
+          <a href="#roles">Roles</a>
+          <a href="#controls">Controls</a>
+          <a href="#coop">Co-op</a>
+          <a href="#me">About me</a>
+        </nav>
+        <a class="btn btn-primary btn-sm" href="#arcade"><Fragment set:html={play} />Play now</a>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero wrap">
+        <div class="hero-copy">
+          <p class="eyebrow">// onboarding.rs: the AI already picked a role for you. Ignore it.</p>
+          <h1>The last human dev versus the AI&nbsp;rollout.</h1>
+          <p class="lede">A free browser RPG with classic MMO combat. Close Jira tickets, climb the office tower, unplug the AGI.</p>
+          <div class="ctas">
+            <a class="btn btn-primary" href="#arcade"><Fragment set:html={play} />Play now</a>
+            <a class="btn btn-ghost" href={REPO}><Fragment set:html={github} />Source code</a>
+          </div>
+        </div>
+        <figure class="hero-shot">
+          <Image src={roles} alt="Role picker with four characters: Fullstack, Frontend, Backend and DevOps engineer" loading="eager" widths={[640, 1280]} sizes="(min-width: 1024px) 58vw, 100vw" />
+        </figure>
+      </section>
+
+      <section id="arcade" class="wrap arcade" aria-label="Play The Last Dev">
+        <div class="player" data-src={GAME}>
+          <Image src={campus} alt="" widths={[1280]} sizes="(min-width: 1200px) 1136px, 100vw" />
+          <button class="btn btn-primary btn-start" type="button"><Fragment set:html={play} />Start the game here</button>
+        </div>
+        <div class="player-bar">
+          <span class="muted">Runs in your browser. The first load is a big download, after that it works offline.</span>
+          <span class="player-actions">
+            <button class="btn btn-ghost btn-sm" type="button" data-fullpage aria-pressed="false"><Fragment set:html={expand} /><span>Full page</span></button>
+            <a class="btn btn-ghost btn-sm" href={GAME}>Open in new tab<Fragment set:html={arrow} /></a>
+          </span>
+        </div>
+      </section>
+      <script is:inline>
+        // Click-to-load: the wasm build is large, so nobody downloads it just by opening the landing page.
+        const player = document.querySelector('.player');
+        // The game's key handlers sit on its canvas, so focus that, not just the frame (same origin, so reachable).
+        const focusGame = (frame) => (frame.contentDocument?.getElementById('bevy') ?? frame).focus();
+        const start = () => {
+          const existing = player.querySelector('iframe');
+          if (existing) return existing;
+          const frame = document.createElement('iframe');
+          frame.src = player.dataset.src;
+          frame.title = 'The Last Dev';
+          frame.allow = 'fullscreen; autoplay; gamepad';
+          frame.addEventListener('load', () => focusGame(frame));
+          player.replaceChildren(frame);
+          // Nothing on the landing keeps animating while the game owns the GPU.
+          document.body.classList.add('playing');
+          return frame;
+        };
+        player.querySelector('.btn-start').addEventListener('click', () => {
+          // Touch controls need the whole screen; a phone-sized embed is worse than the game's own page.
+          if (matchMedia('(max-width: 767px), (pointer: coarse)').matches) location.href = player.dataset.src;
+          else start();
+        });
+        // Fills the window instead of the Fullscreen API, whose Esc exit would fight the game's Esc menu.
+        const arcade = document.getElementById('arcade');
+        const fullBtn = document.querySelector('[data-fullpage]');
+        fullBtn.addEventListener('click', () => {
+          const full = arcade.classList.toggle('is-full');
+          document.body.style.overflow = full ? 'hidden' : '';
+          fullBtn.setAttribute('aria-pressed', String(full));
+          fullBtn.querySelector('span').textContent = full ? 'Exit full page' : 'Full page';
+          focusGame(start());
+        });
+      </script>
+
+      <section id="game" class="wrap section reveal">
+        <h2>A long, loving roast of AI-first corporations.</h2>
+        <p class="body">Your company pushed AI onto every task for no reason. You start at level 1 on the corporate campus, close the tickets the AI forgot, climb five floors to the CEO ("Chief AI Evangelist") and shut down the AGI. Your hair thins as your HP drops. When you die, an AI agent backfills your role.</p>
+        <ol class="route">
+          {route.map((r) => (
+            <li>
+              <span class="lvl">Lv {r.lvl}</span>
+              <strong>{r.zone}</strong>
+              <span class="muted">{r.note}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section id="roles" class="wrap section reveal">
+        <h2>Pick a role. The AI will ignore it.</h2>
+        <div class="roles">
+          {classes.map((c) => (
+            <article class="role">
+              <span class="tag">{c.role}</span>
+              <h3>{c.name}</h3>
+              <p>{c.text}</p>
+              <p class="abilities">{c.abilities}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section id="coop" class="wrap section reveal">
+        <h2>Bring the team. Someone has to tank the CEO.</h2>
+        <p class="body">The game is single-player and works offline. Co-op is opt-in: 2 to 5 players share one world, and the server runs the fight so nobody's laptop gets to be authoritative.</p>
+        <ol class="coop-how">
+          <li><kbd>Esc</kbd><span>Open <strong>Co-op</strong>. The public server is already filled in.</span></li>
+          <li><kbd>Create</kbd><span>Get a room code like <code>MERGE-CONFLICT-42</code> and send it to your team.</span></li>
+          <li><kbd>Join</kbd><span>Enter the code, or pick a public room from the "Open standups" list.</span></li>
+        </ol>
+        <p class="muted small">The public server runs on a free plan. After about 15 idle minutes it sleeps, and the first connection takes 30 to 60 seconds to wake it.</p>
+
+        <h3 class="sub">Run your own server</h3>
+        <p class="body">One Rust binary, no accounts, no secrets, no database. It hosts rooms over WebSocket and can serve the game client too.</p>
+        <div class="servers">
+          <details open>
+            <summary>On your LAN</summary>
+            <pre><code>cargo build -p server --release
+./target/release/the-last-dev-server --web-dir ./web</code></pre>
+            <p>It prints its address, for example <code>http://192.168.1.20:7777/</code>. Everyone on the network opens that URL and plays from there. Build the client first with <code>./scripts/build-web.sh</code>, and open TCP 7777 in the firewall if nobody can connect.</p>
+          </details>
+          <details>
+            <summary>On a VPS, for the hosted game</summary>
+            <p>Browsers only allow <code>wss://</code> from an https page, so put a TLS proxy in front. Caddy gets the certificate on its own:</p>
+            <pre><code>game.example.com &#123;
+    reverse_proxy 127.0.0.1:7777
+&#125;</code></pre>
+            <pre><code>TLD_ALLOWED_ORIGINS=https://wraithyy.github.io \
+  the-last-dev-server --bind 127.0.0.1:7777</code></pre>
+            <p>Then enter <code>wss://game.example.com</code> in Esc &gt; Co-op. There is a <code>Dockerfile</code> if you prefer a container.</p>
+          </details>
+          <details>
+            <summary>On Render, free tier</summary>
+            <p>Fork the repo, then in Render pick <strong>New &gt; Blueprint</strong> and select your fork. <code>render.yaml</code> sets up the Docker service, the health check and the Frankfurt region. When it is live, enter <code>wss://&lt;name&gt;.onrender.com</code> in Esc &gt; Co-op.</p>
+          </details>
+        </div>
+        <p class="muted small">All flags, limits and the protocol are in <a href={`${REPO}/blob/main/docs/SERVER.md`}>docs/SERVER.md</a>.</p>
+      </section>
+
+      <section id="controls" class="wrap section reveal">
+        <h2>How to play</h2>
+        <p class="body">Tab-target combat like the MMOs you grew up on. Every key is rebindable in the Esc menu and follows physical positions, so Czech and other layouts work.</p>
+        <div class="controls">
+          {controls.map((g) => (
+            <div class="control-group">
+              <h3>{g.group}</h3>
+              <dl>
+                {g.keys.map(([k, v]) => (
+                  <div><dt><kbd>{k}</kbd></dt><dd>{v}</dd></div>
+                ))}
+              </dl>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="screens" class="section reveal">
+        <div class="wrap">
+          <h2>Screens from the open space</h2>
+        </div>
+        <div class="wrap gallery">
+          <figure>
+            <Image src={jira} alt="The in-game Jira quest log next to the AI-Native Intern" widths={[640, 1280]} sizes="(min-width: 768px) 50vw, 100vw" />
+            <figcaption>Quests are Jira tickets. Velocity: whatever the dashboard needs.</figcaption>
+          </figure>
+          <figure>
+            <Image src={ceo} alt="Boss fight against the CEO under a sign reading Days since last AI pivot" widths={[640, 1280]} sizes="(min-width: 768px) 50vw, 100vw" />
+            <figcaption>The CEO, phase two. Days since last AI pivot: zero.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="section jokes reveal" aria-labelledby="jokes-h">
+        <div class="wrap">
+          <h2 id="jokes-h">Loading tips, verbatim</h2>
+        </div>
+        <div class="marquee" aria-hidden="true">
+          <div class="marquee-track">
+            {[...tips, ...tips].map((t) => <span>Tip: {t}</span>)}
+          </div>
+        </div>
+        <ul class="sr-only">{tips.map((t) => <li>{t}</li>)}</ul>
+        <div class="wrap yells">
+          {yells.map((y) => (
+            <blockquote>
+              <p>“{y.line}”</p>
+              <cite>{y.who} yells</cite>
+            </blockquote>
+          ))}
+        </div>
+      </section>
+
+      <section class="wrap section reveal">
+        <h2>What it's built with</h2>
+        <dl class="stack">
+          {stack.map((s) => (
+            <div><dt>{s.name}</dt><dd>{s.why}</dd></div>
+          ))}
+        </dl>
+        <p class="muted small">Original game. No Blizzard assets, code, text or data. Music and sound credits live in the repo.</p>
+      </section>
+
+      <section id="me" class="wrap section me reveal">
+        <img class="avatar" src="https://avatars.githubusercontent.com/u/40492790?v=4" alt="Josef Kvapil" width="160" height="160" loading="lazy" />
+        <div>
+          <h2>Hi, I'm Josef.</h2>
+          <p class="body">Frontend architect from Liberec with 10+ years of React and TypeScript. I architect frontend platforms that other teams build on. The Last Dev is a side project in Rust, a game about the thing my industry keeps trying to replace us with.</p>
+          <!-- TODO(josef): your own "why I made this" story, two or three sentences. -->
+          <p class="quote">AI speeds me up; it doesn't steer. Vibecoding is not engineering.</p>
+          <div class="ctas">
+            <a class="btn btn-ghost" href="https://jkvapil.cz">jkvapil.cz<Fragment set:html={arrow} /></a>
+            <a class="btn btn-ghost" href="https://github.com/wraithyy"><Fragment set:html={github} />@wraithyy</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap coffee reveal">
+        <h2>Free to play. No ads. No AI upsell.</h2>
+        <p class="body">If it made you laugh during a stand-up, a coffee keeps the last dev awake for the next floor.</p>
+        <a class="btn btn-coffee" href={COFFEE}><Fragment set:html={coffee} />Buy me a coffee</a>
+      </section>
+    </main>
+
+    <footer class="wrap footer">
+      <span>The Last Dev. MIT or Apache-2.0.</span>
+      <a href={REPO}>github.com/wraithyy/the-last-dev</a>
+    </footer>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --bg: #f3f5f8;
+    --surface: #ffffff;
+    --line: #d9dee7;
+    --text: #0f1522;
+    --muted: #4f5b6e;
+    --accent: #0a7c86;
+    --accent-ink: #ffffff;
+    --coffee: #ffdd00;
+    --radius: 6px;
+    --mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+    --sans: 'Geist Variable', system-ui, sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #080b12;
+      --surface: #111725;
+      --line: #222b3c;
+      --text: #e6ebf3;
+      --muted: #9aa6b9;
+      --accent: #5fd1da;
+      --accent-ink: #061015;
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 400 1rem/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+  img { max-width: 100%; height: auto; display: block; }
+  a { color: inherit; }
+  h1, h2, h3 { font-family: var(--mono); letter-spacing: -0.02em; line-height: 1.15; margin: 0; }
+  h2 { font-size: clamp(1.6rem, 3vw, 2.3rem); max-width: 24ch; }
+  h3 { font-size: 1.05rem; }
+  svg { width: 1.15em; height: 1.15em; fill: currentColor; flex: none; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: var(--radius); }
+
+  .wrap { max-width: 1200px; margin-inline: auto; padding-inline: 16px; }
+  @media (min-width: 768px) { .wrap { padding-inline: 32px; } }
+  .section { padding-block: 72px; }
+  @media (min-width: 1024px) { .section { padding-block: 96px; } }
+  .body { color: var(--muted); max-width: 62ch; margin: 16px 0 0; font-size: 1.05rem; }
+  .muted { color: var(--muted); }
+  .small { font-size: 0.875rem; margin-top: 32px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+  /* Opaque on purpose: a backdrop blur over the game iframe would re-blur every WebGL frame. */
+  .nav { position: sticky; top: 0; z-index: 10; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .nav-inner { height: 64px; display: flex; align-items: center; gap: 24px; }
+  .logo { font: 700 1rem var(--mono); color: var(--accent); text-decoration: none; }
+  .nav nav { display: none; gap: 24px; margin-left: auto; }
+  .nav nav a { color: var(--muted); text-decoration: none; font-size: 0.925rem; }
+  .nav nav a:hover { color: var(--text); }
+  .nav .btn-sm { margin-left: auto; }
+  @media (min-width: 900px) { .nav nav { display: flex; } .nav .btn-sm { margin-left: 0; } }
+
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: var(--radius); font: 600 0.95rem var(--sans); text-decoration: none; white-space: nowrap; border: 1px solid transparent; transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s; }
+  .btn:active { transform: translateY(1px) scale(0.98); }
+  .btn-sm { padding: 8px 14px; font-size: 0.875rem; }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); }
+  .btn-primary:hover { background: color-mix(in srgb, var(--accent) 85%, var(--text)); }
+  .btn-ghost { border-color: var(--line); color: var(--text); }
+  .btn-ghost:hover { border-color: var(--accent); }
+  /* Buy Me a Coffee brand yellow, the one deliberate exception to the single accent. */
+  .btn-coffee { background: var(--coffee); color: #0d0d0d; font-size: 1.05rem; padding: 14px 24px; }
+  .btn-coffee:hover { transform: translateY(-2px); }
+  .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+
+  .hero { display: grid; gap: 40px; padding-block: 48px 72px; align-items: center; }
+  @media (min-width: 1024px) { .hero { grid-template-columns: 1fr 1fr; gap: 56px; padding-block: 72px 64px; } }
+  .eyebrow { font: 500 0.8rem var(--mono); color: var(--muted); margin: 0 0 20px; }
+  h1 { font-size: clamp(2.1rem, 3.6vw, 3.1rem); }
+  .lede { color: var(--muted); font-size: 1.15rem; max-width: 40ch; margin: 20px 0 0; }
+  .hero-shot { margin: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: 0 30px 80px -30px color-mix(in srgb, var(--accent) 35%, transparent); }
+  /* The role picker screenshot has empty black bands left and right; 4:3 cover crops exactly those. */
+  .hero-shot img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+
+  .route { list-style: none; padding: 0; margin: 48px 0 0; display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  @media (min-width: 768px) { .route { grid-template-columns: repeat(4, 1fr); } }
+  .route li { background: var(--surface); padding: 24px; display: grid; gap: 6px; align-content: start; }
+  .route .lvl { font: 600 0.8rem var(--mono); color: var(--accent); }
+  .route .muted { font-size: 0.925rem; }
+
+  .roles { display: grid; gap: 16px; margin-top: 40px; }
+  @media (min-width: 768px) { .roles { grid-template-columns: 1fr 1fr; } }
+  .role { border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; background: var(--surface); display: grid; gap: 10px; align-content: start; }
+  .role p { margin: 0; color: var(--muted); }
+  .role .abilities { font: 500 0.85rem var(--mono); color: var(--accent); }
+  .tag { justify-self: start; font: 600 0.75rem var(--mono); text-transform: uppercase; border: 1px solid var(--accent); color: var(--accent); padding: 2px 8px; border-radius: var(--radius); }
+
+  .coop-how { list-style: none; padding: 0; margin: 36px 0 0; display: grid; gap: 16px; }
+  @media (min-width: 768px) { .coop-how { grid-template-columns: repeat(3, 1fr); gap: 32px; } }
+  .coop-how li { display: grid; gap: 10px; justify-items: start; color: var(--muted); }
+  .coop-how strong { color: var(--text); }
+  .sub { margin-top: 72px; font-size: 1.35rem; }
+  .servers { display: grid; gap: 10px; margin-top: 28px; max-width: 860px; }
+  .servers details { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 0 20px; }
+  .servers summary { cursor: pointer; padding: 16px 0; font: 600 1rem var(--mono); }
+  .servers details[open] summary { color: var(--accent); }
+  .servers p { color: var(--muted); margin: 0 0 16px; }
+  code { font: 500 0.875em var(--mono); }
+  pre { margin: 0 0 16px; padding: 16px; overflow-x: auto; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); }
+  pre code { font-size: 0.85rem; line-height: 1.6; }
+
+  .controls { display: grid; gap: 32px; margin-top: 40px; }
+  @media (min-width: 768px) { .controls { grid-template-columns: 1.1fr 1fr 1fr; } }
+  .control-group h3 { color: var(--muted); font-size: 0.9rem; margin-bottom: 12px; }
+  .control-group dl { margin: 0; display: grid; gap: 10px; }
+  .control-group dl div { display: flex; gap: 12px; align-items: baseline; }
+  .control-group dd { margin: 0; color: var(--muted); }
+  kbd { font: 600 0.8rem var(--mono); padding: 3px 8px; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: var(--radius); background: var(--surface); white-space: nowrap; }
+
+  .gallery { display: grid; gap: 24px; margin-top: 40px; }
+  @media (min-width: 768px) { .gallery { grid-template-columns: 1fr 1fr; } }
+  .gallery figure { margin: 0; }
+  .gallery img { border: 1px solid var(--line); border-radius: var(--radius); width: 100%; }
+
+  .arcade { padding-bottom: 24px; }
+  .player { position: relative; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #05070c; display: grid; place-items: center; }
+  .player img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.45; }
+  .player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .btn-start { position: relative; font-size: 1.05rem; padding: 16px 28px; }
+  .player-bar { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; align-items: center; margin-top: 14px; font-size: 0.9rem; }
+  .player-actions { display: flex; gap: 8px; }
+  .player-bar button { cursor: pointer; background: none; }
+  .arcade.is-full { position: fixed; inset: 0; z-index: 20; max-width: none; padding: 0; background: var(--bg); display: flex; flex-direction: column-reverse; }
+  .arcade.is-full .player { flex: 1; aspect-ratio: auto; border: 0; border-radius: 0; }
+  .arcade.is-full .player-bar { margin: 0; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+  figcaption { color: var(--muted); font-size: 0.875rem; margin-top: 10px; }
+
+  .marquee { overflow: hidden; border-block: 1px solid var(--line); margin-top: 40px; padding-block: 18px; background: var(--surface); }
+  .marquee-track { display: flex; gap: 56px; width: max-content; font: 500 0.95rem var(--mono); color: var(--muted); }
+  @media (prefers-reduced-motion: no-preference) {
+    .marquee-track { animation: marquee 60s linear infinite; }
+    .marquee:hover .marquee-track, .playing .marquee-track { animation-play-state: paused; }
+  }
+  @media (prefers-reduced-motion: reduce) { .marquee { overflow-x: auto; } }
+  @keyframes marquee { to { transform: translateX(-50%); } }
+  .yells { display: grid; gap: 40px 48px; margin-top: 56px; }
+  @media (min-width: 768px) { .yells { grid-template-columns: repeat(6, 1fr); } .yells blockquote:nth-child(-n+2) { grid-column: span 3; } .yells blockquote:nth-child(n+3) { grid-column: span 2; } }
+  blockquote { margin: 0; border-left: 2px solid var(--accent); padding-left: 20px; }
+  blockquote p { margin: 0; font: 600 1.1rem/1.4 var(--mono); }
+  .yells blockquote:nth-child(-n+2) p { font-size: 1.35rem; }
+  cite { display: block; margin-top: 10px; font-style: normal; color: var(--muted); font-size: 0.875rem; }
+
+  .stack { display: grid; gap: 28px 48px; margin: 40px 0 0; }
+  @media (min-width: 768px) { .stack { grid-template-columns: 1fr 1fr; } }
+  .stack div { display: grid; grid-template-columns: 9rem 1fr; gap: 16px; }
+  .stack dt { font: 700 0.95rem var(--mono); color: var(--accent); }
+  .stack dd { margin: 0; color: var(--muted); }
+
+  .me { display: grid; gap: 32px; align-items: start; }
+  @media (min-width: 768px) { .me { grid-template-columns: 160px 1fr; gap: 48px; } }
+  .avatar { border-radius: var(--radius); border: 1px solid var(--line); }
+  .quote { font: 600 1.1rem var(--mono); border-left: 2px solid var(--accent); padding-left: 20px; margin: 28px 0 0; max-width: 46ch; }
+
+  .coffee { text-align: center; padding-block: 96px 120px; display: grid; justify-items: center; }
+  .coffee h2 { max-width: 20ch; }
+  .coffee .body { margin-bottom: 32px; }
+
+  .footer { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; border-top: 1px solid var(--line); padding-block: 28px; color: var(--muted); font-size: 0.875rem; }
+
+  /* Motion only explains order: the hero lands first, sections settle in as they arrive. */
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-copy, .hero-shot { animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .hero-shot { animation-delay: 0.12s; }
+    @supports (animation-timeline: view()) {
+      .reveal { animation: rise linear both; animation-timeline: view(); animation-range: entry 0% entry 35%; }
+    }
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(24px); } }
+</style>

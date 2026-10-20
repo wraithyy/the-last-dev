@@ -3,3 +3,6 @@
 /.playwright-mcp
 /web/assets
 /web/precache.js
+/site/node_modules
+/site/dist
+/site/.astro
