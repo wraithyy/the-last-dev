@@ -185,3 +185,13 @@
 .changelog li { margin-block: 6px; }
 .changelog h2 a { text-decoration: none; }
 .changelog h2 a:hover { color: var(--accent); }
+
+.credits { display: grid; gap: 40px 48px; margin-top: 40px; }
+@media (min-width: 768px) { .credits { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 1100px) { .credits { grid-template-columns: repeat(3, 1fr); } }
+.credits h3 { font-size: 0.9rem; color: var(--muted); margin-bottom: 14px; }
+.credits ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.credits li { display: grid; gap: 2px; }
+.credits a { font-weight: 600; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.credits a:hover { text-decoration-color: var(--accent); }
+.credits .muted { font-size: 0.875rem; }

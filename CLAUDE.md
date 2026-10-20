@@ -21,3 +21,10 @@ Release only when the user asks for one. While the game is 0.x: content (zones, 
 raids) bumps the minor version, fixes alone bump the patch. Steps are in README.md under "Releasing";
 the `vX.Y.Z` tag push creates the GitHub Release from the changelog section and fails if the tag and
 `Cargo.toml` disagree.
+
+## Asset credits
+
+Every third-party asset (model, icon, sound, music, font) gets a row in `assets/CREDITS.md` with author,
+source link and licence, and a new author also goes into the `credits` list in
+`site/src/pages/index.astro` with a link that resolves. CC BY assets must be credited; CC0 ones are
+credited anyway.

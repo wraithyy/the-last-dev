@@ -70,6 +70,53 @@ const yells = [
   { who: 'AGI Prototype', line: 'Beginning Alignment Training. Your feedback will be used against you.' },
 ];
 
+// Mirrors assets/CREDITS.md; every link points at the author or the exact pack used.
+const gi = (a: string) => `https://github.com/game-icons/icons/tree/master/${a}`;
+const credits = [
+  {
+    group: '3D models and cursors',
+    items: [
+      { who: 'Quaternius', what: 'Ultimate Animated Character Pack', href: 'https://quaternius.com', license: 'CC0' },
+      { who: 'Kenney', what: 'furniture, campus props and cursors', href: 'https://kenney.nl', license: 'CC0' },
+    ],
+  },
+  {
+    group: 'Icons',
+    items: [
+      { who: 'J. W. Bjerk (eleazzaar)', what: 'Painterly Spell Icons', href: 'https://opengameart.org/content/painterly-spell-icons-part-1', license: 'CC BY 3.0' },
+      { who: 'Delapouite', what: 'game-icons.net glyphs', href: gi('delapouite'), license: 'CC BY 3.0' },
+      { who: 'Lorc', what: 'game-icons.net glyphs', href: gi('lorc'), license: 'CC BY 3.0' },
+      { who: 'Rihlsul, sbed, PriorBlue, Guard13007, Caro Asercion, Andy Meneely', what: 'game-icons.net glyphs', href: 'https://game-icons.net', license: 'CC BY 3.0' },
+    ],
+  },
+  {
+    group: 'Music',
+    items: [
+      { who: 'Alex McCulloch (Pro Sensory)', what: 'Elevator Music', href: 'https://opengameart.org/content/elevator-music', license: 'CC0' },
+      { who: 'Juhani Junkala', what: 'Epic Boss Battle', href: 'https://opengameart.org/content/boss-battle-music', license: 'CC0' },
+    ],
+  },
+  {
+    group: 'Sound effects',
+    items: [
+      { who: 'Kenney', what: 'interface, impact, RPG, sci-fi, UI and voiceover packs', href: 'https://kenney.nl/assets/category:Audio', license: 'CC0' },
+      { who: 'unicaegames', what: 'Keyboard Soundpack 1', href: 'https://opengameart.org/content/keyboard-soundpack-1-typing-and-single-keystrokes', license: 'CC0' },
+      { who: 'bart', what: 'Squeak toy sounds', href: 'https://opengameart.org/content/squeak-toy-sounds', license: 'CC0' },
+      { who: 'qubodup', what: 'Liquid / bottle / drink set', href: 'https://opengameart.org/content/liquid-bottle-drink-set', license: 'CC0' },
+      { who: 'artisticdude', what: 'Swishes sound pack', href: 'https://opengameart.org/content/swishes-sound-pack', license: 'CC0' },
+      { who: 'rubberduck', what: '30 CC0 SFX loops', href: 'https://opengameart.org/content/30-cc0-sfx-loops', license: 'CC0' },
+    ],
+  },
+  {
+    group: 'Fonts and site icons',
+    items: [
+      { who: 'JetBrains', what: 'JetBrains Mono', href: 'https://github.com/JetBrains/JetBrainsMono', license: 'OFL 1.1' },
+      { who: 'Vercel', what: 'Geist', href: 'https://github.com/vercel/geist-font', license: 'OFL 1.1' },
+      { who: 'Phosphor', what: 'Phosphor Icons', href: 'https://phosphoricons.com', license: 'MIT' },
+    ],
+  },
+];
+
 const stack = [
   { name: 'Rust', why: 'The whole thing: sim, client and server in one workspace.' },
   { name: 'Bevy 0.19', why: '3D rendering, UI, audio. No engine editor, everything is code.' },
@@ -274,7 +321,24 @@ the-last-dev-server --bind 127.0.0.1:7777</code></pre>
           <div><dt>{s.name}</dt><dd>{s.why}</dd></div>
         ))}
       </dl>
-      <p class="muted small">Original game. No Blizzard assets, code, text or data. Music and sound credits live in the repo.</p>
+      <p class="muted small">Original game. No Blizzard assets, code, text or data.</p>
+    </section>
+
+    <section id="credits" class="wrap section reveal">
+      <h2>Made with other people's great work</h2>
+      <p class="body">Everything below is free to use. Thank you. Per-file details are in <a href={`${REPO}/blob/main/assets/CREDITS.md`}>assets/CREDITS.md</a>.</p>
+      <div class="credits">
+        {credits.map((c) => (
+          <div>
+            <h3>{c.group}</h3>
+            <ul>
+              {c.items.map((i) => (
+                <li><a href={i.href}>{i.who}</a><span class="muted">{i.what}, {i.license}</span></li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
     </section>
 
     <section id="me" class="wrap section reveal">
