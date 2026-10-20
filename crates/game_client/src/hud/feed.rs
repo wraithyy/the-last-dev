@@ -253,6 +253,7 @@ pub fn event_sink(ev: &Event) -> Sink {
         | Event::QuestAccepted { .. }
         | Event::QuestReady { .. }
         | Event::QuestCompleted { .. }
+        | Event::QuestFailed { .. }
         | Event::Looted { .. }
         | Event::GearChanged { .. }
         | Event::RankProgress { .. }
@@ -614,6 +615,13 @@ fn collect_events(
             ),
             Event::QuestCompleted { quest } => out.push(
                 format!("Ticket closed: {}.", quest_name(&*sim, quest)),
+                QUEST_YELLOW,
+            ),
+            Event::QuestFailed { quest } => out.push(
+                format!(
+                    "Ticket failed: {}. It can be taken again.",
+                    quest_name(&*sim, quest)
+                ),
                 QUEST_YELLOW,
             ),
             Event::Looted {

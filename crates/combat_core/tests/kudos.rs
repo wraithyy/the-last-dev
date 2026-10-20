@@ -1,11 +1,11 @@
 //! Kudos economy balance: expected income per zone of one campaign pass versus vendor prices
-//! (docs/FORMULAS.md, Kudos). Print the table with
+//! (docs/FORMULAS.md, Kudos). The campus districts are optional side content and stay out. Print the table with
 //! `cargo test -p combat_core --test kudos -- --nocapture`.
 
 mod common;
 
 use combat_core::{Command, Content, Goods, Rarity, Sim, Vec3};
-use common::content;
+use common::campaign_content as content;
 
 const CAMPAIGN: [&str; 10] = [
     "campus",

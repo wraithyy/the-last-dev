@@ -1,7 +1,8 @@
-//! The outdoor hub: a generic corporate campus, 140 x 100 m, with the arrival parking lot,
-//! a cafeteria pavilion, a smoking corner, the reception plaza and three building facades
-//! (tower, data center, innovation lab). Buildings are single large blockers; the entrances
-//! are the door anchors. Everything is primitives so it stays light on WebGL2.
+//! The outdoor hub: a generic corporate campus, 220 x 160 m. The core (140 x 100 m) has the
+//! arrival parking lot, a cafeteria pavilion, a smoking corner, the reception plaza and three
+//! building facades (tower, data center, innovation lab); the open-world districts around it
+//! are in `districts.rs`. Buildings are single large blockers; the entrances are the door
+//! anchors. Everything is primitives so it stays light on WebGL2.
 
 use super::kit::*;
 use super::layout::{FloorKind, FloorLayout, Theme, assemble, yaw_towards};
@@ -11,8 +12,8 @@ use super::themes::{pt, route_point_near, runner, v};
 use bevy::prelude::*;
 use std::f32::consts::{FRAC_PI_2, PI};
 
-pub const HALF_X: f32 = 70.0;
-pub const HALF_Z: f32 = 50.0;
+pub const HALF_X: f32 = 110.0;
+pub const HALF_Z: f32 = 80.0;
 
 const SPAWN: (f32, f32) = (-23.0, 22.0);
 const GRAVEYARD: (f32, f32) = (-15.0, 28.5);
@@ -124,6 +125,7 @@ pub fn build() -> FloorLayout {
     graveyard(&mut p);
     lawn(&mut p);
     ambient_props(&mut p);
+    super::districts::build(&mut p);
 
     let door = |n: usize| doors[n].1;
     p.route = vec![
@@ -489,7 +491,7 @@ fn parking_lot(p: &mut Plan) {
 }
 
 /// Simple car: body and cabin slabs, box wheels, one collider.
-fn car(p: &mut Plan, x: f32, z: f32, along_x: bool, mat: Mat) {
+pub(super) fn car(p: &mut Plan, x: f32, z: f32, along_x: bool, mat: Mat) {
     let yaw = if along_x { 0.0 } else { FRAC_PI_2 };
     let rot = |lx: f32, lz: f32| {
         let (s, c) = yaw.sin_cos();
@@ -1063,7 +1065,7 @@ fn shuttle_stop(p: &mut Plan) -> (Vec3, f32) {
 }
 
 /// Kick scooter: deck, stem, bars and two wheels; low enough to step over.
-fn scooter(p: &mut Plan, x: f32, z: f32, yaw: f32, fallen: bool) {
+pub(super) fn scooter(p: &mut Plan, x: f32, z: f32, yaw: f32, fallen: bool) {
     let (s, c) = yaw.sin_cos();
     let at = |lx: f32, lz: f32| (x + lx * c + lz * s, z - lx * s + lz * c);
     p.slab(v(x, 0.1, z), yaw, v(0.18, 0.04, 0.7), Mat::Metal);
@@ -1088,6 +1090,7 @@ fn trees(p: &mut Plan, doors: &[(&'static str, (Vec3, f32))]) {
         .chain([SPAWN, GRAVEYARD].iter())
         .map(|&(x, z)| pt(x, z))
         .chain(doors.iter().map(|(_, (pos, _))| pt(pos.x, pos.z)))
+        .chain(super::districts::keep_clear().map(|(x, z)| pt(x, z)))
         .collect();
     let route = p.route.clone();
     let tree = |p: &mut Plan, x: f32, z: f32, pine: bool, size: f32| {
@@ -1119,16 +1122,25 @@ fn trees(p: &mut Plan, doors: &[(&'static str, (Vec3, f32))]) {
         }
         p.block(v(x, 1.5, z), v(0.7, 3.0, 0.7));
     };
-    // A belt around the edge plus clumps in the lawns between buildings.
-    for i in 0..22 {
-        let x = -66.0 + i as f32 * 6.2;
-        tree(p, x, -47.0, i % 2 == 0, 1.5 + (i % 3) as f32 * 0.2);
-        tree(p, x + 2.0, 47.5, i % 2 == 1, 1.6);
+    // A belt around the edge (sparser than the core lawns: it is mostly fog from the
+    // middle) plus clumps in the lawns between buildings and in the districts.
+    for i in 0..27 {
+        let x = -106.0 + i as f32 * 8.2;
+        // The construction site and the railway own the north edge, the step board the south.
+        if (-43.0..38.0).contains(&x) {
+            tree(p, x, -78.5, i % 2 == 0, 1.5 + (i % 3) as f32 * 0.2);
+        }
+        if !(84.0..100.0).contains(&(x + 3.0)) {
+            tree(p, x + 3.0, 78.5, i % 2 == 1, 1.6);
+        }
     }
-    for i in 0..13 {
-        let z = -42.0 + i as f32 * 7.0;
-        tree(p, -67.0, z, i % 2 == 0, 1.6);
-        tree(p, 67.0, z, i % 2 == 1, 1.7);
+    for i in 0..19 {
+        let z = -72.0 + i as f32 * 8.0;
+        tree(p, -108.5, z, i % 2 == 0, 1.6);
+        tree(p, 108.5, z, i % 2 == 1, 1.7);
+    }
+    for (x, z, pine) in super::districts::TREES {
+        tree(p, x, z, pine, 1.7);
     }
     for (x, z, pine) in [
         (-22.0, -30.0, false),

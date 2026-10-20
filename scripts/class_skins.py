@@ -1,7 +1,10 @@
 # Builds the Frontend / Backend / DevOps player models from the Quaternius "Ultimate Animated
 # Character Pack" (CC0). Every class keeps the Casual2_Male skeleton, proportions and animations
 # (same as Engineer.glb); only outfit, hair and a few extra skinned bits differ.
+# The QA Engineer and Data Scientist are reskins of two of those (RESKINS): same mesh, hood and
+# hair stages, new colours and clothing texture, so they need only the built GLBs.
 # Usage: python3 -I scripts/class_skins.py "<pack>/glTF" assets/models/characters
+#        python3 -I scripts/class_skins.py --reskin assets/models/characters
 import base64
 import json
 import math
@@ -29,6 +32,17 @@ CLASSES = {
     "DevOps": dict(hair_from="Casual_Male", hair=(0.20, 0.08, 0.025), skin=(0.78, 0.50, 0.34),
                    shirt=None, sleeves=None, hood=None,
                    pants=(0.05, 0.12, 0.30), belt=(0.06, 0.03, 0.015), bags=(0.16, 0.07, 0.07), thick=0.0),
+}
+
+
+# name -> (built model it reuses, material colours by name, clothing texture or None)
+RESKINS = {
+    "QA": ("Frontend", {"Skin": (0.62, 0.42, 0.31), "Hair": (0.36, 0.10, 0.04), "Pants": (0.17, 0.17, 0.19),
+                        "Belt": (0.70, 0.05, 0.05), "Sleeves": (0.03, 0.03, 0.035), "Hood": (0.03, 0.03, 0.035)},
+           "caution"),
+    "DataScientist": ("DevOps", {"Skin": (0.55, 0.36, 0.25), "Hair": (0.02, 0.02, 0.025),
+                                 "Pants": (0.42, 0.36, 0.24), "Belt": (0.12, 0.07, 0.03)},
+                      "graph_paper"),
 }
 
 
@@ -162,6 +176,51 @@ def stripes_png():
             c = (20, 190, 180)
         rows.append([c, c])
     return png(rows)
+
+
+def caution_png():
+    # Hi-vis yellow hoodie with a black/yellow "caution: untested" chest band, as one 2x32 column.
+    rows = []
+    for y in range(32):
+        c = (236, 196, 18)
+        if 6 <= y <= 7 or 10 <= y <= 11 or y >= 29:
+            c = (22, 22, 24)
+        rows.append([c, c])
+    return png(rows)
+
+
+def graph_paper_png():
+    # Purple sweater knitted like graph paper, with one rising "trend line" pixel per column.
+    base, grid, trend = (84, 38, 132), (146, 104, 196), (120, 230, 170)
+    px = [[base] * 16 for _ in range(16)]
+    for y in range(16):
+        for x in range(16):
+            if x % 4 == 0 or y % 4 == 0:
+                px[y][x] = grid
+    for x in range(16):
+        px[15 - x][x] = trend
+    return png(px)
+
+
+def read_glb(path):
+    with open(path, "rb") as f:
+        data = f.read()
+    n = struct.unpack("<I", data[12:16])[0]
+    doc = json.loads(data[20:20 + n])
+    return doc, data[20 + n + 8:]
+
+
+def reskin(outdir, name, src, colours, texture):
+    doc, blob = read_glb(os.path.join(outdir, src + ".glb"))
+    for m in doc["materials"]:
+        base = m["name"].split("_")[0]  # Hair_1..Hair_5 follow Hair
+        if base in colours:
+            m["pbrMetallicRoughness"]["baseColorFactor"] = list(colours[base]) + [1.0]
+    w = Writer(doc, blob)
+    if texture:
+        data = {"caution": caution_png, "graph_paper": graph_paper_png}[texture]()
+        doc["images"][0]["bufferView"] = w._view(data, None)
+    write_glb(doc, compact(doc, bytes(w.blob)), os.path.join(outdir, name + ".glb"))
 
 
 def add_texture(w, data):
@@ -401,6 +460,11 @@ def write_glb(doc, blob, path):
         f.write(struct.pack("<I4s", len(js), b"JSON") + js + struct.pack("<I4s", len(blob), b"BIN\0") + blob)
 
 
+def reskin_all(outdir):
+    for name, (src, colours, texture) in RESKINS.items():
+        reskin(outdir, name, src, colours, texture)
+
+
 def main(pack, outdir):
     with tempfile.TemporaryDirectory() as tmp:
         for name, cfg in CLASSES.items():
@@ -408,9 +472,13 @@ def main(pack, outdir):
             # Hair staging lives in split_hair.py so all characters bald the same way.
             subprocess.run([sys.executable, "-I", os.path.join(HERE, "split_hair.py"), pre,
                             os.path.join(outdir, name + ".glb")], check=True)
+    reskin_all(outdir)
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        sys.exit("usage: python3 -I scripts/class_skins.py <pack>/glTF assets/models/characters")
-    main(sys.argv[1], sys.argv[2])
+        sys.exit("usage: python3 -I scripts/class_skins.py (<pack>/glTF | --reskin) assets/models/characters")
+    if sys.argv[1] == "--reskin":
+        reskin_all(sys.argv[2])
+    else:
+        main(sys.argv[1], sys.argv[2])

@@ -219,9 +219,15 @@ pub fn mine(def: &PropDef, outcome: u32, nth: u32, content: &Content) -> Option<
     let own_lines = !def.lines.is_empty()
         && !matches!(
             def.kind,
-            PropKind::Vending | PropKind::Table | PropKind::Scooter | PropKind::FireAlarm
+            PropKind::Vending
+                | PropKind::Table
+                | PropKind::Scooter
+                | PropKind::FireAlarm
+                | PropKind::ShuttleStop
         )
-        && (def.kind != PropKind::Coffee || n != 0);
+        && (def.kind != PropKind::Coffee || n != 0)
+        // A device's own lines are for the step it took; refusals use the stock ones.
+        && (def.kind != PropKind::Device || n == combat_core::QUEST_PROP_COUNTED);
     if own_lines {
         let k = n.wrapping_add(nth) as usize % def.lines.len();
         return def.lines.get(k).cloned();
@@ -270,6 +276,29 @@ pub fn mine(def: &PropDef, outcome: u32, nth: u32, content: &Content) -> Option<
         PropKind::Calendar => {
             "Every slot is double-booked. Yours is triple-booked, with yourself.".to_string()
         }
+        PropKind::ShuttleStop if n == 0 => "The shuttle is not running. It says 'soon'.".into(),
+        PropKind::ShuttleStop => format!(
+            "The campus shuttle drives itself, badly. Next stop: {}.",
+            content
+                .prop(&def.to)
+                .map_or("somewhere", |p| p.name.as_str())
+        ),
+        PropKind::Pickup => format!("You pocket the {}.", def.name),
+        PropKind::Inspect => format!(
+            "*click* {} photographed, timestamped, filed. Nobody will read it.",
+            def.name
+        ),
+        PropKind::Device if n == combat_core::QUEST_PROP_WRONG_ORDER => format!(
+            "{}: wrong order. Everything you did resets, as the runbook warned, on page 40.",
+            def.name
+        ),
+        PropKind::Device if n == combat_core::QUEST_PROP_COUNTED => {
+            format!("{}: done. It does not say thank you.", def.name)
+        }
+        PropKind::Device => format!(
+            "The {} hums at you. Nothing to do here right now.",
+            def.name
+        ),
     })
 }
 
@@ -323,15 +352,22 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::QuietRoom => "Hide in the quiet room",
         PropKind::Dog => "Pet the office dog",
         PropKind::VrDemo => "Put on a VR headset (15 s)",
+        PropKind::ShuttleStop => "Ride the campus shuttle",
+        PropKind::Pickup => "Pick up",
+        PropKind::Inspect => "Photograph it for the report",
+        PropKind::Device => "Operate",
     };
     let extra = match def.kind {
         PropKind::FireAlarm => "WARNING: every enemy on this floor will come for you.".to_string(),
-        PropKind::Coffee => format!("{}% chance: descaling required.", def.fail_pct),
+        PropKind::Coffee if def.fail_pct > 0 => {
+            format!("{}% chance: descaling required.", def.fail_pct)
+        }
         PropKind::Vending => format!("Costs {} Kudos. No refunds.", def.cost_sp),
         PropKind::Scooter => "+60% speed out of combat. Damage ends the ride.".to_string(),
         PropKind::Printer => "Users report persistence helps. Users are wrong.".to_string(),
         PropKind::BikeRack => "It has been waiting a long time.".to_string(),
         PropKind::VrDemo => "Mirrored controls for 15 s. Not in combat.".to_string(),
+        PropKind::ShuttleStop => "Fast travel to the next stop on the loop. Not in combat.".into(),
         PropKind::SprintBoard => {
             "Story points, affixes, a par time. Velocity is mandatory.".to_string()
         }

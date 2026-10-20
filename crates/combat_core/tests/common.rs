@@ -20,6 +20,26 @@ pub fn content() -> Content {
     }
 }
 
+/// The campaign path alone: the campus districts are optional open-world content on their own
+/// level band (packs with a fixed level, the campus rares, `open_world` quests), so campaign
+/// pacing tests leave them out.
+pub fn without_districts(c: &mut Content) {
+    for z in &mut c.zones {
+        z.packs.retain(|p| p.level.is_none());
+        if z.id == "campus" {
+            z.rares.clear();
+        }
+    }
+    c.quests.retain(|q| !q.open_world);
+}
+
+/// `content()` without the campus districts (`without_districts`).
+pub fn campaign_content() -> Content {
+    let mut c = content();
+    without_districts(&mut c);
+    c
+}
+
 pub fn def_mut<'a>(c: &'a mut Content, key: &str) -> &'a mut UnitDef {
     match c.units.iter_mut().find(|u| u.key == key) {
         Some(u) => u,
@@ -362,6 +382,7 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
         } => format!("quest {quest} objective {objective}: {count}/{need}"),
         Event::QuestReady { quest } => format!("quest {quest} ready"),
         Event::QuestCompleted { quest } => format!("quest {quest} completed"),
+        Event::QuestFailed { quest } => format!("quest {quest} failed"),
         Event::TelegraphStarted {
             id,
             source,
@@ -433,6 +454,13 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
         Event::WorldBoss { state, secs, unit } => {
             format!("world boss {state:?} {secs} s ({})", t(*unit))
         }
+        Event::WorldEvent {
+            key,
+            phase,
+            secs,
+            count,
+            need,
+        } => format!("world event {key} {phase:?} {secs} s {count}/{need}"),
         Event::PetChanged { unit, pet } => format!("{} pet: {pet}", t(*unit)),
         Event::PetLearned { unit, pet } => format!("{} learns pet {pet}", t(*unit)),
         Event::PetLooted { unit, items, .. } => {
@@ -507,4 +535,46 @@ pub fn wall(z: f32) -> Aabb {
         min: Vec3::new(-5.0, -1.0, z - 0.5),
         max: Vec3::new(5.0, 10.0, z + 0.5),
     }
+}
+
+/// One zone of `content/zone_geometry.ron` (the client's exported layouts): anchors and walls.
+pub struct Geo {
+    pub anchors: std::collections::HashMap<String, (Vec3, f32)>,
+    pub blockers: Vec<Aabb>,
+}
+
+#[derive(serde::Deserialize)]
+struct RawGeo {
+    id: String,
+    anchors: Vec<(String, [f32; 3], f32)>,
+    blockers: Vec<([f32; 3], [f32; 3])>,
+}
+
+/// Every zone of the shipped geometry, by id.
+pub fn geometry() -> std::collections::HashMap<String, Geo> {
+    let raw: Vec<RawGeo> = match ron::from_str(include_str!("../../../content/zone_geometry.ron")) {
+        Ok(r) => r,
+        Err(e) => panic!("zone_geometry.ron: {e}"),
+    };
+    let v = |p: [f32; 3]| Vec3::new(p[0], p[1], p[2]);
+    raw.into_iter()
+        .map(|z| {
+            let geo = Geo {
+                anchors: z
+                    .anchors
+                    .into_iter()
+                    .map(|(n, p, yaw)| (n, (v(p), yaw)))
+                    .collect(),
+                blockers: z
+                    .blockers
+                    .into_iter()
+                    .map(|(min, max)| Aabb {
+                        min: v(min),
+                        max: v(max),
+                    })
+                    .collect(),
+            };
+            (z.id, geo)
+        })
+        .collect()
 }

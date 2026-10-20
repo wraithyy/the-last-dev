@@ -154,11 +154,7 @@ fn smooth_interval(old: f64, measured: f64) -> f64 {
 }
 
 fn objective_need(o: &Objective) -> u32 {
-    match o {
-        Objective::Kill(_, n) | Objective::Loot(_, n) | Objective::KillClean(_, n) => *n,
-        Objective::Wait { secs, .. } | Objective::Defend { secs, .. } => *secs,
-        Objective::Talk(_) | Objective::ClearZone(_) => 1,
-    }
+    o.need()
 }
 
 fn ms_to_ticks(ms: u32) -> u64 {
@@ -584,7 +580,9 @@ impl NetWorld {
         if !target_ok || busy || me.silenced {
             return;
         }
-        let bar = d.cast_ms > 0 && !moving && (d.channel.is_none() || me.mana < me.max_mana);
+        // A full bar only blocks the drink; damage channels cast whatever the mana.
+        let drink = d.channel.is_some_and(|c| !c.hits());
+        let bar = d.cast_ms > 0 && !moving && (!drink || me.mana < me.max_mana);
         if d.cast_ms > 0 && !bar {
             return;
         }
@@ -1034,6 +1032,7 @@ impl NetWorld {
                 let end = self.tick + ms_to_ticks(*ms);
                 self.item_cds.insert(item.clone(), (end, *ms));
             }
+            Event::QuestFailed { quest } => self.quests.active.retain(|q| q.id != *quest),
             Event::QuestCompleted { quest } => {
                 self.quests.active.retain(|q| q.id != *quest);
                 if !self.quests.completed.contains(quest) {

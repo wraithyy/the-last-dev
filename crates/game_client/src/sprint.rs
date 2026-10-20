@@ -163,6 +163,8 @@ fn class_name(key: &str) -> &'static str {
         "frontend" => "Frontend",
         "backend" => "Backend",
         "devops" => "DevOps",
+        "qa" => "QA",
+        "data_scientist" => "Data Scientist",
         _ => "Contractor",
     }
 }

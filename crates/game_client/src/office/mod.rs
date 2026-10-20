@@ -55,6 +55,8 @@ pub struct PropSpot {
     radius: f32,
     /// Borrowed scooters: hidden until this time (seconds since start).
     gone_until: f32,
+    /// Quest pickups nobody local needs right now: not drawn, hovered or used.
+    hidden: bool,
 }
 
 #[derive(Resource, Default)]
@@ -66,7 +68,17 @@ pub struct Props {
     days_reset: f32,
     /// The local player's prop uses this session (varies repeated lines).
     uses: u32,
+    /// Quest pickups the local player took (`world.props` keys), mirroring the sim's per-player
+    /// record; a new quest for their tag puts them back.
+    picked: Vec<String>,
 }
+
+/// Entities drawn per zone by this module (parked scooters, quest pickups).
+type ZoneProps = Or<(With<ParkedScooter>, With<QuestPickup>)>;
+
+/// A glowing quest pickup on the floor (index into `Props::list`); `true` for its halo disc.
+#[derive(Component)]
+struct QuestPickup(usize, bool);
 
 /// The prop under the cursor (index into `Props::list`), for the cursor icon and the tooltip.
 #[derive(Resource, Default)]
@@ -109,6 +121,7 @@ impl Plugin for OfficePlugin {
                 (
                     track_zone,
                     parked_scooters,
+                    quest_pickups,
                     hover_props,
                     use_props,
                     prop_events,
@@ -148,7 +161,14 @@ fn hover_radius(kind: PropKind) -> f32 {
         | PropKind::SprintBoard
         | PropKind::ScrumBoard
         | PropKind::Calendar => 1.0,
-        PropKind::Bench | PropKind::BeanBag | PropKind::Dog | PropKind::VrDemo => 0.9,
+        PropKind::Bench
+        | PropKind::BeanBag
+        | PropKind::Dog
+        | PropKind::VrDemo
+        | PropKind::ShuttleStop
+        | PropKind::Inspect
+        | PropKind::Device => 0.9,
+        PropKind::Pickup => 0.6,
         PropKind::QuietRoom => 1.2,
         PropKind::Scooter | PropKind::Printer => 0.6,
         PropKind::Coffee => 0.5,
@@ -156,14 +176,17 @@ fn hover_radius(kind: PropKind) -> f32 {
     }
 }
 
-/// Rebuilds the prop list (and the parked scooters) whenever the zone changes.
+/// Rebuilds the prop list (and the parked scooters, quest pickups) whenever the zone changes.
+#[allow(clippy::too_many_arguments)] // Bevy system: one parameter per resource it reads
 fn track_zone(
     mut commands: Commands,
     time: Res<Time>,
     flow: Res<GameFlow>,
     sim: SimView,
     mut props: ResMut<Props>,
-    parked: Query<Entity, With<ParkedScooter>>,
+    parked: Query<Entity, ZoneProps>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     if flow.zone == props.zone || flow.zone.is_empty() {
         return;
@@ -195,9 +218,44 @@ fn track_zone(
                 reach: def.reach_m,
                 radius: hover_radius(def.kind),
                 gone_until: 0.0,
+                hidden: def.kind == PropKind::Pickup,
             })
         })
         .collect();
+    // One shared glowing note-sized slab over a soft gold halo on the floor: the item's own
+    // name is in the tooltip, the halo is what catches the eye across a room.
+    let mesh = meshes.add(Cuboid::new(0.42, 0.07, 0.3));
+    let glow = materials.add(StandardMaterial {
+        base_color: Color::srgb(1.0, 0.8, 0.25),
+        emissive: LinearRgba::rgb(4.0, 2.6, 0.5),
+        ..default()
+    });
+    let disc = meshes.add(Cylinder::new(0.55, 0.02));
+    let halo = materials.add(StandardMaterial {
+        base_color: Color::srgba(1.0, 0.78, 0.25, 0.28),
+        emissive: LinearRgba::rgb(1.6, 1.0, 0.2),
+        alpha_mode: AlphaMode::Blend,
+        unlit: true,
+        ..default()
+    });
+    for (i, p) in props.list.iter().enumerate() {
+        if p.kind == PropKind::Pickup {
+            commands.spawn((
+                QuestPickup(i, false),
+                Mesh3d(mesh.clone()),
+                MeshMaterial3d(glow.clone()),
+                Transform::from_translation(p.center),
+                Visibility::Hidden,
+            ));
+            commands.spawn((
+                QuestPickup(i, true),
+                Mesh3d(disc.clone()),
+                MeshMaterial3d(halo.clone()),
+                Transform::from_xyz(p.center.x, 0.03, p.center.z),
+                Visibility::Hidden,
+            ));
+        }
+    }
     for (i, p) in props.list.iter().enumerate() {
         if p.kind == PropKind::Scooter {
             commands.spawn((
@@ -228,6 +286,54 @@ fn parked_scooters(
             *vis = want;
         }
     }
+}
+
+/// Shows a quest pickup only while the local player's quest still wants it and they have not
+/// taken it, bobbing gently so it reads as "for you" next to the static dressing.
+fn quest_pickups(
+    time: Res<Time>,
+    sim: SimView,
+    mut props: ResMut<Props>,
+    mut q: Query<(&QuestPickup, &mut Transform, &mut Visibility)>,
+) {
+    let content = sim.content();
+    let log = sim.quests();
+    let wanted = |tag: &str| {
+        log.active.iter().any(|a| {
+            content.quest(&a.id).is_some_and(|def| {
+                def.objectives.iter().zip(&a.counts).any(|(o, c)| {
+                    matches!(o, combat_core::Objective::Collect(t, _) if t == tag) && *c < o.need()
+                })
+            })
+        })
+    };
+    let t = time.elapsed_secs();
+    let picked = std::mem::take(&mut props.picked);
+    for (pick, mut tf, mut vis) in &mut q {
+        let Some(spot) = props.list.get_mut(pick.0) else {
+            continue;
+        };
+        let tag = content.prop(spot.key).map_or("", |d| d.tag.as_str());
+        spot.hidden = !wanted(tag) || picked.iter().any(|k| k == spot.key);
+        let want = if spot.hidden {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
+        if *vis != want {
+            *vis = want;
+        }
+        if !spot.hidden {
+            let phase = pick.0 as f32;
+            if pick.1 {
+                tf.scale = Vec3::splat(0.85 + 0.15 * (t * 2.2 + phase).sin());
+            } else {
+                tf.translation.y = spot.center.y + 0.1 + 0.08 * (t * 2.2 + phase).sin();
+                tf.rotation = Quat::from_rotation_y(t * 0.8 + phase);
+            }
+        }
+    }
+    props.picked = picked;
 }
 
 /// Units under the cursor win; otherwise the nearest prop sphere in line of sight.
@@ -261,7 +367,7 @@ fn hover_props(
             .list
             .iter()
             .enumerate()
-            .filter(|(_, p)| p.gone_until <= now)
+            .filter(|(_, p)| p.gone_until <= now && !p.hidden)
             .filter_map(|(i, p)| {
                 ray_sphere(ray.origin, *ray.direction, p.center, p.radius).map(|t| (t, i))
             })
@@ -329,7 +435,7 @@ fn use_props(
                 .list
                 .iter()
                 .enumerate()
-                .filter(|(_, p)| p.stand.distance(body.pos) <= p.reach)
+                .filter(|(_, p)| !p.hidden && p.stand.distance(body.pos) <= p.reach)
                 .min_by(|a, b| {
                     a.1.stand
                         .distance(body.pos)
@@ -386,6 +492,12 @@ fn prop_events(
                 if def.kind == PropKind::DaysSign {
                     props.days_reset = now;
                 }
+                if def.kind == PropKind::Pickup
+                    && Some(*unit) == me
+                    && *outcome == combat_core::QUEST_PROP_COUNTED
+                {
+                    props.picked.push(prop.clone());
+                }
                 let spot = props.list.iter().find(|p| p.key == prop.as_str());
                 match (def.kind, spot) {
                     // `/sit` snaps to the nearest free slot of the bench (`ride::apply_emotes`);
@@ -413,6 +525,27 @@ fn prop_events(
                     };
                     log.write(LogLineMsg(text, color));
                 }
+            }
+            // The sim puts a quest's pickups back for a player who takes it (again).
+            Event::QuestAccepted { quest } => {
+                let content = sim.content();
+                let tags: Vec<&str> = content
+                    .quest(quest)
+                    .map(|q| {
+                        q.objectives
+                            .iter()
+                            .filter_map(|o| match o {
+                                combat_core::Objective::Collect(t, _) => Some(t.as_str()),
+                                _ => None,
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                props.picked.retain(|k| {
+                    content
+                        .prop(k)
+                        .is_none_or(|d| !tags.contains(&d.tag.as_str()))
+                });
             }
             Event::Achievement { unit, key } => {
                 let Some(a) = sim.content().achievement(key) else {

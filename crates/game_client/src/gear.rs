@@ -1,7 +1,8 @@
 //! Accessories parented to skeleton bones so they follow every animation. The local player
 //! carries a coffee mug in the left fist; every class skin (player, teammates, role picker,
 //! lineup) gets its class kit: Fullstack headphones resting on the neck, Frontend glasses,
-//! Backend big over-ear headphones, a DevOps pager on the belt. Offsets are in bone space
+//! Backend big over-ear headphones, a DevOps pager on the belt, a QA clipboard on the other hip,
+//! a Data Scientist's lanyard with a glowing chart badge. Offsets are in bone space
 //! (model units; the model root is scaled).
 //!
 //! While the player channels Coffee Break the left arm is posed procedurally (two-bone IK
@@ -25,6 +26,10 @@ const CANS_Y: f32 = 0.42;
 /// Hips-bone offset of the pager: clipped to the front of the belt (z 0.2), off to the side
 /// where the hanging arm does not cover it.
 const PAGER_AT: Vec3 = Vec3::new(0.27, 0.13, 0.27);
+/// Hips-bone offset of the QA clipboard: on the hip opposite the pager, tilted like it hangs.
+const CLIPBOARD_AT: Vec3 = Vec3::new(-0.3, 0.05, 0.25);
+/// Neck-bone offset of the Data Scientist's badge: on the chest, below the collar.
+const BADGE_AT: Vec3 = Vec3::new(0.0, -0.55, 0.36);
 const HAND_BONE: &str = "Fist.L";
 /// Yaw of the mug relative to the player, so the handle faces the camera side.
 /// Mug origin in bone space before the lift.
@@ -257,6 +262,84 @@ fn attach_accessories(
                         MeshMaterial3d(screen),
                         Transform::from_xyz(0.0, 0.05, 0.045),
                     ));
+                });
+            }
+            "qa" => {
+                // Clipboard of repro steps: brown board, white sheet, one red failed check.
+                let board = mat(Color::srgb(0.45, 0.28, 0.12), 0.7);
+                let paper = mat(Color::srgb(0.95, 0.95, 0.92), 0.8);
+                let fail = materials.add(StandardMaterial {
+                    base_color: Color::BLACK,
+                    emissive: LinearRgba::rgb(3.0, 0.2, 0.15),
+                    ..default()
+                });
+                let back = meshes.add(Cuboid::new(0.26, 0.34, 0.03));
+                let sheet = meshes.add(Cuboid::new(0.22, 0.28, 0.01));
+                let mark = meshes.add(Cuboid::new(0.12, 0.03, 0.01));
+                commands.entity(hips).with_children(|c| {
+                    c.spawn((
+                        Mesh3d(back),
+                        MeshMaterial3d(board),
+                        Transform::from_translation(CLIPBOARD_AT)
+                            .with_rotation(Quat::from_rotation_z(0.2)),
+                        NotShadowCaster,
+                    ))
+                    .with_children(|b| {
+                        b.spawn((
+                            Mesh3d(sheet),
+                            MeshMaterial3d(paper),
+                            Transform::from_xyz(0.0, -0.01, 0.02),
+                        ));
+                        b.spawn((
+                            Mesh3d(mark),
+                            MeshMaterial3d(fail),
+                            Transform::from_xyz(0.0, 0.05, 0.03)
+                                .with_rotation(Quat::from_rotation_z(0.6)),
+                        ));
+                    });
+                });
+            }
+            "data_scientist" => {
+                // Conference lanyard around the neck with a badge glowing a green chart.
+                let strap = mat(Color::srgb(0.45, 0.2, 0.7), 0.6);
+                let card = mat(Color::srgb(0.95, 0.95, 0.97), 0.6);
+                let chart = materials.add(StandardMaterial {
+                    base_color: Color::BLACK,
+                    emissive: LinearRgba::rgb(0.3, 2.6, 1.2),
+                    ..default()
+                });
+                let loop_mesh = meshes.add(Torus::new(0.33, 0.36));
+                let badge = meshes.add(Cuboid::new(0.18, 0.24, 0.02));
+                let bar = meshes.add(Cuboid::new(0.03, 1.0, 0.01));
+                commands.entity(neck).with_children(|c| {
+                    c.spawn((
+                        Mesh3d(loop_mesh),
+                        MeshMaterial3d(strap),
+                        Transform::from_xyz(0.0, -0.25, 0.08)
+                            .with_rotation(Quat::from_rotation_x(1.1)),
+                        NotShadowCaster,
+                    ));
+                    c.spawn((
+                        Mesh3d(badge),
+                        MeshMaterial3d(card),
+                        Transform::from_translation(BADGE_AT),
+                        NotShadowCaster,
+                    ))
+                    .with_children(|b| {
+                        // A rising bar chart, three bars.
+                        for (k, h) in [0.05f32, 0.09, 0.14].into_iter().enumerate() {
+                            b.spawn((
+                                Mesh3d(bar.clone()),
+                                MeshMaterial3d(chart.clone()),
+                                Transform::from_xyz(
+                                    -0.05 + k as f32 * 0.05,
+                                    -0.08 + h / 2.0,
+                                    0.015,
+                                )
+                                .with_scale(Vec3::new(1.0, h, 1.0)),
+                            ));
+                        }
+                    });
                 });
             }
             _ => {

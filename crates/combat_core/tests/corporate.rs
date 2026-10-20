@@ -23,7 +23,13 @@ fn at(x: f32, z: f32) -> Option<(Vec3, f32)> {
 /// Campus props and boards next to the player, packs far away.
 fn campus(name: &str) -> Option<(Vec3, f32)> {
     match name {
-        n if n.starts_with("pack_") || n == "boss" => at(400.0, 400.0),
+        n if n.starts_with("pack_")
+            || n.starts_with("rare_")
+            || n.starts_with("event:")
+            || n == "boss" =>
+        {
+            at(400.0, 400.0)
+        }
         n if n.starts_with("npc_") || n.starts_with("secret:") || n.starts_with("night_") => {
             at(60.0, 60.0)
         }

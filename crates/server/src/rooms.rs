@@ -525,6 +525,25 @@ mod tests {
             .collect()
     }
 
+    /// Hello validates the class against the content: the new classes pass, made-up ones do not.
+    #[tokio::test(start_paused = true)]
+    async fn hello_knows_every_playable_class() {
+        let reg = reg(&cfg(2, 4));
+        for class in [
+            "fullstack",
+            "frontend",
+            "backend",
+            "devops",
+            "qa",
+            "data_scientist",
+        ] {
+            assert!(reg.knows_class(class), "{class}");
+        }
+        assert!(!reg.knows_class("product_manager"));
+        let a = reg.create_and_join("Quinn", "qa").unwrap();
+        assert!(reg.join(&a.code, "Dee", "data_scientist").is_ok());
+    }
+
     #[test]
     fn code_shape() {
         let c = random_room_code().unwrap();

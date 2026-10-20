@@ -8,6 +8,7 @@ mod campus;
 mod client;
 pub mod corporate;
 mod datacenter;
+mod districts;
 #[cfg(test)]
 mod export;
 mod kit;
@@ -16,6 +17,7 @@ mod layout;
 mod office;
 mod offsite;
 mod props;
+mod quest_spots;
 mod shape;
 mod teambuilding;
 #[cfg(test)]
@@ -25,6 +27,7 @@ mod themes;
 mod vibecon;
 mod zones;
 
+pub use districts::{DISTRICTS, district_at};
 use layout::build_floor;
 pub use layout::{FloorLayout, elevator_exit_trigger};
 pub use textures::{icon_image, z_image};

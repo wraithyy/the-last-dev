@@ -187,3 +187,64 @@ fn every_task_goal_fits_the_work_zone() {
         bad.join("\n")
     );
 }
+
+/// Interactive objectives need things placed in the shipped layouts: enough anchored props
+/// per tag, every device of a sequence, units an item can go on, a recipient and an escort
+/// with its goal anchor in the same zone.
+#[test]
+fn every_interactive_objective_has_its_props_units_and_anchors() {
+    let c = content();
+    let geo = geometry();
+    let anchored =
+        |zone: &str, name: &str| geo.get(zone).is_some_and(|g| g.anchors.contains_key(name));
+    let placed = |f: &dyn Fn(&combat_core::PropDef) -> bool| {
+        c.world
+            .props
+            .iter()
+            .filter(|p| f(p) && anchored(&p.zone, &format!("prop:{}", p.key)))
+            .count() as u32
+    };
+    // A friendly unit spawned at an anchor the zone's layout has.
+    let stands = |unit: &str| {
+        c.zones.iter().any(|z| {
+            z.friendly
+                .iter()
+                .any(|f| f.unit == unit && anchored(&z.id, &f.anchor))
+        })
+    };
+    let mut bad = Vec::new();
+    for q in &c.quests {
+        for o in &q.objectives {
+            let ok = match o {
+                Objective::Collect(tag, n) | Objective::Inspect(tag, n) => {
+                    placed(&|p| p.tag == *tag) >= *n
+                }
+                Objective::Interact(k, _) => placed(&|p| p.key == *k) == 1,
+                Objective::Sequence { props, .. } => {
+                    props.iter().all(|k| placed(&|p| p.key == *k) == 1)
+                }
+                Objective::UseOn { target, n, .. } => match c.unit_def(target) {
+                    Some(u) if u.hostile => best(&c, |z| kill_supply(&c, z, target)) >= *n,
+                    Some(_) => stands(target),
+                    None => placed(&|p| p.key == *target || p.tag == *target) >= *n,
+                },
+                Objective::Deliver { npc, .. } => stands(npc),
+                Objective::Escort { unit, to, .. } => c.zones.iter().any(|z| {
+                    z.friendly
+                        .iter()
+                        .any(|f| f.unit == *unit && anchored(&z.id, &f.anchor))
+                        && anchored(&z.id, to)
+                }),
+                _ => continue,
+            };
+            if !ok {
+                bad.push(format!("{}: {o:?}", q.id));
+            }
+        }
+    }
+    assert!(
+        bad.is_empty(),
+        "unplaceable objectives:\n{}",
+        bad.join("\n")
+    );
+}

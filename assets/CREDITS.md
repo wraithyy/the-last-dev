@@ -22,6 +22,8 @@ The base models cover the whole cast (plus one skin per playable class); per-uni
 | assets/models/characters/Frontend.glb | Casual2_Male body with the Casual2_Female hair, recoloured (magenta hoodie, teal sleeves), small procedural stripe texture and hood added, hair split into Hair_1..Hair_5 by scripts/class_skins.py | Frontend Developer (player) |
 | assets/models/characters/Backend.glb | Casual2_Male body with the Casual3_Female hair, recoloured (charcoal hoodie, dark trousers), torso widened, hood and eye shadows added, hair split into Hair_1..Hair_5 by scripts/class_skins.py | Backend Engineer (player) |
 | assets/models/characters/DevOps.glb | Casual2_Male body with the Casual_Male hair, recoloured (plaid flannel via small procedural texture, jeans), eye shadows added, hair split into Hair_1..Hair_5 by scripts/class_skins.py | DevOps Engineer (player) |
+| assets/models/characters/QA.glb | Frontend.glb reskinned by `scripts/class_skins.py --reskin`: hi-vis yellow hoodie with a black caution band (small procedural texture), black hood and sleeves, auburn hair | QA Engineer (player) |
+| assets/models/characters/DataScientist.glb | DevOps.glb reskinned by `scripts/class_skins.py --reskin`: purple graph-paper sweater with a trend line (small procedural texture), black hair, khaki trousers | Data Scientist (player) |
 | assets/models/characters/Casual_Female.glb | Casual_Female | AI-Native Intern, Agile Coach, LinkedIn Influencer |
 | assets/models/characters/Casual2_Male.glb | Casual2_Male | Vibe Coder, Vibe-Coding Junior, Scrum Master, Crypto Bro, Growth Hacker, IT Support |
 | assets/models/characters/Casual_Male.glb | Casual_Male | MeatProxy, Copilot Drone, Chatbot Minion, Unreviewed PR |

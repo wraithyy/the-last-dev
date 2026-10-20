@@ -1525,7 +1525,10 @@ fn spell_tip(d: &SpellDef, content: &Content, perks: &PerkView) -> TipContent {
         "self".to_string()
     });
     let cast_ms = (i64::from(d.cast_ms) * (100 + perks.cast_time_pct(d.id)).max(0) / 100) as u32;
-    stats.push(if cast_ms == 0 {
+    stats.push(if d.channel.is_some() {
+        // Channel length is authored; haste and cast-time perks do not stretch it.
+        format!("{:.1}s channel", d.cast_ms as f32 / 1000.0)
+    } else if cast_ms == 0 {
         "instant".to_string()
     } else {
         format!("{:.1}s cast", cast_ms as f32 / 1000.0)

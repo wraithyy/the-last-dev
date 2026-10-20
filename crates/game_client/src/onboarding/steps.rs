@@ -191,6 +191,8 @@ pub struct Ctx {
     pub role_spell: (String, String),
     /// The tank's taunt and the level it unlocks at.
     pub taunt: Option<(String, u8)>,
+    /// One extra sentence for the role tip of classes whose kit works differently.
+    pub class_tip: Option<String>,
 }
 
 /// One step's panel copy.
@@ -327,8 +329,11 @@ pub fn copy(t: &Tutorial, c: &Ctx) -> Option<Copy> {
             Role::Ranged => (
                 "ranged tip: kiting",
                 format!(
-                    "Back off to {KITE_M:.0}+ m while it shuffles after you, then hit it with {}.",
-                    c.spell1.0
+                    "Back off to {KITE_M:.0}+ m while it shuffles after you, then hit it with {}.{}",
+                    c.spell1.0,
+                    c.class_tip
+                        .as_ref()
+                        .map_or(String::new(), |t| format!(" {t}"))
                 ),
                 "Distance is the only boundary management respects.",
             ),
@@ -507,6 +512,7 @@ mod tests {
                 interrupt: Some(("SIGSTOP".into(), "3".into(), 2)),
                 role_spell: ("Hotfix".into(), "2".into()),
                 taunt: None,
+                class_tip: Some("File a Bug Report (2) first.".into()),
             };
             for role in [Role::Tank, Role::Healer, Role::Melee, Role::Ranged] {
                 let mut t = Tutorial::new(role, false);
@@ -516,6 +522,9 @@ mod tests {
                         panic!("no copy for step {k}");
                     };
                     assert!(!copy.how.is_empty() && !copy.quip.is_empty());
+                    if role == Role::Ranged && t.current() == Some(Step::RoleTip) {
+                        assert!(copy.how.contains("Bug Report"), "{}", copy.how);
+                    }
                     // Touch copy never asks for a key.
                     if touch && !matches!(t.current(), Some(Step::Interrupt | Step::RoleTip)) {
                         assert!(!copy.how.contains("press "), "{}", copy.how);

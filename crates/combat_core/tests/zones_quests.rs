@@ -156,7 +156,17 @@ impl T {
         });
     }
 
+    /// Walks to a quest's separate turn-in NPC when they stand in the loaded zone (zone
+    /// turn-ins wait at the far end, not at the giver), then hands it in.
     fn turn_in(&mut self, q: &str) {
+        let ender = self
+            .sim
+            .content()
+            .quest(q)
+            .and_then(|d| d.turn_in.as_ref().map(|t| t.npc.clone()));
+        if let Some(npc) = ender.filter(|k| self.sim.units().any(|u| u.key == *k && u.alive)) {
+            self.talk_to(&npc);
+        }
         self.quest_cmd(Command::TurnInQuest {
             quest: q.to_string(),
             choice: 0,
@@ -214,7 +224,19 @@ fn load_zone_spawns_the_campus_and_reports_its_links() {
     assert!(t.has(|e| matches!(e, Event::ZoneLoaded { zone } if zone == "campus")));
     assert!(!t.has(|e| matches!(e, Event::FloorLoaded { .. })));
     let hostiles = t.sim.units().filter(|u| u.hostile).count();
-    assert_eq!(hostiles, 16, "8 packs, no boss, the onboarding dummy");
+    // The rares need anchors this layout lacks; the district packs all spawn.
+    let districts: usize = content().zone("campus").map_or(0, |z| {
+        z.packs
+            .iter()
+            .filter(|p| p.level.is_some())
+            .map(|p| p.units.len())
+            .sum()
+    });
+    assert_eq!(
+        hostiles,
+        16 + districts,
+        "8 packs, no boss, the onboarding dummy, the districts"
+    );
     for key in ["intern", "facilities_guy", "barista", "smoking_corner_dev"] {
         assert!(t.sim.units().any(|u| u.key == key && !u.hostile), "{key}");
     }
@@ -755,6 +777,23 @@ fn area(zone: &str) -> &str {
     zone.split('/').next().unwrap_or(zone)
 }
 
+/// Campaign order of the zones (`playthrough.rs` WORLD_ORDER); 0 for zones off the path.
+fn campaign_rank(zone: &str) -> usize {
+    const ORDER: [&str; 10] = [
+        "campus",
+        "tower/1",
+        "tower/2",
+        "tower/3",
+        "datacenter/1",
+        "datacenter/2",
+        "tower/4",
+        "tower/5",
+        "lab/1",
+        "lab/2",
+    ];
+    ORDER.iter().position(|z| *z == zone).map_or(0, |k| k + 1)
+}
+
 #[test]
 fn every_quest_is_given_where_its_work_happens() {
     let c = content();
@@ -769,7 +808,15 @@ fn every_quest_is_given_where_its_work_happens() {
             }
             continue;
         }
-        assert_eq!(q.ender().zone, q.giver.zone, "{}", q.id);
+        // Work is handed in where it ends: the giver's zone, or a later one on the campaign
+        // path (the story steps and timed deliveries carried forward).
+        let ender = q.ender().zone.as_str();
+        assert!(
+            ender == q.giver.zone || campaign_rank(ender) > campaign_rank(&q.giver.zone),
+            "{}: turned in at {ender}, given in {}",
+            q.id,
+            q.giver.zone
+        );
         // Company Calendar chains are side trips from the campus: their work may sit in any
         // zone open from level 1 (the Open Space).
         let calendar = c.calendar.chains.iter().any(|ch| ch.quests.contains(&q.id));
@@ -783,9 +830,11 @@ fn every_quest_is_given_where_its_work_happens() {
                 );
                 continue;
             }
-            let here = zones
-                .iter()
-                .any(|z| *z == q.giver.zone || area(z) == area(&q.giver.zone) && z != &"campus");
+            let here = zones.iter().any(|z| {
+                *z == q.giver.zone
+                    || *z == ender
+                    || area(z) == area(&q.giver.zone) && z != &"campus"
+            });
             assert!(
                 here,
                 "{}: {o:?} happens in {zones:?}, given in {}",
@@ -820,6 +869,9 @@ fn every_quest_is_given_where_its_work_happens() {
 fn quest_levels_fit_their_zone() {
     let c = content();
     for q in &c.quests {
+        if q.open_world {
+            continue;
+        }
         let zone = if q.is_breadcrumb() {
             &q.ender().zone
         } else {
@@ -934,6 +986,7 @@ fn gear_rewards_offer_a_role_choice_and_the_pick_lands_in_the_bag() {
     };
     let choices = t.sim.content().quest_gear_choices(&def, Some(Role::Ranged));
     let bag = t.sim.unit(t.p).map_or(0, |u| u.bag.len());
+    t.talk_to("reviewer_t1");
     t.quest_cmd(Command::TurnInQuest {
         quest: "code_freeze".into(),
         choice: 1,
@@ -1024,7 +1077,8 @@ fn quest_and_kill_xp_track_the_zone_levels() {
         ("lab/1", 10, 10),
         ("lab/2", 10, 10),
     ];
-    let c = content();
+    // The campus districts level on their own band (`campus_districts_level_a_fresh_hire`).
+    let c = campaign_content();
     let mut sim = Sim::new(c.clone(), 1);
     sim.spawn_player("fullstack", Vec3::new(0.0, 0.0, 0.0), 0.0);
     let (mut level, mut xp) = (1u8, 0u32);
@@ -1092,7 +1146,7 @@ fn group_members_keep_their_own_logs_and_share_kill_credit() {
     t.load("tower/1");
     let p2 = t.sim.spawn_player("devops", Vec3::new(1.0, 0.0, 20.0), 0.0);
     t.talk_to("helpdesk_lead");
-    t.accept("forwarded_to_ai");
+    t.accept("secrets_in_the_repo");
     // The second member stands next to the first and takes a different ticket.
     let Some(at) = t.sim.unit(t.p).map(|u| u.pos) else {
         panic!()
@@ -1115,17 +1169,14 @@ fn group_members_keep_their_own_logs_and_share_kill_credit() {
     t.sim.apply_as(
         p2,
         Command::AcceptQuest {
-            quest: "autocomplete_pest_control".into(),
+            quest: "forwarded_to_ai".into(),
         },
     );
     t.tick();
-    assert_eq!(
-        t.sim.quests_of(p2).active[0].id,
-        "autocomplete_pest_control"
-    );
-    assert_eq!(t.sim.quests_of(t.p).active[0].id, "forwarded_to_ai");
-    // A drone killed by the first member near the second counts for the second's ticket.
-    let drone = t.id_of("copilot_drone");
+    assert_eq!(t.sim.quests_of(p2).active[0].id, "forwarded_to_ai");
+    assert_eq!(t.sim.quests_of(t.p).active[0].id, "secrets_in_the_repo");
+    // A MeatProxy killed by the first member near the second counts for the second's ticket.
+    let drone = t.id_of("meatproxy");
     let Some(dpos) = t.sim.unit(drone).map(|u| u.pos) else {
         panic!()
     };
@@ -1141,7 +1192,7 @@ fn group_members_keep_their_own_logs_and_share_kill_credit() {
     t.kill(drone);
     assert_eq!(t.sim.quests_of(p2).active[0].counts, [1]);
     assert_eq!(t.sim.quests_of(t.p).active[0].counts, [0]);
-    assert_eq!(t.sim.quests_of(p2).kills.get("copilot_drone"), Some(&1));
+    assert_eq!(t.sim.quests_of(p2).kills.get("meatproxy"), Some(&1));
 }
 
 // ---- corpse lifetime ----
@@ -1365,17 +1416,20 @@ fn body_leasing_chain_runs_from_the_account_manager_to_the_title() {
     assert_eq!(t.sim.quest_status("bl_access_rights"), QuestStatus::Ready);
     t.turn_in("bl_access_rights");
 
-    // Muted meeting: accepted at the reception, closed by talking to the lead.
+    // Muted meeting: accepted at the reception, closed at the lead in the back room, who
+    // also hands out the timesheet: nothing sends you back to reception.
     t.talk_to("client_receptionist");
     t.accept("bl_meeting");
     t.talk_to("client_delivery_lead");
     assert_eq!(t.sim.quest_status("bl_meeting"), QuestStatus::Ready);
-    t.talk_to("client_receptionist");
-    t.turn_in("bl_meeting");
+    t.quest_cmd(Command::TurnInQuest {
+        quest: "bl_meeting".into(),
+        choice: 0,
+    });
+    assert_eq!(t.sim.quest_status("bl_meeting"), QuestStatus::Done);
 
     // The only way out is gated by the timesheet.
     assert_eq!(links(&t.sim, "client/1"), [("campus".to_string(), false)]);
-    t.talk_to("client_receptionist");
     t.accept("bl_timesheet");
     wait_secs(&mut t, 21);
     assert_eq!(t.sim.quest_status("bl_timesheet"), QuestStatus::Ready);
@@ -1566,4 +1620,115 @@ fn talking_stick_finishes_solo_in_a_cleared_zone() {
         "Stand-up Talking Stick",
         true,
     );
+}
+
+/// Level of the district units an open-world objective sends you to: the fixed level of the
+/// campus pack, or the authored level of a campus rare.
+fn district_level(c: &combat_core::Content, unit: &str) -> Option<u8> {
+    let z = c.zone("campus")?;
+    let pack = z
+        .packs
+        .iter()
+        .filter(|p| p.units.iter().any(|u| u == unit))
+        .filter_map(|p| p.level)
+        .min();
+    let rare = z
+        .rares
+        .iter()
+        .filter(|r| r.unit == unit)
+        .filter_map(|r| c.unit_def(&r.unit).map(|d| d.level))
+        .min();
+    pack.or(rare)
+}
+
+/// Open-world quests are offered at the level of the district they send you to: never above
+/// it, at most two below it.
+#[test]
+fn open_world_quests_match_their_district_band() {
+    let c = content();
+    let mut bad = Vec::new();
+    for q in c.quests.iter().filter(|q| q.open_world) {
+        for o in &q.objectives {
+            let unit = match o {
+                Objective::Kill(k, _) | Objective::KillClean(k, _) => Some(k.clone()),
+                Objective::Loot(it, _) => c
+                    .units
+                    .iter()
+                    .find(|u| {
+                        u.loot
+                            .iter()
+                            .any(|l| l.item == *it && l.quest.as_deref() == Some(q.id.as_str()))
+                    })
+                    .map(|u| u.key.clone()),
+                _ => None,
+            };
+            let Some(level) = unit.as_deref().and_then(|u| district_level(&c, u)) else {
+                continue;
+            };
+            if q.level_min > level || q.level_min + 2 < level {
+                bad.push(format!(
+                    "{}: level {} for district level {level}",
+                    q.id, q.level_min
+                ));
+            }
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+/// The districts are a leveling path of their own: a fresh hire who works only the district
+/// packs and the open-world quests up to level 5 reaches 4 to 6 (WotLK-style: about one level
+/// per district), and the level-10 spots stay out of reach of that budget.
+#[test]
+fn campus_districts_level_a_fresh_hire() {
+    let c = content();
+    let Some(campus) = c.zone("campus") else {
+        panic!("no campus")
+    };
+    let mut mobs: Vec<(u8, u32)> = Vec::new();
+    for p in campus.packs.iter().filter(|p| p.level.is_some()) {
+        let level = p.level.unwrap_or(1);
+        for u in &p.units {
+            let Some(d) = c.unit_def(u) else {
+                panic!("no unit {u}")
+            };
+            // Authored XP scales by `mob_scaling.xp_pct_per_level` from the authored level.
+            let pct = 100 + i32::from(level) * 10 - i32::from(d.level) * 10;
+            let xp = (i64::from(d.xp_reward) * i64::from(pct.max(10)) / 100) as u32;
+            let xp = xp * c.xp_reward_pct(level) / 100;
+            mobs.push((level, xp));
+        }
+    }
+    mobs.sort();
+    let (mut level, mut xp) = (1u8, 0u32);
+    let gain = |level: &mut u8, xp: &mut u32, amount: u32| {
+        *xp += amount;
+        while c.xp_to_next(*level) > 0 && *xp >= c.xp_to_next(*level) {
+            *xp -= c.xp_to_next(*level);
+            *level += 1;
+        }
+    };
+    let mut kills = 0;
+    let mut quests = 0;
+    for (ml, reward) in &mobs {
+        let a = c.kill_xp(level, *ml, *reward);
+        kills += a;
+        gain(&mut level, &mut xp, a);
+    }
+    for q in c.quests.iter().filter(|q| q.open_world && q.level_min <= 5) {
+        quests += c.quest_xp(q);
+        gain(&mut level, &mut xp, c.quest_xp(q));
+    }
+    println!("districts: 1 -> {level} (kills {kills} XP, quests {quests} XP)");
+    assert!(
+        (4..=6).contains(&level),
+        "districts take a fresh hire to {level}"
+    );
+    let ten: Vec<&str> = c
+        .quests
+        .iter()
+        .filter(|q| q.open_world && q.level_min > 5)
+        .map(|q| q.id.as_str())
+        .collect();
+    assert!(ten.len() >= 2, "level-10 spots: {ten:?}");
 }

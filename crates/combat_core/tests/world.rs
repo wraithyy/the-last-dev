@@ -16,7 +16,14 @@ fn anchors(name: &str) -> Option<(Vec3, f32)> {
     let at = |x: f32, z: f32| Some((Vec3::new(x, 0.0, z), 0.0));
     match name {
         // The onboarding dummy is hostile too (it waits to be hit, but not on top of you).
-        n if n.starts_with("pack_") || n == "boss" || n == "npc_dummy" => at(400.0, 400.0),
+        n if n.starts_with("pack_")
+            || n.starts_with("rare_")
+            || n.starts_with("event:")
+            || n == "boss"
+            || n == "npc_dummy" =>
+        {
+            at(400.0, 400.0)
+        }
         "prop:coffee_campus" | "prop:printer_pmo" | "prop:vending_open_space" => at(1.0, 0.0),
         "prop:bike_rack" => at(-20.0, 0.0),
         "prop:scooter_1" => at(0.0, 2.0),

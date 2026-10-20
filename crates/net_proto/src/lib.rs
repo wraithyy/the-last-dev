@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 20;
+pub const PROTOCOL_VERSION: u16 = 21;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -923,7 +923,9 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
             Err(ProtoError::TooMany)
         }
         Event::DailyBoard { board, .. } => check_board(board),
-        Event::TaskCompleted { key, .. } if key.len() > combat_core::world::WORLD_KEY_MAX => {
+        Event::TaskCompleted { key, .. } | Event::WorldEvent { key, .. }
+            if key.len() > combat_core::world::WORLD_KEY_MAX =>
+        {
             Err(ProtoError::TooMany)
         }
         Event::Reputation { dept, .. } if usize::from(*dept) >= combat_core::DEPARTMENTS => {
@@ -1429,6 +1431,9 @@ mod tests {
                     Event::QuestOffered {
                         npc: 4,
                         quests: vec!["q_intro".into()],
+                    },
+                    Event::QuestFailed {
+                        quest: "coffee_for_the_cto".into(),
                     },
                     Event::TelegraphStarted {
                         id: 7,

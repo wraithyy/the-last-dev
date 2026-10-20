@@ -518,6 +518,8 @@ fn class_name(key: &str) -> String {
         "frontend" => "the Frontend",
         "backend" => "the Backend",
         "devops" => "the DevOps",
+        "qa" => "the QA",
+        "data_scientist" => "the Data Scientist",
         _ => "someone",
     }
     .to_string()

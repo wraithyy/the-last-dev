@@ -23,6 +23,7 @@ pub const GOLD: Color = Color::srgb(1.0, 0.82, 0.3);
 pub const GREY_MARK: Color = Color::srgb(0.62, 0.64, 0.7);
 const DONE_GREEN: Color = Color::srgb(0.4, 1.0, 0.5);
 const DONE_GREY: Color = Color::srgb(0.5, 0.53, 0.58);
+const FAILED_RED: Color = Color::srgb(1.0, 0.4, 0.35);
 const WINDOW_W: f32 = 460.0;
 pub(crate) const TRACKER_W: f32 = 290.0;
 /// Quests the tracker shows at most; touch screens have less room under the minimap.
@@ -87,6 +88,91 @@ pub fn objective_label(content: &Content, o: &Objective) -> String {
             format!("{who} terminated, no telegraph hits")
         }
         Objective::Wait { label, .. } | Objective::Defend { label, .. } => label.clone(),
+        Objective::Interact(k, _) => {
+            let name = content.prop(k).map_or(k.as_str(), |p| p.name.as_str());
+            format!("Use {name}")
+        }
+        Objective::Collect(tag, n) => format!("{} collected", counted(&tag_name(content, tag), *n)),
+        Objective::Inspect(tag, n) => {
+            format!("{} documented", counted(&tag_name(content, tag), *n))
+        }
+        Objective::Sequence { label, .. } | Objective::Escort { label, .. } => label.clone(),
+        Objective::UseOn { item, target, n } => {
+            let who = content
+                .unit_def(target)
+                .map(|u| u.name.clone())
+                .unwrap_or_else(|| tag_name(content, target));
+            format!("Use {item} on {}", counted(&who, *n))
+        }
+        Objective::Deliver { item, npc, .. } => {
+            format!("Deliver {item} to {}", unit_name(content, npc))
+        }
+    }
+}
+
+/// The enemy F hands a quest item to (`UseOn` on a hostile key): the target when it
+/// qualifies, else the nearest wanted one within `reach` of `from`.
+pub fn use_on_target(
+    sim: &dyn SimRead,
+    target: Option<combat_core::EntityId>,
+    from: combat_core::Vec3,
+    reach: f32,
+) -> Option<combat_core::EntityId> {
+    let content = sim.content();
+    let wanted: Vec<&str> = sim
+        .quests()
+        .active
+        .iter()
+        .filter_map(|a| content.quest(&a.id).map(|d| (d, a)))
+        .flat_map(|(d, a)| d.objectives.iter().zip(&a.counts))
+        .filter_map(|(o, c)| match o {
+            Objective::UseOn { target, .. } if *c < o.need() => Some(target.as_str()),
+            _ => None,
+        })
+        .collect();
+    if wanted.is_empty() {
+        return None;
+    }
+    let ok = |u: &combat_core::UnitState| {
+        u.alive
+            && u.hostile
+            && wanted.contains(&u.key.as_str())
+            && combat_core::in_range(u.pos, from, reach)
+    };
+    if let Some(t) = target.and_then(|t| sim.unit(t)).filter(|u| ok(u)) {
+        return Some(t.id);
+    }
+    sim.units()
+        .filter(|u| ok(u))
+        .min_by(|a, b| {
+            combat_core::distance(a.pos, from).total_cmp(&combat_core::distance(b.pos, from))
+        })
+        .map(|u| u.id)
+}
+
+/// Display name of a quest prop group: the first prop whose key or tag is `tag`.
+fn tag_name(content: &Content, tag: &str) -> String {
+    content
+        .world
+        .props
+        .iter()
+        .find(|p| p.tag == tag || p.key == tag)
+        .map_or_else(|| tag.to_string(), |p| p.name.clone())
+}
+
+/// `name` in the plural when `n` > 1, pluralising the head noun of a described thing:
+/// "Sticky Notes with a Password", "Gantt Charts (Pure Fiction)".
+fn counted(name: &str, n: u32) -> String {
+    if n <= 1 {
+        return name.to_string();
+    }
+    let cut = [" with ", " Under ", " Showing ", " Taped ", " ("]
+        .iter()
+        .filter_map(|c| name.find(c))
+        .min();
+    match cut {
+        Some(i) => format!("{}{}", plural(&name[..i]), &name[i..]),
+        None => plural(name),
     }
 }
 
@@ -111,10 +197,25 @@ pub fn objective_line(content: &Content, o: &Objective, have: u32, need: u32) ->
         Objective::Kill(..) | Objective::Loot(..) | Objective::KillClean(..) => {
             format!("{what} {have}/{need}")
         }
-        Objective::Wait { .. } | Objective::Defend { .. } => {
+        Objective::Interact(..) | Objective::UseOn { .. } if need > 1 => {
+            format!("{what} {have}/{need}")
+        }
+        Objective::Interact(..) | Objective::UseOn { .. } => what,
+        Objective::Collect(..) | Objective::Inspect(..) => format!("{what} {have}/{need}"),
+        // The next step is the hint: the order is the puzzle, not finding the machines.
+        Objective::Sequence { props, .. } => match props.get(have as usize) {
+            Some(next) if have < need => {
+                let name = content
+                    .prop(next)
+                    .map_or(next.as_str(), |p| p.name.as_str());
+                format!("{what} {have}/{need} \u{2014} next: {name}")
+            }
+            _ => format!("{what} {have}/{need}"),
+        },
+        Objective::Wait { .. } | Objective::Defend { .. } | Objective::Escort { .. } => {
             format!("{what} {}", wait_bar(have, need))
         }
-        Objective::Talk(_) | Objective::ClearZone(_) => what,
+        Objective::Talk(_) | Objective::ClearZone(_) | Objective::Deliver { .. } => what,
     }
 }
 
@@ -152,7 +253,13 @@ pub fn tracker_lines(content: &Content, def: &QuestDef, counts: &[u32]) -> Vec<(
     if out.iter().all(|(_, l)| *l == Line::Done) {
         out.push((
             format!(
-                "Ready to close \u{2014} return to {}",
+                "Ready to close \u{2014} {} {}",
+                // Turn-ins stand where the work ends: you go on to them, not back.
+                if def.turn_in.is_some() {
+                    "report to"
+                } else {
+                    "return to"
+                },
                 unit_name(content, &def.ender().npc)
             ),
             Line::Ready,
@@ -206,6 +313,9 @@ pub struct QuestTrack {
     pub collapsed: bool,
     /// Quest the log (J) opens on, from a tracker title click.
     pub focus: Option<String>,
+    /// Timed deliveries: (quest, `Time::elapsed_secs` when it runs out), started on accept so
+    /// the countdown works the same offline and online.
+    pub deadlines: Vec<(String, f32)>,
 }
 
 impl QuestTrack {
@@ -242,8 +352,12 @@ pub fn objective_units(sim: &dyn SimRead, track: &QuestTrack) -> Vec<String> {
                 continue;
             }
             match o {
-                Objective::Kill(u, _) | Objective::Talk(u) | Objective::KillClean(u, _) => add(u),
-                Objective::Defend { unit, wave, .. } => {
+                Objective::Kill(u, _)
+                | Objective::Talk(u)
+                | Objective::KillClean(u, _)
+                | Objective::Deliver { npc: u, .. }
+                | Objective::UseOn { target: u, .. } => add(u),
+                Objective::Defend { unit, wave, .. } | Objective::Escort { unit, wave, .. } => {
                     add(unit);
                     add(wave);
                 }
@@ -261,7 +375,11 @@ pub fn objective_units(sim: &dyn SimRead, track: &QuestTrack) -> Vec<String> {
                         add(&b.unit);
                     }
                 }
-                Objective::Wait { .. } => {}
+                Objective::Wait { .. }
+                | Objective::Interact(..)
+                | Objective::Collect(..)
+                | Objective::Inspect(..)
+                | Objective::Sequence { .. } => {}
             }
         }
     }
@@ -1146,8 +1264,10 @@ fn update_log(
     });
 }
 
+#[allow(clippy::too_many_arguments)] // Bevy system: one parameter per resource it reads
 fn update_tracker(
     mut commands: Commands,
+    time: Res<Time>,
     sim: SimView,
     windows: Res<QuestWindows>,
     trophies: Res<TrophiesOpen>,
@@ -1196,7 +1316,17 @@ fn update_tracker(
     };
     // Whole quests only, as many as fit the area; before its first layout it reads 0: show all.
     let room = if room > 0.0 { room } else { f32::MAX };
-    let sig = format!("{list:?}|{}|{max}|{room:.0}|{}", track.collapsed, live.sig);
+    // Whole seconds left on timed deliveries; part of the signature so the countdown ticks.
+    let now = time.elapsed_secs();
+    let clock: Vec<(&str, u32)> = track
+        .deadlines
+        .iter()
+        .map(|(q, end)| (q.as_str(), (end - now).max(0.0).ceil() as u32))
+        .collect();
+    let sig = format!(
+        "{list:?}|{}|{max}|{room:.0}|{}|{clock:?}",
+        track.collapsed, live.sig
+    );
     if !visible || sig == shown.tracker {
         return;
     }
@@ -1211,11 +1341,18 @@ fn update_tracker(
         .take(max)
         .filter_map(|q| {
             let def = content.quest(&q.id)?;
-            Some((
-                q.id.clone(),
-                def.name.clone(),
-                tracker_lines(content, def, &q.counts),
-            ))
+            let mut lines = tracker_lines(content, def, &q.counts);
+            let left = clock.iter().find(|(id, _)| *id == q.id).map(|c| c.1);
+            for (k, o) in def.objectives.iter().enumerate() {
+                if let (Objective::Deliver { secs, .. }, Some(left), Some(line)) =
+                    (o, left, lines.get_mut(k))
+                    && *secs > 0
+                    && line.1 == Line::Pending
+                {
+                    line.0 = format!("{} ({}:{:02})", line.0, left / 60, left % 60);
+                }
+            }
+            Some((q.id.clone(), def.name.clone(), lines))
         })
         .take_while(|(_, _, lines)| {
             used += LINE_PX * (lines.len() + 1) as f32 + 3.0;
@@ -1318,9 +1455,51 @@ fn quest_events(
 ) {
     let content = sim.content();
     let (toast_text, toast_color) = &mut *toast;
+    // A timed delivery seen without an accept (a loaded save) starts its clock now, as the
+    // sim does.
+    for q in &sim.quests().active {
+        let secs = content.quest(&q.id).and_then(|d| {
+            d.objectives.iter().find_map(|o| match o {
+                Objective::Deliver { secs, .. } if *secs > 0 => Some(*secs),
+                _ => None,
+            })
+        });
+        if let Some(secs) = secs
+            && !track.deadlines.iter().any(|(id, _)| *id == q.id)
+        {
+            let end = time.elapsed_secs() + secs as f32;
+            track.deadlines.push((q.id.clone(), end));
+        }
+    }
     for CombatEvent(ev) in events.read() {
         match ev {
-            Event::QuestAccepted { quest } => track.untracked.retain(|u| u != quest),
+            Event::QuestAccepted { quest } => {
+                track.untracked.retain(|u| u != quest);
+                track.deadlines.retain(|(q, _)| q != quest);
+                let secs = content.quest(quest).and_then(|q| {
+                    q.objectives.iter().find_map(|o| match o {
+                        Objective::Deliver { secs, .. } if *secs > 0 => Some(*secs),
+                        _ => None,
+                    })
+                });
+                if let Some(secs) = secs {
+                    let end = time.elapsed_secs() + secs as f32;
+                    track.deadlines.push((quest.clone(), end));
+                }
+            }
+            Event::QuestFailed { quest } => {
+                track.deadlines.retain(|(q, _)| q != quest);
+                if let Some(def) = content.quest(quest) {
+                    banners.write(Banner {
+                        title: format!("Ticket failed: {}", def.name),
+                        subtitle: format!(
+                            "Too slow. {} has another one if you want to try again.",
+                            unit_name(content, &def.giver.npc)
+                        ),
+                        color: FAILED_RED,
+                    });
+                }
+            }
             Event::QuestProgress {
                 quest,
                 objective,
@@ -1342,8 +1521,13 @@ fn quest_events(
                     set_text(
                         toast_text,
                         &format!(
-                            "{}: ready to close \u{2014} return to {}",
+                            "{}: ready to close \u{2014} {} {}",
                             def.name,
+                            if def.turn_in.is_some() {
+                                "report to"
+                            } else {
+                                "return to"
+                            },
                             unit_name(content, &def.ender().npc)
                         ),
                     );
@@ -1351,6 +1535,7 @@ fn quest_events(
                 }
             }
             Event::QuestCompleted { quest } => {
+                track.deadlines.retain(|(q, _)| q != quest);
                 let Some(def) = content.quest(quest) else {
                     continue;
                 };
@@ -1472,7 +1657,7 @@ mod tests {
         assert_eq!(
             lines.last(),
             Some(&(
-                "Ready to close \u{2014} return to Lab Safety Officer".to_string(),
+                "Ready to close \u{2014} report to Peg Hollis".to_string(),
                 Line::Ready
             ))
         );
@@ -1484,6 +1669,49 @@ mod tests {
             tracker_lines(c, crumb, &[1])
                 .last()
                 .is_some_and(|l| l.0.ends_with("IT Support Lead"))
+        );
+    }
+
+    #[test]
+    fn interactive_objectives_read_as_plain_tasks() {
+        let s = sim();
+        let c = s.content();
+        let line = |q: &str, counts: &[u32]| {
+            let Some(def) = c.quest(q) else {
+                panic!("no {q}")
+            };
+            tracker_lines(c, def, counts)
+                .first()
+                .map(|l| l.0.clone())
+                .unwrap_or_default()
+        };
+        assert_eq!(
+            line("passwords_on_post_its", &[2]),
+            "Sticky Notes with a Password collected 2/4"
+        );
+        assert_eq!(
+            line("fire_code_violations", &[1]),
+            "Fire-Code Violations documented 1/4"
+        );
+        assert_eq!(
+            line("have_you_tried_restarting", &[1]),
+            "Restart the floor switches, A to C 1/3 \u{2014} next: Network Switch B (Humming)"
+        );
+        assert_eq!(
+            line("meeting_room_reclamation", &[0]),
+            "Use 'Room Released' Sticker on Meeting Room Panels 0/3"
+        );
+        assert_eq!(
+            line("autocomplete_pest_control", &[1]),
+            "Use Telemetry Opt-Out Form on Copilot Drones 1/3"
+        );
+        assert_eq!(
+            line("coffee_for_the_noc", &[0]),
+            "Deliver Lukewarm Coffee to NOC Operator"
+        );
+        assert!(
+            line("performance_improvement_plan", &[40])
+                .starts_with("Dave walked to his calibration [========")
         );
     }
 

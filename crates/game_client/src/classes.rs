@@ -1,7 +1,7 @@
 //! Playable classes on the client: the chosen class (persisted), the player's skin and kit,
 //! and the "Choose your role" picker (first launch, or Esc menu > Change role).
 //!
-//! `WOW_CLASS=fullstack|frontend|backend|devops` skips the picker for that run;
+//! `WOW_CLASS=fullstack|frontend|backend|devops|qa|data_scientist` skips the picker for that run;
 //! `WOW_PICKER=1` opens it even when a role is stored.
 
 use crate::anim::{Character, ModelKind};
@@ -240,7 +240,7 @@ fn spawn_stage(
             Visibility::default(),
         ))
         .id();
-    // The camera looks slightly down at the four skins standing in a row.
+    // The camera looks slightly down at the skins standing in a row.
     commands.spawn((
         PickerStage,
         StageCamera,
@@ -288,7 +288,7 @@ fn spawn_stage(
             Transform::from_xyz(0.0, 3.0, -2.0),
         ));
         for (k, rim) in rims.into_iter().enumerate() {
-            let x = (k as f32 - 1.5) * SPACING;
+            let x = slot_x(k, cards.len());
             s.spawn((
                 Mesh3d(pad_mesh.clone()),
                 MeshMaterial3d(pad.clone()),
@@ -330,10 +330,15 @@ fn spawn_stage(
         }
     });
     for k in 0..CLASS_SKINS.len() {
-        let x = (k as f32 - 1.5) * SPACING;
+        let x = slot_x(k, CLASS_SKINS.len());
         let e = spawn_skin(commands, k, STAGE + Vec3::new(x, 0.0, 0.0), PI, 0);
         commands.entity(e).insert(PickerStage);
     }
+}
+
+/// Stage x of skin `k` of `n`, the row centred on the camera.
+fn slot_x(k: usize, n: usize) -> f32 {
+    (k as f32 - (n as f32 - 1.0) / 2.0) * SPACING
 }
 
 fn spawn_picker_ui(commands: &mut Commands, picker: &Picker, image: Handle<Image>) {
@@ -378,10 +383,15 @@ fn spawn_picker_ui(commands: &mut Commands, picker: &Picker, image: Handle<Image
                 BorderColor::all(PANEL_EDGE),
                 ImageNode::new(image).with_mode(NodeImageMode::Stretch),
             ));
+            // A grid, not a flex row: flex measured the wrapped card text too short with six
+            // narrow cards. The cards keep their height; the stage above is what shrinks.
             root.spawn(Node {
+                display: Display::Grid,
+                grid_template_columns: RepeatedGridTrack::flex(picker.cards.len() as u16, 1.0),
                 width: percent(100),
                 max_width: px(1200),
-                column_gap: px(10),
+                column_gap: px(8),
+                flex_shrink: 0.0,
                 ..default()
             })
             .with_children(|row| {
@@ -399,11 +409,9 @@ fn spawn_card(row: &mut ChildSpawnerCommands, i: usize, c: &ClassCard) {
         Button,
         PickerCard(i),
         Node {
-            flex_grow: 1.0,
-            flex_basis: px(0),
             flex_direction: FlexDirection::Column,
-            row_gap: px(5),
-            padding: UiRect::all(px(10)),
+            row_gap: px(4),
+            padding: UiRect::all(px(8)),
             border: UiRect::all(px(2)),
             border_radius: BorderRadius::all(px(6)),
             ..default()
@@ -431,7 +439,7 @@ fn spawn_card(row: &mut ChildSpawnerCommands, i: usize, c: &ClassCard) {
                 children![(label(c.role.tag(), 11.0), TextColor(color))],
             ));
         });
-        card.spawn((label(c.name.clone(), 19.0), TextColor(Color::WHITE)));
+        card.spawn((label(c.name.clone(), 17.0), TextColor(Color::WHITE)));
         card.spawn((
             label(c.blurb.clone(), 12.0),
             TextColor(Color::srgb(0.85, 0.88, 0.95)),
@@ -499,7 +507,7 @@ fn change_role_menu(
     let text = if online {
         "Leave the room first: roles change offline only."
     } else {
-        "Your progress restarts. Like every reorg."
+        "Each role keeps its own save. Like every reorg, nobody else's."
     };
     if hint.0 != text {
         hint.0 = text.into();
@@ -539,6 +547,8 @@ fn picker_input(
         KeyCode::Digit2,
         KeyCode::Digit3,
         KeyCode::Digit4,
+        KeyCode::Digit5,
+        KeyCode::Digit6,
     ]
     .iter()
     .position(|k| keys.just_pressed(*k));
@@ -583,9 +593,9 @@ fn sync_picker(
         border.set_all(color);
     }
     let text = if picker.change {
-        "1-4 or click to pick. Esc cancels. Picking restarts your progress at level 1."
+        "1-6 or click to pick. Esc cancels. Each role keeps its own save."
     } else {
-        "1-4 or click to pick. You can change it later from the Esc menu (progress restarts)."
+        "1-6 or click to pick. Change it later from the Esc menu; each role keeps its own save."
     };
     for mut t in &mut footer {
         if t.0 != text {

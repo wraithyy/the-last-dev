@@ -131,16 +131,38 @@ impl T {
 fn classes_spawn_with_their_own_stats_bars_and_auto_attacks() {
     let c = content();
     let keys: Vec<&str> = c.classes.iter().map(|k| k.key.as_str()).collect();
-    assert_eq!(keys, ["fullstack", "frontend", "backend", "devops"]);
+    assert_eq!(
+        keys,
+        [
+            "fullstack",
+            "frontend",
+            "backend",
+            "devops",
+            "qa",
+            "data_scientist"
+        ]
+    );
     let mut sim = Sim::new(content(), 1);
     assert_eq!(sim.spawn_player("rockstar", Vec3::default(), 0.0), 0);
+    // A room holds five players, so the sixth class gets a sim of its own.
+    let mut spare = Sim::new(content(), 1);
     let ids: Vec<EntityId> = keys
         .iter()
-        .map(|k| sim.spawn_player(k, Vec3::default(), 0.0))
+        .enumerate()
+        .map(|(k, key)| {
+            let s = if k < 5 { &mut sim } else { &mut spare };
+            s.spawn_player(key, Vec3::default(), 0.0)
+        })
         .collect();
-    let stats: Vec<(String, u32, u32)> = ids
-        .iter()
-        .filter_map(|id| sim.unit(*id))
+    let unit = |k: usize| {
+        if k < 5 {
+            sim.unit(ids[k])
+        } else {
+            spare.unit(ids[k])
+        }
+    };
+    let stats: Vec<(String, u32, u32)> = (0..ids.len())
+        .filter_map(unit)
         .map(|u| (u.key.clone(), u.max_hp, u.max_mana))
         .collect();
     assert_eq!(
@@ -150,13 +172,16 @@ fn classes_spawn_with_their_own_stats_bars_and_auto_attacks() {
             ("frontend_dev".to_string(), 360, 220),
             ("backend_dev".to_string(), 440, 200),
             ("devops_eng".to_string(), 290, 300),
+            ("qa_engineer".to_string(), 320, 260),
+            ("data_scientist".to_string(), 320, 280),
         ]
     );
-    for (id, key) in ids.iter().zip(&keys) {
-        let class = sim.class_of(*id).map(|c| c.key.clone());
+    for (k, (id, key)) in ids.iter().zip(&keys).enumerate() {
+        let s = if k < 5 { &sim } else { &spare };
+        let class = s.class_of(*id).map(|c| c.key.clone());
         assert_eq!(class.as_deref(), Some(*key));
         // Two spells at level 1, each class its own bar of ten.
-        assert_eq!(sim.known_spells(*id).len(), 2, "{key}");
+        assert_eq!(s.known_spells(*id).len(), 2, "{key}");
         assert_eq!(c.class(key).map(|k| k.action_bar.len()), Some(10));
     }
     // Melee classes melee, the casters wand.
@@ -168,6 +193,8 @@ fn classes_spawn_with_their_own_stats_bars_and_auto_attacks() {
     assert_eq!(range("frontend_dev"), Some(4.0));
     assert_eq!(range("backend_dev"), Some(4.0));
     assert_eq!(range("devops_eng"), Some(25.0));
+    assert_eq!(range("qa_engineer"), Some(25.0));
+    assert_eq!(range("data_scientist"), Some(25.0));
     // The tank's level HP grows 60% faster: 440 + 315 * 1.6 at level 10.
     assert!(sim.set_level_of(ids[2], 10));
     assert_eq!(sim.unit(ids[2]).map(|u| u.max_hp), Some(440 + 504));
@@ -465,4 +492,309 @@ fn devops_heals_allies_and_the_group_and_restarts_dead_pods() {
     };
     assert!(alive);
     assert_eq!(hp, max / 2);
+}
+
+// ---- cleansing ----
+
+fn auras_of(sim: &Sim, p: EntityId) -> Vec<String> {
+    sim.unit(p)
+        .map(|u| u.auras.iter().map(|a| a.key.clone()).collect())
+        .unwrap_or_default()
+}
+
+fn cleanse_sim(class: &str) -> (Sim, EntityId) {
+    let mut c = content();
+    for s in &mut c.spells {
+        s.learn_level = 1;
+        s.yells.clear();
+    }
+    let mut sim = Sim::new(c, 3);
+    let p = sim.spawn_player(class, Vec3::new(0.0, 0.0, 0.0), 0.0);
+    assert_ne!(p, 0, "unknown class {class}");
+    (sim, p)
+}
+
+/// Every class has a self-cleanse: it removes a dispellable debuff, never an undispellable
+/// boss mechanic (Budget Frozen is `dispel: Never`), and a second press waits for the cooldown.
+#[test]
+fn every_class_can_cleanse_itself_but_not_boss_mechanics() {
+    let cleanses = [
+        ("fullstack", 7),       // Rollback
+        ("frontend", 25),       // Dark Mode
+        ("backend", 37),        // Retry With Exponential Backoff
+        ("devops", 46),         // Feature Flag Off
+        ("qa", 56),             // Revert to Last Green
+        ("data_scientist", 65), // Confidence Interval
+    ];
+    let classes: Vec<String> = content().classes.iter().map(|c| c.key.clone()).collect();
+    assert_eq!(classes.len(), cleanses.len(), "a new class needs a cleanse");
+    for (class, id) in cleanses {
+        let spell = SpellId(id);
+        let (mut sim, p) = cleanse_sim(class);
+        assert!(sim.debug_apply_aura(p, "budget_frozen", 60_000));
+        assert!(sim.debug_apply_aura(p, "code_smell", 60_000));
+        sim.apply_as(p, Command::Cast { caster: p, spell });
+        for _ in 0..2 {
+            sim.tick();
+        }
+        let left = auras_of(&sim, p);
+        assert!(!left.contains(&"code_smell".into()), "{class}: {left:?}");
+        assert!(left.contains(&"budget_frozen".into()), "{class}: {left:?}");
+        assert!(
+            sim.cooldown(p, spell).cd_remaining_ms > 0,
+            "{class}: no cooldown"
+        );
+        // Off the GCD, still on its own cooldown: the new debuff stays.
+        for _ in 0..60 {
+            sim.tick();
+        }
+        assert!(sim.debug_apply_aura(p, "code_smell", 60_000));
+        assert_eq!(
+            sim.cooldown(p, spell).usable,
+            Err(CastError::OnCooldown),
+            "{class}"
+        );
+        sim.apply_as(p, Command::Cast { caster: p, spell });
+        sim.tick();
+        assert!(auras_of(&sim, p).contains(&"code_smell".into()), "{class}");
+    }
+}
+
+/// The vendor cleanse works for any class, keeps boss mechanics and shares the consumable
+/// cooldown.
+#[test]
+fn the_postmortem_consumable_cleanses_any_class_on_the_shared_cooldown() {
+    const ITEM: &str = "Incident Postmortem (Blameless)";
+    for class in ["backend", "qa"] {
+        let (mut sim, p) = cleanse_sim(class);
+        assert!(sim.grant_goods(p, ITEM) && sim.grant_goods(p, ITEM));
+        assert!(sim.debug_apply_aura(p, "budget_frozen", 60_000));
+        assert!(sim.debug_apply_aura(p, "code_smell", 60_000));
+        assert!(sim.debug_apply_aura(p, "review_fatigue", 60_000));
+        sim.apply_as(p, Command::UseItem { item: ITEM.into() });
+        sim.tick();
+        assert_eq!(auras_of(&sim, p), ["budget_frozen"], "{class}");
+        assert!(sim.debug_apply_aura(p, "code_smell", 60_000));
+        sim.apply_as(p, Command::UseItem { item: ITEM.into() });
+        let ev = sim.tick();
+        assert!(ev.contains(&Event::ItemError {
+            reason: combat_core::ItemError::NotReady
+        }));
+        assert!(auras_of(&sim, p).contains(&"code_smell".into()));
+    }
+}
+
+// ---- QA Engineer and Data Scientist ----
+
+/// A level-10 `class` at the origin facing -Z and plain melee `units` (abilities stripped) in
+/// a row 20 m ahead, 2 m apart. Hits always land; every spell is learned; no regen, no yells.
+fn arena(class: &str, units: &[&str]) -> (Sim, EntityId, Vec<EntityId>) {
+    let mut c = content();
+    c.config.white_hit_pct = 100;
+    c.config.spell_hit_pct = 100;
+    c.config.regen.hp_pct = 0;
+    c.config.regen.mana_pct = 0;
+    legacy_ceo(&mut c);
+    for s in &mut c.spells {
+        s.learn_level = 1;
+        s.yells.clear();
+    }
+    for key in units {
+        if let Some(ai) = def_mut(&mut c, key).ai.as_mut() {
+            ai.abilities.clear();
+        }
+    }
+    let mut sim = Sim::new(c, 9);
+    sim.set_wandering(false);
+    let p = sim.spawn_player(class, Vec3::new(0.0, 0.0, 0.0), 0.0);
+    assert!(sim.set_level_of(p, 10));
+    let mobs = units
+        .iter()
+        .enumerate()
+        .map(
+            |(k, key)| match sim.spawn_unit(key, Vec3::new(k as f32 * 2.0, 0.0, -20.0), 0.0) {
+                Ok(id) => id,
+                Err(e) => panic!("{e}"),
+            },
+        )
+        .collect();
+    (sim, p, mobs)
+}
+
+fn cast_at(sim: &mut Sim, p: EntityId, t: EntityId, spell: SpellId) -> Vec<Event> {
+    sim.apply_as(
+        p,
+        Command::SetTarget {
+            unit: p,
+            target: Some(t),
+        },
+    );
+    sim.apply_as(p, Command::Cast { caster: p, spell });
+    sim.tick()
+}
+
+fn stacks(sim: &Sim, id: EntityId, key: &str) -> u8 {
+    sim.unit(id)
+        .and_then(|u| u.auras.iter().find(|a| a.key == key))
+        .map_or(0, |a| a.stacks)
+}
+
+fn pos_z(sim: &Sim, id: EntityId) -> f32 {
+    sim.unit(id).map_or(0.0, |u| u.pos.z)
+}
+
+#[test]
+fn regression_trap_roots_trash_and_only_slows_a_boss() {
+    let (mut sim, p, mobs) = arena("qa", &["sales_rep"]);
+    cast_at(&mut sim, p, mobs[0], SpellId(54));
+    let at = pos_z(&sim, mobs[0]);
+    for _ in 0..60 {
+        sim.tick();
+    }
+    assert_eq!(pos_z(&sim, mobs[0]), at, "a rooted Sales Rep must not walk");
+    assert!(stacks(&sim, mobs[0], "regression_trap") > 0);
+    // The CEO is a boss: no root, but 40% slower than an untrapped CEO.
+    let walked = |trap: bool| {
+        let (mut sim, p, mobs) = arena("qa", &["ceo"]);
+        let spell = if trap { SpellId(54) } else { SpellId(52) };
+        cast_at(&mut sim, p, mobs[0], spell);
+        let at = pos_z(&sim, mobs[0]);
+        for _ in 0..30 {
+            sim.tick();
+        }
+        pos_z(&sim, mobs[0]) - at
+    };
+    let (free, trapped) = (walked(false), walked(true));
+    assert!(trapped > 0.0, "a boss is never rooted");
+    assert!(
+        (trapped / free - 0.6).abs() < 0.1,
+        "boss slowed to {trapped} of {free}"
+    );
+}
+
+#[test]
+fn bug_reports_stack_to_three() {
+    let (mut sim, p, mobs) = arena("qa", &["ceo"]);
+    for _ in 0..4 {
+        cast_at(&mut sim, p, mobs[0], SpellId(52));
+        for _ in 0..46 {
+            sim.tick();
+        }
+    }
+    assert_eq!(stacks(&sim, mobs[0], "bug_report"), 3);
+}
+
+#[test]
+fn cannot_reproduce_closes_every_hit_for_its_duration() {
+    let (mut sim, p, mobs) = arena("qa", &["sales_rep"]);
+    sim.apply_as(
+        p,
+        Command::Cast {
+            caster: p,
+            spell: SpellId(57),
+        },
+    );
+    sim.tick();
+    let hp = sim.unit(p).map_or(0, |u| u.hp);
+    // Walk into the Sales Rep and let it swing for the 2.5 s window.
+    sim.apply_as(
+        p,
+        Command::PlayerMoved {
+            pos: Vec3::new(0.0, 0.0, -18.0),
+            yaw: 0.0,
+            moving: false,
+            jumping: false,
+        },
+    );
+    let mut swung = false;
+    for _ in 0..70 {
+        swung |= sim
+            .tick()
+            .iter()
+            .any(|e| matches!(e, Event::MeleeSwing { attacker, .. } if *attacker == mobs[0]));
+    }
+    assert!(swung, "the Sales Rep never swung");
+    assert_eq!(sim.unit(p).map_or(0, |u| u.hp), hp);
+}
+
+#[test]
+fn training_run_hits_every_second_stacks_overfitting_and_shrugs_off_hits() {
+    let (mut sim, p, mobs) = arena("data_scientist", &["ceo"]);
+    let mut ev = cast_at(&mut sim, p, mobs[0], SpellId(66));
+    for _ in 0..95 {
+        ev.extend(sim.tick());
+    }
+    let hits = ev
+        .iter()
+        .filter(
+            |e| matches!(e, Event::Damage { source, spell: Some(SpellId(66)), .. } if *source == p),
+        )
+        .count();
+    assert_eq!(hits, 3, "two ticks and the completion");
+    assert_eq!(stacks(&sim, mobs[0], "overfitting"), 3);
+    assert!(
+        !ev.iter()
+            .any(|e| matches!(e, Event::CastInterrupted { caster, .. } if *caster == p))
+    );
+}
+
+#[test]
+fn cross_validation_copies_dots_with_their_stacks_to_fighting_neighbours() {
+    let (mut sim, p, mobs) = arena("data_scientist", &["sales_rep", "sales_rep", "sales_rep"]);
+    // Pull all three, then stack Overfitting twice and Data Drift once on the first.
+    for &m in &mobs {
+        cast_at(&mut sim, p, m, SpellId(61));
+        for _ in 0..80 {
+            sim.tick();
+        }
+    }
+    for spell in [62, 62] {
+        cast_at(&mut sim, p, mobs[0], SpellId(spell));
+        for _ in 0..60 {
+            sim.tick();
+        }
+    }
+    cast_at(&mut sim, p, mobs[0], SpellId(64));
+    for _ in 0..60 {
+        sim.tick();
+    }
+    assert_eq!(stacks(&sim, mobs[0], "overfitting"), 2);
+    assert_eq!(stacks(&sim, mobs[0], "data_drift"), 1);
+    cast_at(&mut sim, p, mobs[0], SpellId(67));
+    for &m in &mobs[1..] {
+        assert_eq!(stacks(&sim, m, "overfitting"), 2, "{m}");
+        assert_eq!(stacks(&sim, m, "data_drift"), 1, "{m}");
+    }
+}
+
+/// The new classes save and load like the old ones: class, level and Career Ladder picks
+/// survive the text round trip into a fresh sim of the same class.
+#[test]
+fn new_class_saves_round_trip_with_their_talents() {
+    for class in ["qa", "data_scientist"] {
+        let mut sim = Sim::new(content(), 4);
+        let p = sim.spawn_player(class, Vec3::new(0.0, 0.0, 0.0), 0.0);
+        assert!(sim.set_level_of(p, 10));
+        for row in 0..combat_core::TALENT_ROWS as u8 {
+            sim.apply_as(p, Command::PickTalent { row, choice: 2 });
+        }
+        sim.tick();
+        let Some(save) = sim.export_save(p) else {
+            panic!("{class}: no save")
+        };
+        let Some(back) = combat_core::SaveData::decode(&save.encode()) else {
+            panic!("{class}: save does not decode")
+        };
+        assert_eq!(back.class, class);
+        let mut fresh = Sim::new(content(), 5);
+        let q = fresh.spawn_player(class, Vec3::new(0.0, 0.0, 0.0), 0.0);
+        assert!(fresh.import_save(q, &back), "{class}");
+        let me = fresh.unit(q).cloned();
+        assert_eq!(me.as_ref().map(|u| u.level), Some(10), "{class}");
+        assert_eq!(
+            me.map(|u| u.talents),
+            Some([2; combat_core::TALENT_ROWS]),
+            "{class}"
+        );
+    }
 }

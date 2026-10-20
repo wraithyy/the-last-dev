@@ -782,6 +782,13 @@ fn interact_input(
         clicked = true;
     }
     if binds.just(&keys, crate::keybinds::Action::Interact) {
+        // A quest item for an enemy in reach (a sticker, an opt-out form) goes over with F.
+        let targeted = target.0.and_then(|e| sim_units.get(e).ok()).map(|s| s.0);
+        let at = crate::collision::to_core(player_tf.translation);
+        if let Some(unit) = crate::hud::quests::use_on_target(&*sim, targeted, at, reach) {
+            pending.0.push(Command::Talk { unit });
+            return;
+        }
         let mirrored: Vec<_> = units
             .iter()
             .map(|(e, tf, u)| (e, tf.translation, *u))

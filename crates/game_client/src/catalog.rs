@@ -71,6 +71,9 @@ const ENGINEER: &str = "models/characters/Engineer.glb";
 const FRONTEND: &str = "models/characters/Frontend.glb";
 const BACKEND: &str = "models/characters/Backend.glb";
 const DEVOPS: &str = "models/characters/DevOps.glb";
+/// Reskins of Frontend.glb / DevOps.glb (scripts/class_skins.py --reskin).
+const QA: &str = "models/characters/QA.glb";
+const DATA_SCIENTIST: &str = "models/characters/DataScientist.glb";
 const CASUAL_F: &str = "models/characters/Casual_Female.glb";
 const CASUAL2: &str = "models/characters/Casual2_Male.glb";
 const CASUAL_M: &str = "models/characters/Casual_Male.glb";
@@ -81,11 +84,13 @@ const WORKER: &str = "models/characters/Worker_Male.glb";
 const PRIM: &str = "prim/";
 
 /// Every character GLB the catalog references.
-pub const CHARACTER_MODELS: [&str; 14] = [
+pub const CHARACTER_MODELS: [&str; 16] = [
     ENGINEER,
     FRONTEND,
     BACKEND,
     DEVOPS,
+    QA,
+    DATA_SCIENTIST,
     SUIT_M,
     SUIT_M_BALD,
     SUIT_F,
@@ -113,6 +118,17 @@ const fn v(
         title,
         paints,
     }
+}
+
+/// Peg Hollis: grey bob, cardigan, reading glasses implied.
+const PEG_PAINT: &[Paint] = &[
+    paint("Hair", 0.78, 0.78, 0.8),
+    paint("Shirt", 0.45, 0.2, 0.25),
+    paint("Pants", 0.22, 0.22, 0.26),
+];
+
+const fn peg(title: &'static str) -> UnitVisual {
+    v(CASUAL_F, 1.7, "Peg Hollis", title, PEG_PAINT)
 }
 
 static TABLE: &[(&str, UnitVisual)] = &[
@@ -149,6 +165,20 @@ static TABLE: &[(&str, UnitVisual)] = &[
     (
         "devops_eng",
         v(DEVOPS, 1.8, "DevOps Engineer", "<On Call Since 2019>", &[]),
+    ),
+    (
+        "qa_engineer",
+        v(QA, 1.8, "QA Engineer", "<Reopened Your Ticket>", &[]),
+    ),
+    (
+        "data_scientist",
+        v(
+            DATA_SCIENTIST,
+            1.8,
+            "Data Scientist",
+            "<Significant at p = 0.06>",
+            &[],
+        ),
     ),
     (
         "intern",
@@ -760,6 +790,378 @@ static TABLE: &[(&str, UnitVisual)] = &[
                 paint("Pants", 0.15, 0.15, 0.2),
                 paint("Hair", 0.1, 0.8, 0.9),
                 paint("Skin", 0.9, 0.7, 0.58),
+            ],
+        ),
+    ),
+    // ---- campus districts (open world)
+    (
+        "lunch_optimizer",
+        v(
+            CASUAL_M,
+            1.75,
+            "Lunch Queue Optimizer",
+            "<Has a Spreadsheet for This>",
+            &[
+                paint("Shirt", 0.2, 0.55, 0.3),
+                paint("Pants", 0.25, 0.25, 0.3),
+                paint("Hair", 0.2, 0.15, 0.1),
+            ],
+        ),
+    ),
+    (
+        "wellness_manager",
+        v(
+            CASUAL2,
+            1.8,
+            "Wellness-Obsessed Manager",
+            "<Has Run a Marathon, Will Tell You>",
+            &[
+                paint("Shirt", 0.85, 1.0, 0.1),
+                paint("Pants", 0.1, 0.1, 0.12),
+                paint("Hair", 0.55, 0.5, 0.45),
+                paint("Skin", 0.92, 0.72, 0.6),
+            ],
+        ),
+    ),
+    (
+        "mindfulness_coach",
+        v(
+            CASUAL_F,
+            1.7,
+            "Mindfulness Coach",
+            "<Breathe In, Deliverables Out>",
+            &[
+                paint("Shirt", 0.75, 0.6, 0.9),
+                paint("Pants", 0.95, 0.95, 0.92),
+                paint("Hair", 0.85, 0.7, 0.4),
+            ],
+        ),
+    ),
+    (
+        "preseed_founder",
+        v(
+            CASUAL3,
+            1.75,
+            "Pre-Seed Founder",
+            "<Disrupting Disruption>",
+            &[
+                paint("Shirt", 0.12, 0.12, 0.14),
+                paint("Pants", 0.3, 0.4, 0.6),
+                paint("Skin", 0.85, 0.66, 0.52),
+            ],
+        ),
+    ),
+    (
+        "referral_hustler",
+        v(
+            CASUAL_M,
+            1.78,
+            "Referral Hustler",
+            "<Dark Patterns, Bright Future>",
+            &[
+                paint("Shirt", 0.95, 0.4, 0.1),
+                paint("Pants", 0.15, 0.15, 0.18),
+                paint("Hair", 0.95, 0.85, 0.3),
+            ],
+        ),
+    ),
+    (
+        "unicorn_founder",
+        v(
+            SUIT_M,
+            2.15,
+            "Unicorn Founder",
+            "<Valuation Pending>",
+            &[
+                paint("Black", 0.95, 0.95, 0.98),
+                paint("Shirt", 0.85, 0.5, 0.95),
+                paint("Tie", 1.0, 0.3, 0.8),
+                paint("Skin", 0.9, 0.72, 0.6),
+            ],
+        ),
+    ),
+    (
+        "step_counter",
+        v(
+            DOC_M,
+            1.75,
+            "Step Count Enforcer",
+            "<10,000 or Else>",
+            &[paint("Shirt", 0.2, 0.7, 0.85)],
+        ),
+    ),
+    (
+        "gym_bro_vp",
+        v(
+            WORKER,
+            2.05,
+            "VP of Gains",
+            "<Corporate Wellness Champion>",
+            &[
+                paint("Shirt", 0.9, 0.15, 0.15),
+                paint("Vest", 0.1, 0.1, 0.12),
+                paint("Pants", 0.12, 0.12, 0.14),
+                paint("Hat", 0.9, 0.9, 0.9),
+                paint("Skin", 0.85, 0.62, 0.48),
+            ],
+        ),
+    ),
+    (
+        "autonomous_valet",
+        v(
+            "prim/delivery_robot",
+            1.5,
+            "Autonomous Valet",
+            "<Parked Your Car Inside Another Car>",
+            &[],
+        ),
+    ),
+    (
+        "rto_commuter",
+        v(
+            SUIT_M_BALD,
+            1.8,
+            "Return-to-Office Commuter",
+            "<Three Hours Each Way>",
+            &[
+                paint("Black", 0.35, 0.33, 0.3),
+                paint("Shirt", 0.8, 0.82, 0.86),
+                paint("Pants", 0.28, 0.27, 0.25),
+                paint("Skin", 0.78, 0.7, 0.62),
+            ],
+        ),
+    ),
+    (
+        "site_foreman",
+        v(
+            WORKER,
+            1.85,
+            "Agile Site Foreman",
+            "<Building the Plane While Flying It>",
+            &[
+                paint("Vest", 1.0, 0.55, 0.1),
+                paint("Hat", 1.0, 0.9, 0.1),
+                paint("Shirt", 0.3, 0.4, 0.6),
+            ],
+        ),
+    ),
+    (
+        "survey_drone",
+        v(
+            "prim/drone",
+            1.0,
+            "Survey Drone",
+            "<Measuring Twice, Cutting Budget>",
+            &[],
+        ),
+    ),
+    (
+        "the_goose",
+        v(
+            "prim/goose",
+            1.0,
+            "The Campus Goose",
+            "<Reports to No One>",
+            &[],
+        ),
+    ),
+    (
+        "hq_architect",
+        v(
+            SUIT_M,
+            2.0,
+            "The Visionary Architect",
+            "<Opening 2019>",
+            &[
+                paint("Black", 0.08, 0.08, 0.09),
+                paint("Shirt", 0.08, 0.08, 0.09),
+                paint("Tie", 0.08, 0.08, 0.09),
+                paint("Pants", 0.08, 0.08, 0.09),
+                paint("Skin", 0.86, 0.7, 0.58),
+            ],
+        ),
+    ),
+    (
+        "pizza_vulture",
+        v(
+            SUIT_M,
+            1.8,
+            "Pizza-Seeking Middle Manager",
+            "<Just Grabbing One Slice>",
+            &[
+                paint("Black", 0.3, 0.32, 0.4),
+                paint("Shirt", 0.95, 0.9, 0.75),
+                paint("Tie", 0.9, 0.5, 0.1),
+            ],
+        ),
+    ),
+    (
+        "fire_warden",
+        v(
+            WORKER,
+            1.8,
+            "Self-Appointed Fire Warden",
+            "<Hi-Vis, High Authority>",
+            &[
+                paint("Vest", 1.0, 0.85, 0.05),
+                paint("Hat", 0.95, 0.15, 0.1),
+                paint("Shirt", 0.9, 0.9, 0.9),
+            ],
+        ),
+    ),
+    (
+        "food_truck_owner",
+        v(
+            CASUAL3,
+            1.75,
+            "Food Truck Owner",
+            "<Accepts Crypto, Regrets It>",
+            &[
+                paint("Shirt", 0.95, 0.95, 0.92),
+                paint("Pants", 0.2, 0.25, 0.35),
+                paint("Skin", 0.7, 0.5, 0.36),
+            ],
+        ),
+    ),
+    (
+        "espresso_cart",
+        v(
+            "prim/espresso_cart",
+            1.4,
+            "The Last Working Espresso Cart",
+            "<Load-Bearing>",
+            &[],
+        ),
+    ),
+    (
+        "pizza_table",
+        v(
+            "prim/pizza",
+            1.0,
+            "Free Pizza (Leftover, Allegedly)",
+            "<Three Slices Left>",
+            &[],
+        ),
+    ),
+    (
+        "park_ranger",
+        v(
+            WORKER,
+            1.8,
+            "Campus Park Ranger",
+            "<Contractor, Badge Pending>",
+            &[
+                paint("Vest", 0.25, 0.45, 0.25),
+                paint("Hat", 0.55, 0.45, 0.3),
+                paint("Shirt", 0.75, 0.7, 0.55),
+            ],
+        ),
+    ),
+    (
+        "fire_drill_marshal",
+        v(
+            WORKER,
+            1.8,
+            "Fire Drill Marshal",
+            "<Clipboard Certified>",
+            &[
+                paint("Vest", 0.1, 0.8, 0.3),
+                paint("Hat", 0.95, 0.95, 0.95),
+                paint("Shirt", 0.2, 0.25, 0.35),
+            ],
+        ),
+    ),
+    (
+        "incubator_manager",
+        v(
+            SUIT_F,
+            1.72,
+            "Incubator Program Manager",
+            "<Equity Instead of Salary>",
+            &[
+                paint("Black", 0.15, 0.1, 0.25),
+                paint("Shirt", 0.3, 0.9, 0.95),
+                paint("Hair", 0.15, 0.1, 0.08),
+            ],
+        ),
+    ),
+    (
+        "community_manager",
+        v(
+            CASUAL_F,
+            1.7,
+            "Coworking Community Manager",
+            "<Head of Vibes>",
+            &[
+                paint("Shirt", 1.0, 0.6, 0.2),
+                paint("Pants", 0.3, 0.5, 0.75),
+                paint("Hair", 0.9, 0.35, 0.6),
+            ],
+        ),
+    ),
+    (
+        "wellness_clerk",
+        v(
+            DOC_F,
+            1.7,
+            "Wellness Desk Clerk",
+            "<Your Membership Is Mandatory>",
+            &[],
+        ),
+    ),
+    (
+        "parking_attendant",
+        v(
+            WORKER,
+            1.78,
+            "Parking Attendant",
+            "<Replaced by an App, Still Here>",
+            &[
+                paint("Vest", 0.15, 0.2, 0.55),
+                paint("Hat", 0.15, 0.2, 0.55),
+                paint("Shirt", 0.85, 0.85, 0.85),
+            ],
+        ),
+    ),
+    (
+        "construction_liaison",
+        v(
+            SUIT_F,
+            1.72,
+            "Construction Liaison",
+            "<Opening Soon Since 2019>",
+            &[
+                paint("Black", 0.45, 0.45, 0.5),
+                paint("Shirt", 1.0, 0.75, 0.1),
+                paint("Hair", 0.4, 0.25, 0.12),
+            ],
+        ),
+    ),
+    (
+        "handbook_reader",
+        v(
+            CASUAL2,
+            1.75,
+            "Employee Who Read the Handbook",
+            "<All 412 Pages>",
+            &[
+                paint("Shirt", 0.6, 0.55, 0.45),
+                paint("Pants", 0.3, 0.28, 0.25),
+                paint("Hair", 0.35, 0.3, 0.25),
+            ],
+        ),
+    ),
+    (
+        "intern_2019",
+        v(
+            CASUAL_M,
+            1.7,
+            "Intern From the 2019 Cohort",
+            "<Onboarding Pending>",
+            &[
+                paint("Shirt", 0.95, 0.9, 0.3),
+                paint("Pants", 0.3, 0.3, 0.35),
+                paint("Hair", 0.4, 0.25, 0.1),
             ],
         ),
     ),
@@ -2015,6 +2417,81 @@ static TABLE: &[(&str, UnitVisual)] = &[
             ],
         ),
     ),
+    // ---- Peg Hollis, the reviewer at every campaign zone's far end: one look, a title per floor.
+    (
+        "reviewer_t1",
+        peg("<Principal Engineer, Rehired as Contractor>"),
+    ),
+    ("reviewer_t2", peg("<Reviews Everything, Twice>")),
+    (
+        "reviewer_t3",
+        peg("<Has Opinions About Your Commit Messages>"),
+    ),
+    (
+        "reviewer_dc1",
+        peg("<Brought a Sweater and a 2011 Network Diagram>"),
+    ),
+    ("reviewer_dc2", peg("<Keeper of the Last Tape>")),
+    ("reviewer_t4", peg("<Sticker Budget: Unlimited>")),
+    ("reviewer_t5", peg("<Has Seen the CEO's Prompt>")),
+    ("reviewer_lab1", peg("<Not Technically Anywhere>")),
+    ("reviewer_lab2", peg("<Final Approver>")),
+    (
+        "cto",
+        v(
+            SUIT_M_BALD,
+            1.82,
+            "The CTO",
+            "<Technically the Officer>",
+            &[
+                paint("Shirt", 0.2, 0.22, 0.3),
+                paint("Pants", 0.12, 0.12, 0.14),
+            ],
+        ),
+    ),
+    (
+        "pip_colleague",
+        v(
+            CASUAL_M,
+            1.76,
+            "Dave from QA",
+            "<On a Performance Improvement Plan>",
+            &[
+                paint("Shirt", 0.55, 0.6, 0.45),
+                paint("Pants", 0.3, 0.28, 0.25),
+            ],
+        ),
+    ),
+    (
+        "tape_robot",
+        v(
+            "prim/overheated_rack",
+            1.2,
+            "TAPE-9000",
+            "<Carrying the Last Real Backup>",
+            &[],
+        ),
+    ),
+    (
+        "rogue_calendar_invite",
+        v(
+            "prim/demo_bug",
+            1.0,
+            "Recurring Calendar Invite",
+            "<Accepted on Your Behalf>",
+            &[],
+        ),
+    ),
+    (
+        "zombie_process",
+        v(
+            "prim/agi_beta",
+            1.3,
+            "Zombie Process",
+            "<Parent: None>",
+            &[],
+        ),
+    ),
     (
         "jira_automation",
         v(
@@ -2290,6 +2767,8 @@ mod tests {
         "frontend_dev",
         "backend_dev",
         "devops_eng",
+        "qa_engineer",
+        "data_scientist",
         "intern",
         "meatproxy",
         "vibe_junior",
@@ -2386,7 +2865,8 @@ mod tests {
             assert!(CHARACTER_MODELS.contains(&vis.model), "{k}: {}", vis.model);
             assert!(!vis.title.is_empty());
         }
-        assert!(CHARACTER_MODELS.len() <= 14);
+        // Every GLB is about 1.3 MB of download; one per playable class plus ten NPC bodies.
+        assert!(CHARACTER_MODELS.len() <= 16);
     }
 
     #[test]

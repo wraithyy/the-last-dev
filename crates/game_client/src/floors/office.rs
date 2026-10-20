@@ -37,11 +37,15 @@ fn secret_seated(p: &mut Plan, anchor: &'static str, x: f32, z: f32, look: (f32,
 
 /// Parked e-scooters anyone can borrow; the office module draws them (they vanish when
 /// borrowed), so the campus builder leaves these four spots empty.
-pub const CAMPUS_SCOOTERS: [(&str, f32, f32); 4] = [
+pub const CAMPUS_SCOOTERS: [(&str, f32, f32); 7] = [
     ("prop:scooter_1", -20.0, 17.5),
     ("prop:scooter_2", 4.0, 8.0),
     ("prop:scooter_3", 18.0, -2.0),
     ("prop:scooter_4", 3.5, -17.0),
+    // At the district shuttle stops: park, station, Incubator Street.
+    ("prop:scooter_5", -76.0, 21.5),
+    ("prop:scooter_6", 55.5, -58.0),
+    ("prop:scooter_7", 77.0, 36.0),
 ];
 
 pub fn place(zone: &str, p: &mut Plan) {

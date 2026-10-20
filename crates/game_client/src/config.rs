@@ -7,8 +7,8 @@ pub const WINDOW_TITLE: &str = "The Last Dev";
 // Floors (metres). Outlines are free-form (see floors/shape.rs); every floor fits inside
 // [-FLOOR_HALF_X, FLOOR_HALF_X] x [-FLOOR_HALF_Z, FLOOR_HALF_Z], which is also the generous
 // outer clamp that collision keeps as a safety net behind the walls.
-pub const FLOOR_HALF_X: f32 = 72.0;
-pub const FLOOR_HALF_Z: f32 = 54.0;
+pub const FLOOR_HALF_X: f32 = 112.0;
+pub const FLOOR_HALF_Z: f32 = 82.0;
 /// Also the ceiling height: the ceiling slab sits on top of the walls.
 pub const WALL_HEIGHT: f32 = 4.5;
 

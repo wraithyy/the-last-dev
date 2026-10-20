@@ -115,9 +115,16 @@ impl Sim {
         let mut pack_id = self.next_pack;
         let mut slot = 0;
         let mut packs = Vec::new();
+        // Only packs without a level of their own split the zone's range.
+        let banded = z.packs.iter().filter(|p| p.level.is_none()).count();
+        let mut nth = 0;
         for (k, p) in z.packs.iter().enumerate() {
             let (at, yaw) = anchor(&p.anchor)?;
-            let level = self.sprint_level(if k * 2 < z.packs.len() { lo } else { hi });
+            let level = p.level.unwrap_or_else(|| {
+                nth += 1;
+                if (nth - 1) * 2 < banded { lo } else { hi }
+            });
+            let level = self.sprint_level(level);
             let mut defs = Vec::new();
             for key in &p.units {
                 defs.push(self.def_index(key)?);
@@ -257,6 +264,7 @@ impl Sim {
             self.set_respawn_point(pos, yaw);
         }
         self.load_world(id, anchors);
+        self.load_quests(id, anchors);
         self.load_live(id, anchors);
         self.minigame_after_load(id, anchors);
         self.events.push(Event::ZoneLoaded {

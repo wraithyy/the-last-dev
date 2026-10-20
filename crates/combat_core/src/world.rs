@@ -65,6 +65,15 @@ pub enum PropKind {
     Calendar,
     /// The Innovation Lab VR demo: a short headset aura (mirrored controls, out of combat only).
     VrDemo,
+    /// A campus shuttle stop: out of combat, takes the rider to the stop named in `to`.
+    ShuttleStop,
+    /// A glowing quest item on the floor (`Objective::Collect`): only shown to, and usable by,
+    /// players whose quest still wants it.
+    Pickup,
+    /// Something to look at for a quest (`Objective::Inspect`).
+    Inspect,
+    /// A machine a quest has you operate (`Objective::Sequence`, `Objective::UseOn`).
+    Device,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -103,6 +112,12 @@ pub struct PropDef {
     /// Tooltip verb when the kind's own one does not fit (a gong is not a music button).
     #[serde(default)]
     pub action: String,
+    /// Shuttle stops: the key of the stop this one goes to.
+    #[serde(default)]
+    pub to: String,
+    /// Quest props: the group a `Collect`, `Inspect` or `UseOn` objective names.
+    #[serde(default)]
+    pub tag: String,
 }
 
 /// A friendly unit spawned at a layout anchor of one zone, outside `ZoneDef::friendly`.
@@ -190,6 +205,17 @@ impl WorldDef {
             }
             if let Some(n) = p.items.iter().find(|n| c.economy.goods(n).is_none()) {
                 return bad(format!("prop {} gives unknown goods {n}", p.key));
+            }
+            let stop = |k: &str| {
+                self.props
+                    .iter()
+                    .any(|o| o.key == k && o.kind == PropKind::ShuttleStop && o.zone == p.zone)
+            };
+            if p.kind == PropKind::ShuttleStop && (p.to == p.key || !stop(&p.to)) {
+                return bad(format!(
+                    "shuttle stop {} needs another stop in its zone",
+                    p.key
+                ));
             }
         }
         for s in &self.secrets {
@@ -473,8 +499,15 @@ impl Sim {
         if !in_range(s.pos, spot, def.reach_m) {
             return self.item_error(player, ItemError::TooFar);
         }
-        // Mirrored controls in a fight would be a griefing tool, not a joke.
-        if def.kind == PropKind::VrDemo && s.in_combat {
+        if matches!(
+            def.kind,
+            PropKind::Pickup | PropKind::Inspect | PropKind::Device
+        ) {
+            return self.use_quest_prop(player, k);
+        }
+        // Mirrored controls in a fight would be a griefing tool, not a joke; a shuttle would be
+        // a free escape.
+        if matches!(def.kind, PropKind::VrDemo | PropKind::ShuttleStop) && s.in_combat {
             return self.item_error(player, ItemError::InCombat);
         }
         let rewards = !def.auras.is_empty() || !def.items.is_empty();
@@ -504,6 +537,7 @@ impl Sim {
         let streak = fun.streak;
         let outcome = match def.kind {
             PropKind::Scooter => 1,
+            PropKind::ShuttleStop => self.ride_shuttle(pi, &def.to),
             PropKind::FireAlarm => self.pull_fire_alarm(player),
             _ if rewards => self.prop_reward(pi, &def),
             _ => self.fun.rng.below(1 << 16),
@@ -513,6 +547,10 @@ impl Sim {
             prop: def.key.clone(),
             outcome,
         });
+        self.quest_credit(
+            player,
+            |o| matches!(o, crate::content::Objective::Interact(k, _) if *k == def.key),
+        );
         self.burnout_on_prop(pi, k);
         if matches!(def.kind, PropKind::ScrumBoard | PropKind::Calendar) {
             self.close_tickets(pi);
@@ -581,6 +619,21 @@ impl Sim {
         self.apply_aura(pi, &aura, ms, None, player, Some(spell.id));
         self.fun.parked.insert(k, self.now + ticks(def.respawn_ms));
         true
+    }
+
+    /// Moves the rider to the stand spot of stop `to` (dismounted: the scooter stays behind).
+    /// 1 when it went, 0 when the destination is not in this layout.
+    fn ride_shuttle(&mut self, pi: usize, to: &str) -> u32 {
+        let Some(pos) = self.prop_spot(to) else {
+            return 0;
+        };
+        self.dismount(pi);
+        self.units[pi].state.pos = pos;
+        self.events.push(Event::Teleported {
+            unit: Self::id_of(pi),
+            pos,
+        });
+        1
     }
 
     /// Every living enemy of the zone comes for whoever pulled it. Returns how many.

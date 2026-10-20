@@ -19,7 +19,13 @@ const SECOND: u32 = 30;
 fn anchors(name: &str) -> Option<(Vec3, f32)> {
     let at = |x: f32, z: f32| Some((Vec3::new(x, 0.0, z), 0.0));
     match name {
-        n if n.starts_with("pack_") || n == "boss" => at(400.0, 400.0),
+        n if n.starts_with("pack_")
+            || n.starts_with("rare_")
+            || n.starts_with("event:")
+            || n == "boss" =>
+        {
+            at(400.0, 400.0)
+        }
         "scrum_bot" => at(2.0, 0.0),
         "prop:scrum_board" => at(-2.0, 0.0),
         "world_boss" => at(0.0, -60.0),

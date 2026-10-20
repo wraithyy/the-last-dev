@@ -329,7 +329,7 @@ fn hover_cursor(
     ui: Query<&Interaction>,
     units: Query<(Entity, &Transform, &Unit)>,
     sims: Query<&SimUnit>,
-    prop: Res<crate::office::PropHover>,
+    (prop, props): (Res<crate::office::PropHover>, Res<crate::office::Props>),
     mut state: Local<(Option<Vec2>, f32, Option<SystemCursorIcon>)>,
 ) {
     let (win_entity, win) = *window;
@@ -367,10 +367,13 @@ fn hover_cursor(
                     Hover::Nothing
                 })
             })
-            .unwrap_or(if prop.0.is_some() {
-                Hover::Friendly
-            } else {
-                Hover::Nothing
+            // A quest pickup takes the loot hand, like a corpse with something on it.
+            .unwrap_or(match prop.0.and_then(|i| props.list.get(i)) {
+                Some(p) if p.kind == combat_core::PropKind::Pickup => Hover::Corpse {
+                    in_reach: p.stand.distance(player.pos) <= p.reach,
+                },
+                Some(_) => Hover::Friendly,
+                None => Hover::Nothing,
             }),
     };
     let icon = cursor_for(hover);

@@ -153,11 +153,15 @@ pub struct LiveDef {
     pub boss: Option<WorldBossDef>,
     #[serde(default)]
     pub night: NightDef,
+    /// Timed public events (`world_events.rs`).
+    #[serde(default)]
+    pub events: Vec<crate::world_events::WorldEventDef>,
 }
 
 impl LiveDef {
     pub(crate) fn validate(&self, c: &Content) -> Result<(), ContentError> {
         validate_world(c)?;
+        crate::world_events::validate(c)?;
         crate::dailies::validate_tasks(c)
     }
 }
@@ -202,6 +206,8 @@ pub(crate) struct LiveRt {
     /// Per-player daily and weekly tasks (`dailies.rs`).
     pub(crate) tasks: BTreeMap<EntityId, crate::dailies::PlayerTasks>,
     pub(crate) board_npc: Option<EntityId>,
+    /// One per `LiveDef::events`, from the first clock anchor on.
+    pub(crate) events: Vec<crate::world_events::EventRt>,
 }
 
 impl Content {
@@ -253,6 +259,7 @@ impl Sim {
     pub fn set_clock(&mut self, unix_s: u64) {
         if self.live.clock.is_none() {
             self.live.boss_left_ms = self.content.world_boss().map_or(0, |b| b.every_ms);
+            self.init_world_events();
         }
         self.live.clock = Some((unix_s, self.now));
         self.events.push(Event::Clock { unix_s });
@@ -367,6 +374,7 @@ impl Sim {
                 .collect();
             self.live.night_spots = spots;
         }
+        self.load_world_events(zone, anchors);
         self.load_board(zone, anchors);
     }
 
@@ -374,6 +382,7 @@ impl Sim {
     pub(crate) fn update_live(&mut self) {
         self.scan_task_events();
         self.watch_world_boss();
+        self.watch_world_events();
         if !self.now.is_multiple_of(ticks(1000)) {
             return;
         }
@@ -384,6 +393,7 @@ impl Sim {
         }
         self.update_night();
         self.world_boss_second();
+        self.world_events_second();
     }
 
     /// `Command::GoHome`: clocking out at 18:00 sharp is an achievement.

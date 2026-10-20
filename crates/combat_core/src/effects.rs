@@ -4,6 +4,7 @@ use crate::content::{Area, AuraDef, Effect, School, SpellDef, SpellId, ticks};
 use crate::geom::{Vec3, distance, forward};
 use crate::sim::{AuraRt, Hit, Sim, SpawnOpts};
 use crate::targeting::EntityId;
+use crate::time::ticks_to_ms;
 use crate::types::{AiState, AuraEnd, Event};
 
 /// Horizontal distance: effects and AI work on the ground plane.
@@ -418,6 +419,9 @@ impl Sim {
                 self.resurrect(ti, caster, *hp_pct, *mana_pct);
             }
             (Effect::Taunt, Some(ti)) => self.taunt(ti, caster),
+            (Effect::Spread { radius_m, count }, Some(ti)) => {
+                self.spread_from(ci, ti, *radius_m, *count)
+            }
             (Effect::Threat { amount }, Some(ti)) => {
                 let t = &self.units[ti];
                 if t.state.hostile && self.content.units[t.def].ai.is_some() {
@@ -767,6 +771,49 @@ impl Sim {
                 });
             if let Some(o) = next {
                 self.apply_aura(o, &key, total_ms, None, source, spell);
+            }
+        }
+    }
+
+    /// `Effect::Spread`: the caster's harmful auras on `ti` jump to the nearest fighting enemies.
+    fn spread_from(&mut self, ci: usize, ti: usize, radius_m: f32, count: u8) {
+        let caster = Self::id_of(ci);
+        let copies: Vec<(String, u32, u8, Option<SpellId>)> = self.units[ti]
+            .auras
+            .iter()
+            .filter(|a| a.source == caster)
+            .filter(|a| self.content.aura(&a.key).is_some_and(|d| d.harmful))
+            .map(|a| {
+                let left = ticks_to_ms(a.expires.saturating_sub(self.now)) as u32;
+                (a.key.clone(), left, a.stacks, a.spell)
+            })
+            .collect();
+        if copies.is_empty() {
+            return;
+        }
+        let at = self.units[ti].state.pos;
+        let mut near: Vec<usize> = (0..self.units.len())
+            .filter(|&o| {
+                let u = &self.units[o];
+                o != ti
+                    && u.state.alive
+                    && !u.despawned
+                    && u.state.in_combat
+                    && u.state.ai != Some(AiState::Evade)
+                    && self.hostile_to(ci, o)
+                    && dist_xz(u.state.pos, at) <= radius_m
+            })
+            .collect();
+        near.sort_by(|&a, &b| {
+            dist_xz(self.units[a].state.pos, at)
+                .total_cmp(&dist_xz(self.units[b].state.pos, at))
+                .then(a.cmp(&b))
+        });
+        for o in near.into_iter().take(usize::from(count)) {
+            for (key, left, stacks, spell) in &copies {
+                for _ in 0..*stacks {
+                    self.apply_aura(o, key, (*left).max(1), None, caster, *spell);
+                }
             }
         }
     }

@@ -565,7 +565,7 @@ fn def_targets_ally(id: SpellId) -> bool {
     spell(id).target == SpellTarget::Ally
 }
 
-/// Every perk of every talent (4 classes x 5 rows x 3 options) does what its card says.
+/// Every perk of every talent (every class x 5 rows x 3 options) does what its card says.
 #[test]
 fn every_talent_mechanic_works() {
     let c = content();
@@ -584,7 +584,7 @@ fn every_talent_mechanic_works() {
         }
     }
     println!("{checked} talent perks checked");
-    assert_eq!(c.talents.classes.len(), 4);
+    assert_eq!(c.talents.classes.len(), c.classes.len());
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 

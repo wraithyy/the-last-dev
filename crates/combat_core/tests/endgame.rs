@@ -19,7 +19,14 @@ const MINUTE: u32 = 60 * SECOND;
 fn anchors(name: &str) -> Option<(Vec3, f32)> {
     let at = |x: f32, z: f32| Some((Vec3::new(x, 0.0, z), 0.0));
     match name {
-        n if n.starts_with("pack_") || n == "boss" || n == "npc_dummy" => at(400.0, 400.0),
+        n if n.starts_with("pack_")
+            || n.starts_with("rare_")
+            || n.starts_with("event:")
+            || n == "boss"
+            || n == "npc_dummy" =>
+        {
+            at(400.0, 400.0)
+        }
         "world_boss" | "graveyard" => at(0.0, -60.0),
         n if n.starts_with("night_") || n.starts_with("npc_") || n.starts_with("secret:") => {
             at(60.0, 60.0)

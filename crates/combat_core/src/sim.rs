@@ -693,6 +693,7 @@ impl Sim {
         self.update_ai();
         self.update_telegraphs();
         self.update_wander();
+        self.update_escorts();
         self.update_auras();
         self.update_regen();
         self.update_hp_history();
@@ -1074,7 +1075,11 @@ impl Sim {
             self.request_yell(ti, YellKind::Talk);
             self.on_talk(player, &key);
             self.quest_credit(player, |o| matches!(o, Objective::Talk(k) if *k == key));
+            self.quest_talk(player, ti);
             self.offer_quests(player, ti);
+        } else if p.state.alive && t.state.alive && !t.despawned && t.state.hostile && near {
+            // F on an enemy in reach: only a `UseOn` item ("Do Not Deploy" sticker) does anything.
+            self.quest_talk(player, ti);
         }
     }
 
@@ -1181,7 +1186,7 @@ impl Sim {
         if u.state.mana < self.perk_mana_cost(ci, spell.id, spell.mana) {
             return Err(CastError::NotEnoughMana);
         }
-        if spell.channel.is_some() && u.state.mana >= u.state.max_mana {
+        if spell.channel.is_some_and(|c| !c.hits()) && u.state.mana >= u.state.max_mana {
             return Err(CastError::FullMana);
         }
         Ok(target)
@@ -1369,6 +1374,10 @@ impl Sim {
             if next > self.now {
                 continue;
             }
+            if ch.hits() {
+                self.channel_hit(ci, spell_id, next + ticks(ch.interval_ms));
+                continue;
+            }
             let u = &mut self.units[ci];
             let want = (u.state.max_mana * ch.mana_pct / 100).max(1);
             let gain = want.min(u.state.max_mana.saturating_sub(u.state.mana));
@@ -1387,6 +1396,32 @@ impl Sim {
             if full {
                 self.complete_cast(ci);
             }
+        }
+    }
+
+    /// One tick of a damage channel: the spell's effects on the cast target, no cost. The tick
+    /// due on the final tick is left to the completion, which applies them once more.
+    fn channel_hit(&mut self, ci: usize, spell_id: SpellId, next: u64) {
+        let Some(spell) = self.content.spell(spell_id).cloned() else {
+            return;
+        };
+        let Some(cast) = self.units[ci].cast.as_mut() else {
+            return;
+        };
+        cast.channel_next = Some(next);
+        if cast.end <= self.now {
+            return;
+        }
+        let target = cast.target;
+        if let Err(reason) = self.revalidate(ci, &spell, target) {
+            self.cancel_cast(ci, None, 0);
+            return self.fail(Self::id_of(ci), spell_id, reason);
+        }
+        let Some(ti) = target.and_then(|t| self.index(t)) else {
+            return;
+        };
+        for e in spell.effects().filter(|e| !e.caster_centric()) {
+            self.apply_effect(ci, &spell, e, Some(ti));
         }
     }
 
@@ -1666,13 +1701,19 @@ impl Sim {
 
     /// Pushback is player-only: enemy telegraphs must keep a fixed window.
     fn pushback(&mut self, ti: usize) {
-        // Taking damage breaks a channel outright instead of delaying it.
-        if self.units[ti]
-            .cast
-            .as_ref()
-            .is_some_and(|c| c.channel_next.is_some())
+        // Taking damage breaks a drink outright instead of delaying it; damage channels shrug.
+        if let Some(c) = self.units[ti].cast.as_ref()
+            && c.channel_next.is_some()
         {
-            return self.cancel_cast(ti, None, 0);
+            let drink = self
+                .content
+                .spell(c.spell)
+                .and_then(|s| s.channel)
+                .is_some_and(|ch| !ch.hits());
+            if drink {
+                self.cancel_cast(ti, None, 0);
+            }
+            return;
         }
         let (ms, max) = (
             self.content.config.pushback_ms,

@@ -490,6 +490,10 @@ pub enum Event {
     QuestCompleted {
         quest: String,
     },
+    /// A timed objective ran out: the quest left the log and can be accepted again.
+    QuestFailed {
+        quest: String,
+    },
     /// A ground telegraph of `spell` will land `resolve_ms` from now on whoever of the other
     /// side is inside `shape` at `pos` (cones and lines open along `facing`, a yaw). `cover`
     /// lists the safe spots (radius in the spell's `TelegraphDef`), usually empty.
@@ -655,6 +659,15 @@ pub enum Event {
         state: crate::live::WorldBossState,
         secs: u32,
         unit: EntityId,
+    },
+    /// A public world event (`world_events.rs`): warned `secs` ahead, started for `secs`, kill
+    /// progress `count`/`need` (`need` 0 = hold out), won or failed.
+    WorldEvent {
+        key: String,
+        phase: crate::world_events::WorldEventPhase,
+        secs: u32,
+        count: u32,
+        need: u32,
     },
     /// A player's active pet changed ("" = none); everyone sees it follow them.
     PetChanged {

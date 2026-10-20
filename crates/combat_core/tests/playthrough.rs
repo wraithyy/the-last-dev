@@ -8,11 +8,18 @@
 mod common;
 
 use combat_core::{
-    Command, Event, QuestStatus, Sim, SpellId, TRASH_RESPAWN_MS, TelegraphView, Vec3, ms_to_ticks,
+    Command, Event, Objective, QuestStatus, Sim, SpellId, TRASH_RESPAWN_MS, TelegraphView, Vec3,
+    ms_to_ticks,
 };
 use common::*;
 use std::fmt::Write as _;
 use std::path::PathBuf;
+
+/// The bots walk the campaign; the campus districts are optional side content on their own
+/// band (`common::without_districts`), so they stay out of these runs.
+fn content() -> combat_core::Content {
+    campaign_content()
+}
 
 const GOLDEN: &str = "../../content/replays/floor1_seed7.log";
 const MAX_TICKS: u64 = 60_000;
@@ -58,6 +65,37 @@ const REVERT: SpellId = SpellId(45);
 const FEATURE_FLAG: SpellId = SpellId(46);
 const CIRCUIT: SpellId = SpellId(47);
 const TERRAFORM: SpellId = SpellId(49);
+const UNIT_TEST: SpellId = SpellId(51);
+const BUG_REPORT: SpellId = SpellId(52);
+const BLOCKER: SpellId = SpellId(53);
+const TRAP: SpellId = SpellId(54);
+const FLAKY: SpellId = SpellId(55);
+const REVERT_GREEN: SpellId = SpellId(56);
+const CANNOT_REPRO: SpellId = SpellId(57);
+const SUITE: SpellId = SpellId(58);
+const LOAD_TEST: SpellId = SpellId(59);
+const PEN_TEST: SpellId = SpellId(60);
+const LIN_REG: SpellId = SpellId(61);
+const OVERFIT: SpellId = SpellId(62);
+const EARLY_STOP: SpellId = SpellId(63);
+const DRIFT: SpellId = SpellId(64);
+const CONFIDENCE: SpellId = SpellId(65);
+const TRAINING: SpellId = SpellId(66);
+const CROSS_VAL: SpellId = SpellId(67);
+const P_HACK: SpellId = SpellId(68);
+const SWEEP: SpellId = SpellId(69);
+const RETRAIN: SpellId = SpellId(70);
+/// Every playable class; `bot_covers_every_class` keeps it in step with the content.
+const CLASSES: [&str; 6] = [
+    "fullstack",
+    "frontend",
+    "backend",
+    "devops",
+    "qa",
+    "data_scientist",
+];
+/// Shields of linked raid bosses: the open member is the only one worth hitting.
+const LINK_SHIELDS: [&str; 2] = ["synergy_shield", "panel_muted"];
 
 /// Packs on a straight corridor toward -Z, the boss at the end, NPCs off to the side.
 fn anchor(name: &str) -> Option<(Vec3, f32)> {
@@ -71,6 +109,10 @@ fn anchor(name: &str) -> Option<(Vec3, f32)> {
     // The campus onboarding corner (named, not numbered), far out of every pull.
     if name.starts_with("npc_") {
         return Some((Vec3::new(-400.0, 0.0, 400.0), 0.0));
+    }
+    // Quest props share one quiet corner next to it; the bot walks there to use them.
+    if name.starts_with("prop:") {
+        return Some((Vec3::new(-390.0, 0.0, 390.0), 0.0));
     }
     (name == "boss").then_some((Vec3::new(0.0, 0.0, -PACK_SPACING * 7.0), 0.0))
 }
@@ -91,6 +133,8 @@ struct Report {
     level_ups: Vec<(u64, u8)>,
     /// Walking the bot skips by teleporting between packs and NPCs, at `RUN_MPS`, in ms.
     travel_ms: u64,
+    /// Whole run in seconds: fights, rests and the walking above.
+    secs: u64,
 }
 
 struct Bot {
@@ -112,6 +156,8 @@ struct Bot {
     low_hp_pct: u32,
     /// Stop drinking when something attacks (sprint adds); off for the golden runs.
     rest_alert: bool,
+    /// HP % below which the bot drinks between pulls.
+    rest_hp_pct: u32,
     last_pos: Vec3,
 }
 
@@ -151,6 +197,7 @@ impl Bot {
             seed,
             low_hp_pct: 100,
             rest_alert: false,
+            rest_hp_pct: 60,
             last_pos: start,
         }
     }
@@ -240,6 +287,8 @@ impl Bot {
             "frontend" => (LIGHTHOUSE, CENTER_DIV),
             "backend" => (KILL_QUERY, DB_LOCK),
             "devops" => (SIGSTOP, SIGSTOP),
+            "qa" => (BLOCKER, BLOCKER),
+            "data_scientist" => (EARLY_STOP, EARLY_STOP),
             _ => (RPR, DUCK),
         }
     }
@@ -276,11 +325,21 @@ impl Bot {
                 return Some(id);
             }
         }
+        let shielded = |u: &combat_core::UnitState| {
+            u.auras
+                .iter()
+                .any(|a| LINK_SHIELDS.contains(&a.key.as_str()))
+        };
+        let open_boss = self
+            .sim
+            .units()
+            .any(|u| u.boss && u.alive && u.in_combat && !shielded(u));
         self.sim
             .units()
             .filter(|u| {
                 u.hostile && u.alive && u.in_combat && u.ai != Some(combat_core::AiState::Evade)
             })
+            .filter(|u| !(open_boss && shielded(u)))
             .min_by(|a, b| {
                 a.max_hp.cmp(&b.max_hp).then(
                     combat_core::distance(a.pos, self.pos)
@@ -392,7 +451,33 @@ impl Bot {
         kick(spell) || !pack_kicks
     }
 
+    /// Raid "Pair up!": a tethered player closes in on its partner before anything else.
+    fn tether(&mut self) -> bool {
+        let view = self.sim.raid_view();
+        let me = self.player;
+        let partner = view.tethers.iter().find_map(|&(a, b)| {
+            if a == me {
+                Some(b)
+            } else if b == me {
+                Some(a)
+            } else {
+                None
+            }
+        });
+        let range = f32::from(view.tether_m.max(1)) - 2.0;
+        match partner.and_then(|p| self.sim.unit(p)).map(|u| u.pos) {
+            Some(at) if combat_core::distance(at, self.pos) > range => {
+                self.walk(at);
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn act(&mut self) {
+        if self.me().alive && !self.me().stunned && self.tether() {
+            return;
+        }
         if self.me().alive && !self.me().stunned && (self.dodge() || self.chase()) {
             return;
         }
@@ -412,6 +497,8 @@ impl Bot {
             "frontend" => self.act_frontend(),
             "backend" => self.act_backend(),
             "devops" => self.act_devops(),
+            "qa" => self.act_qa(),
+            "data_scientist" => self.act_data_scientist(),
             _ => self.act_fullstack(),
         }
     }
@@ -597,6 +684,134 @@ impl Bot {
         }
     }
 
+    /// Stacks of `key` on `t` (any source) and the time left on them.
+    fn stacks(t: &combat_core::UnitState, key: &str) -> (u8, u32) {
+        t.auras
+            .iter()
+            .find(|a| a.key == key)
+            .map_or((0, 0), |a| (a.stacks, a.remaining_ms))
+    }
+
+    fn act_qa(&mut self) {
+        let Some((me, t)) = self.engage() else { return };
+        let reflecting = Self::reflecting(&t);
+        if reflecting && me.cast.is_some() {
+            self.sim.push(Command::StopCasting {
+                caster: self.player,
+            });
+        }
+        let hp_pct = me.hp * 100 / me.max_hp.max(1);
+        // The dodge: a long enemy cast about to land that the kick cannot stop.
+        let landing = self.sim.units().any(|u| {
+            u.hostile
+                && u.in_combat
+                && u.cast.is_some_and(|c| {
+                    c.total_ms >= 1500 && c.total_ms - c.elapsed_ms.min(c.total_ms) <= 300
+                })
+        });
+        if (hp_pct < 40 || landing) && self.ready(CANNOT_REPRO) {
+            self.cast(CANNOT_REPRO);
+        }
+        if !reflecting && self.try_kick(&t, BLOCKER, BLOCKER) {
+            return;
+        }
+        if self.busy(&me) {
+            return;
+        }
+        let deadline = me.auras.iter().any(|a| a.key == "deadline");
+        if (deadline || hp_pct < 45) && self.ready(REVERT_GREEN) {
+            return self.cast(REVERT_GREEN);
+        }
+        if reflecting {
+            return;
+        }
+        if self.enemies_near(10.0) >= 2 && self.ready(LOAD_TEST) {
+            return self.cast(LOAD_TEST);
+        }
+        let trapped = t
+            .auras
+            .iter()
+            .any(|a| a.key == "regression_trap" || a.key == "flaky_failed");
+        let d = combat_core::distance(me.pos, t.pos);
+        if !trapped && d > 8.0 && t.hp > 150 && self.ready(TRAP) {
+            return self.cast(TRAP);
+        }
+        if t.max_hp > 1000 && hp_pct > 60 && self.ready(PEN_TEST) {
+            return self.cast(PEN_TEST);
+        }
+        let (reports, left) = Self::stacks(&t, "bug_report");
+        if (reports < 3 || left < 3000) && t.hp > 150 && self.ready(BUG_REPORT) {
+            return self.cast(BUG_REPORT);
+        }
+        if reports >= 3 && self.ready(SUITE) {
+            return self.cast(SUITE);
+        }
+        if self.ready(FLAKY) {
+            return self.cast(FLAKY);
+        }
+        if self.ready(UNIT_TEST) {
+            self.cast(UNIT_TEST);
+        }
+    }
+
+    fn act_data_scientist(&mut self) {
+        let Some((me, t)) = self.engage() else { return };
+        let reflecting = Self::reflecting(&t);
+        if reflecting && me.cast.is_some() {
+            self.sim.push(Command::StopCasting {
+                caster: self.player,
+            });
+        }
+        if !reflecting && self.try_kick(&t, EARLY_STOP, EARLY_STOP) {
+            return;
+        }
+        if self.busy(&me) {
+            return;
+        }
+        let hp_pct = me.hp * 100 / me.max_hp.max(1);
+        let shielded = me.auras.iter().any(|a| a.key == "confidence_interval");
+        // A reflect bounces the DoTs already ticking: shield up before it lands.
+        if (hp_pct < 75 || reflecting) && !shielded && self.ready(CONFIDENCE) {
+            return self.cast(CONFIDENCE);
+        }
+        if reflecting {
+            return;
+        }
+        let (overfit, of_left) = Self::stacks(&t, "overfitting");
+        let (drift, dr_left) = Self::stacks(&t, "data_drift");
+        if self.enemies_near(10.0) >= 2 && self.ready(SWEEP) {
+            return self.cast(SWEEP);
+        }
+        let others = self.enemies_near(40.0) >= 2;
+        if others && overfit + drift >= 2 && self.ready(CROSS_VAL) {
+            return self.cast(CROSS_VAL);
+        }
+        let t_pct = t.hp * 100 / t.max_hp.max(1);
+        if t_pct <= 30 && self.ready(P_HACK) {
+            return self.cast(P_HACK);
+        }
+        // DoTs only pay off on something that lives through a few ticks.
+        let lasts = t.hp > 300;
+        if lasts && (drift < 2 || dr_left < 3000) && self.ready(DRIFT) {
+            return self.cast(DRIFT);
+        }
+        if lasts && (overfit < 3 || of_left < 3000) && self.ready(OVERFIT) {
+            return self.cast(OVERFIT);
+        }
+        if t.max_hp > 1000 && hp_pct > 60 && self.ready(RETRAIN) {
+            return self.cast(RETRAIN);
+        }
+        if t.hp > 200 && self.ready(TRAINING) {
+            return self.cast(TRAINING);
+        }
+        if self.ready(P_HACK) {
+            return self.cast(P_HACK);
+        }
+        if self.ready(LIN_REG) {
+            self.cast(LIN_REG);
+        }
+    }
+
     fn act_fullstack(&mut self) {
         let me = self.me();
         if !me.alive || me.stunned {
@@ -680,11 +895,12 @@ impl Bot {
         self.target = None;
     }
 
-    /// Drinks (out-of-combat regen) only below 60% HP or 50% mana, then up to 95%.
+    /// Drinks (out-of-combat regen) only below `rest_hp_pct` HP or 50% mana, then up to 95%.
     /// Before the boss it always tops off, which does not count as a rest.
     fn rest(&mut self, before_boss: bool) {
+        let hp_pct = self.rest_hp_pct;
         let low = |u: &combat_core::UnitState| {
-            u.hp * 100 < u.max_hp * 60 || u.mana * 100 < u.max_mana * 50
+            u.hp * 100 < u.max_hp * hp_pct || u.mana * 100 < u.max_mana * 50
         };
         let full = |u: &combat_core::UnitState| {
             u.hp * 100 >= u.max_hp * 95 && u.mana * 100 >= u.max_mana * 95
@@ -717,6 +933,7 @@ impl Bot {
         };
         self.pos = Vec3::new(at.x, 0.0, at.z + gap);
         self.tick();
+        self.hand_items(at);
         let first = self
             .sim
             .units()
@@ -763,6 +980,91 @@ impl Bot {
                 corpse: id,
             });
             self.tick();
+        }
+    }
+
+    /// `UseOn` items for enemies go over before the fight: step up to each wanted one in the
+    /// pack and press F. Without such a quest nothing changes (the golden run).
+    fn hand_items(&mut self, at: Vec3) {
+        let wanted: Vec<(u64, Vec3)> = self
+            .sim
+            .units()
+            .filter(|u| u.hostile && u.alive && combat_core::distance(u.pos, at) < 6.0)
+            .filter(|u| self.sim.wants_use_on(self.player, &u.key))
+            .map(|u| (u.id, u.pos))
+            .collect();
+        for (id, pos) in wanted {
+            self.pos = Vec3::new(pos.x + 1.0, 0.0, pos.z);
+            self.tick();
+            self.sim.push(Command::Talk { unit: id });
+            self.tick();
+        }
+    }
+
+    fn use_prop(&mut self, key: &str) {
+        let Some((at, _)) = anchor(&format!("prop:{key}")) else {
+            return;
+        };
+        self.pos = at;
+        self.tick();
+        self.sim.push(Command::Interact {
+            prop: key.to_string(),
+        });
+        self.tick();
+    }
+
+    /// The zone's interactive tickets after the clear: pickups, photos, devices and escorts.
+    fn work_quests(&mut self, zone: &str) {
+        let c = self.sim.content().clone();
+        let props = |f: &dyn Fn(&combat_core::PropDef) -> bool| -> Vec<String> {
+            c.world
+                .props
+                .iter()
+                .filter(|p| p.zone == zone && f(p))
+                .map(|p| p.key.clone())
+                .collect()
+        };
+        for q in self.sim.quests().active.clone() {
+            let Some(def) = c.quest(&q.id) else { continue };
+            for (o, n) in def.objectives.iter().zip(&q.counts) {
+                if *n >= o.need() {
+                    continue;
+                }
+                let keys = match o {
+                    Objective::Collect(tag, _) | Objective::Inspect(tag, _) => {
+                        props(&|p| p.tag == *tag)
+                    }
+                    Objective::Sequence { props: seq, .. } => seq
+                        .iter()
+                        .filter(|k| !props(&|p| p.key == **k).is_empty())
+                        .cloned()
+                        .collect(),
+                    Objective::UseOn { target, .. } => {
+                        props(&|p| p.key == *target || p.tag == *target)
+                    }
+                    Objective::Escort { unit, .. } => {
+                        // Walk beside it for up to two minutes; its waves fight the bot's fights.
+                        for _ in 0..120 {
+                            let Some(at) = self.sim.units().find(|u| u.key == *unit && u.alive)
+                            else {
+                                break;
+                            };
+                            self.pos = Vec3::new(at.pos.x + 1.0, 0.0, at.pos.z + 1.0);
+                            for _ in 0..30 {
+                                self.tick();
+                            }
+                            if self.sim.quest_status(&q.id) != QuestStatus::Active {
+                                break;
+                            }
+                        }
+                        Vec::new()
+                    }
+                    _ => Vec::new(),
+                };
+                for k in keys {
+                    self.use_prop(&k);
+                }
+            }
         }
     }
 
@@ -849,6 +1151,8 @@ impl Bot {
             self.pull(at, true);
         }
         self.report.level = self.me().level;
+        self.report.secs =
+            (combat_core::ticks_to_ms(self.sim.now().0) + self.report.travel_ms) / 1000;
         // Tuning aid: `WOW_BOT_DUMP=<dir>` keeps every run's full event log.
         if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
             let name = format!(
@@ -949,7 +1253,7 @@ fn clear_zones(class: &'static str, zones: &[&str]) -> (Vec<String>, Vec<(String
     (failures, lowest)
 }
 
-/// Frontend, Backend and DevOps clear every zone solo at its max level, like the Fullstack
+/// Every class but the Fullstack clears every zone solo at its max level, like the Fullstack
 /// gate above (the campus chain from level 1 is covered per class below). `WOW_CLASS_ZONES`
 /// (comma list) narrows it while tuning.
 #[test]
@@ -963,7 +1267,7 @@ fn other_classes_clear_every_zone() {
     );
     let zones: Vec<&str> = zones.iter().map(String::as_str).collect();
     let mut failures = Vec::new();
-    for class in ["frontend", "backend", "devops"] {
+    for class in CLASSES.into_iter().skip(1) {
         let (f, lowest) = clear_zones(class, &zones);
         println!("{class}: lowest boss-fight HP % per zone over 3 seeds: {lowest:?}");
         failures.extend(f);
@@ -978,7 +1282,7 @@ fn campus_quest_chain_from_level_one() {
 
 #[test]
 fn campus_quest_chain_from_level_one_other_classes() {
-    for class in ["frontend", "backend", "devops"] {
+    for class in CLASSES.into_iter().skip(1) {
         campus_chain(class);
     }
 }
@@ -1280,6 +1584,9 @@ fn campaign_build(
         let max = content().zone(zone).map_or(1, |z| z.level_range.1);
         let mut bot = Bot::new_as(class, zone, max, seed);
         bot.looting = true;
+        // Glass-cannon builds walked into a three-unit pull at 60% HP and died on one seed;
+        // a player watching the HP bar tops off first.
+        bot.rest_hp_pct = 70;
         if let Some(s) = &save {
             assert!(bot.sim.import_save(bot.player, s));
             bot.sim.set_player_level(max);
@@ -1296,6 +1603,7 @@ fn campaign_build(
         // close what is done after the clear (twice, for chains that open on turn-in).
         bot.visit_givers(zone, &quests);
         bot.run_geared(zone);
+        bot.work_quests(zone);
         bot.visit_givers(zone, &quests);
         bot.visit_givers(zone, &quests);
         let secs = bot.report.after.last().map_or(0, |a| a.2);
@@ -1322,7 +1630,7 @@ fn campaign_build(
 #[test]
 fn every_class_clears_the_campaign_equipping_drops() {
     let mut failures = Vec::new();
-    for class in ["fullstack", "frontend", "backend", "devops"] {
+    for class in CLASSES {
         let mut lowest: Vec<(String, u32)> = Vec::new();
         for seed in [7, 42, 1234] {
             let (lines, me, done) = campaign(class, seed);
@@ -1383,7 +1691,7 @@ fn tier_gear_makes_boss_fights_clearly_easier() {
     ];
     let mut table = Vec::new();
     let mut failures = Vec::new();
-    for class in ["fullstack", "frontend", "backend", "devops"] {
+    for class in CLASSES {
         let (mut bare_secs, mut geared_secs, mut bare_hp, mut geared_hp) = (0u64, 0u64, 0u64, 0u64);
         for (zone, tier) in zones {
             let max = content().zone(zone).map_or(1, |z| z.level_range.1);
@@ -1521,7 +1829,7 @@ fn sprinter(class: &'static str, seed: u64) -> Bot {
     b
 }
 
-const SPRINT_CLASSES: [&str; 4] = ["fullstack", "frontend", "backend", "devops"];
+const SPRINT_CLASSES: [&str; 6] = CLASSES;
 
 /// Every class solo delivers sprint levels 1-3 within par over three seeds (one building per
 /// seed, so all three buildings are covered).
@@ -1570,7 +1878,7 @@ fn every_talent_build_clears_the_campaign() {
             .map(|l| l.2)
             .sum()
     };
-    let classes = ["fullstack", "frontend", "backend", "devops"];
+    let classes = CLASSES;
     let seeds = [7, 42, 1234];
     let mut base: Vec<(&str, u64)> = Vec::new();
     for class in classes {
@@ -1666,6 +1974,7 @@ fn natural_campaign(class: &'static str, seed: u64) -> (Vec<u64>, Vec<ZoneEnd>, 
         }
         bot.visit_givers(zone, &quests);
         bot.run_geared(zone);
+        bot.work_quests(zone);
         bot.visit_givers(zone, &quests);
         bot.visit_givers(zone, &quests);
         let ms = |tick: u64, travel: u64| combat_core::ticks_to_ms(tick) + travel;
@@ -1784,4 +2093,172 @@ fn dailies_keep_the_campaign_inside_the_level_bands() {
         end_with <= end_plain + 1,
         "dailies add more than a level over the campaign: {end_plain} -> {end_with}"
     );
+}
+
+// ---- solo viability of every class ----
+
+#[test]
+fn bot_covers_every_class() {
+    let keys: Vec<String> = content().classes.iter().map(|c| c.key.clone()).collect();
+    assert_eq!(keys, CLASSES, "teach the playthrough bot the new class");
+}
+
+/// Solo time budget per zone: 80 s per pack plus 160 s for the boss, walking and resting
+/// included. Before the class pass the bot's DevOps needed up to 570 s for tower/4 (budget
+/// 640 s); after it every class stays under about 90% of the budget.
+fn zone_budget_secs(z: &combat_core::ZoneDef) -> u64 {
+    let boss = if z.boss.is_some() { 160 } else { 0 };
+    z.packs.len() as u64 * 80 + boss
+}
+
+/// Every class clears every zone with a fight solo at its max level on three seeds, within the
+/// zone's time budget, and no class takes more than 1.6x the fastest class's time anywhere.
+#[test]
+fn every_class_clears_every_zone_solo_within_budget() {
+    let zones: Vec<combat_core::ZoneDef> = content().zones.into_iter().filter(has_combat).collect();
+    let mut failures = Vec::new();
+    let mut table = Vec::new();
+    for z in &zones {
+        let max = z.level_range.1;
+        let budget = zone_budget_secs(z);
+        let mut times: Vec<(&str, u64, u32)> = Vec::new();
+        for class in CLASSES {
+            let (mut secs, mut low) = (0, 100);
+            for seed in [7, 42, 1234] {
+                let (r, _) = Bot::new_as(class, &z.id, max, seed).run(&z.id);
+                if r.died || (z.boss.is_some() && !r.cleared) {
+                    failures.push(format!("{class} seed {seed} {}: died or no clear", z.id));
+                }
+                if r.secs > budget {
+                    failures.push(format!(
+                        "{class} seed {seed} {}: {} s over the {budget} s budget",
+                        z.id, r.secs
+                    ));
+                }
+                secs = secs.max(r.secs);
+                if std::env::var_os("WOW_SOLO_DEBUG").is_some() {
+                    let fights: u64 = r.after.iter().map(|a| a.2).sum();
+                    println!(
+                        "  {class} {} seed {seed}: {} s total, {fights} s fighting, {} rests / {} pulls",
+                        z.id, r.secs, r.rests, r.pulls
+                    );
+                }
+                if z.boss.is_some() {
+                    low = low.min(r.boss_min_hp_pct);
+                }
+            }
+            times.push((class, secs, low));
+        }
+        let fastest = times.iter().map(|t| t.1).min().unwrap_or(1).max(1);
+        for (class, secs, _) in &times {
+            if *secs * 10 > fastest * 16 {
+                failures.push(format!(
+                    "{class} {}: {secs} s is over 1.6x the fastest class ({fastest} s)",
+                    z.id
+                ));
+            }
+        }
+        let cells: Vec<String> = times
+            .iter()
+            .map(|(c, s, l)| format!("{c} {s}s/{l}%"))
+            .collect();
+        table.push(format!(
+            "{:13} budget {budget:4}s | {}",
+            z.id,
+            cells.join(" | ")
+        ));
+    }
+    println!(
+        "slowest seed per class (seconds / lowest boss HP %):\n{}",
+        table.join("\n")
+    );
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+const RAID_ROOMS: [&str; 4] = ["offsite/1", "offsite/2", "offsite/3", "offsite/4"];
+const VIBECON_ROOMS: [&str; 5] = [
+    "vibecon/1",
+    "vibecon/2",
+    "vibecon/3",
+    "vibecon/4",
+    "vibecon/5",
+];
+
+impl Bot {
+    /// The best Legacy piece (ilvl 12) of every slot for the class's role.
+    fn wear_legacy_gear(&mut self) {
+        let role = self.role();
+        let eco = self.sim.content().economy.clone();
+        for slot in combat_core::Slot::ALL {
+            let best = eco
+                .gear
+                .iter()
+                .filter(|g| g.slot == slot && g.source == combat_core::GearSource::Legacy)
+                .max_by_key(|g| eco.score(g, role));
+            if let Some(g) = best {
+                self.sim.debug_equip(self.player, &g.name);
+            }
+        }
+    }
+
+    /// One raid on Async Attendance: rooms in order, packs then the boss, topping off before
+    /// each boss; stops at the first room whose boss survives. Returns bosses killed, seconds,
+    /// lowest HP %.
+    fn raid_async(&mut self, rooms: &[&str]) -> (usize, u64, u32) {
+        self.sim.debug_force_raid_async(Some(true));
+        let start = self.sim.now().0;
+        let mut bosses = 0;
+        for &zone in rooms {
+            if let Err(e) = self.sim.load_zone(zone, &anchor, Vec::new()) {
+                panic!("load_zone {zone}: {e}");
+            }
+            self.tick();
+            self.pos = self.me().pos;
+            self.rest(true);
+            self.run_geared(zone);
+            let boss = self
+                .sim
+                .content()
+                .zone(zone)
+                .and_then(|z| z.boss.as_ref())
+                .map(|b| b.unit.clone())
+                .unwrap_or_default();
+            if self.report.died || !self.sim.raid_locked(&boss, true) {
+                break;
+            }
+            bosses += 1;
+        }
+        let secs = (self.sim.now().0 - start) / 30;
+        (bosses, secs, self.low_hp_pct)
+    }
+}
+
+/// Every class, alone at level 10 in Legacy gear, clears both raids on Async Attendance (the
+/// solo difficulty) on three seeds.
+#[test]
+fn every_class_clears_async_attendance_solo() {
+    let mut failures = Vec::new();
+    for class in CLASSES {
+        for (name, rooms) in [
+            ("Offsite", &RAID_ROOMS[..]),
+            ("VibeCon", &VIBECON_ROOMS[..]),
+        ] {
+            for seed in [7, 42, 1234] {
+                let mut b = Bot::new_as(class, "campus", 10, seed);
+                b.wear_legacy_gear();
+                b.rest_alert = true;
+                let (bosses, secs, low) = b.raid_async(rooms);
+                println!(
+                    "{class:14} {name} Async seed {seed:4}: {bosses}/{} bosses in {secs} s, low {low}%",
+                    rooms.len()
+                );
+                if bosses < rooms.len() {
+                    failures.push(format!(
+                        "{class} {name} seed {seed}: Async stopped after {bosses} bosses"
+                    ));
+                }
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

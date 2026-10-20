@@ -4,11 +4,25 @@
 //! zone or carried items.
 
 use crate::content::{Content, Objective, QuestDef, QuestGiver, Role, ticks};
-use crate::geom::in_range;
+use crate::effects::dist_xz;
+use crate::geom::{Vec3, in_range};
 use crate::sim::Sim;
 use crate::targeting::EntityId;
 use crate::types::{Event, ItemError};
-use std::collections::BTreeMap;
+use crate::world::PropKind;
+use std::collections::{BTreeMap, BTreeSet};
+
+/// An escort counts as delivered this close to its goal anchor (it stops short of whoever
+/// stands there).
+pub const ESCORT_DONE_M: f32 = 2.5;
+/// Escorts amble: slower than a walking player, so the guard is never left behind.
+const ESCORT_MPS: f32 = 2.4;
+/// An `Inspect` prop counts for a player in reach whose facing is this close to the prop's.
+const INSPECT_FACING_RAD: f32 = 1.2;
+/// `Interacted` outcomes of quest props, for the client's lines.
+pub const QUEST_PROP_IDLE: u32 = 0;
+pub const QUEST_PROP_COUNTED: u32 = 1;
+pub const QUEST_PROP_WRONG_ORDER: u32 = 2;
 
 /// A `Defend` second counts while the player stands this close to the defended unit.
 pub const DEFEND_RANGE_M: f32 = 25.0;
@@ -44,8 +58,19 @@ pub struct QuestLog {
 pub(crate) struct QuestRt {
     /// Last tick a ground telegraph landed on each player (`KillClean`).
     pub(crate) telegraph_hit: BTreeMap<EntityId, u64>,
-    /// Next wave tick per defended unit key (`Defend`).
+    /// Next wave tick per defended or escorted unit key (`Defend`, `Escort`).
     next_wave: BTreeMap<String, u64>,
+    /// Quest props each player has already used up (index into `world.props`): pickups taken,
+    /// spots inspected, devices an item went on. Not saved: pickups respawn per player.
+    used_props: BTreeMap<EntityId, BTreeSet<usize>>,
+    /// Units each player already applied a `UseOn` item to.
+    used_units: BTreeMap<EntityId, BTreeSet<EntityId>>,
+    /// `Deliver` deadline tick per (player, quest).
+    deadlines: BTreeMap<(EntityId, String), u64>,
+    /// Escorted unit key -> goal of the loaded zone.
+    escorts: BTreeMap<String, Vec3>,
+    /// `Inspect` props of the loaded zone: (index into `world.props`, stand spot, its yaw).
+    inspect_spots: Vec<(usize, Vec3, f32)>,
 }
 
 static EMPTY_LOG: QuestLog = QuestLog {
@@ -163,6 +188,7 @@ impl Sim {
         };
         let ready = is_ready(&def, &q);
         self.quest_logs.entry(pid).or_default().active.push(q);
+        self.quest_accept_rt(pid, &def);
         self.emit_to(
             pid,
             Event::QuestAccepted {
@@ -267,29 +293,39 @@ impl Sim {
             }
         }
         self.quest_defends();
+        self.quest_inspects();
+        self.quest_deadlines();
     }
 
-    /// `Defend` objectives, once a second: waves spawn while someone guards, guarding players
-    /// count, and a fallen defended unit resets everyone's count and stands up again.
+    /// `Defend` and `Escort` objectives, once a second: waves spawn while someone guards,
+    /// guarding players count (a second held, or the share of the way walked), and a fallen
+    /// unit resets everyone's count and stands up again at its start.
     fn quest_defends(&mut self) {
-        let mut wanted: Vec<(String, String, u32)> = Vec::new();
+        // (unit, wave, every_ms, escort)
+        let mut wanted: Vec<(String, String, u32, bool)> = Vec::new();
         for pid in &self.players {
             for q in &self.quests_of(*pid).active {
                 let Some(def) = self.content.quest(&q.id) else {
                     continue;
                 };
                 for (o, c) in def.objectives.iter().zip(&q.counts) {
-                    if let Objective::Defend {
-                        unit,
-                        wave,
-                        every_ms,
-                        secs,
-                        ..
-                    } = o
-                        && c < secs
-                        && !wanted.iter().any(|w| w.0 == *unit)
-                    {
-                        wanted.push((unit.clone(), wave.clone(), *every_ms));
+                    let (unit, wave, every_ms, escort) = match o {
+                        Objective::Defend {
+                            unit,
+                            wave,
+                            every_ms,
+                            ..
+                        } => (unit, wave, every_ms, false),
+                        Objective::Escort {
+                            unit,
+                            wave,
+                            every_ms,
+                            ..
+                        } => (unit, wave, every_ms, true),
+                        _ => continue,
+                    };
+                    if *c < o.need() && !wanted.iter().any(|w| w.0 == *unit) {
+                        wanted.push((unit.clone(), wave.clone(), *every_ms, escort));
                     }
                 }
             }
@@ -297,7 +333,7 @@ impl Sim {
         self.quest_rt
             .next_wave
             .retain(|k, _| wanted.iter().any(|w| w.0 == *k));
-        for (unit, wave, every_ms) in wanted {
+        for (unit, wave, every_ms, escort) in wanted {
             let Some(gi) = self
                 .units
                 .iter()
@@ -322,6 +358,20 @@ impl Sim {
             if guards.is_empty() {
                 continue;
             }
+            let pct = if escort {
+                let Some(goal) = self.quest_rt.escorts.get(&unit).copied() else {
+                    continue;
+                };
+                let total = dist_xz(self.units[gi].spawn_pos, goal).max(1.0);
+                let left = dist_xz(at, goal);
+                if left <= ESCORT_DONE_M {
+                    100
+                } else {
+                    ((1.0 - left / total).clamp(0.0, 0.99) * 100.0) as u32
+                }
+            } else {
+                0
+            };
             let next = *self
                 .quest_rt
                 .next_wave
@@ -332,17 +382,24 @@ impl Sim {
                 .iter()
                 .filter(|u| !u.despawned && u.state.alive && u.state.key == wave)
                 .count();
-            if next <= self.now && alive < DEFEND_MAX_WAVES {
+            if next <= self.now && alive < DEFEND_MAX_WAVES && pct < 100 {
                 self.quest_rt
                     .next_wave
                     .insert(unit.clone(), self.now + ticks(every_ms));
                 self.defend_wave(gi, &wave);
             }
             for p in guards {
-                self.quest_credit(
-                    p,
-                    |o| matches!(o, Objective::Defend { unit: u, .. } if *u == unit),
-                );
+                if escort {
+                    self.quest_update(p, |o, c| match o {
+                        Objective::Escort { unit: u, .. } if *u == unit => Some(c.max(pct)),
+                        _ => None,
+                    });
+                } else {
+                    self.quest_credit(
+                        p,
+                        |o| matches!(o, Objective::Defend { unit: u, .. } if *u == unit),
+                    );
+                }
             }
         }
     }
@@ -387,7 +444,11 @@ impl Sim {
                     continue;
                 };
                 for (k, o) in def.objectives.iter().enumerate() {
-                    let hit = matches!(o, Objective::Defend { unit: u, .. } if u == unit);
+                    let hit = matches!(
+                        o,
+                        Objective::Defend { unit: u, .. } | Objective::Escort { unit: u, .. }
+                            if u == unit
+                    );
                     if let Some(c) = q.counts.get_mut(k)
                         && hit
                         && *c > 0
@@ -484,6 +545,7 @@ impl Sim {
         if let Some(log) = self.quest_logs.get_mut(&pid) {
             log.active.retain(|q| q.id != id);
         }
+        self.quest_rt.deadlines.remove(&(pid, id.to_string()));
     }
 
     /// Debug/test: forces quest `id` into `Active` (no progress), `Ready` (objectives full) or
@@ -532,11 +594,22 @@ impl Sim {
         true
     }
 
-    /// Adds one to every matching objective of `pid`'s active quests.
-    pub(crate) fn quest_credit(&mut self, pid: EntityId, hit: impl Fn(&Objective) -> bool) {
+    /// Adds one to every matching objective of `pid`'s active quests; true if any counted.
+    pub(crate) fn quest_credit(&mut self, pid: EntityId, hit: impl Fn(&Objective) -> bool) -> bool {
+        self.quest_update(pid, |o, c| hit(o).then_some(c + 1))
+    }
+
+    /// Sets every unfinished objective of `pid`'s active quests that `f` maps (objective,
+    /// count) to a new count (capped at its need); true if any count changed.
+    pub(crate) fn quest_update(
+        &mut self,
+        pid: EntityId,
+        f: impl Fn(&Objective, u32) -> Option<u32>,
+    ) -> bool {
         let Some(log) = self.quest_logs.get_mut(&pid) else {
-            return;
+            return false;
         };
+        let mut changed = false;
         for q in &mut log.active {
             let Some(def) = self.content.quests.iter().find(|d| d.id == q.id) else {
                 continue;
@@ -546,9 +619,11 @@ impl Sim {
                 let need = o.need();
                 if let Some(c) = q.counts.get_mut(k)
                     && *c < need
-                    && hit(o)
+                    && let Some(n) = f(o, *c).map(|n| n.min(need))
+                    && n != *c
                 {
-                    *c += 1;
+                    *c = n;
+                    changed = true;
                     self.routed.push((self.events.len(), pid));
                     self.events.push(Event::QuestProgress {
                         quest: q.id.clone(),
@@ -565,6 +640,7 @@ impl Sim {
                 });
             }
         }
+        changed
     }
 
     /// `QuestOffered` for a giver with quests `pid` can accept or turn in.
@@ -585,6 +661,301 @@ impl Sim {
             let npc = Self::id_of(npc);
             self.emit_to(pid, Event::QuestOffered { npc, quests });
         }
+    }
+}
+
+/// The interactive objectives: props, item hand-overs, deliveries and escorts.
+impl Sim {
+    /// Called by `load_zone`: where this zone's escorts head and its inspect spots stand.
+    pub(crate) fn load_quests(
+        &mut self,
+        zone: &str,
+        anchors: &dyn Fn(&str) -> Option<(Vec3, f32)>,
+    ) {
+        self.quest_rt.inspect_spots = self
+            .content
+            .world
+            .props
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.zone == zone && p.kind == PropKind::Inspect)
+            .filter_map(|(k, p)| anchors(&format!("prop:{}", p.key)).map(|(at, yaw)| (k, at, yaw)))
+            .collect();
+        self.quest_rt.escorts.clear();
+        let Some(z) = self.content.zone(zone) else {
+            return;
+        };
+        for o in self.content.quests.iter().flat_map(|q| &q.objectives) {
+            if let Objective::Escort { unit, to, .. } = o
+                && z.friendly.iter().any(|f| f.unit == *unit)
+                && let Some((goal, _)) = anchors(to)
+            {
+                self.quest_rt.escorts.insert(unit.clone(), goal);
+            }
+        }
+    }
+
+    /// Escorted units of the loaded zone do not wander off on their own.
+    pub(crate) fn escorted(&self, i: usize) -> bool {
+        self.quest_rt.escorts.contains_key(&self.units[i].state.key)
+    }
+
+    /// A quest was accepted: its pickups and spots are fresh again and its delivery clock runs.
+    fn quest_accept_rt(&mut self, pid: EntityId, def: &QuestDef) {
+        for o in &def.objectives {
+            match o {
+                Objective::Collect(tag, _) | Objective::Inspect(tag, _) => {
+                    let props = &self.content.world.props;
+                    if let Some(used) = self.quest_rt.used_props.get_mut(&pid) {
+                        used.retain(|k| props.get(*k).is_none_or(|p| p.tag != *tag));
+                    }
+                }
+                Objective::Deliver { secs, .. } if *secs > 0 => {
+                    self.quest_rt
+                        .deadlines
+                        .insert((pid, def.id.clone()), self.now + ticks(secs * 1000));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// A player used quest prop `k` (reach already checked): pickups and inspect spots count
+    /// once, devices advance a sequence or take a `UseOn` item. Answers with `Interacted`
+    /// (`QUEST_PROP_*` outcome) when something happened, and always for devices.
+    pub(crate) fn use_quest_prop(&mut self, pid: EntityId, k: usize) {
+        let Some(def) = self.content.world.props.get(k).cloned() else {
+            return;
+        };
+        let used = self
+            .quest_rt
+            .used_props
+            .get(&pid)
+            .is_some_and(|s| s.contains(&k));
+        let mut outcome = QUEST_PROP_IDLE;
+        let mut take = false;
+        match def.kind {
+            PropKind::Pickup if !used => {
+                take = self.quest_credit(
+                    pid,
+                    |o| matches!(o, Objective::Collect(t, _) if *t == def.tag),
+                );
+            }
+            PropKind::Inspect if !used => {
+                take = self.quest_credit(
+                    pid,
+                    |o| matches!(o, Objective::Inspect(t, _) if *t == def.tag),
+                );
+            }
+            PropKind::Device => {
+                let wrong = std::cell::Cell::new(false);
+                let stepped = self.quest_update(pid, |o, c| match o {
+                    Objective::Sequence { props, .. } => {
+                        let at = c as usize;
+                        if props.get(at) == Some(&def.key) {
+                            Some(c + 1)
+                        } else if props.iter().skip(at + 1).any(|p| *p == def.key) {
+                            wrong.set(true);
+                            Some(0)
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                });
+                // A step too early when nothing was done yet changes no count: still say so.
+                let skipped = wrong.get();
+                if skipped {
+                    outcome = QUEST_PROP_WRONG_ORDER;
+                } else if stepped {
+                    outcome = QUEST_PROP_COUNTED;
+                }
+                if !used {
+                    take = self.quest_credit(pid, |o| {
+                        matches!(o, Objective::UseOn { target, .. }
+                            if *target == def.key || (!def.tag.is_empty() && *target == def.tag))
+                    });
+                }
+            }
+            _ => {}
+        }
+        if take {
+            self.quest_rt.used_props.entry(pid).or_default().insert(k);
+            outcome = QUEST_PROP_COUNTED;
+        }
+        if outcome != QUEST_PROP_IDLE || def.kind == PropKind::Device {
+            self.events.push(Event::Interacted {
+                unit: pid,
+                prop: def.key,
+                outcome,
+            });
+        }
+    }
+
+    /// Talking to (or, for a hostile, pressing F on) the unit at `ti` within reach: deliveries
+    /// to it and items handed to it count.
+    pub(crate) fn quest_talk(&mut self, pid: EntityId, ti: usize) {
+        let key = self.units[ti].state.key.clone();
+        let uid = Self::id_of(ti);
+        if !self.units[ti].state.hostile {
+            self.quest_credit(
+                pid,
+                |o| matches!(o, Objective::Deliver { npc, .. } if *npc == key),
+            );
+        }
+        let used = self
+            .quest_rt
+            .used_units
+            .get(&pid)
+            .is_some_and(|s| s.contains(&uid));
+        if !used
+            && self.quest_credit(
+                pid,
+                |o| matches!(o, Objective::UseOn { target, .. } if *target == key),
+            )
+        {
+            self.quest_rt.used_units.entry(pid).or_default().insert(uid);
+        }
+    }
+
+    /// Whether `pid` has an unfinished `UseOn` objective for units with key `key`.
+    pub fn wants_use_on(&self, pid: EntityId, key: &str) -> bool {
+        self.quests_of(pid).active.iter().any(|q| {
+            self.content.quest(&q.id).is_some_and(|def| {
+                def.objectives.iter().zip(&q.counts).any(|(o, c)| {
+                    matches!(o, Objective::UseOn { target, .. } if target == key) && *c < o.need()
+                })
+            })
+        })
+    }
+
+    /// Once a second: players standing at an `Inspect` spot, facing what it shows, count it.
+    fn quest_inspects(&mut self) {
+        if self.quest_rt.inspect_spots.is_empty() {
+            return;
+        }
+        for pid in self.players.clone() {
+            let Some((pos, yaw)) = self.unit(pid).filter(|u| u.alive).map(|u| (u.pos, u.yaw))
+            else {
+                continue;
+            };
+            for (k, at, face) in self.quest_rt.inspect_spots.clone() {
+                let Some(reach) = self.content.world.props.get(k).map(|p| p.reach_m) else {
+                    continue;
+                };
+                let turn = (yaw - face + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+                    - std::f32::consts::PI;
+                if in_range(pos, at, reach) && turn.abs() <= INSPECT_FACING_RAD {
+                    self.use_quest_prop(pid, k);
+                }
+            }
+        }
+    }
+
+    /// Once a second: a delivery whose time ran out fails its quest. A timed delivery without a
+    /// clock (a loaded save, a debug-forced quest) gets a full one now.
+    fn quest_deadlines(&mut self) {
+        let now = self.now;
+        for (pid, log) in &self.quest_logs {
+            for q in &log.active {
+                let secs = self.content.quest(&q.id).and_then(|d| {
+                    d.objectives.iter().find_map(|o| match o {
+                        Objective::Deliver { secs, .. } if *secs > 0 => Some(*secs),
+                        _ => None,
+                    })
+                });
+                if let Some(secs) = secs {
+                    self.quest_rt
+                        .deadlines
+                        .entry((*pid, q.id.clone()))
+                        .or_insert(now + ticks(secs * 1000));
+                }
+            }
+        }
+        let logs = &self.quest_logs;
+        self.quest_rt.deadlines.retain(|(pid, quest), _| {
+            logs.get(pid)
+                .is_some_and(|l| l.active.iter().any(|q| q.id == *quest))
+        });
+        let late: Vec<(EntityId, String)> = self
+            .quest_rt
+            .deadlines
+            .iter()
+            .filter(|(_, at)| **at <= now)
+            .map(|(k, _)| k.clone())
+            .collect();
+        for (pid, quest) in late {
+            self.quest_rt.deadlines.remove(&(pid, quest.clone()));
+            let delivered = self.content.quest(&quest).is_some_and(|def| {
+                self.quests_of(pid)
+                    .active
+                    .iter()
+                    .find(|q| q.id == quest)
+                    .is_some_and(|q| {
+                        def.objectives
+                            .iter()
+                            .zip(&q.counts)
+                            .all(|(o, c)| !matches!(o, Objective::Deliver { .. }) || *c >= o.need())
+                    })
+            });
+            if delivered {
+                continue;
+            }
+            if let Some(log) = self.quest_logs.get_mut(&pid) {
+                log.active.retain(|q| q.id != quest);
+            }
+            self.emit_to(pid, Event::QuestFailed { quest });
+        }
+    }
+
+    /// Once a tick: escorted units walk towards their goal while someone with the quest is near.
+    pub(crate) fn update_escorts(&mut self) {
+        if self.quest_rt.escorts.is_empty() {
+            return;
+        }
+        for (unit, goal) in self.quest_rt.escorts.clone() {
+            let Some(gi) = self.units.iter().position(|u| {
+                !u.despawned && u.state.alive && !u.state.hostile && u.state.key == unit
+            }) else {
+                continue;
+            };
+            let pos = self.units[gi].state.pos;
+            if dist_xz(pos, goal) <= ESCORT_DONE_M {
+                continue;
+            }
+            let guarded = self.players.iter().any(|p| {
+                self.unit(*p)
+                    .is_some_and(|u| u.alive && in_range(u.pos, pos, DEFEND_RANGE_M))
+                    && self.wants_escort(*p, &unit)
+            });
+            if !guarded {
+                continue;
+            }
+            let Some((target, _)) = self.nav_target(gi, goal) else {
+                continue;
+            };
+            self.units[gi].state.yaw = crate::ai::yaw_toward(pos, target);
+            let step = ESCORT_MPS / crate::time::TICK_HZ as f32;
+            self.units[gi].state.pos = crate::ai::step_toward(pos, target, step, 0.0);
+        }
+    }
+
+    fn wants_escort(&self, pid: EntityId, key: &str) -> bool {
+        self.quests_of(pid).active.iter().any(|q| {
+            self.content.quest(&q.id).is_some_and(|def| {
+                def.objectives.iter().zip(&q.counts).any(|(o, c)| {
+                    matches!(o, Objective::Escort { unit, .. } if unit == key) && *c < o.need()
+                })
+            })
+        })
+    }
+
+    /// Ticks left on `pid`'s delivery for `quest`, if its clock runs.
+    pub fn deliver_ticks_left(&self, pid: EntityId, quest: &str) -> Option<u64> {
+        self.quest_rt
+            .deadlines
+            .get(&(pid, quest.to_string()))
+            .map(|at| at.saturating_sub(self.now))
     }
 }
 
@@ -645,6 +1016,46 @@ impl Content {
                 .map(|z| z.id.as_str())
                 .collect(),
             Objective::ClearZone(z) | Objective::Wait { zone: z, .. } => vec![z.as_str()],
+            Objective::Interact(k, _) => {
+                self.prop(k).map(|p| p.zone.as_str()).into_iter().collect()
+            }
+            Objective::Collect(tag, _) | Objective::Inspect(tag, _) => {
+                self.prop_zones(|p| p.tag == *tag)
+            }
+            Objective::Sequence { props, .. } => self.prop_zones(|p| props.contains(&p.key)),
+            Objective::UseOn { target, .. } => {
+                let mut out = spawns(target);
+                for z in self.prop_zones(|p| p.key == *target || p.tag == *target) {
+                    if !out.contains(&z) {
+                        out.push(z);
+                    }
+                }
+                out
+            }
+            Objective::Deliver { npc: unit, .. } | Objective::Escort { unit, .. } => self
+                .zones
+                .iter()
+                .filter(|z| z.friendly.iter().any(|f| f.unit == *unit))
+                .map(|z| z.id.as_str())
+                .collect(),
         }
+    }
+
+    /// Zones of the props `f` picks, content order of the zones.
+    fn prop_zones(&self, f: impl Fn(&crate::world::PropDef) -> bool) -> Vec<&str> {
+        self.zones
+            .iter()
+            .filter(|z| self.world.props.iter().any(|p| p.zone == z.id && f(p)))
+            .map(|z| z.id.as_str())
+            .collect()
+    }
+
+    /// Props of `kind` carrying `tag`.
+    pub fn tagged_props(&self, tag: &str, kind: PropKind) -> u32 {
+        self.world
+            .props
+            .iter()
+            .filter(|p| p.kind == kind && p.tag == tag)
+            .count() as u32
     }
 }

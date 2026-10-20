@@ -50,7 +50,13 @@ fn venue(near: Option<&'static str>, at: (f32, f32)) -> impl Fn(&str) -> Option<
 fn campus(name: &str) -> Option<(Vec3, f32)> {
     let at = |x: f32, z: f32| Some((Vec3::new(x, 0.0, z), 0.0));
     match name {
-        n if n.starts_with("pack_") || n == "boss" => at(400.0, 400.0),
+        n if n.starts_with("pack_")
+            || n.starts_with("rare_")
+            || n.starts_with("event:")
+            || n == "boss" =>
+        {
+            at(400.0, 400.0)
+        }
         n if n.starts_with("npc_") || n.starts_with("secret:") || n.starts_with("night_") => {
             at(60.0, 60.0)
         }

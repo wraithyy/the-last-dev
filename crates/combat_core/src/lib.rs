@@ -36,6 +36,7 @@ pub mod time;
 pub mod types;
 mod wander;
 pub mod world;
+pub mod world_events;
 mod zones;
 
 pub use burnout::{BURNOUT_MAX, BurnoutCause, BurnoutDef, QuipKind};
@@ -66,7 +67,10 @@ pub use minigame::{
 };
 pub use pets::{PetDef, PetDrop, duck_tip};
 pub use progression::GROUP_SHARE_RANGE_M;
-pub use quests::{ActiveQuest, DEFEND_RANGE_M, GIVER_REACH_SLACK_M, QuestLog, QuestStatus};
+pub use quests::{
+    ActiveQuest, DEFEND_RANGE_M, ESCORT_DONE_M, GIVER_REACH_SLACK_M, QUEST_PROP_COUNTED,
+    QUEST_PROP_IDLE, QUEST_PROP_WRONG_ORDER, QuestLog, QuestStatus,
+};
 pub use raid::{RaidDef, RaidView, TwinsDef};
 pub use save::{SAVE_VERSION, SaveData};
 pub use sim::{MAX_PLAYERS, Sim};
@@ -91,4 +95,5 @@ pub use types::{
     Event, ItemError, UnitState,
 };
 pub use world::{AchievementDef, PropDef, PropKind, SecretNpc, Trigger, WorldDef};
+pub use world_events::{WorldEventDef, WorldEventPhase};
 pub use zones::{TRASH_RESPAWN_MS, ZoneLinkView};

@@ -109,6 +109,7 @@ impl Sim {
             || u.summoner.is_some()
             || self.is_player(u.state.id)
             || self.is_watcher(i)
+            || self.escorted(i)
             || self.has_aura_flag(i, |a| a.stun)
         {
             return None;

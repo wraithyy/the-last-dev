@@ -456,6 +456,22 @@ pub enum Sign {
     ClientCoffee,
     ClientPlaque,
     ClientEvac,
+    // Campus districts (`districts.rs`).
+    ParkName,
+    AssemblyPoint,
+    FoodTrucks,
+    IncubatorStreet,
+    CoworkCafe,
+    GymName,
+    StationName,
+    NewHq,
+    Garage,
+    CampusShuttle,
+    StepBoard,
+    DepartureBoard,
+    TruckMenu,
+    PitchBooth,
+    HardHat,
 }
 
 #[derive(Clone, Debug)]

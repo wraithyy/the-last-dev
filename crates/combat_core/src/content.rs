@@ -203,6 +203,13 @@ pub struct AuraDef {
     /// Extra in-combat mana per 5 s while it lasts (Fresh Brew).
     #[serde(default)]
     pub mana_regen: u32,
+    /// Enemy AI cannot move while it lasts (it still casts and swings); bosses ignore it, like
+    /// stuns. Player movement is client-owned, so players ignore it too.
+    #[serde(default)]
+    pub root: bool,
+    /// Enemy AI moves this much slower (the largest wins); bosses included.
+    #[serde(default)]
+    pub slow_pct: u32,
 }
 
 /// Dispel category of an aura, shown on the debuff so players know what can clear it.
@@ -343,6 +350,12 @@ pub enum Effect {
         #[serde(default)]
         boost_aura: Option<String>,
     },
+    /// Copies every harmful aura the caster has on the target (stacks and time left) to up to
+    /// `count` more fighting enemies within `radius_m` of it (Cross-Validation).
+    Spread {
+        radius_m: f32,
+        count: u8,
+    },
     Nothing,
 }
 
@@ -404,10 +417,20 @@ pub struct Area {
 /// Makes a spell a drink-style channel: `cast_ms` is the full duration, and every
 /// `interval_ms` the caster regains `mana_pct` percent of max mana. Movement, jumping,
 /// damage taken or casting another spell cancel it; the cooldown starts when it ends.
+/// With `mana_pct: 0` it is a damage channel instead (Training Run): every tick before the end
+/// applies the spell's effects to the target, the end applies them once more and pays the
+/// mana, and taking damage does not break it.
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub struct ChannelDef {
     pub interval_ms: u32,
+    #[serde(default)]
     pub mana_pct: u32,
+}
+
+impl ChannelDef {
+    pub fn hits(&self) -> bool {
+        self.mana_pct == 0
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -851,6 +874,10 @@ pub struct LevelDef {
 pub struct PackDef {
     pub anchor: String,
     pub units: Vec<String>,
+    /// Fixed level for the pack (campus districts with their own level band); `None` takes the
+    /// zone's `level_range` split.
+    #[serde(default)]
+    pub level: Option<u8>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -936,14 +963,61 @@ pub enum Objective {
     /// Like `Kill`, but a kill only counts if no ground telegraph hit the player since that unit
     /// was pulled.
     KillClean(String, u32),
+    /// Use the prop with this key (`world.props`) this many times.
+    Interact(String, u32),
+    /// Pick up this many glowing `Pickup` props carrying this `tag` (F or a tap); each prop
+    /// counts once per player and stays there for everyone else.
+    Collect(String, u32),
+    /// Look at this many `Inspect` props carrying this `tag`: stand within reach facing the
+    /// prop for a second, or use it. Each prop counts once per player.
+    Inspect(String, u32),
+    /// Use these `Device` props in this order; a later step used too early starts over.
+    Sequence {
+        label: String,
+        props: Vec<String>,
+    },
+    /// Apply `item` (a quest prop the giver hands over, not a bag item) to `n` distinct targets:
+    /// friendly or hostile units with key `target` (talk / F in reach), or `Device` props whose
+    /// key or tag is `target`.
+    UseOn {
+        item: String,
+        target: String,
+        n: u32,
+    },
+    /// Carry `item` to the friendly `npc` and talk to it; with `secs` > 0 the quest fails
+    /// (`QuestFailed`) when the time runs out first.
+    Deliver {
+        item: String,
+        npc: String,
+        #[serde(default)]
+        secs: u32,
+    },
+    /// Walk the friendly `unit` (a zone spawn) to anchor `to`: it moves while a player with the
+    /// quest is within `DEFEND_RANGE_M`, `wave` units come for it every `every_ms`, and its death
+    /// sends it back to the start. Counts percent of the way (need 100).
+    Escort {
+        unit: String,
+        to: String,
+        wave: String,
+        every_ms: u32,
+        label: String,
+    },
 }
 
 impl Objective {
     pub fn need(&self) -> u32 {
         match self {
-            Objective::Kill(_, n) | Objective::Loot(_, n) | Objective::KillClean(_, n) => *n,
+            Objective::Kill(_, n)
+            | Objective::Loot(_, n)
+            | Objective::KillClean(_, n)
+            | Objective::Interact(_, n)
+            | Objective::Collect(_, n)
+            | Objective::Inspect(_, n)
+            | Objective::UseOn { n, .. } => *n,
             Objective::Wait { secs, .. } | Objective::Defend { secs, .. } => *secs,
-            Objective::Talk(_) | Objective::ClearZone(_) => 1,
+            Objective::Talk(_) | Objective::ClearZone(_) | Objective::Deliver { .. } => 1,
+            Objective::Sequence { props, .. } => props.len() as u32,
+            Objective::Escort { .. } => 100,
         }
     }
 }
@@ -998,6 +1072,10 @@ pub struct QuestDef {
     /// Elite or boss work the ticket recommends a group for.
     #[serde(default)]
     pub group: bool,
+    /// Optional work in the campus districts, off the campaign path: it levels on its own
+    /// band, so the campaign XP budget leaves it out.
+    #[serde(default)]
+    pub open_world: bool,
 }
 
 impl QuestDef {
@@ -1171,7 +1249,9 @@ impl Content {
 
     /// The player's mana channel (Coffee Break); it lives off the action bar.
     pub fn channel_spell(&self) -> Option<&SpellDef> {
-        self.spells.iter().find(|s| s.channel.is_some())
+        self.spells
+            .iter()
+            .find(|s| s.channel.is_some_and(|c| !c.hits()))
     }
 
     /// The co-op resurrect (first `DeadAlly` spell), off the bar like Coffee Break.
@@ -1325,11 +1405,11 @@ impl Content {
             if let Some(ch) = &s.channel
                 && (ch.interval_ms == 0
                     || ch.interval_ms > s.cast_ms
-                    || !(1..=100).contains(&ch.mana_pct)
-                    || s.target != SpellTarget::Caster)
+                    || ch.mana_pct > 100
+                    || (!ch.hits() && s.target != SpellTarget::Caster))
             {
                 return bad(format!(
-                    "spell {} channel needs 0 < interval_ms <= cast_ms, mana_pct 1..=100 and target Caster",
+                    "spell {} channel needs 0 < interval_ms <= cast_ms, mana_pct 0..=100 and (drinks) target Caster",
                     s.name
                 ));
             }
@@ -1617,6 +1697,48 @@ impl Content {
                     Objective::ClearZone(z) => self.zone(z).is_some_and(|z| z.boss.is_some()),
                     Objective::Wait { zone, label, .. } => {
                         self.zone(zone).is_some() && !label.is_empty()
+                    }
+                    Objective::Interact(k, _) => self.prop(k).is_some(),
+                    Objective::Collect(tag, n) => {
+                        self.tagged_props(tag, crate::world::PropKind::Pickup) >= *n
+                    }
+                    Objective::Inspect(tag, n) => {
+                        self.tagged_props(tag, crate::world::PropKind::Inspect) >= *n
+                    }
+                    Objective::Sequence { label, props } => {
+                        !label.is_empty()
+                            && props.len() >= 2
+                            && props.iter().all(|p| {
+                                self.prop(p)
+                                    .is_some_and(|d| d.kind == crate::world::PropKind::Device)
+                            })
+                    }
+                    Objective::UseOn { item, target, n } => {
+                        let units = self.unit_def(target).is_some();
+                        let props = self
+                            .world
+                            .props
+                            .iter()
+                            .filter(|p| p.key == *target || p.tag == *target)
+                            .count() as u32;
+                        !item.is_empty() && *n >= 1 && (units || props >= *n)
+                    }
+                    Objective::Deliver { item, npc, .. } => {
+                        !item.is_empty() && self.unit_def(npc).is_some_and(|u| !u.hostile)
+                    }
+                    Objective::Escort {
+                        unit,
+                        wave,
+                        every_ms,
+                        label,
+                        ..
+                    } => {
+                        self.unit_def(unit).is_some_and(|u| !u.hostile)
+                            && self
+                                .unit_def(wave)
+                                .is_some_and(|u| u.hostile && u.ai.is_some())
+                            && *every_ms >= 1000
+                            && !label.is_empty()
                     }
                 };
                 if !ok {

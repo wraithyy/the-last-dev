@@ -1384,6 +1384,100 @@ fn sign_spec(s: Sign) -> SignSpec {
             [70, 70, 76],
             [70, 130, 80],
         ),
+        Sign::ParkName => sp(
+            &["WELLNESS PARK", "DO NOT APPROACH", "THE GOOSE"],
+            [40, 80, 50],
+            [235, 245, 230],
+            [250, 210, 90],
+        ),
+        Sign::AssemblyPoint => sp(
+            &["FIRE ASSEMBLY POINT", "SURPRISE DRILLS", "TWICE AN HOUR"],
+            [30, 120, 60],
+            [245, 250, 245],
+            [255, 230, 120],
+        ),
+        Sign::FoodTrucks => sp(
+            &["FOOD TRUCK PLAZA", "NOW WITH AI TACOS"],
+            [200, 90, 30],
+            [255, 245, 225],
+            [255, 220, 90],
+        ),
+        Sign::IncubatorStreet => sp(
+            &["INCUBATOR STREET", "PRE-REVENUE ZONE"],
+            [24, 16, 40],
+            [140, 240, 255],
+            [255, 110, 220],
+        ),
+        Sign::CoworkCafe => sp(
+            &["HOT DESK CAFE", "BRING YOUR OWN DESK"],
+            [60, 45, 35],
+            [245, 235, 215],
+            [120, 220, 160],
+        ),
+        Sign::GymName => sp(
+            &["CORPORATE WELLNESS", "PARTICIPATION", "IS TRACKED"],
+            [20, 30, 45],
+            [230, 240, 250],
+            [120, 255, 140],
+        ),
+        Sign::StationName => sp(
+            &["SYNERGY CAMPUS", "STATION"],
+            [20, 40, 100],
+            [240, 245, 255],
+            [250, 210, 60],
+        ),
+        Sign::NewHq => sp(
+            &["NEW HQ", "OPENING 2019"],
+            [235, 235, 230],
+            [30, 40, 60],
+            [210, 50, 40],
+        ),
+        Sign::Garage => sp(
+            &["AUTONOMOUS GARAGE", "IT REMEMBERS NOTHING"],
+            [30, 34, 40],
+            [220, 225, 235],
+            [250, 180, 60],
+        ),
+        Sign::CampusShuttle => sp(
+            &["CAMPUS SHUTTLE", "SELF-DRIVING", "(MOSTLY)"],
+            [20, 90, 130],
+            [240, 248, 255],
+            [255, 220, 90],
+        ),
+        Sign::StepBoard => sp(
+            &["STEP LEADERBOARD", "1 CEILING FAN 41002", "LAST: YOU"],
+            [10, 14, 20],
+            [120, 255, 160],
+            [255, 90, 80],
+        ),
+        Sign::DepartureBoard => sp(
+            &[
+                "08:12 NEW HQ  DELAYED",
+                "08:14 CITY  CANCELLED",
+                "08:20 RTO  ON TIME?",
+            ],
+            [10, 10, 14],
+            [255, 200, 60],
+            [255, 90, 60],
+        ),
+        Sign::TruckMenu => sp(
+            &["TACO, CONCEPTUALLY", "PROMPT BOWL", "TODAY: FREE PIZZA?"],
+            [25, 25, 28],
+            [245, 245, 240],
+            [255, 200, 70],
+        ),
+        Sign::PitchBooth => sp(
+            &["UBER FOR UBERS", "SEED ROUND OPEN"],
+            [16, 10, 30],
+            [255, 120, 230],
+            [120, 240, 255],
+        ),
+        Sign::HardHat => sp(
+            &["HARD HAT AREA", "LEADERSHIP EXEMPT"],
+            [250, 200, 40],
+            [20, 20, 20],
+            [180, 30, 30],
+        ),
     }
 }
 

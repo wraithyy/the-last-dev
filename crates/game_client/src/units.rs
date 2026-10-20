@@ -164,11 +164,13 @@ fn headphones(c: &mut ChildSpawnerCommands, assets: &UnitAssets, h: f32) {
 struct Lineup(u32);
 
 /// Player skins in class order (`Content::classes`): (class key, unit key).
-pub const CLASS_SKINS: [(&str, &str); 4] = [
+pub const CLASS_SKINS: [(&str, &str); 6] = [
     ("fullstack", "senior_engineer"),
     ("frontend", "frontend_dev"),
     ("backend", "backend_dev"),
     ("devops", "devops_eng"),
+    ("qa", "qa_engineer"),
+    ("data_scientist", "data_scientist"),
 ];
 
 /// A player skin with its class kit and a fixed hair stage, for display only.
@@ -183,7 +185,7 @@ pub fn spawn_skin(commands: &mut Commands, class: usize, pos: Vec3, yaw: f32, ha
 }
 
 /// `WOW_LINEUP=1|2`: half of the cast per screenshot, two rows facing the player.
-/// `WOW_LINEUP=4`: the four class skins in front, the Backend's five hair stages behind.
+/// `WOW_LINEUP=4`: the class skins in front, the Backend's five hair stages behind.
 fn spawn_lineup(mut commands: Commands, lineup: Res<Lineup>) {
     // 0: bare stage, only the player (pose close-ups).
     if lineup.0 == 0 {
@@ -191,7 +193,7 @@ fn spawn_lineup(mut commands: Commands, lineup: Res<Lineup>) {
     }
     if lineup.0 == 4 {
         for k in 0..CLASS_SKINS.len() {
-            let x = (k as f32 - 1.5) * 1.5;
+            let x = (k as f32 - (CLASS_SKINS.len() as f32 - 1.0) / 2.0) * 1.5;
             spawn_skin(&mut commands, k, Vec3::new(x, 0.0, -1.0), PI, 0);
         }
         for stage in 1..=5u8 {

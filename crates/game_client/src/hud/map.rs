@@ -23,6 +23,8 @@ const BLOCK_RGBA: [u8; 4] = [70, 84, 108, 255];
 const OPEN: Color = Color::srgb(0.4, 1.0, 0.5);
 const LOCKED: Color = Color::srgb(1.0, 0.42, 0.36);
 const QUEST: Color = Color::srgb(1.0, 0.9, 0.2);
+/// District names on the campus map: readable, but quieter than markers.
+const DISTRICT: Color = Color::srgba(0.75, 0.85, 1.0, 0.55);
 
 #[derive(Component)]
 struct MapRoot;
@@ -378,6 +380,18 @@ fn update_map(
     {
         marks.push((view.to_canvas(*pos), "B", super::ACCENT_WARM));
     }
+    // World events warned or running: an "E" at their anchor.
+    for e in &live.events {
+        let anchor = content
+            .live
+            .events
+            .iter()
+            .find(|d| d.key == e.key)
+            .map(|d| d.anchor.as_str());
+        if let Some((_, pos, _)) = flow.anchors.iter().find(|a| Some(a.0) == anchor) {
+            marks.push((view.to_canvas(*pos), "E", super::GOLD));
+        }
+    }
     // Zones where a tracked quest still has work, for the tree.
     let quest_zones: Vec<String> = super::quests::tracked(&*sim, &track)
         .into_iter()
@@ -430,6 +444,25 @@ fn update_map(
         commands.entity(e).despawn();
     }
     commands.entity(canvas.0).with_children(|c| {
+        // District names under everything else, so the big campus reads at a glance.
+        if flow.zone == "campus" {
+            for d in &crate::floors::DISTRICTS {
+                let at = view.to_canvas(Vec3::new(d.centre.0, 0.0, d.centre.1));
+                let w = d.name.len() as f32 * 5.6;
+                c.spawn((
+                    MapMarker,
+                    label(d.name.to_uppercase(), 10.0),
+                    TextColor(DISTRICT),
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: px((at.x - w / 2.0).clamp(0.0, CANVAS_W - w)),
+                        top: px(at.y - 6.0),
+                        ..default()
+                    },
+                    GlobalZIndex(34),
+                ));
+            }
+        }
         for (at, glyph, color) in &marks {
             marker(c, *at, glyph, 15.0, *color);
         }

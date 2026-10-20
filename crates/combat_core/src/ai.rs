@@ -208,6 +208,18 @@ impl Sim {
             .map(|(id, _)| id)
     }
 
+    /// Movement multiplier from slowing auras (the strongest wins).
+    fn slow_factor(&self, i: usize) -> f32 {
+        let slow = self.units[i]
+            .auras
+            .iter()
+            .filter_map(|a| self.content.aura(&a.key))
+            .map(|d| d.slow_pct.min(100))
+            .max()
+            .unwrap_or(0);
+        (100 - slow) as f32 / 100.0
+    }
+
     fn fight(&mut self, i: usize, ai: &AiDef) {
         let top = self.top_threat(i);
         let Some(ti) = top.and_then(|t| self.index(t)) else {
@@ -243,7 +255,11 @@ impl Sim {
         };
         let (me, them) = (self.units[i].state.pos, self.units[ti].state.pos);
         if dist_xz(me, them) > ai.melee_range_m {
-            let step = ai.chase_speed_mps / TICK_HZ as f32;
+            let rooted = !self.units[i].state.boss && self.has_aura_flag(i, |a| a.root);
+            if rooted {
+                return self.set_ai(i, AiState::Chase);
+            }
+            let step = ai.chase_speed_mps * self.slow_factor(i) / TICK_HZ as f32;
             match self.nav_target(i, them) {
                 Some((wp, last)) => {
                     // Stop slightly inside melee range so float jitter cannot flap Chase/Attack.

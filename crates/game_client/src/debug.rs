@@ -4,8 +4,8 @@
 //! - `WOW_LINEUP=1|2`: bare stage with half of the cast in two rows (see `units.rs`); `0` leaves the stage empty.
 //! - `WOW_LINEUP=3`: only the campus/data center/lab units, three rows (use `WOW_CAM_DIST=20`).
 //! - `WOW_LINEUP=5`: the raid (and minigame) cast from the offsite on, three rows like 3.
-//! - `WOW_LINEUP=4`: the four class skins with their kits, plus the Backend's five hair stages.
-//! - `WOW_CLASS=fullstack|frontend|backend|devops`: play that class and skip the role picker;
+//! - `WOW_LINEUP=4`: the class skins with their kits, plus the Backend's five hair stages.
+//! - `WOW_CLASS=fullstack|frontend|backend|devops|qa|data_scientist`: play that class and skip the role picker;
 //!   `WOW_PICKER=1` opens the picker even when a role is stored (see `classes.rs`).
 //!   `WOW_SHOT_SIZE=<w>x<h>` changes the target size (e.g. 2560x1080 for ultrawide checks).
 //! - `WOW_ZONE=<id>`: start in a zone (campus, tower/1..5, datacenter/1..2, lab/1..2), sim-backed and
@@ -24,7 +24,7 @@
 //! - `WOW_CAM_LOOK=ex,ey,ez,tx,ty,tz`: fixed camera at `e` looking at `t` (see `camera.rs`).
 //! - `WOW_CAM_DIST=<m>`: start with the camera zoomed to that distance; `WOW_CAM_PITCH=<deg>` tilts it.
 //! - `WOW_GIVE_ITEMS=1`: grant a sample set of trophies at start (stacks included).
-//! - `WOW_TROPHIES=1`: open the `~/trophies` window at start.
+//! - `WOW_TROPHIES=1`: open the `~/trophies` window at start; `WOW_CAREER=1` opens `~/career`.
 //! - `WOW_LOOT_DEMO=1`: show the loot window and log lines for three sample items (display only; see `hud/loot.rs`); `WOW_AUTO_LOOT=0|1` overrides the Auto Loot setting.
 //! - `WOW_COFFEE=<secs>`: drain mana to 30 and start a Coffee Break that many seconds in (1 if not a number).
 //! - `WOW_AUTORUN=1`: hold "forward" so animation and camera can be checked without input.
@@ -298,6 +298,9 @@ impl Plugin for DebugPlugin {
         }
         if env::var("WOW_TROPHIES").is_ok() {
             app.insert_resource(TrophiesOpen(true));
+        }
+        if env::var_os("WOW_CAREER").is_some() {
+            app.insert_resource(crate::input::CareerOpen(true));
         }
         if env::var("WOW_JIRA").is_ok() || env::var("WOW_MAP").is_ok() {
             app.insert_resource(crate::input::QuestWindows {

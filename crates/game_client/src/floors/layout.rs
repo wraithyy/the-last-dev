@@ -217,6 +217,7 @@ pub fn assemble(
 ) -> FloorLayout {
     let mut plan = plan;
     super::office::place(zone, &mut plan);
+    super::quest_spots::place(zone, &mut plan);
     let ceiling = plan.top();
     let Plan {
         pieces,

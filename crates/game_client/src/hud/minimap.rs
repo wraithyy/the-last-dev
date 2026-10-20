@@ -391,6 +391,12 @@ fn update_radar(
         radar.scale = scale;
         set_text(&mut zone_text, &zone_label(sim.content(), &flow.zone));
     }
+    // On the campus the header names the district under the player, like a WoW subzone.
+    if flow.zone == "campus" {
+        let name = crate::floors::district_at(player.pos.x, player.pos.z)
+            .map_or_else(|| zone_label(sim.content(), &flow.zone), str::to_string);
+        set_text(&mut zone_text, &name);
+    }
 
     let me = Vec2::new(player.pos.x, player.pos.z);
     let px_per_m = (MM / 2.0) / RADII[radar.zoom];

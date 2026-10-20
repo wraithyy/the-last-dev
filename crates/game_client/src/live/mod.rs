@@ -7,7 +7,8 @@
 //! QA hooks: `WOW_GAME_TIME=HH:MM` starts the offline office clock at that game time (today's
 //! date); `WOW_WORLD_BOSS_IN=<secs>` sets the Board Meeting countdown (offline, campus);
 //! `WOW_STANDUP=1` joins today's standup at start with a little progress; `WOW_BOARD=<secs>`
-//! opens the Scrum board window at that time; `WOW_FREEZE_DAY=1` keeps it day (`DayNight`).
+//! opens the Scrum board window at that time; `WOW_FREEZE_DAY=1` keeps it day (`DayNight`);
+//! `WOW_WORLD_EVENT=<key>@<secs>` starts that campus world event in `secs` (offline).
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
@@ -28,6 +29,7 @@ use combat_core::live::{
 };
 use combat_core::{
     BoardView, Content, EntityId, Event, GoalSpec, GoalView, TaskState, WorldBossState,
+    WorldEventPhase,
 };
 
 const NIGHT_BLUE: Color = Color::srgb(0.55, 0.65, 1.0);
@@ -45,6 +47,27 @@ pub struct LiveState {
     boss_warn: Option<(f32, u32)>,
     boss_up: Option<EntityId>,
     night: Option<bool>,
+    /// Campus world events warned or running, as last announced.
+    pub events: Vec<WorldEventState>,
+}
+
+/// A world event as the HUD tracks it: the phase and its countdown from the last event.
+#[derive(Clone, Debug)]
+pub struct WorldEventState {
+    pub key: String,
+    pub phase: WorldEventPhase,
+    /// App seconds when `secs` was announced.
+    at: f32,
+    secs: u32,
+    pub count: u32,
+    pub need: u32,
+}
+
+impl WorldEventState {
+    /// Seconds left of the warning or the run, counted down locally.
+    pub fn left(&self, now: f32) -> u32 {
+        self.secs.saturating_sub((now - self.at).max(0.0) as u32)
+    }
 }
 
 impl LiveState {
@@ -357,10 +380,114 @@ fn track_events(
                     });
                 }
             },
-            Event::ZoneLoaded { .. } => st.boss_up = None,
+            Event::WorldEvent {
+                key,
+                phase,
+                secs,
+                count,
+                need,
+            } => world_event(
+                &mut st,
+                content,
+                now,
+                (key, *phase, *secs, *count, *need),
+                &mut banners,
+                &mut log,
+            ),
+            Event::ZoneLoaded { .. } => {
+                st.boss_up = None;
+                st.events.clear();
+            }
             _ => {}
         }
     }
+}
+
+const EVENT_GOLD: Color = Color::srgb(1.0, 0.82, 0.3);
+
+/// A world event phase into the HUD state, a banner and a chat line.
+fn world_event(
+    st: &mut LiveState,
+    content: &Content,
+    now: f32,
+    (key, phase, secs, count, need): (&str, WorldEventPhase, u32, u32, u32),
+    banners: &mut MessageWriter<Banner>,
+    log: &mut MessageWriter<LogLineMsg>,
+) {
+    let def = content.live.events.iter().find(|e| e.key == key);
+    let name = def.map_or(key, |d| d.name.as_str());
+    let i = match st.events.iter().position(|e| e.key == key) {
+        Some(i) => i,
+        None => {
+            st.events.push(WorldEventState {
+                key: key.to_string(),
+                phase,
+                at: now,
+                secs,
+                count,
+                need,
+            });
+            st.events.len() - 1
+        }
+    };
+    let e = &mut st.events[i];
+    match phase {
+        WorldEventPhase::Progress => {
+            e.count = count;
+            return;
+        }
+        WorldEventPhase::Warning | WorldEventPhase::Started => {
+            *e = WorldEventState {
+                key: key.to_string(),
+                phase,
+                at: now,
+                secs,
+                count,
+                need,
+            };
+        }
+        WorldEventPhase::Won | WorldEventPhase::Failed => {
+            st.events.remove(i);
+        }
+    }
+    match phase {
+        WorldEventPhase::Warning => log.write(LogLineMsg(
+            format!("[Campus] {name} in {}. Everyone nearby joins.", mmss(secs)),
+            EVENT_GOLD,
+        )),
+        WorldEventPhase::Started => {
+            let goal = if need > 0 {
+                format!("Stop {need} of them in {} at the marker.", mmss(secs))
+            } else {
+                format!("Hold out for {} at the marker.", mmss(secs))
+            };
+            banners.write(Banner {
+                title: name.to_string(),
+                subtitle: format!("World event started. {goal}"),
+                color: EVENT_GOLD,
+            });
+            log.write(LogLineMsg(
+                format!("[Campus] {name} has started. {goal}"),
+                EVENT_GOLD,
+            ))
+        }
+        WorldEventPhase::Won => {
+            banners.write(Banner {
+                title: format!("{name}: done"),
+                subtitle: "Everyone who took part gets XP and Kudos.".into(),
+                color: DONE_GREEN,
+            });
+            log.write(LogLineMsg(
+                format!("[Campus] {name}: success. Rewards go to everyone who took part."),
+                DONE_GREEN,
+            ))
+        }
+        WorldEventPhase::Failed => log.write(LogLineMsg(
+            format!("[Campus] {name}: failed. It comes back later."),
+            DIM,
+        )),
+        WorldEventPhase::Progress => return,
+    };
 }
 
 /// The office clock on the radar, and a chat line when Crunch mode starts or ends.
@@ -497,6 +624,46 @@ fn tracker_lines(
             BOSS_RED,
         ));
     }
+    let now = time.elapsed_secs();
+    for e in &st.events {
+        let name = content
+            .live
+            .events
+            .iter()
+            .find(|d| d.key == e.key)
+            .map_or(e.key.as_str(), |d| d.name.as_str());
+        if e.phase == WorldEventPhase::Warning {
+            footer.push((
+                format!("World event: {name} in {}", mmss(e.left(now))),
+                EVENT_GOLD,
+            ));
+            continue;
+        }
+        let goal = if e.need > 0 {
+            let what = content
+                .live
+                .events
+                .iter()
+                .find(|d| d.key == e.key)
+                .map_or_else(
+                    || "Enemies".to_string(),
+                    |d| plural(&unit_name(content, &d.wave)),
+                );
+            let done = if e.count >= e.need {
+                Line::Done
+            } else {
+                Line::Pending
+            };
+            (format!("{what} stopped {}/{}", e.count, e.need), done)
+        } else {
+            ("Keep it alive at the marker".to_string(), Line::Pending)
+        };
+        entries.push((
+            format!("World Event: {name}"),
+            EVENT_GOLD,
+            vec![goal, (format!("{} left", mmss(e.left(now))), Line::Pending)],
+        ));
+    }
     if let Some(h) = &calendar.hint {
         footer.push((h.clone(), ACCENT));
     }
@@ -532,6 +699,12 @@ fn qa_hooks(
         done.0 = true;
         if let Some(secs) = env_secs("WOW_WORLD_BOSS_IN") {
             sim.0.debug_world_boss_in(secs as u32);
+        }
+        if let Some((key, secs)) = std::env::var("WOW_WORLD_EVENT").ok().and_then(|v| {
+            let (k, s) = v.split_once('@')?;
+            Some((k.to_string(), s.trim().parse::<u32>().ok()?))
+        }) {
+            sim.0.debug_world_event_in(&key, secs);
         }
         if std::env::var_os("WOW_STANDUP").is_some()
             && let Some(p) = sim.0.player()

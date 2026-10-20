@@ -151,6 +151,10 @@ fn parts(kind: &str) -> Vec<Part> {
         "unreviewed_pr" => unreviewed_pr(),
         "demo_bug" => demo_bug(),
         "agi_beta" => agi_beta(),
+        "drone" => drone(),
+        "goose" => goose(),
+        "pizza" => pizza(),
+        "espresso_cart" => espresso_cart(),
         k if k.starts_with("pet_") => pet(&k[4..]),
         _ => vec![Part::cube(
             [0.0, 0.5, 0.0],
@@ -631,6 +635,88 @@ fn pet(key: &str) -> Vec<Part> {
 }
 
 /// Kick scooter that goes under a character's feet.
+/// Survey quadcopter hovering at head height: a body, four arms with spinning rotors, a red
+/// laser eye.
+fn drone() -> Vec<Part> {
+    let mut v = vec![
+        Part::cube([0.0, 1.6, 0.0], [0.4, 0.14, 0.5], [0.92, 0.92, 0.9]).bob(0.08, 2.5),
+        Part::ball([0.0, 1.5, -0.24], 0.14, DARK).bob(0.08, 2.5),
+        Part::ball([0.0, 1.5, -0.3], 0.06, [1.0, 0.1, 0.1])
+            .glow(3.0)
+            .bob(0.08, 2.5),
+    ];
+    for (x, z) in [(-0.38, -0.38), (0.38, -0.38), (-0.38, 0.38), (0.38, 0.38)] {
+        v.push(
+            Part::cube([x / 2.0, 1.62, z / 2.0], [0.5, 0.04, 0.05], STEEL)
+                .rot([0.0, 45.0, 0.0])
+                .bob(0.08, 2.5),
+        );
+        v.push(
+            Part::cyl([x, 1.68, z], 0.42, 0.015, [0.3, 0.32, 0.36])
+                .spin(Vec3::Y, 30.0)
+                .bob(0.08, 2.5),
+        );
+    }
+    v
+}
+
+/// The Campus Goose: white body, long black neck, orange beak and legs. Smug.
+fn goose() -> Vec<Part> {
+    const WHITE: [f32; 3] = [0.94, 0.93, 0.9];
+    const ORANGE: [f32; 3] = [1.0, 0.55, 0.1];
+    vec![
+        Part::ball([0.0, 0.75, 0.15], 0.9, WHITE),
+        Part::ball([0.0, 0.85, 0.55], 0.45, [0.6, 0.58, 0.55]),
+        Part::cyl([0.0, 1.3, -0.25], 0.16, 0.8, DARK).rot([-20.0, 0.0, 0.0]),
+        Part::ball([0.0, 1.72, -0.4], 0.28, DARK),
+        Part::cube([0.0, 1.68, -0.62], [0.1, 0.07, 0.24], ORANGE),
+        Part::ball([-0.1, 1.77, -0.48], 0.06, WHITE),
+        Part::ball([0.1, 1.77, -0.48], 0.06, WHITE),
+        Part::cyl([-0.15, 0.2, 0.15], 0.06, 0.4, ORANGE),
+        Part::cyl([0.15, 0.2, 0.15], 0.06, 0.4, ORANGE),
+        Part::cube([-0.15, 0.02, 0.05], [0.18, 0.03, 0.22], ORANGE),
+        Part::cube([0.15, 0.02, 0.05], [0.18, 0.03, 0.22], ORANGE),
+    ]
+}
+
+/// The free pizza: three open boxes on a folding table.
+fn pizza() -> Vec<Part> {
+    const BOX: [f32; 3] = [0.85, 0.68, 0.45];
+    let mut v = vec![Part::cube(
+        [0.0, 0.85, 0.0],
+        [1.6, 0.06, 0.8],
+        [0.95, 0.95, 0.95],
+    )];
+    for (x, z) in [(-0.6, 0.0), (0.6, 0.0)] {
+        v.push(Part::cube([x, 0.42, z], [0.05, 0.84, 0.7], STEEL));
+    }
+    for (k, x) in [-0.5, 0.0, 0.5].into_iter().enumerate() {
+        v.push(Part::cube([x, 0.9, 0.0], [0.44, 0.04, 0.44], BOX));
+        v.push(Part::cyl([x, 0.93, 0.0], 0.38, 0.02, [0.95, 0.75, 0.3]));
+        v.push(Part::cube([x, 1.12, 0.21], [0.44, 0.44, 0.03], BOX).rot([-15.0, 0.0, 0.0]));
+        if k != 1 {
+            v.push(Part::ball([x + 0.08, 0.95, -0.05], 0.07, [0.8, 0.15, 0.1]));
+        }
+    }
+    v
+}
+
+/// The last working espresso cart: a box on wheels, a chrome machine, steam that never stops.
+fn espresso_cart() -> Vec<Part> {
+    let mut v = vec![
+        Part::cube([0.0, 0.55, 0.0], [1.2, 0.7, 0.7], [0.45, 0.2, 0.12]),
+        Part::cube([0.0, 0.92, 0.0], [1.3, 0.05, 0.8], [0.7, 0.7, 0.72]),
+        Part::cube([0.1, 1.2, 0.05], [0.6, 0.5, 0.45], [0.8, 0.82, 0.86]),
+        Part::cube([0.1, 1.25, -0.18], [0.3, 0.12, 0.02], HOT).glow(2.0),
+        Part::ball([0.1, 1.6, 0.05], 0.18, [0.95, 0.95, 0.95]).bob(0.1, 3.0),
+        Part::cyl([-0.4, 1.1, 0.0], 0.14, 0.3, [0.9, 0.9, 0.9]),
+    ];
+    for x in [-0.45, 0.45] {
+        v.push(Part::cyl([x, 0.16, 0.0], 0.32, 0.1, DARK).rot([0.0, 0.0, 90.0]));
+    }
+    v
+}
+
 fn scooter() -> Vec<Part> {
     vec![
         Part::cube([0.0, 0.1, 0.0], [0.22, 0.05, 0.9], [0.2, 0.2, 0.25]),

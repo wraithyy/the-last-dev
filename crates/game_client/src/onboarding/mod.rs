@@ -411,6 +411,20 @@ fn observe(
     }
 }
 
+/// The new classes' openers are debuffs, not damage: say so on the role tip.
+fn class_tip(class: &str, spell2: &(String, String)) -> Option<String> {
+    let (name, key) = spell2;
+    match class {
+        "qa" => Some(format!(
+            "File a {name} ({key}) first: every report makes the target take 6% more damage, up to three."
+        )),
+        "data_scientist" => Some(format!(
+            "Stack {name} ({key}) up to three times first; it keeps ticking while you cast."
+        )),
+        _ => None,
+    }
+}
+
 fn class_key(sim: &CombatSim, p: EntityId) -> String {
     sim.0.class_of(p).map(|c| c.key.clone()).unwrap_or_default()
 }
@@ -496,6 +510,7 @@ fn ctx(sim: &CombatSim, p: EntityId, binds: &Keybinds, touch: bool) -> Ctx {
         role_spell,
         taunt: bar_spell(sim, p, |s| matches!(s.effect, Effect::Taunt))
             .map(|(_, name, lvl)| (name, lvl)),
+        class_tip: class_tip(&class_key(sim, p), &slot(1)),
     }
 }
 

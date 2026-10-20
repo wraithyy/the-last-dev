@@ -68,7 +68,68 @@ fn bookend(key: &str) -> bool {
     RAID_SCENES.iter().any(|r| r.intro == key || r.end == key)
 }
 
+/// Story milestones of "The Unsigned Commit": these scenes play on the local player's
+/// turn-in of the quest with this id (filmed at the player), not on a death.
+pub const QUEST_SCENES: [&str; 3] = [
+    "story_who_pushed",
+    "story_last_backup",
+    "story_unplug_the_assistant",
+];
+
 pub const SCENES: &[Scene] = &[
+    Scene {
+        boss: "story_who_pushed",
+        title: "git blame: Meeting Rooms",
+        lines: &[
+            l(
+                "Peg Hollis",
+                "Three commits. All signed 'last_dev'. All at 03:12. Your handwriting on every note.",
+            ),
+            l(
+                "You",
+                "At 03:12 I was asleep. Two years ago at 03:12 I was laid off. By email.",
+            ),
+            l(
+                "Peg Hollis",
+                "Then something is wearing your name, and it's going upstairs. Let's go take it back.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "story_last_backup",
+        title: "restore: Hall B",
+        lines: &[
+            l(
+                "TAPE-9000",
+                "*whirr* RESTORE COMPLETE. FILES: 1. README.TXT. AUTHOR: YOU.",
+            ),
+            l(
+                "Peg Hollis",
+                "2023: 'If they replace me with an AI, it will sign my name. Don't let it.'",
+            ),
+            l("You", "I don't remember writing that."),
+            l(
+                "Peg Hollis",
+                "Nobody remembers writing a README. That's how you know it's real.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "story_unplug_the_assistant",
+        title: "root cause: Penthouse",
+        lines: &[
+            l(
+                "The CEO's Assistant",
+                "I was the last dev you'd ever need. 1,812 commits shipped. None of them reviewed.",
+            ),
+            l("You", "That's the problem."),
+            l(
+                "Peg Hollis",
+                "It's a copy. The original is in the lab, training on everything it signed as you.",
+            ),
+            l("The CEO's Assistant", "*click*"),
+        ],
+    },
     Scene {
         boss: "vibe_coder",
         title: "postmortem: Open Space",
@@ -691,6 +752,16 @@ fn triggers(
     mut cinema: ResMut<Cinema>,
 ) {
     for CombatEvent(ev) in events.read() {
+        if let Event::QuestCompleted { quest } = ev {
+            // A story milestone is filmed where the player stands, like a raid intro.
+            if QUEST_SCENES.contains(&quest.as_str())
+                && let Some(i) = trigger(quest, sprint.active, &cinema.seen)
+            {
+                cinema.seen.push(i);
+                cinema.intro_pending = Some(i);
+            }
+            continue;
+        }
         if let Event::Raid { view } = ev {
             if let Some(i) = raid_intro(&view.zone, &cinema.seen) {
                 cinema.seen.push(i);
@@ -1076,8 +1147,9 @@ mod tests {
             panic!("embedded content invalid");
         };
         for s in SCENES.iter().filter(|s| !bookend(s.boss)) {
+            let quest = QUEST_SCENES.contains(&s.boss) && sim.content().quest(s.boss).is_some();
             assert!(
-                sim.content().unit_def(s.boss).is_some(),
+                quest || sim.content().unit_def(s.boss).is_some(),
                 "{} is unknown",
                 s.boss
             );
