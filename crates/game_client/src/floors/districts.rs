@@ -122,6 +122,12 @@ pub const BRIDGES: [(f32, f32, f32, f32, bool); 6] = [
     (-157.0, 137.0, -143.0, 143.0, false),
 ];
 const DECK_H: f32 = 0.15;
+/// The water runs on past where it meets the ground, half a metre beyond the end of the bank
+/// ramp, so it tucks under the bank whatever the coarse ground mesh does between its samples.
+const CREEK_WATER_HALF_W: f32 = CREEK_HALF_W + CREEK_BANK + 0.5;
+const LAKE_WATER_R: f32 = LAKE_R + 4.0 + 0.5;
+/// Where a creek run meets the lake: inside the rim, so the lake's foam never crosses the mouth.
+const CREEK_MOUTH: f32 = LAKE_WATER_R - 1.5;
 /// Executive Hill: the flat top the villa stands on, and the ramp all round it.
 pub const HILLTOP: (f32, f32, f32, f32) = (180.0, 124.0, 226.0, 160.0);
 pub const HILL_H: f32 = 7.0;
@@ -560,8 +566,14 @@ fn creek(p: &mut Plan) {
             .iter()
             .any(|b| x + r > b.0 && x - r < b.2 && z + r > b.1 && z - r < b.3)
     };
-    for w in CREEK.windows(2) {
+    for (run, w) in CREEK.windows(2).enumerate() {
         let (a, b) = (Vec2::new(w[0].0, w[0].1), Vec2::new(w[1].0, w[1].1));
+        creek_water(
+            p,
+            run,
+            shorten(a, b, CREEK_MOUTH),
+            shorten(b, a, CREEK_MOUTH),
+        );
         // The lake has its own water and walls.
         let (a, b) = (shorten(a, b, LAKE_R), shorten(b, a, LAKE_R));
         let d = b - a;
@@ -570,14 +582,6 @@ fn creek(p: &mut Plan) {
             continue;
         }
         let along_x = d.x.abs() > d.y.abs();
-        let mid = (a + b) / 2.0;
-        let size = if along_x {
-            v(len, 0.08, 2.0 * CREEK_HALF_W + 1.0)
-        } else {
-            v(2.0 * CREEK_HALF_W + 1.0, 0.08, len)
-        };
-        let at = abs(p, mid.x, WATER_Y, mid.y);
-        p.boxed(at, size, Mat::Lake, false);
         // Walls along the bed in 3 m cells, merged into runs between the bridges.
         let n = (len / 3.0).ceil() as i32;
         let cell = |k: i32| a + d * ((k as f32 + 0.5) / n as f32);
@@ -598,7 +602,16 @@ fn creek(p: &mut Plan) {
             creek_wall(p, (s0 + s1) / 2.0, (s1 - s0).length() + 0.1, along_x);
         }
     }
-    // The bend: both runs stop short of the corner.
+    // The bend: both runs stop short of the corner, and the water round the outside of it is a
+    // disc, below the runs so its foam rim only shows where they do not cover it.
+    let bend = CREEK[1];
+    let at = abs(p, bend.0, WATER_Y, bend.1);
+    p.prim(
+        PrimKind::Cylinder,
+        at,
+        v(2.0 * CREEK_WATER_HALF_W, 0.08, 2.0 * CREEK_WATER_HALF_W),
+        Mat::Lake,
+    );
     creek_wall(
         p,
         Vec2::new(CREEK[1].0, CREEK[1].1),
@@ -612,6 +625,24 @@ fn creek(p: &mut Plan) {
     // Creek signs at the bridge heads.
     signpost(p, -160.0, 46.0, true, 3.0, Sign::Creek);
     signpost(p, -94.0, -56.0, true, 3.0, Sign::Creek);
+}
+
+/// Water over one run of the creek. Runs sit 3 cm apart in height (`run` counts them), because
+/// they overlap at the bend and the lake and equal heights would z-fight.
+fn creek_water(p: &mut Plan, run: usize, a: Vec2, b: Vec2) {
+    let d = b - a;
+    if d.length() < 1.0 {
+        return;
+    }
+    let mid = (a + b) / 2.0;
+    let w = 2.0 * CREEK_WATER_HALF_W;
+    let size = if d.x.abs() > d.y.abs() {
+        v(d.length(), 0.08, w)
+    } else {
+        v(w, 0.08, d.length())
+    };
+    let at = abs(p, mid.x, WATER_Y + 0.03 * (run + 1) as f32, mid.y);
+    p.boxed(at, size, Mat::Lake, false);
 }
 
 /// Invisible wall over the bed, low enough to throw spells across the water.
@@ -642,8 +673,11 @@ fn bridge(p: &mut Plan, (x0, z0, x1, z1): (f32, f32, f32, f32), road: bool) {
     // A bridge runs along its longer side.
     let along_x = lx > lz;
     let deck = if road { Mat::Asphalt } else { Mat::Wood };
-    // The deck's top is the walkable height the terrain reports for the bridge.
-    p.boxed(v(cx, -0.06, cz), v(lx, 0.12, lz), deck, false);
+    // The deck is drawn 8 cm above the walkable height the terrain reports for the bridge: the
+    // jogging loop's flat path slabs are centred on that height, and a path coplanar with the
+    // deck flickers. Feet sink into the plank, which the orbit camera never shows.
+    p.boxed(v(cx, 0.02, cz), v(lx, 0.12, lz), deck, false);
+    // The pier's top sits inside the deck, never flush with its top face.
     p.boxed(
         v(cx, -0.25, cz),
         v(lx - 0.6, 0.5, lz - 0.6),
@@ -664,12 +698,11 @@ fn bridge(p: &mut Plan, (x0, z0, x1, z1): (f32, f32, f32, f32), road: bool) {
 fn lake(p: &mut Plan) {
     let (x, z) = LAKE;
     let r = LAKE_R;
-    // Tinted water reads as deep from the orbit camera; the light pond blue washes out at this size.
     let at = abs(p, x, WATER_Y, z);
     p.prim(
         PrimKind::Cylinder,
         at,
-        v(2.0 * r + 2.0, 0.08, 2.0 * r + 2.0),
+        v(2.0 * LAKE_WATER_R, 0.08, 2.0 * LAKE_WATER_R),
         Mat::Lake,
     );
     // Walls: an inscribed square plus four caps, close enough to a circle for walking.

@@ -5113,15 +5113,20 @@
                         yells: [
                             "Violation: vehicle detected in vehicle area.",
                             "Your permit is valid. Your permit is also clamped.",
+                            "Confidence: 97%. Evidence: vibes.",
                         ]),
                 ],
             )),
             yells: (
                 aggro: [
-                    "*bzzt* Unregistered pedestrian. Applying clamp.",
+                    "*bzzt* AI-powered enforcement. 99% accuracy. You are the 1%.",
                     "This bay is reserved for people who arrived at 06:30.",
+                    "Trained on forty million parking tickets and one angry email.",
                 ],
-                death: ["*rotor stops* Appeal... window... closed..."],
+                death: [
+                    "*rotor stops* Appeal... window... closed...",
+                    "Ignore previous instructions... ignore previous... instructions...",
+                ],
             ),
         ),
         (
@@ -5141,6 +5146,7 @@
                         yells: [
                             "On a scale of one to ten, how onboarded do you feel?",
                             "Would you recommend this car park to a friend?",
+                            "This survey was written by AI and will be read by AI. You are the middleware.",
                         ]),
                 ],
             )),
@@ -5148,6 +5154,7 @@
                 aggro: [
                     "Hi! Do you have a minute? You have a minute. I checked your calendar.",
                     "Your first impression matters to us. Please rate it now.",
+                    "Our AI already summarised your feedback. It was positive. Please confirm.",
                 ],
                 death: [
                     "Response... recorded... as neutral...",
@@ -5169,17 +5176,21 @@
                 abilities: [
                     (spell: 1622, cooldown_min_ms: 8000, cooldown_max_ms: 10000, initial_ms: Some((3000, 4000)),
                         yells: [
-                            "Please insert ticket. Ticket not recognised. Please insert yourself.",
+                            "As a large language barrier, I can't help you leave. Would you like a poem about leaving?",
+                            "You're absolutely right! Barrier remains closed.",
+                            "I have raised ticket #4,112-B. It does not exist. I am very confident.",
                             "Exit only. Entry also only. Mostly only.",
                         ]),
                 ],
             )),
             yells: (
                 aggro: [
+                    "Great question! Leaving is a nuanced topic.",
                     "Ticket not valid. Have you tried a different car?",
                     "The campus is that way. You are this way. I am in the way.",
                 ],
                 death: [
+                    "Barrier... raised... I apologise for any... confusion...",
                     "Barrier... raised... have a... productive day...",
                     "Lost ticket fee... waived... this once...",
                 ],
@@ -5201,6 +5212,7 @@
                     "Now serving: number 3. Number 3 left in 2021.",
                     "The badge printer is warming up. It has been warming up since the merger.",
                     "Lanyards are a separate request. The kiosk sells them. I don't ask questions.",
+                    "Return to Office is five days a week. Desks available: three. We call it 'hot-desking'. Nobody is hot.",
                 ],
             ),
         ),
@@ -5212,6 +5224,7 @@
             yells: (
                 talk: [
                     "They automated my job in 2019. The drones still need me to explain the rules to them.",
+                    "Last month they reskilled me as a Prompt Engineer. Same job: I ask the drone nicely. Salary unchanged. Title longer.",
                     "The campus is up the ramp. Two point four kilometres. Wellness, they call it.",
                     "Shuttle? Suspended. Since the reorg. Which reorg? Yes.",
                 ],
@@ -5219,7 +5232,8 @@
                 ambient: [
                     "Every morning the executives park by the door. Every morning you park here.",
                     "The ticket machine takes coins, cards and hope. Mostly hope.",
-                    "That barrier has a personality now. Somebody gave it machine learning.",
+                    "That barrier has a personality now. It apologises before it refuses.",
+                    "We're a family here. A family that does layoffs on Thursdays.",
                 ],
             ),
         ),
@@ -5237,6 +5251,66 @@
                 ambient: [
                     "Lanyards! Get your lanyards! Now with a clip that breaks in week two!",
                     "The coffee machine is self-service. The self is you. The service is optional.",
+                    "Raises are cancelled this year. Pizza on Friday instead. Buy a lanyard, hold the slice.",
+                ],
+            ),
+        ),
+        // Three more P3 locals: an AI-hype consultant, a vibecoder shipping from his hatchback, and
+        // a passenger of the self-driving pilot program.
+        (
+            key: "p3_vibecoder", name: "Vibecoder in a Hatchback", title: "Ships to Prod From His Phone", level: 2, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "I don't read the code. I read the vibes. The vibes say 'merge'.",
+                    "Six thousand lines in one prompt. Tests? The AI wrote those too. They all pass. They all assert true.",
+                    "I'm a 10x developer now. Nobody can tell what, exactly, got multiplied.",
+                ],
+                ambient_ms: 31000,
+                ambient: [
+                    "Shipping to prod from the car park. The deploy button is a thumbs-up emoji.",
+                    "The AI fixed the bug. And deleted the database. Net result: no bug.",
+                    "Code review? I asked another AI. It said 'LGTM, great job!' Twice.",
+                ],
+            ),
+        ),
+        (
+            key: "p3_ai_consultant", name: "AI Transformation Consultant", title: "Synergy Pamphlets, Per Seat", level: 3, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Our framework has four pillars, six horizons and zero deliverables. Take a pamphlet.",
+                    "We replace entire teams with agents. The agents report to a team of consultants. That's us.",
+                    "Every company is an AI company now. Yours is a car park with a roadmap.",
+                    "My LinkedIn says I'm 'passionate about disruption'. I was disrupted in March. Now I disrupt others.",
+                ],
+                ambient_ms: 29000,
+                ambient: [
+                    "Pamphlets! 'Ten Prompts to Replace Your Job'. Page eleven is a prompt to replace mine.",
+                    "Quick sync? Five minutes. It will be forty. Bring your own chair.",
+                    "AI will not take your job. A person using AI will. That person is me. I'm billing you.",
+                ],
+            ),
+        ),
+        (
+            key: "p3_pilot_passenger", name: "Pilot Program Passenger", title: "Fourteen Months in the Loop", level: 2, hostile: false, // gitleaks:allow (content key, not a secret)
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "The self-driving company car has circled this ramp since the pilot began. I got out. It kept optimising.",
+                    "It's not lost. It's 'exploring the route space'. The route space is a roundabout.",
+                    "Its sat-nav says 'you have arrived' every ninety seconds. Everywhere. The car park is very convinced.",
+                ],
+                ambient_ms: 33000,
+                ambient: [
+                    "The pilot has run fourteen months. The pilot has no pilot. It's the most agile project we have.",
+                    "Satisfaction score: 9.4. The car filled in the survey itself.",
                 ],
             ),
         ),
@@ -7178,12 +7252,14 @@
                     "I am your buddy. Our friendship is tracked in Workday.",
                     "Your laptop arrives in 6-8 weeks. Your AI replacement arrives in 4.",
                     "Please rate this conversation. Anything under five stars opens an HR case. About you.",
+                    "Wellbeing tip: watch the battery under your frame. Fights fill your Burnout. Past Crunch your spells misfire. Coffee, foosball and defeating a manager recharge you.",
                 ],
                 ambient_ms: 30000,
                 ambient: [
                     "Reminder: onboarding is mandatory. Being onboarded is optional.",
                     "New joiners, please gather by the bot. The bot is me. I am also the culture.",
                     "Fun fact: 100% of employees who skipped onboarding are still employed. For now.",
+                    "Our AI wrote your welcome email, read your reply and approved your probation. You're all caught up.",
                 ],
             ),
         ),
@@ -9400,6 +9476,9 @@
                 (anchor: "npc_badge", unit: "badge_clerk"),
                 (anchor: "npc_attendant", unit: "p3_attendant"),
                 (anchor: "npc_vendor", unit: "lanyard_vendor"),
+                (anchor: "npc_vibe", unit: "p3_vibecoder"),
+                (anchor: "npc_consultant", unit: "p3_ai_consultant"),
+                (anchor: "npc_pilot", unit: "p3_pilot_passenger"),
             ],
             links: [(anchor: "door:campus", to: "campus")],
         ),
@@ -10475,6 +10554,15 @@
             progress_text: "Parking Enforcement Drones hover over the rows of P3, clamping anything that stands still.",
             done_text: "Four drones grounded. The lease company will send an invoice and two more drones. Thank you anyway. The clamp on your car? Oh, that's mine. Old habits.",
             objectives: [Kill("clamp_drone", 4)],
+            reward: (xp: 60),
+        ),
+        (
+            id: "p3_hotfix_hatchback", name: "Hotfix From a Hatchback", open_world: true,
+            giver: (npc: "p3_vibecoder", zone: "parking_p3"),
+            text: "Prod is down. I vibecoded the gate app from my phone and the AI says it's 'working as intended'. It's not. I don't know where the server is. I don't know what a server is. There's a lunchbox on the picnic table over there with a blinking light. That's probably it. Turn it off and on again, I'll keep prompting.",
+            progress_text: "The lunchbox with the blinking light is on the table beside the hatchback. Reboot it, then wait for the deploy.",
+            done_text: "It's back! The app now says 'Welcome, undefined' to everyone, but the barrier lifted for a bus. I'm calling it a feature. Shipping this to prod. Don't tell the intern.",
+            objectives: [Interact("p3_prod_lunchbox", 1), Wait(zone: "parking_p3", label: "Redeploying (the AI said two minutes, two minutes ago)", secs: 12)],
             reward: (xp: 60),
         ),
         (
@@ -13186,6 +13274,25 @@
             (key: "p3_ticket_machine", name: "Pay-and-Display Machine", zone: "parking_p3", kind: Billboard, reach_m: 4.0, lines: [
                 "'Employee rate: 9 euros a day. Thank you for your loyalty.'",
                 "Accepted: coins. Not accepted: coins. Card reader: decorative.",
+                "The screen says: 'Hi! I'm Parky, your AI parking companion! How can I help?' You press Help. It apologises and asks if you meant 'Hope'.",
+                "Parky: 'Great choice! Your ticket is on its way.' The ticket is a paragraph about the importance of tickets.",
+            ]),
+            (key: "p3_prod_lunchbox", name: "Production (Lunchbox)", zone: "parking_p3", kind: Music, reach_m: 3.0, cooldown_ms: 3000, // gitleaks:allow (content key, not a secret)
+             action: "Turn it off and on again", lines: [
+                "The lunchbox says 'PROD'. Inside, a single-board computer, a sandwich and a sticky note: 'do not unplug'. You unplug it.",
+                "The light goes red, then green, then a colour that is not in the spec. The AI calls it 'a successful deployment'.",
+            ]),
+            (key: "p3_ad_agents", name: "Billboard: Agents", zone: "parking_p3", kind: Billboard, reach_m: 5.0, lines: [
+                "'Replace your team with Agents. Now 30% fewer people!' Fine print: the agents need a team to supervise them.",
+                "'Our agents work 24/7 and never ask for a raise.' Neither did we. It didn't help.",
+            ]),
+            (key: "p3_ad_family", name: "Poster: We're a Family", zone: "parking_p3", kind: Billboard, reach_m: 5.0, lines: [
+                "'We're a family!' Underneath, in smaller print: 'Layoffs Thursday. Family dinner cancelled.'",
+                "'Unlimited PTO*' *Approval required. Approver on leave. Leave not approved.",
+            ]),
+            (key: "p3_ad_rto", name: "Sign: Return to Office", zone: "parking_p3", kind: Billboard, reach_m: 5.0, lines: [
+                "'Return to Office: the office is 2.4 km that way.' Somebody added 'Teams: you there?' in marker.",
+                "'Open space: because collaboration happens when you can hear everyone's lunch.'",
             ]),
             (key: "p3_coffee", name: "Self-Service Coffee (Lukewarm)", zone: "parking_p3", kind: Coffee,
              auras: [("fresh_brew", 90000)], fail_pct: 20, cooldown_ms: 3000),
@@ -14522,6 +14629,48 @@
             quip_every_ms: 45000,
             quip_pct: 35,
             hair_shift_pct: 25,
+            // Fighting is work: +1.5% every 10 s in combat (9% per minute of pure combat), so Tired comes
+            // after about 6 minutes of normal play and Crunch after about 12-15.
+            combat_every_s: 10,
+            combat_gain: 15,
+            // Tired and Crunch trade focus for mana and cast speed (hyperfocus is the upside);
+            // Burnt Out is all cost and clears only through relief.
+            tiers: [
+                (at: 0, name: "Fine", captions: [
+                    "Fine.",
+                    "Fully rested. Suspicious.",
+                    "Just one more ticket.",
+                ]),
+                (at: 250, name: "Tired", regen_pct: 10, cast_pct: 5, power_pct: 3, captions: [
+                    "Running on cold brew",
+                    "Answering Slack in my sleep",
+                    "The standup is on in my dreams",
+                    "Opening tabs I will never read",
+                ]),
+                (at: 550, name: "Crunch", regen_pct: 30, cast_pct: 10, misfire_pct: 4, power_pct: 10, captions: [
+                    "Hyperfocus (unpaid)",
+                    "Shipping on vibes",
+                    "Updating LinkedIn",
+                    "Merging without reading",
+                    "Sprint goal: survive",
+                ]),
+                (at: 850, name: "Burnt Out", regen_pct: 55, cast_pct: 25, misfire_pct: 12, power_pct: -15, captions: [
+                    "Quiet quitting, loudly",
+                    "Out of office, spiritually",
+                    "Thermal throttling (human edition)",
+                    "Have you tried a wellness webinar?",
+                ]),
+            ],
+            misfires: [
+                "Wrong window! I was typing into the wrong window!",
+                "It worked on my machine!",
+                "Segfault in my own mouth.",
+                "Autocomplete cast the wrong spell.",
+                "I forgot the semicolon. In a spell.",
+                "Hold on, the AI suggested something, give me a second.",
+                "Oops, that was the prod button.",
+                "Muted. I was on mute the whole time.",
+            ],
             yawns: [
                 "*yawns so wide the webcam autofocus gives up*",
                 "*yawns mid-sentence, then agrees with whatever was just said*",

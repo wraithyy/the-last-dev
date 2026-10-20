@@ -870,6 +870,39 @@ static TABLE: &[(&str, UnitVisual)] = &[
         ),
     ),
     (
+        "p3_vibecoder",
+        v(
+            CASUAL3,
+            1.76,
+            "Vibecoder",
+            "<Ships From His Phone>",
+            &[
+                paint("Shirt", 0.45, 0.2, 0.75),
+                paint("Pants", 0.2, 0.2, 0.25),
+            ],
+        ),
+    ),
+    (
+        "p3_ai_consultant",
+        v(
+            SUIT_M,
+            1.82,
+            "AI Transformation Consultant",
+            "<Pamphlets, Per Seat>",
+            &[],
+        ),
+    ),
+    (
+        "p3_pilot_passenger",
+        v(
+            CASUAL_M,
+            1.74,
+            "Pilot Program Passenger",
+            "<14 Months in the Loop>",
+            &[paint("Shirt", 0.3, 0.6, 0.55)],
+        ),
+    ),
+    (
         "rewrite_evangelist",
         v(
             CASUAL2,

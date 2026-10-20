@@ -42,6 +42,7 @@
 [00292] Fullstack Engineer gains guardrails
 [00299] Fullstack Engineer swings at CEO
 [00299] Fullstack Engineer hits CEO with melee for 10 (absorbed 0)
+[00300] Fullstack Engineer burnout 15 (Combat)
 [00334] CEO casts Hallucination Blast
 [00334] CEO hits Fullstack Engineer with Hallucination Blast for 0 (absorbed 45)
 [00334] CEO ai Attack
@@ -81,12 +82,14 @@
 [00574] CEO swings at Fullstack Engineer
 [00574] CEO hits Fullstack Engineer with melee for 1 (absorbed 13)
 [00574] Fullstack Engineer loses guardrails (Depleted)
+[00600] Fullstack Engineer burnout 30 (Combat)
 [00626] Fullstack Engineer casts Code Review
 [00626] Fullstack Engineer hits CEO with Code Review for 93 (absorbed 0)
 [00626] Fullstack Engineer auto attack off
 [00626] CEO dies (killer Fullstack Engineer)
 [00626] CEO ai Dead
 [00626] Fullstack Engineer gains 144 xp
+[00626] Fullstack Engineer burnout 0 (Kill)
 [00626] CEO drops ["Prompt Fragment", "Mandatory Prompt Training Certificate", "Noise-Cancelling Headset of 'You're on Mute'"] and 36 SP
 [00626] Fullstack Engineer leaves combat
 [00626] CEO leaves combat

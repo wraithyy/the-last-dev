@@ -31,6 +31,8 @@ pub enum BurnoutCause {
     Duck,
     /// An office prop (its `Interacted` event comes right before).
     Prop,
+    /// Time spent fighting (a small gain every `combat_every_s`).
+    Combat,
     /// Defeated management.
     Kill,
     Debug,
@@ -43,6 +45,27 @@ pub enum QuipKind {
     Yawn,
     Mutter,
     ReplyAll,
+    /// A spell that failed at the last second (`BurnoutTier::misfire_pct`).
+    Misfire,
+}
+
+/// One band of the meter: where it starts and what it does to a player inside it.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct BurnoutTier {
+    /// Per mille this tier starts at.
+    pub at: u16,
+    pub name: String,
+    /// Mana regeneration in combat is this many percent lower.
+    pub regen_pct: u32,
+    /// Cast times are this many percent longer.
+    pub cast_pct: i32,
+    /// Chance in percent that a finished cast fizzles with a joke (mana is still spent).
+    pub misfire_pct: u32,
+    /// Hyperfocus (positive) or brain fog (negative): percent change to spell power.
+    pub power_pct: i32,
+    /// Meter captions, picked by position inside the tier.
+    pub captions: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -80,6 +103,12 @@ pub struct BurnoutDef {
     pub quip_pct: u32,
     /// At full burnout hair thins as if HP were this many percent lower.
     pub hair_shift_pct: u32,
+    /// A player in combat gains `combat_gain` every `combat_every_s` seconds.
+    pub combat_every_s: u32,
+    pub combat_gain: u16,
+    /// Ascending bands; the first starts at 0.
+    pub tiers: Vec<BurnoutTier>,
+    pub misfires: Vec<String>,
     pub yawns: Vec<String>,
     pub mutters: Vec<String>,
     pub reply_all: Vec<String>,
@@ -98,9 +127,24 @@ impl BurnoutDef {
         if let Some(u) = self.management.iter().find(|u| c.unit_def(u).is_none()) {
             return bad(format!("burnout management unit {u} unknown"));
         }
-        let lines = [&self.yawns, &self.mutters, &self.reply_all, &self.therapy];
+        let lines = [
+            &self.misfires,
+            &self.yawns,
+            &self.mutters,
+            &self.reply_all,
+            &self.therapy,
+        ];
         if lines.iter().any(|l| l.len() > usize::from(u16::MAX)) {
             return bad("too many burnout lines".into());
+        }
+        if !self.tiers.windows(2).all(|w| w[0].at < w[1].at)
+            || self.tiers.first().is_some_and(|t| t.at != 0)
+            || self
+                .tiers
+                .iter()
+                .any(|t| t.regen_pct > 90 || t.misfire_pct > 50)
+        {
+            return bad("burnout tiers ascend from 0; regen_pct <= 90, misfire_pct <= 50".into());
         }
         if !self.tips.windows(2).all(|w| w[0].0 < w[1].0) || self.slow_pct > 50 {
             return bad("burnout tips ascend; slow_pct <= 50".into());
@@ -115,6 +159,31 @@ impl BurnoutDef {
         } else {
             100
         }
+    }
+
+    /// Index of the band `burnout` is in (0 without tiers).
+    pub fn tier_index(&self, burnout: u16) -> usize {
+        self.tiers
+            .iter()
+            .rposition(|t| burnout >= t.at)
+            .unwrap_or(0)
+    }
+
+    /// The band `burnout` is in.
+    pub fn tier(&self, burnout: u16) -> Option<&BurnoutTier> {
+        self.tiers.get(self.tier_index(burnout))
+    }
+
+    /// The caption for this burnout: the tier's list spread over its range.
+    pub fn caption(&self, burnout: u16) -> &str {
+        let i = self.tier_index(burnout);
+        let Some(t) = self.tiers.get(i) else {
+            return "";
+        };
+        let end = self.tiers.get(i + 1).map_or(BURNOUT_MAX + 1, |n| n.at);
+        let span = u32::from(end.saturating_sub(t.at)).max(1);
+        let k = u32::from(burnout.saturating_sub(t.at)) * t.captions.len() as u32 / span;
+        t.captions.get(k as usize).map_or("", String::as_str)
     }
 
     /// HP percent points hair loss runs ahead by at this burnout.
@@ -136,6 +205,7 @@ impl BurnoutDef {
             QuipKind::Yawn => &self.yawns,
             QuipKind::Mutter => &self.mutters,
             QuipKind::ReplyAll => &self.reply_all,
+            QuipKind::Misfire => &self.misfires,
         };
         list.get(usize::from(line)).map(String::as_str)
     }
@@ -354,10 +424,51 @@ impl Sim {
                     }
                 }
             }
+            let def = &self.content.endgame.burnout;
+            let (every, gain) = (def.combat_every_s, i32::from(def.combat_gain));
+            if every > 0
+                && since > 0
+                && since.is_multiple_of(ticks(every * 1000))
+                && self.units[i].state.in_combat
+            {
+                self.add_burnout(i, gain, BurnoutCause::Combat);
+            }
             if since > 0 && since.is_multiple_of(quip_every) {
                 self.roll_quip(i);
             }
         }
+    }
+
+    /// Spell power and cast time are the burnout tier's for players (neutral for everyone else).
+    pub(crate) fn burnout_power_pct(&self, i: usize) -> i64 {
+        let d = self.burnout_def();
+        d.tier(self.units[i].state.career.burnout)
+            .map_or(0, |t| i64::from(t.power_pct))
+    }
+
+    pub(crate) fn burnout_cast_pct(&self, i: usize) -> i32 {
+        let d = self.burnout_def();
+        d.tier(self.units[i].state.career.burnout)
+            .map_or(0, |t| t.cast_pct)
+    }
+
+    /// Rolls a misfire for a finished cast; on a hit the quip event is queued. Own rng stream.
+    pub(crate) fn burnout_misfire(&mut self, i: usize) -> bool {
+        let def = self.burnout_def();
+        let pct = def
+            .tier(self.units[i].state.career.burnout)
+            .map_or(0, |t| t.misfire_pct);
+        let n = def.misfires.len();
+        if pct == 0 || n == 0 || !self.burnout.rng.chance_pct(pct) {
+            return false;
+        }
+        let line = self.burnout.rng.below(n as u32) as u16;
+        self.events.push(Event::BurnoutQuip {
+            unit: Self::id_of(i),
+            kind: QuipKind::Misfire,
+            line,
+        });
+        true
     }
 
     fn roll_quip(&mut self, i: usize) {

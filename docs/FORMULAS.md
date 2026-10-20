@@ -323,13 +323,18 @@ Departments by zone: Engineering (tower/1, lab/1, lab/2), Security (tower/4), HR
 ```
 burnout up    : meeting debuff +2% (standup, quick_sync, recurring_meeting, wellness_survey, culture_fit,
                 mandatory_fun, deadline), Sprint run end +6%, death +8%,
-                per minute: night (Crunch mode) +1%, session past 45 min +0.5%
+                per minute: night (Crunch mode) +1%, session past 45 min +0.5%,
+                in combat +1.5% every 10 s (endgame.burnout.combat_*)
 burnout down  : Coffee Break channel -3% (once per 2 min), Friday from 12:00 UTC -2%/min,
                 rubber duck out -1%/min, holiday -10% per full hour logged off (after 15 min; offline
                 from the save's timestamp, online rooms start fresh at 0), management kill -5%
                 (bosses -15%), props (own cooldown per prop and player): coffee -6%/2 min,
                 vending -4%/2 min, foosball and ping-pong -12%/3 min, bean bag -15%/5 min,
                 quiet room -10%/4 min, office dog -10%/2 min, Sad Bench -5%/2 min
+tiers         : Fine 0 | Tired 250 | Crunch 550 | Burnt Out 850 (per mille), each with regen_pct,
+                cast_pct, misfire_pct and power_pct (see GAME_DESIGN.md); spell power scales every
+                damage and heal amount of the caster, cast time adds to the aura/perk percentages,
+                a misfire spends the mana and skips the effects (channels never misfire)
 effects       : >= 75% move 10% slower (client speed, server budget is a ceiling); quips every 45 s at
                 35%: yawn from 30%, mutter from 50%, reply-all from 70%; hair stages come
                 burnout * 25 HP points earlier

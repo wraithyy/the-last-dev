@@ -693,3 +693,89 @@ fn every_legacy_piece_drops_somewhere() {
     let missing: Vec<&&String> = want.iter().filter(|n| !seen.contains(**n)).collect();
     assert!(missing.is_empty(), "never dropped: {missing:?}");
 }
+
+#[test]
+fn burnout_tiers_carry_their_effects_and_captions() {
+    let c = content();
+    let b = &c.endgame.burnout;
+    let names: Vec<&str> = b.tiers.iter().map(|t| t.name.as_str()).collect();
+    assert_eq!(names, ["Fine", "Tired", "Crunch", "Burnt Out"]);
+    assert_eq!(b.tier_index(249), 0);
+    assert_eq!(b.tier_index(250), 1);
+    assert_eq!(b.tier_index(1000), 3);
+    // Hyperfocus is the upside of Crunch; Burnt Out only costs.
+    assert!(
+        b.tier(600)
+            .is_some_and(|t| t.power_pct > 0 && t.misfire_pct > 0)
+    );
+    assert!(b.tier(900).is_some_and(|t| t.power_pct < 0));
+    assert!(!b.caption(0).is_empty() && !b.caption(1000).is_empty());
+    assert_ne!(b.caption(560), b.caption(840));
+}
+
+#[test]
+fn fighting_fills_the_meter() {
+    let (mut sim, p) = world("campus", 5, |_| {});
+    // The dummy never pulls on its own: hitting it puts the player in combat.
+    let dummy = spawn(&mut sim, "training_dummy");
+    sim.apply_as(
+        p,
+        Command::SetTarget {
+            unit: p,
+            target: Some(dummy),
+        },
+    );
+    let spell = sim
+        .content()
+        .spells
+        .iter()
+        .find(|s| s.name == "Code Review")
+        .map(|s| s.id);
+    sim.apply_as(
+        p,
+        Command::Cast {
+            caster: p,
+            spell: spell.expect("code review"),
+        },
+    );
+    let ev = run(&mut sim, 11 * SECOND);
+    assert!(
+        causes(&ev).contains(&(BurnoutCause::Combat, 15)),
+        "{:?}",
+        causes(&ev)
+    );
+}
+
+#[test]
+fn a_misfire_spends_mana_but_not_the_spell() {
+    let cast = |misfire_pct: u32| {
+        let (mut sim, p) = world("campus", 5, |c| {
+            c.endgame.burnout.tiers[0].misfire_pct = misfire_pct;
+        });
+        let spell = sim
+            .content()
+            .spells
+            .iter()
+            .find(|s| s.name == "Guardrails")
+            .map(|s| s.id)
+            .expect("guardrails");
+        sim.apply_as(p, Command::Cast { caster: p, spell });
+        run(&mut sim, 3 * SECOND)
+    };
+    let quip = |ev: &[Event]| {
+        ev.iter().any(|e| {
+            matches!(
+                e,
+                Event::BurnoutQuip {
+                    kind: QuipKind::Misfire,
+                    ..
+                }
+            )
+        })
+    };
+    let done = |ev: &[Event]| ev.iter().any(|e| matches!(e, Event::CastSucceeded { .. }));
+    let (bad, good) = (cast(50), cast(0));
+    assert!(done(&good) && !quip(&good));
+    // 50% on one seed may go either way; the invariant is that a quip never comes with a success.
+    assert!(quip(&bad) != done(&bad), "{bad:?}");
+}

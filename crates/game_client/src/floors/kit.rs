@@ -521,6 +521,9 @@ pub enum Sign {
     ToCampusGate,
     FirstDay,
     ClampWarning,
+    AgentsAd,
+    FamilyAd,
+    RtoAd,
 }
 
 #[derive(Clone, Debug)]

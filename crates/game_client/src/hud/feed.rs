@@ -813,6 +813,10 @@ fn collect_events(
                     QuipKind::Yawn => {
                         out.push(format!("{name} {text}"), Color::srgb(0.6, 0.6, 0.66))
                     }
+                    QuipKind::Misfire => out.push(
+                        format!("Your spell fizzles. {name}: \"{text}\""),
+                        Color::srgb(1.0, 0.6, 0.35),
+                    ),
                 }
             }
             _ => {}

@@ -29,6 +29,7 @@ mod testgrid;
 mod textures;
 mod themes;
 mod vibecon;
+mod water;
 mod zones;
 
 pub use districts::{DISTRICTS, district_at};
@@ -146,7 +147,7 @@ impl Plugin for FloorsPlugin {
             .add_systems(Startup, spawn_sun)
             // Same frame as the sim floor swap, so movement never slides against old blockers.
             .add_systems(Update, load_floor.after(crate::game::FloorSwap))
-            .add_systems(Update, blink_leds);
+            .add_systems(Update, (blink_leds, water::animate));
     }
 }
 
@@ -359,6 +360,8 @@ fn load_floor(
     let pennant = meshes.add(pennant_mesh());
     let mut mats: HashMap<Mat, Handle<StandardMaterial>> = HashMap::new();
     let mut texs: HashMap<Tex, Handle<StandardMaterial>> = HashMap::new();
+    // Created on the first water piece: most zones have none.
+    let mut water_mat: Option<Handle<StandardMaterial>> = None;
     // The QA overview camera sits far above everything: culling would hide all the decor.
     let overview = std::env::var_os("WOW_TOPDOWN").is_some();
     let decor_range = VisibilityRange::abrupt(
@@ -393,6 +396,15 @@ fn load_floor(
             Piece::Box {
                 center, size, mat, ..
             } => {
+                if *mat == Mat::Lake {
+                    let m = water_mat
+                        .get_or_insert_with(|| materials.add(water::material(&mut images)))
+                        .clone();
+                    let top = *center + Vec3::Y * (size.y / 2.0);
+                    let rect = water::Shape::Rect(Vec2::new(size.x, size.z));
+                    water::spawn(&mut commands, &mut meshes, m, top, rect, FloorEntity);
+                    continue;
+                }
                 let mut e = commands.spawn((
                     FloorEntity,
                     Mesh3d(unit_cube.clone()),
@@ -494,6 +506,15 @@ fn load_floor(
                 yaw,
                 mat,
             } => {
+                if *mat == Mat::Lake && matches!(kind, PrimKind::Cylinder) {
+                    let m = water_mat
+                        .get_or_insert_with(|| materials.add(water::material(&mut images)))
+                        .clone();
+                    let top = *center + Vec3::Y * (size.y / 2.0);
+                    let disc = water::Shape::Disc(size.x / 2.0);
+                    water::spawn(&mut commands, &mut meshes, m, top, disc, FloorEntity);
+                    continue;
+                }
                 let mesh = match kind {
                     PrimKind::Cylinder => &cylinder,
                     PrimKind::Sphere => &sphere,

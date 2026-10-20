@@ -94,7 +94,7 @@ fn spawn_bubbles(
             Event::Yell { unit, text } => (unit, text.clone()),
             Event::BurnoutQuip {
                 unit,
-                kind: kind @ (QuipKind::Yawn | QuipKind::Mutter),
+                kind: kind @ (QuipKind::Yawn | QuipKind::Mutter | QuipKind::Misfire),
                 line,
             } => {
                 let def = &sim.content().endgame.burnout;

@@ -1457,6 +1457,13 @@ impl Sim {
         if let Err(reason) = self.revalidate(ci, &spell, cast.target) {
             return self.fail(Self::id_of(ci), spell.id, reason);
         }
+        // Relief (the coffee channel) must never fizzle, or a Burnt Out player could not recover.
+        if spell.channel.is_none() && self.is_player(Self::id_of(ci)) && self.burnout_misfire(ci) {
+            let mana = self.perk_mana_cost(ci, spell.id, spell.mana);
+            let u = &mut self.units[ci];
+            u.state.mana = u.state.mana.saturating_sub(mana);
+            return;
+        }
         self.resolve(ci, &spell, cast.target);
     }
 
@@ -1909,7 +1916,14 @@ impl Sim {
                 .filter_map(|a| self.content.aura(&a.key))
                 .map(|a| a.mana_regen)
                 .sum();
-            u.regen_acc += d.mana_regen_per_5s_combat + u.item_bonus.mana_regen + brew;
+            let tired = self
+                .content
+                .endgame
+                .burnout
+                .tier(u.state.career.burnout)
+                .map_or(0, |t| t.regen_pct);
+            u.regen_acc +=
+                (d.mana_regen_per_5s_combat + u.item_bonus.mana_regen + brew) * (100 - tired) / 100;
             u.state.mana = (u.state.mana + u.regen_acc / 150).min(u.state.max_mana);
             u.regen_acc %= 150;
         }

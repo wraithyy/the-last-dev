@@ -105,6 +105,7 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - Keybindings: one key per action (slot keys and numpad keys are separate actions, so there is no secondary binding). Esc, Enter, Backspace, F9 and modifier keys other than Shift cannot be bound; the ticket dialog (arrows, Enter, Backspace), the victory restart (R), the role picker (1-4) and the debug overlay (F9) are fixed. A key already in use is swapped, never rejected. The panel is hidden in the touch layout; touch buttons press whatever key their action is bound to.
 - Aura tooltips: the content defines no aura prose, so the description line is derived from the aura's mechanics (stun, silence, periodic damage or heal, stat percentages), and the name is the aura's display name in snake_case. Party frames show up to 6 aura icons per member; the target frame shows harmful auras only.
 - The cast tooltip exists for the target's cast bar only; the player's own cast uses the action bar tooltip.
+- Burnout: no screen desaturation and no chat typos yet (the gauge pulse, banners and misfire yells carry the effect); the Company Calendar only lists burnout costs and relief, it does not react to the tier.
 
 ## Touch and PWA
 

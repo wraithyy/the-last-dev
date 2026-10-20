@@ -47,7 +47,9 @@ impl Sim {
     /// Haste first, then cast-time auras (Review Fatigue, Pivot to AGI) and talent perks.
     pub(crate) fn cast_time(&self, i: usize, spell: &SpellDef) -> u32 {
         let hasted = self.content.cast_ms(spell, self.haste(i));
-        let pct = self.aura_sum(i, |a| a.cast_time_pct) + self.perk_cast_time_pct(i, spell.id);
+        let pct = self.aura_sum(i, |a| a.cast_time_pct)
+            + self.perk_cast_time_pct(i, spell.id)
+            + i64::from(self.burnout_cast_pct(i));
         pct_mod(u64::from(hasted), pct) as u32
     }
 
@@ -136,7 +138,8 @@ impl Sim {
         (u64::from(base) + u64::from(u.sp) * u64::from(coefficient_pct) / 100)
             * u64::from(u.dmg_pct)
             * (1000 + u64::from(u.item_bonus.power_tenths))
-            / 100_000
+            * (100 + self.burnout_power_pct(ci)).max(0) as u64
+            / 10_000_000
     }
 
     pub(crate) fn apply_effect(

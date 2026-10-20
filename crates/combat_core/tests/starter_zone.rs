@@ -159,6 +159,12 @@ fn every_starter_ticket_is_finishable_solo_and_the_gate_leads_on() {
     w.secs(16);
     w.turn_in("p3_badge_photo");
 
+    // The vibecoder's hotfix is interact-and-wait only: no kills, giver and prop side by side.
+    w.accept("p3_vibecoder", "p3_hotfix_hatchback");
+    w.use_prop("p3_prod_lunchbox");
+    w.secs(13);
+    w.turn_in("p3_hotfix_hatchback");
+
     w.accept("badge_clerk", "p3_feedback_loop");
     w.accept("p3_attendant", "p3_pay_and_display");
     w.accept("lanyard_vendor", "p3_lost_lanyards");

@@ -431,6 +431,16 @@ impl Group {
                 },
             );
         }
+        // A real group grabs coffee, plays foosball and kills a manager now and then: once a
+        // minute any member who reached Tired is back to Fine, so burnout never decides a run.
+        if self.sim.now().0.is_multiple_of(60 * 30) {
+            for k in 0..self.m.len() {
+                let id = self.m[k].id;
+                if self.unit(id).is_some_and(|u| u.career.burnout >= 250) {
+                    self.sim.debug_set_burnout(id, 100);
+                }
+            }
+        }
         let ev = self.sim.tick();
         if std::env::var_os("WOW_RAID_LOG").is_some() {
             let now = self.sim.now().0;

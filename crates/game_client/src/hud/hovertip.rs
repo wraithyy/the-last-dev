@@ -241,8 +241,31 @@ fn burnout_tip(b: u16, content: &Content) -> Tip {
             effects.push(what.to_string());
         }
     }
+    if let Some(t) = def.tier(b) {
+        let mut pct = |v: i32, what: &str| {
+            if v != 0 {
+                effects.push(format!("{what} {v:+}%"));
+            }
+        };
+        pct(
+            t.power_pct,
+            if t.power_pct > 0 {
+                "hyperfocus: spell power"
+            } else {
+                "brain fog: spell power"
+            },
+        );
+        pct(-(t.regen_pct as i32), "mana regen");
+        pct(t.cast_pct, "cast time");
+        if t.misfire_pct > 0 {
+            effects.push(format!("{}% misfire", t.misfire_pct));
+        }
+    }
     if b > 0 {
         effects.push("hair thins faster".into());
+    }
+    if def.tier_index(b) > 0 {
+        effects.push("relief: coffee, foosball, pets, kill a manager".into());
     }
     let stats = if effects.is_empty() {
         "no side effects yet".to_string()

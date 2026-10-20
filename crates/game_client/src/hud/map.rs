@@ -23,7 +23,10 @@ const BLOCK_RGBA: [u8; 4] = [70, 84, 108, 255];
 /// Outdoors: roads and car parks, footpaths and plazas, water.
 const ROAD_RGBA: [u8; 4] = [92, 96, 104, 255];
 const PATH_RGBA: [u8; 4] = [66, 74, 86, 255];
-const WATER_RGBA: [u8; 4] = [52, 118, 178, 255];
+const WATER_RGBA: [u8; 4] = [88, 160, 212, 255];
+/// Water pixels next to land: a light shoreline instead of a hard dark edge, so a river reads
+/// as water and not as a blue road.
+const SHORE_RGBA: [u8; 4] = [160, 214, 236, 255];
 const OPEN: Color = Color::srgb(0.4, 1.0, 0.5);
 const LOCKED: Color = Color::srgb(1.0, 0.42, 0.36);
 const QUEST: Color = Color::srgb(1.0, 0.9, 0.2);
@@ -219,6 +222,15 @@ pub(super) fn rasterise(layout: &FloorLayout) -> (Image, Vec2, f32) {
             let p = a.lerp(b, k as f32 / steps as f32);
             for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
                 put(p.x as i64 + dx, p.y as i64 + dy, WALL_RGBA);
+            }
+        }
+    }
+    let water: Vec<bool> = data.chunks_exact(4).map(|p| p == WATER_RGBA).collect();
+    for y in 1..h.saturating_sub(1) {
+        for x in 1..w.saturating_sub(1) {
+            let i = y * w + x;
+            if water[i] && !(water[i - 1] && water[i + 1] && water[i - w] && water[i + w]) {
+                data[i * 4..i * 4 + 4].copy_from_slice(&SHORE_RGBA);
             }
         }
     }

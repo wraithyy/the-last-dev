@@ -35,7 +35,7 @@ const PACKS: [(f32, f32); 6] = [
 ];
 /// Friendly cast: (anchor, position, the point it faces).
 type Spot = (&'static str, (f32, f32), (f32, f32));
-const CAST: [Spot; 7] = [
+const CAST: [Spot; 10] = [
     // The "First Day" corner beside your car.
     ("npc_hr", (-3.5, 68.0), SPAWN),
     ("npc_dummy", (2.0, 61.5), SPAWN),
@@ -45,6 +45,10 @@ const CAST: [Spot; 7] = [
     ("npc_badge", (-30.0, 24.5), (-30.0, 34.0)),
     ("npc_attendant", (25.0, 28.0), (16.0, 28.0)),
     ("npc_vendor", (28.6, -10.5), (14.0, -10.5)),
+    // Along the walk to the gate: a vibecoder at his hatchback, a consultant, a pilot passenger.
+    ("npc_vibe", (9.5, 45.0), (13.0, 45.0)),
+    ("npc_consultant", (-8.0, 14.0), (0.0, 14.0)),
+    ("npc_pilot", (-8.0, -22.0), (0.0, -26.0)),
 ];
 const BOSS: (f32, f32) = (9.0, -71.0);
 
@@ -89,6 +93,7 @@ pub fn build() -> FloorLayout {
     badge_office(&mut p);
     attendant_booth(&mut p);
     vendor_kiosk(&mut p);
+    jokes(&mut p);
     let door = exit(&mut p);
     pickups(&mut p);
 
@@ -336,6 +341,26 @@ fn exit(p: &mut Plan) -> (Vec3, f32) {
     }
     signpost(p, -9.0, -46.0, true, 3.6, Sign::ToCampusGate);
     (v(0.0, 0.0, -80.2), PI)
+}
+
+/// The hatchback's picnic table with "production" on it, and the AI-hype and corporate ads
+/// along the way north.
+fn jokes(p: &mut Plan) {
+    let (tx, tz) = (14.0, 45.0);
+    p.boxed(v(tx, 0.7, tz), v(1.6, 0.1, 1.0), Mat::Wood, true);
+    for dx in [-0.6, 0.6] {
+        p.boxed(v(tx + dx, 0.35, tz), v(0.1, 0.7, 0.8), Mat::Wood, false);
+    }
+    p.boxed(v(tx, 0.9, tz), v(0.5, 0.3, 0.35), Mat::Yellow, false);
+    spot(p, "prop:p3_prod_lunchbox", (tx, 0.95, tz), (tx, tz + 1.4));
+    for (key, x, z, sign) in [
+        ("prop:p3_ad_agents", 13.0, 60.0, Sign::AgentsAd),
+        ("prop:p3_ad_family", -16.0, 34.0, Sign::FamilyAd),
+        ("prop:p3_ad_rto", 14.0, 2.0, Sign::RtoAd),
+    ] {
+        signpost(p, x, z, true, 3.6, sign);
+        spot(p, key, (x, 1.8, z + 0.3), (x, z + 1.6));
+    }
 }
 
 /// Lost lanyards (`Objective::Collect`, tag `lost_lanyard`): three, dropped by people who quit

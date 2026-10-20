@@ -1,5 +1,6 @@
 //! Player and target unit frames, cast bars and aura icon rows.
 
+use super::banners::Banner;
 use super::{
     ACCENT_WARM, BAR_BG, DIM, HP_GREEN, IconCache, MANA_BLUE, PANEL_BOTTOM, PANEL_EDGE, PANEL_TOP,
     TipSource, fmt_secs, gloss, label, set_text, vgrad,
@@ -55,7 +56,15 @@ struct FrameRoot(Who);
 struct BurnoutStrip;
 #[derive(Component)]
 struct BurnoutFill;
-const BURNOUT_H: f32 = 5.0;
+#[derive(Component)]
+struct BurnoutTrack;
+#[derive(Component)]
+struct BurnoutLabel;
+#[derive(Component)]
+struct BurnoutCaption;
+const BURNOUT_H: f32 = 28.0;
+const BURNOUT_W: f32 = 260.0;
+const CAPTION: Color = Color::srgb(0.95, 0.88, 0.7);
 const BURNOUT_LOW: Color = Color::srgb(0.85, 0.7, 0.3);
 const BURNOUT_HIGH: Color = Color::srgb(0.95, 0.22, 0.18);
 #[derive(Component)]
@@ -361,15 +370,14 @@ fn spawn_frame(commands: &mut Commands, who: Who, left: f32) {
                     });
                     spawn_bar(body, who, Pool::Hp);
                     spawn_bar(body, who, Pool::Mana);
-                    if who == Who::Player {
-                        spawn_burnout_strip(body);
-                    }
                 });
         });
 }
 
-fn spawn_burnout_strip(parent: &mut ChildSpawnerCommands) {
-    parent
+/// A battery gauge hanging under the player frame (own node: the frame has a fixed height).
+/// 260 px wide so it stops short of the target frame's cast bar and aura row.
+fn spawn_burnout_strip(commands: &mut Commands, icons: &mut IconCache, assets: &AssetServer) {
+    commands
         .spawn((
             BurnoutStrip,
             Button,
@@ -378,53 +386,181 @@ fn spawn_burnout_strip(parent: &mut ChildSpawnerCommands) {
                 ..default()
             },
             Node {
-                height: px(BURNOUT_H),
-                width: percent(100),
-                border_radius: BorderRadius::all(px(2)),
-                overflow: Overflow::clip(),
+                position_type: PositionType::Absolute,
+                top: px(FRAME_TOP + FRAME_H + 6.0),
+                left: px(12),
+                flex_direction: FlexDirection::Column,
+                row_gap: px(3),
+                width: px(BURNOUT_W),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.02, 0.02, 0.04, 0.6)),
-            BoxShadow::new(Color::srgba(0.0, 0.0, 0.0, 0.6), px(0), px(1), px(0), px(3)),
         ))
         .with_children(|s| {
+            s.spawn(Node {
+                align_items: AlignItems::Center,
+                column_gap: px(5),
+                ..default()
+            })
+            .with_children(|row| {
+                row.spawn((
+                    ImageNode::new(icons.get(assets, "battery_low")),
+                    Node {
+                        width: px(BURNOUT_H),
+                        height: px(BURNOUT_H),
+                        flex_shrink: 0.0,
+                        ..default()
+                    },
+                ));
+                // The battery: the track drains toward red, tick marks split the four tiers.
+                row.spawn((
+                    BurnoutTrack,
+                    Node {
+                        height: px(BURNOUT_H),
+                        flex_grow: 1.0,
+                        border: UiRect::all(px(2)),
+                        border_radius: BorderRadius::all(px(6)),
+                        overflow: Overflow::clip(),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BorderColor::all(PANEL_EDGE),
+                    BackgroundColor(Color::srgba(0.02, 0.02, 0.04, 0.85)),
+                    BoxShadow::new(Color::srgba(0.0, 0.0, 0.0, 0.6), px(0), px(2), px(0), px(4)),
+                ))
+                .with_children(|t| {
+                    t.spawn((
+                        BurnoutFill,
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: px(0),
+                            top: px(0),
+                            bottom: px(0),
+                            width: percent(0),
+                            ..default()
+                        },
+                        BackgroundColor(BURNOUT_LOW),
+                    ));
+                    for at in [250.0, 550.0, 850.0] {
+                        t.spawn((
+                            Node {
+                                position_type: PositionType::Absolute,
+                                left: percent(at / 10.0),
+                                top: px(0),
+                                bottom: px(0),
+                                width: px(2),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
+                        ));
+                    }
+                    t.spawn((
+                        BurnoutLabel,
+                        label("", 14.0),
+                        TextColor::WHITE,
+                        TextLayout::new(Justify::Left, LineBreak::NoWrap),
+                    ));
+                });
+                // Terminal nub of the battery.
+                row.spawn((
+                    Node {
+                        width: px(5),
+                        height: px(BURNOUT_H * 0.45),
+                        border_radius: BorderRadius::right(px(3)),
+                        margin: UiRect::left(px(-5)),
+                        ..default()
+                    },
+                    BackgroundColor(PANEL_EDGE),
+                ));
+            });
             s.spawn((
-                BurnoutFill,
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: px(0),
-                    top: px(0),
-                    bottom: px(0),
-                    width: percent(0),
-                    ..default()
-                },
-                BackgroundColor(BURNOUT_LOW),
+                BurnoutCaption,
+                label("", 14.0),
+                TextColor(CAPTION),
+                TextLayout::new(Justify::Left, LineBreak::NoWrap),
             ));
         });
 }
 
-/// Fill width and colour follow the player's burnout; the tooltip reads it from `TipSource`.
+/// Pulse rate (rad/s) of the gauge from Crunch on; Burnt Out beats faster.
+const BURNOUT_PULSE: [f32; 4] = [0.0, 0.0, 4.0, 9.0];
+
+/// Fill, colour, label, caption and tooltip source follow the player's burnout; a tier change
+/// raises a banner (not on the first read, so joining or loading stays quiet).
+#[allow(clippy::too_many_arguments)]
 fn update_burnout_strip(
     sim: SimView,
+    time: Res<Time>,
+    mut last_tier: Local<Option<usize>>,
+    mut banners: MessageWriter<Banner>,
+    touch: Res<crate::touch::TouchMode>,
+    mut place: Query<&mut Node, (With<BurnoutStrip>, Without<BurnoutFill>)>,
     mut strip: Query<&mut TipSource, With<BurnoutStrip>>,
     mut fill: Query<(&mut Node, &mut BackgroundColor), With<BurnoutFill>>,
+    mut track: Query<&mut BorderColor, With<BurnoutTrack>>,
+    mut texts: ParamSet<(
+        Query<&mut Text, With<BurnoutLabel>>,
+        Query<&mut Text, With<BurnoutCaption>>,
+    )>,
 ) {
     let b = sim
         .player()
         .and_then(|id| sim.unit(id))
         .map_or(0, |u| u.career.burnout);
+    let def = &sim.content().endgame.burnout;
+    let tier = def.tier_index(b);
     for mut tip in &mut strip {
         if tip.burnout != Some(b) {
             tip.burnout = Some(b);
         }
     }
+    let name = def.tier(b).map_or("", |t| t.name.as_str());
+    if let Some(prev) = last_tier.replace(tier)
+        && prev != tier
+        && let Some(t) = def.tiers.get(tier)
+    {
+        let up = tier > prev;
+        banners.write(Banner {
+            title: t.name.to_uppercase(),
+            subtitle: if up {
+                format!("Burnout rising: {}", def.caption(b))
+            } else {
+                format!("Burnout easing: {}", def.caption(b))
+            },
+            color: BURNOUT_LOW.mix(&BURNOUT_HIGH, tier as f32 / 3.0),
+        });
+    }
     let k = f32::from(b.min(combat_core::BURNOUT_MAX)) / f32::from(combat_core::BURNOUT_MAX);
+    // On touch the Kudos wallet sits right under the player frame, so the gauge hangs below it.
+    let top = px(FRAME_TOP + FRAME_H + 6.0 + if touch.active { 28.0 } else { 0.0 });
+    for mut n in &mut place {
+        if n.top != top {
+            n.top = top;
+        }
+    }
+    let pulse = BURNOUT_PULSE.get(tier).copied().unwrap_or(0.0);
+    let beat = if pulse > 0.0 {
+        0.5 + 0.5 * (time.elapsed_secs() * pulse).sin()
+    } else {
+        0.0
+    };
+    let base = BURNOUT_LOW.mix(&BURNOUT_HIGH, k);
     for (mut node, mut color) in &mut fill {
         let w = percent(k * 100.0);
         if node.width != w {
             node.width = w;
         }
-        color.0 = BURNOUT_LOW.mix(&BURNOUT_HIGH, k);
+        color.0 = base.mix(&Color::WHITE, beat * 0.35);
+    }
+    for mut edge in &mut track {
+        *edge = BorderColor::all(PANEL_EDGE.mix(&BURNOUT_HIGH, beat));
+    }
+    let head = format!("{}  {}%", name.to_uppercase(), b / 10);
+    for mut t in &mut texts.p0() {
+        set_text(&mut t, &head);
+    }
+    for mut t in &mut texts.p1() {
+        set_text(&mut t, def.caption(b));
     }
 }
 
@@ -673,6 +809,7 @@ fn spawn_aura_row(
 
 fn spawn_frames(mut commands: Commands, assets: Res<AssetServer>, mut icons: ResMut<IconCache>) {
     spawn_frame(&mut commands, Who::Player, 12.0);
+    spawn_burnout_strip(&mut commands, &mut icons, &assets);
     let target_left = 12.0 + FRAME_W + FRAME_GAP;
     spawn_frame(&mut commands, Who::Target, target_left);
 

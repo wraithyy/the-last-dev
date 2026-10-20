@@ -212,7 +212,7 @@ pub fn copy(t: &Tutorial, c: &Ctx) -> Option<Copy> {
                 format!("Move with {}. Walk a few metres.", c.move_keys),
                 "Drag on the left half of the screen to walk.",
             ),
-            "Please complete mandatory training. Completion is tracked. Learning is optional.",
+            "Please complete mandatory training. Completion is tracked. Learning is optional. An AI will watch it for you.",
         ),
         Step::Camera => (
             "look around",
@@ -220,7 +220,7 @@ pub fn copy(t: &Tutorial, c: &Ctx) -> Option<Copy> {
                 "Hold the left or right mouse button and drag to look around. Wheel zooms.".into(),
                 "Drag on the right half of the screen to look around. Pinch to zoom.",
             ),
-            "Everything you see was approved by a committee that has never been outside.",
+            "Everything you see was approved by a committee and summarised by an AI that has never been outside.",
         ),
         Step::Accept => (
             "take a ticket",
@@ -231,7 +231,7 @@ pub fn copy(t: &Tutorial, c: &Ctx) -> Option<Copy> {
                 ),
                 "Walk to the HR Onboarding Bot (the yellow ! by the parking lot), tap F to talk and accept the ticket.",
             ),
-            "Every task needs a ticket. Every ticket needs a task. Nobody knows which came first.",
+            "Every task needs a ticket. Every ticket needs a task. The AI writes both and closes neither.",
         ),
         Step::Target => (
             "pick a stakeholder",
@@ -250,7 +250,7 @@ pub fn copy(t: &Tutorial, c: &Ctx) -> Option<Copy> {
                 format!("Press {} to start auto attacking.", c.auto),
                 "Tap the T button (auto attack) on the right.",
             ),
-            "The only automation here that works as advertised.",
+            "The only automation here that works as advertised. No agents were harmed. Or consulted.",
         ),
         Step::Spell1 => (
             "cast your first ability",
@@ -258,7 +258,7 @@ pub fn copy(t: &Tutorial, c: &Ctx) -> Option<Copy> {
                 format!("Cast {} with {}.", c.spell1.0, c.spell1.1),
                 &format!("Tap {} on the action bar.", c.spell1.0),
             ),
-            "The AI says it could do this. The AI says a lot of things.",
+            "The AI says it could do this in one prompt. The AI says a lot of things, confidently.",
         ),
         Step::Spell2 => (
             "cast your second ability",
@@ -266,7 +266,7 @@ pub fn copy(t: &Tutorial, c: &Ctx) -> Option<Copy> {
                 format!("Cast {} with {}.", c.spell2.0, c.spell2.1),
                 &format!("Tap {} on the action bar.", c.spell2.0),
             ),
-            "Twice the output, same salary. Welcome to scaling.",
+            "Twice the output, same salary. HR calls it 10x engineering.",
         ),
         Step::Interrupt => match (&c.interrupt, t.can_interrupt) {
             (Some((name, key, _)), true) => (
@@ -358,7 +358,7 @@ pub fn copy(t: &Tutorial, c: &Ctx) -> Option<Copy> {
                 ),
                 "Back to the HR Onboarding Bot: tap F to turn the ticket in. The tracker shows it is ready.",
             ),
-            "It will be marked done, then reopened next quarter as a 'learning'.",
+            "It will be marked done, then reopened next quarter as a 'learning'. Or summarised by a bot.",
         ),
         Step::Windows => (
             "find your windows",
@@ -396,7 +396,7 @@ pub fn copy(t: &Tutorial, c: &Ctx) -> Option<Copy> {
                 ),
                 "Walk to the AI-Native Intern by your car and tap F. He has your first real ticket, and the way to the campus.",
             ),
-            "He has been here two days. That makes him senior.",
+            "He has been here two days and vibecodes before lunch. That makes him senior.",
         ),
     };
     Some(Copy { title, how, quip })

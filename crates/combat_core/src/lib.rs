@@ -40,7 +40,7 @@ pub mod world;
 pub mod world_events;
 mod zones;
 
-pub use burnout::{BURNOUT_MAX, BurnoutCause, BurnoutDef, QuipKind};
+pub use burnout::{BURNOUT_MAX, BurnoutCause, BurnoutDef, BurnoutTier, QuipKind};
 pub use calendar::{
     CalendarChain, CalendarDef, CalendarGame, CalendarReward, ChainStatus, TICKET_BOARD_MULT,
 };

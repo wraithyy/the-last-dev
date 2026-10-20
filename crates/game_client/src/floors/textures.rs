@@ -1662,6 +1662,24 @@ fn sign_spec(s: Sign) -> SignSpec {
             [20, 20, 20],
             [180, 30, 30],
         ),
+        Sign::AgentsAd => sp(
+            &["REPLACE YOUR TEAM", "WITH AGENTS", "NOW 30% FEWER PEOPLE"],
+            [90, 40, 200],
+            [245, 242, 255],
+            [120, 255, 200],
+        ),
+        Sign::FamilyAd => sp(
+            &["WE'RE A FAMILY", "UNLIMITED PTO*", "*LAYOFFS THURSDAY"],
+            [240, 120, 150],
+            [255, 250, 250],
+            [90, 20, 40],
+        ),
+        Sign::RtoAd => sp(
+            &["RETURN TO OFFICE", "THE OFFICE IS", "2.4 KM THAT WAY"],
+            [40, 60, 90],
+            [235, 240, 248],
+            [255, 200, 70],
+        ),
     }
 }
 

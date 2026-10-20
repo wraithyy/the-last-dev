@@ -65,6 +65,7 @@
 [00248] Copilot Drone enters combat
 [00248] Copilot Drone enters combat
 [00249] Fullstack Engineer begins Code Review (2000 ms)
+[00300] Fullstack Engineer burnout 15 (Combat)
 [00309] Fullstack Engineer casts Code Review
 [00309] Fullstack Engineer hits Copilot Drone with Code Review for 79 (absorbed 0)
 [00309] Fullstack Engineer auto attack off
@@ -118,6 +119,7 @@
 [00524] Vibe-Coding Junior hits Fullstack Engineer with melee for 7 (absorbed 0)
 [00584] Vibe-Coding Junior swings at Fullstack Engineer
 [00584] Vibe-Coding Junior hits Fullstack Engineer with melee for 7 (absorbed 0)
+[00600] Fullstack Engineer burnout 30 (Combat)
 [00626] Fullstack Engineer casts Refactor
 [00626] Vibe-Coding Junior loses code_smell (Consumed)
 [00626] Fullstack Engineer hits Vibe-Coding Junior with Refactor for 151 (absorbed 0) COMBO
@@ -183,6 +185,7 @@
 [00896] Fullstack Engineer swings at MeatProxy
 [00896] Fullstack Engineer hits MeatProxy with melee for 13 (absorbed 0)
 [00897] Fullstack Engineer begins Refactor (3000 ms)
+[00900] Fullstack Engineer burnout 45 (Combat)
 [00903] MeatProxy swings at Fullstack Engineer
 [00903] MeatProxy hits Fullstack Engineer with melee for 8 (absorbed 0)
 [00963] MeatProxy swings at Fullstack Engineer
@@ -274,6 +277,7 @@
 [02075] MeatProxy swings at Fullstack Engineer
 [02075] MeatProxy hits Fullstack Engineer with melee for 8 (absorbed 0)
 [02076] Fullstack Engineer begins Refactor (2500 ms)
+[02100] Fullstack Engineer burnout 60 (Combat)
 [02135] MeatProxy swings at Fullstack Engineer
 [02135] MeatProxy hits Fullstack Engineer with melee for 8 (absorbed 0)
 [02166] Fullstack Engineer casts Refactor
@@ -322,6 +326,7 @@
 [02336] Fullstack Engineer begins Code Review (2000 ms)
 [02376] The Vibe Coder swings at Fullstack Engineer
 [02376] The Vibe Coder hits Fullstack Engineer with melee for 12 (absorbed 0)
+[02400] Fullstack Engineer burnout 75 (Combat)
 [02411] Fullstack Engineer casts Code Review
 [02411] Fullstack Engineer hits The Vibe Coder with Code Review for 86 (absorbed 0)
 [02411] The Vibe Coder gains code_smell
@@ -395,6 +400,7 @@
 [02700] Unreviewed PR ai Dead
 [02700] Unreviewed PR drops [] and 0 SP
 [02700] Unreviewed PR leaves combat
+[02700] Fullstack Engineer burnout 90 (Combat)
 [02700] Unreviewed PR yells: Closed... without... merging...
 [02701] Fullstack Engineer auto attack on
 [02701] Fullstack Engineer swings at The Vibe Coder
@@ -433,6 +439,7 @@
 [02945] Fullstack Engineer begins Refactor (2500 ms)
 [02976] The Vibe Coder swings at Fullstack Engineer
 [02976] The Vibe Coder hits Fullstack Engineer with melee for 12 (absorbed 0)
+[03000] Fullstack Engineer burnout 105 (Combat)
 [03035] Fullstack Engineer casts Refactor
 [03035] The Vibe Coder loses code_smell (Consumed)
 [03035] Fullstack Engineer hits The Vibe Coder with Refactor for 162 (absorbed 0) COMBO
