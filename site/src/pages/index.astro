@@ -8,6 +8,7 @@ import play from '@phosphor-icons/core/assets/regular/play.svg?raw';
 import arrow from '@phosphor-icons/core/assets/regular/arrow-up-right.svg?raw';
 import expand from '@phosphor-icons/core/assets/regular/corners-out.svg?raw';
 import roles from '../assets/shots/roles.png';
+import rolesStage from '../assets/shots/roles-stage.png';
 import campus from '../assets/shots/campus.png';
 import jira from '../assets/shots/jira.png';
 import ceo from '../assets/shots/ceo.png';
@@ -58,9 +59,9 @@ const tips = [
   'The AI summarised this loading screen. The summary is 40% longer.',
   'J opens your Jira. Nobody else will.',
   'N opens the campus map, last updated by a human in 2021.',
-  'The chatbot rollout is "on track". The track is a circle.',
+  'The chatbot rollout is “on track”. The track is a circle.',
   'If this screen takes too long, a consultant will be assigned to it.',
-  'Dying sends you to the graveyard, which HR renamed "the re-onboarding zone".',
+  'Dying sends you to the graveyard, which HR renamed “the re-onboarding zone”.',
   'The board measures AI adoption in tokens burned. Please do not turn the lights off on your way out.',
 ];
 
@@ -123,13 +124,10 @@ const stack = [
           <h1>The last human dev versus the AI&nbsp;rollout.</h1>
           <p class="lede">A free browser RPG with classic MMO combat. Close Jira tickets, climb the office tower, unplug the AGI.</p>
           <div class="ctas">
-            <a class="btn btn-primary" href="#arcade"><Fragment set:html={play} />Play now</a>
+            <a class="btn btn-primary" href="#arcade" data-play><Fragment set:html={play} />Play now</a>
             <a class="btn btn-ghost" href={REPO}><Fragment set:html={github} />Source code</a>
           </div>
         </div>
-        <figure class="hero-shot">
-          <Image src={roles} alt="Role picker with four characters: Fullstack, Frontend, Backend and DevOps engineer" loading="eager" widths={[640, 1280]} sizes="(min-width: 1024px) 58vw, 100vw" />
-        </figure>
       </section>
 
       <section id="arcade" class="wrap arcade" aria-label="Play The Last Dev">
@@ -163,11 +161,13 @@ const stack = [
           document.body.classList.add('playing');
           return frame;
         };
-        player.querySelector('.btn-start').addEventListener('click', () => {
+        const play = () => {
           // Touch controls need the whole screen; a phone-sized embed is worse than the game's own page.
           if (matchMedia('(max-width: 767px), (pointer: coarse)').matches) location.href = player.dataset.src;
           else start();
-        });
+        };
+        player.querySelector('.btn-start').addEventListener('click', play);
+        document.querySelector('[data-play]').addEventListener('click', play);
         // Fills the window instead of the Fullscreen API, whose Esc exit would fight the game's Esc menu.
         const arcade = document.getElementById('arcade');
         const fullBtn = document.querySelector('[data-fullpage]');
@@ -182,7 +182,7 @@ const stack = [
 
       <section id="game" class="wrap section reveal">
         <h2>A long, loving roast of AI-first corporations.</h2>
-        <p class="body">Your company pushed AI onto every task for no reason. You start at level 1 on the corporate campus, close the tickets the AI forgot, climb five floors to the CEO ("Chief AI Evangelist") and shut down the AGI. Your hair thins as your HP drops. When you die, an AI agent backfills your role.</p>
+        <p class="body">Your company pushed AI onto every task for no reason. You start at level 1 on the corporate campus, close the tickets the AI forgot, climb five floors to the CEO (“Chief AI Evangelist”) and shut down the AGI. Your hair thins as your HP drops. When you die, an AI agent backfills your role.</p>
         <ol class="route">
           {route.map((r) => (
             <li>
@@ -196,13 +196,21 @@ const stack = [
 
       <section id="roles" class="wrap section reveal">
         <h2>Pick a role. The AI will ignore it.</h2>
+        <figure class="roles-shot">
+          <Image src={rolesStage} alt="Role picker with four characters: Fullstack, Frontend, Backend and DevOps engineer" widths={[800, 1280]} sizes="(min-width: 1200px) 1136px, 100vw" />
+        </figure>
         <div class="roles">
-          {classes.map((c) => (
+          {classes.map((c, i) => (
             <article class="role">
-              <span class="tag">{c.role}</span>
-              <h3>{c.name}</h3>
-              <p>{c.text}</p>
-              <p class="abilities">{c.abilities}</p>
+              <kbd>{i + 1}</kbd>
+              <div>
+                <h3>{c.name}</h3>
+                <span class="tag">{c.role}</span>
+              </div>
+              <div>
+                <p>{c.text}</p>
+                <p class="abilities">{c.abilities}</p>
+              </div>
             </article>
           ))}
         </div>
@@ -214,7 +222,7 @@ const stack = [
         <ol class="coop-how">
           <li><kbd>Esc</kbd><span>Open <strong>Co-op</strong>. The public server is already filled in.</span></li>
           <li><kbd>Create</kbd><span>Get a room code like <code>MERGE-CONFLICT-42</code> and send it to your team.</span></li>
-          <li><kbd>Join</kbd><span>Enter the code, or pick a public room from the "Open standups" list.</span></li>
+          <li><kbd>Join</kbd><span>Enter the code, or pick a public room from the “Open standups” list.</span></li>
         </ol>
         <p class="muted small">The public server runs on a free plan. After about 15 idle minutes it sleeps, and the first connection takes 30 to 60 seconds to wake it.</p>
 
@@ -346,7 +354,9 @@ const stack = [
     --accent: #0a7c86;
     --accent-ink: #ffffff;
     --coffee: #ffdd00;
-    --radius: 6px;
+    --r-sm: 6px;
+    --r-md: 10px;
+    --r-lg: 14px;
     --mono: 'JetBrains Mono Variable', ui-monospace, monospace;
     --sans: 'Geist Variable', system-ui, sans-serif;
     color-scheme: light;
@@ -370,11 +380,11 @@ const stack = [
   body { margin: 0; background: var(--bg); color: var(--text); font: 400 1rem/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
   img { max-width: 100%; height: auto; display: block; }
   a { color: inherit; }
-  h1, h2, h3 { font-family: var(--mono); letter-spacing: -0.02em; line-height: 1.15; margin: 0; }
+  h1, h2, h3 { font-family: var(--mono); letter-spacing: -0.02em; line-height: 1.15; margin: 0; text-wrap: balance; }
   h2 { font-size: clamp(1.6rem, 3vw, 2.3rem); max-width: 24ch; }
   h3 { font-size: 1.05rem; }
   svg { width: 1.15em; height: 1.15em; fill: currentColor; flex: none; }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: var(--radius); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: var(--r-sm); }
 
   .wrap { max-width: 1200px; margin-inline: auto; padding-inline: 16px; }
   @media (min-width: 768px) { .wrap { padding-inline: 32px; } }
@@ -395,7 +405,7 @@ const stack = [
   .nav .btn-sm { margin-left: auto; }
   @media (min-width: 900px) { .nav nav { display: flex; } .nav .btn-sm { margin-left: 0; } }
 
-  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: var(--radius); font: 600 0.95rem var(--sans); text-decoration: none; white-space: nowrap; border: 1px solid transparent; transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: var(--r-sm); font: 600 0.95rem var(--sans); text-decoration: none; white-space: nowrap; border: 1px solid transparent; transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s; }
   .btn:active { transform: translateY(1px) scale(0.98); }
   .btn-sm { padding: 8px 14px; font-size: 0.875rem; }
   .btn-primary { background: var(--accent); color: var(--accent-ink); }
@@ -407,27 +417,29 @@ const stack = [
   .btn-coffee:hover { transform: translateY(-2px); }
   .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
 
-  .hero { display: grid; gap: 40px; padding-block: 48px 72px; align-items: center; }
-  @media (min-width: 1024px) { .hero { grid-template-columns: 1fr 1fr; gap: 56px; padding-block: 72px 64px; } }
+  .hero { padding-block: 64px 40px; }
+  .hero-copy { max-width: 780px; }
+  @media (min-width: 1024px) { .hero { padding-block: 88px 48px; } }
   .eyebrow { font: 500 0.8rem var(--mono); color: var(--muted); margin: 0 0 20px; }
   h1 { font-size: clamp(2.1rem, 3.6vw, 3.1rem); }
   .lede { color: var(--muted); font-size: 1.15rem; max-width: 40ch; margin: 20px 0 0; }
-  .hero-shot { margin: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: 0 30px 80px -30px color-mix(in srgb, var(--accent) 35%, transparent); }
-  /* The role picker screenshot has empty black bands left and right; 4:3 cover crops exactly those. */
-  .hero-shot img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
 
-  .route { list-style: none; padding: 0; margin: 48px 0 0; display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .route { list-style: none; padding: 0; margin: 48px 0 0; display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
   @media (min-width: 768px) { .route { grid-template-columns: repeat(4, 1fr); } }
   .route li { background: var(--surface); padding: 24px; display: grid; gap: 6px; align-content: start; }
   .route .lvl { font: 600 0.8rem var(--mono); color: var(--accent); }
   .route .muted { font-size: 0.925rem; }
 
-  .roles { display: grid; gap: 16px; margin-top: 40px; }
-  @media (min-width: 768px) { .roles { grid-template-columns: 1fr 1fr; } }
-  .role { border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; background: var(--surface); display: grid; gap: 10px; align-content: start; }
-  .role p { margin: 0; color: var(--muted); }
-  .role .abilities { font: 500 0.85rem var(--mono); color: var(--accent); }
-  .tag { justify-self: start; font: 600 0.75rem var(--mono); text-transform: uppercase; border: 1px solid var(--accent); color: var(--accent); padding: 2px 8px; border-radius: var(--radius); }
+  .roles-shot { margin: 40px 0 0; }
+  .role > kbd { justify-self: start; }
+  .roles { display: grid; gap: 32px; margin-top: 40px; }
+  .role { display: grid; grid-template-columns: auto 1fr; gap: 8px 20px; align-items: start; }
+  .role > div:last-child { grid-column: 2; }
+  @media (min-width: 900px) { .role { grid-template-columns: 3rem 15rem 1fr; } .role > div:last-child { grid-column: auto; } }
+  .role h3 { font-size: 1.1rem; }
+  .role p { margin: 0; color: var(--muted); max-width: 62ch; }
+  .role .abilities { font: 500 0.85rem var(--mono); color: var(--text); margin-top: 8px; }
+  .tag { display: inline-block; margin-top: 6px; font: 600 0.75rem var(--mono); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 
   .coop-how { list-style: none; padding: 0; margin: 36px 0 0; display: grid; gap: 16px; }
   @media (min-width: 768px) { .coop-how { grid-template-columns: repeat(3, 1fr); gap: 32px; } }
@@ -435,12 +447,14 @@ const stack = [
   .coop-how strong { color: var(--text); }
   .sub { margin-top: 72px; font-size: 1.35rem; }
   .servers { display: grid; gap: 10px; margin-top: 28px; max-width: 860px; }
-  .servers details { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 0 20px; }
+  .servers { grid-template-columns: minmax(0, 1fr); }
+  .servers details { min-width: 0; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); padding: 0 20px; }
   .servers summary { cursor: pointer; padding: 16px 0; font: 600 1rem var(--mono); }
   .servers details[open] summary { color: var(--accent); }
   .servers p { color: var(--muted); margin: 0 0 16px; }
-  code { font: 500 0.875em var(--mono); }
-  pre { margin: 0 0 16px; padding: 16px; overflow-x: auto; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); }
+  code { font: 500 0.875em var(--mono); overflow-wrap: anywhere; }
+  pre code { overflow-wrap: normal; }
+  pre { margin: 0 0 16px; padding: 16px; overflow-x: auto; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); }
   pre code { font-size: 0.85rem; line-height: 1.6; }
 
   .controls { display: grid; gap: 32px; margin-top: 40px; }
@@ -449,15 +463,15 @@ const stack = [
   .control-group dl { margin: 0; display: grid; gap: 10px; }
   .control-group dl div { display: flex; gap: 12px; align-items: baseline; }
   .control-group dd { margin: 0; color: var(--muted); }
-  kbd { font: 600 0.8rem var(--mono); padding: 3px 8px; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: var(--radius); background: var(--surface); white-space: nowrap; }
+  kbd { font: 600 0.8rem var(--mono); padding: 3px 8px; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: var(--r-sm); background: var(--surface); white-space: nowrap; }
 
   .gallery { display: grid; gap: 24px; margin-top: 40px; }
   @media (min-width: 768px) { .gallery { grid-template-columns: 1fr 1fr; } }
   .gallery figure { margin: 0; }
-  .gallery img { border: 1px solid var(--line); border-radius: var(--radius); width: 100%; }
+  .gallery img, .roles-shot img { border: 1px solid var(--line); border-radius: var(--r-md); width: 100%; }
 
   .arcade { padding-bottom: 24px; }
-  .player { position: relative; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #05070c; display: grid; place-items: center; }
+  .player { position: relative; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; background: #05070c; display: grid; place-items: center; }
   .player img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.45; }
   .player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
   .btn-start { position: relative; font-size: 1.05rem; padding: 16px 28px; }
@@ -487,12 +501,12 @@ const stack = [
   .stack { display: grid; gap: 28px 48px; margin: 40px 0 0; }
   @media (min-width: 768px) { .stack { grid-template-columns: 1fr 1fr; } }
   .stack div { display: grid; grid-template-columns: 9rem 1fr; gap: 16px; }
-  .stack dt { font: 700 0.95rem var(--mono); color: var(--accent); }
+  .stack dt { font: 700 0.95rem var(--mono); }
   .stack dd { margin: 0; color: var(--muted); }
 
   .me { display: grid; gap: 32px; align-items: start; }
   @media (min-width: 768px) { .me { grid-template-columns: 160px 1fr; gap: 48px; } }
-  .avatar { border-radius: var(--radius); border: 1px solid var(--line); }
+  .avatar { border-radius: var(--r-md); border: 1px solid var(--line); }
   .quote { font: 600 1.1rem var(--mono); border-left: 2px solid var(--accent); padding-left: 20px; margin: 28px 0 0; max-width: 46ch; }
 
   .coffee { text-align: center; padding-block: 96px 120px; display: grid; justify-items: center; }
@@ -503,8 +517,8 @@ const stack = [
 
   /* Motion only explains order: the hero lands first, sections settle in as they arrive. */
   @media (prefers-reduced-motion: no-preference) {
-    .hero-copy, .hero-shot { animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
-    .hero-shot { animation-delay: 0.12s; }
+    .hero-copy, .arcade { animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .arcade { animation-delay: 0.12s; }
     @supports (animation-timeline: view()) {
       .reveal { animation: rise linear both; animation-timeline: view(); animation-range: entry 0% entry 35%; }
     }
