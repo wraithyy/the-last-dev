@@ -11,23 +11,28 @@ import roles from '../assets/shots/roles.png';
 import rolesStage from '../assets/shots/roles-stage.png';
 import campus from '../assets/shots/campus.png';
 import jira from '../assets/shots/jira.png';
+import map from '../assets/shots/map.png';
+import food from '../assets/shots/food.png';
+import sales from '../assets/shots/sales.png';
 
 const GAME = `${BASE}play/`;
 const COFFEE = 'https://buymeacoffee.com/wraithyy';
 
 // Copy below is lifted from the game itself (content/game.ron, copy.rs), not written for the site.
 const route = [
-  { zone: 'Synergy Campus', lvl: '1-2', note: 'Outdoor hub. The shuttle bus is always late.' },
-  { zone: 'The Tower', lvl: '1-10', note: 'Open Space, Meeting Rooms, Sales, PMO, C-Level Penthouse.' },
-  { zone: 'Data Center', lvl: '6-8', note: 'Opens after floor 3. Keep cool.' },
-  { zone: 'Innovation Lab', lvl: '10', note: 'The AGI Prototype. It was a guy forwarding prompts.' },
+  { zone: 'Car Park P3', lvl: 'Lv 1', note: 'Every run starts here. A vibecoder ships to prod from his hatchback.' },
+  { zone: 'Synergy Campus', lvl: 'Lv 1-2', note: 'Open world, 12 districts from Food Truck Plaza to Executive Hill. Scooters included.' },
+  { zone: 'The Tower', lvl: 'Lv 1-10', note: 'Open Space, Meeting Rooms, Sales & Marketing, PMO, C-Level Penthouse.' },
+  { zone: 'Data Center', lvl: 'Lv 6-8', note: 'Two halls. Opens after floor 3. Keep cool.' },
+  { zone: 'Innovation Lab', lvl: 'Lv 10', note: 'Showroom and Rack Room. The AGI Prototype was a guy forwarding prompts.' },
+  { zone: 'Raids', lvl: 'Endgame', note: 'All-Hands Offsite and VibeCon, plus Legacy Mode floors with weekly lockouts.' },
 ];
 
 const classes = [
   {
     name: 'Fullstack Engineer', role: 'Ranged',
     text: 'Knows everything a little, gets blamed for all of it. Reviews, refactors and rolls back from 30 m away.',
-    abilities: 'Code Review, Refactor, Guardrails, Reject PR',
+    abilities: 'Code Review, Refactor, Guardrails',
   },
   {
     name: 'Frontend Developer', role: 'Melee',
@@ -43,6 +48,16 @@ const classes = [
     name: 'DevOps Engineer', role: 'Healer',
     text: 'Keeps prod alive at 3 a.m. so the AI can take credit at 9. Hotfixes, auto-scales and reverts your last five seconds.',
     abilities: 'kill -9, Hotfix, SIGSTOP, Restart Pod',
+  },
+  {
+    name: 'QA Engineer', role: 'Ranged',
+    text: 'Finds the bug the AI swore was a feature, then files it. Debuffs, roots and blocks from 30 m; ships nothing untested.',
+    abilities: 'Unit Test, Bug Report, Severity: Blocker',
+  },
+  {
+    name: 'Data Scientist', role: 'Ranged',
+    text: 'Ninety percent cleaning data, ten percent explaining the chart. Stacks slow damage, spreads it around, waits for significance.',
+    abilities: 'Linear Regression, Overfitting, Early Stopping',
   },
 ];
 
@@ -194,22 +209,23 @@ const stack = [
 
     <section id="game" class="wrap section reveal">
       <h2>A long, loving roast of AI-first corporations.</h2>
-      <p class="body">Your company pushed AI onto every task for no reason. You start at level 1 on the corporate campus, close the tickets the AI forgot, climb five floors to the CEO (“Chief AI Evangelist”) and shut down the AGI. Your hair thins as your HP drops. When you die, an AI agent backfills your role.</p>
+      <p class="body">Your company pushed AI onto every task for no reason. You start at level 1 in Car Park P3, close the tickets the AI forgot, climb five floors to the CEO (“Chief AI Evangelist”) and shut down the AGI. Your hair thins as your HP drops. When you die, an AI agent backfills your role.</p>
       <ol class="route">
         {route.map((r) => (
           <li>
-            <span class="lvl">Lv {r.lvl}</span>
+            <span class="lvl">{r.lvl}</span>
             <strong>{r.zone}</strong>
             <span class="muted">{r.note}</span>
           </li>
         ))}
       </ol>
+      <p class="muted small">Plus a client office on body leasing, your own apartment and company calendar events from Teambuilding to a Reorg: 28 zones and over 140 quests.</p>
     </section>
 
     <section id="roles" class="wrap section reveal">
       <h2>Pick a role. The AI will ignore it.</h2>
       <figure class="roles-shot">
-        <Image src={rolesStage} alt="Role picker with four characters: Fullstack, Frontend, Backend and DevOps engineer" widths={[800, 1280]} sizes="(min-width: 1200px) 1136px, 100vw" />
+        <Image src={rolesStage} alt="The six playable roles on the role picker stage: Fullstack, Frontend, Backend, DevOps, QA and Data Scientist" widths={[800, 1280]} sizes="(min-width: 1200px) 1136px, 100vw" />
       </figure>
       <div class="roles">
         {classes.map((c, i) => (
@@ -288,7 +304,19 @@ the-last-dev-server --bind 127.0.0.1:7777</code></pre>
       </div>
       <div class="wrap gallery">
         <figure>
-          <Image src={jira} alt="The in-game Jira quest log next to the AI-Native Intern" widths={[800, 1280]} sizes="(min-width: 1200px) 1136px, 100vw" />
+          <Image src={map} alt="The campus map with every district and the zone tree with locked and open doors" widths={[640, 1280]} sizes="(min-width: 768px) 50vw, 100vw" />
+          <figcaption>The campus map, last updated by a human in 2021.</figcaption>
+        </figure>
+        <figure>
+          <Image src={sales} alt="A Data Scientist fighting on the Sales and Marketing floor under a Close Deals sign" widths={[640, 1280]} sizes="(min-width: 768px) 50vw, 100vw" />
+          <figcaption>Sales &amp; Marketing. Fully autonomous by Q3. Which year?</figcaption>
+        </figure>
+        <figure>
+          <Image src={food} alt="Food Truck Plaza with a sign reading Now with AI tacos" widths={[640, 1280]} sizes="(min-width: 768px) 50vw, 100vw" />
+          <figcaption>Food Truck Plaza. Now with AI tacos.</figcaption>
+        </figure>
+        <figure>
+          <Image src={jira} alt="The in-game Jira quest log next to the AI-Native Intern" widths={[640, 1280]} sizes="(min-width: 768px) 50vw, 100vw" />
           <figcaption>Quests are Jira tickets. Velocity: whatever the dashboard needs.</figcaption>
         </figure>
       </div>
