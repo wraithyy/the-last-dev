@@ -227,7 +227,9 @@ pub fn mine(def: &PropDef, outcome: u32, nth: u32, content: &Content) -> Option<
         )
         && (def.kind != PropKind::Coffee || n != 0)
         // A device's own lines are for the step it took; refusals use the stock ones.
-        && (def.kind != PropKind::Device || n == combat_core::QUEST_PROP_COUNTED);
+        && (def.kind != PropKind::Device || n == combat_core::QUEST_PROP_COUNTED)
+        && !(n == combat_core::QUEST_PROP_TAKEN
+            && matches!(def.kind, PropKind::Pickup | PropKind::Inspect));
     if own_lines {
         let k = n.wrapping_add(nth) as usize % def.lines.len();
         return def.lines.get(k).cloned();
@@ -283,6 +285,9 @@ pub fn mine(def: &PropDef, outcome: u32, nth: u32, content: &Content) -> Option<
                 .prop(&def.to)
                 .map_or("somewhere", |p| p.name.as_str())
         ),
+        PropKind::Pickup | PropKind::Inspect if n == combat_core::QUEST_PROP_TAKEN => {
+            format!("You already took care of the {}.", def.name)
+        }
         PropKind::Pickup => format!("You pocket the {}.", def.name),
         PropKind::Inspect => format!(
             "*click* {} photographed, timestamped, filed. Nobody will read it.",

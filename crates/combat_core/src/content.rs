@@ -1102,6 +1102,9 @@ pub struct QuestDef {
     pub reward: QuestReward,
     #[serde(default)]
     pub requires: Option<String>,
+    /// Story beat of the campaign (gold markers, first in the log and tracker); everything else is a side quest.
+    #[serde(default)]
+    pub main: bool,
     #[serde(default = "one")]
     pub level_min: u8,
     /// Turned in to this NPC instead of the giver (breadcrumbs: "report to X upstairs").
@@ -1347,6 +1350,25 @@ impl Content {
                     .filter(|u| self.unit_def(u).is_some_and(|d| d.hostile)),
             )
             .collect()
+    }
+
+    /// Friendly units a quest hands out, takes in or sends you to talk to. Enemy damage skips
+    /// them (`Sim::deal_damage`) so a boss AoE can never leave a ticket without its NPC. Units a
+    /// quest makes the player defend or escort stay mortal: their death is that objective.
+    pub fn is_quest_npc(&self, key: &str) -> bool {
+        let mortal = |o: &Objective| matches!(o, Objective::Defend { unit, .. } | Objective::Escort { unit, .. } if unit == key);
+        if self.quests.iter().any(|q| q.objectives.iter().any(mortal)) {
+            return false;
+        }
+        self.quests.iter().any(|q| {
+            q.giver.npc == key
+                || q.ender().npc == key
+                || q.objectives.iter().any(|o| match o {
+                    Objective::Talk(k) => k == key,
+                    Objective::Deliver { npc, .. } => npc == key,
+                    _ => false,
+                })
+        })
     }
 
     pub fn quest(&self, id: &str) -> Option<&QuestDef> {

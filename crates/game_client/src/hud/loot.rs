@@ -523,6 +523,15 @@ fn update_loot(
                 ),
                 goods::SP_GOLD,
             ),
+            // A ticket's item: say so, so it never reads as just another trinket.
+            None if content.quests.iter().any(|q| {
+                q.objectives
+                    .iter()
+                    .any(|o| matches!(o, combat_core::Objective::Loot(it, _) if it == item))
+            }) =>
+            {
+                ("Quest item".to_string(), super::quests::MAIN_MARK)
+            }
             None => (
                 content
                     .item(item)

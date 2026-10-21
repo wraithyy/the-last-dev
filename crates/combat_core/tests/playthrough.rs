@@ -1734,9 +1734,12 @@ fn campaign_build(
         // close what is done after the clear (twice, for chains that open on turn-in).
         bot.visit_givers(zone, &quests);
         bot.run_geared(zone);
-        bot.work_quests(zone);
-        bot.visit_givers(zone, &quests);
-        bot.visit_givers(zone, &quests);
+        // Chains open on turn-in: work what is active, hand it in and pick up the next link.
+        for _ in 0..3 {
+            bot.work_quests(zone);
+            bot.visit_givers(zone, &quests);
+            bot.visit_givers(zone, &quests);
+        }
         let secs = bot.report.after.last().map_or(0, |a| a.2);
         lines.push((
             zone.to_string(),
@@ -2105,9 +2108,20 @@ fn natural_campaign(class: &'static str, seed: u64) -> (Vec<u64>, Vec<ZoneEnd>, 
         }
         bot.visit_givers(zone, &quests);
         bot.run_geared(zone);
-        bot.work_quests(zone);
-        bot.visit_givers(zone, &quests);
-        bot.visit_givers(zone, &quests);
+        // Chains open on turn-in: work what is active, hand it in and pick up the next link.
+        for _ in 0..3 {
+            bot.work_quests(zone);
+            bot.visit_givers(zone, &quests);
+            bot.visit_givers(zone, &quests);
+        }
+        let open: Vec<String> = bot
+            .sim
+            .quests()
+            .active
+            .iter()
+            .map(|q| format!("{}{:?}", q.id, q.counts))
+            .collect();
+        println!("{zone}: still open {open:?}");
         let ms = |tick: u64, travel: u64| combat_core::ticks_to_ms(tick) + travel;
         // Travel is spread evenly over the zone so level-ups inside it split it fairly.
         let (end_tick, travel) = (bot.sim.now().0, bot.report.travel_ms);

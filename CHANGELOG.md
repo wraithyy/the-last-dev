@@ -28,10 +28,15 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - Faster rendering: distant NPCs and extra lamps are no longer drawn, and the HUD only redraws what changed.
 - The web version downloads less before the first scene and caches the rest in the background.
 - After an update the web version keeps every model and sound that did not change, so offline play keeps working.
+- Far fewer tickets in each building: near-duplicate kill and drop tickets are merged into one, and the remaining side quests open in order (finish one to get the next) instead of all at once.
+- Story (main) quests are marked apart from side quests: gold "!" and "?" over their NPCs, azure ones for side quests, a MAIN QUEST or SIDE QUEST label in the ticket, a main quests section first in the quest log and main quests first in the tracker.
+- Quest items in the loot window say "Quest item", and every quest item and every quest pickup has its own icon; pickups glow in their own colour and show their item.
 
 ### Fixed
 
 - A first visit to the web version no longer reloads the page by itself once the offline cache is ready.
+- Quest givers can no longer be killed by a boss or enemy area attack, so you can always hand in your ticket.
+- Quest pickups you already collected stay gone, also after saving and reloading.
 
 ## [0.6.0] - 2026-10-20
 

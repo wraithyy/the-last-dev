@@ -1639,6 +1639,16 @@ impl Sim {
         if !t.state.alive || t.state.ai == Some(AiState::Evade) {
             return;
         }
+        // Quest NPCs are untouchable for enemies: a boss next to the turn-in must not eat the ticket.
+        if !t.state.hostile
+            && !self.is_player(target)
+            && self
+                .index(source)
+                .is_some_and(|si| self.units[si].state.hostile)
+            && self.content.is_quest_npc(&self.content.units[t.def].key)
+        {
+            return;
+        }
         // Players hurt each other only inside a duel (a DoT outliving it does nothing).
         let duel = self.index(source).is_some_and(|si| self.duel_foes(si, ti));
         if !duel && source != target && self.is_player(source) && self.is_player(target) {

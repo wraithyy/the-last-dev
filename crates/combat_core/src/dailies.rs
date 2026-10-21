@@ -759,6 +759,8 @@ impl Sim {
                 Event::Looted { looter, items, .. } if !items.is_empty() => {
                     credit.push((*looter, 0, items.len() as u32))
                 }
+                // Re-pressing a pickup already taken is no activity.
+                Event::Interacted { outcome, .. } if *outcome == crate::QUEST_PROP_TAKEN => {}
                 Event::Interacted { unit, prop, .. } => {
                     match self.content.prop(prop).map(|p| p.kind) {
                         Some(PropKind::ScrumBoard) => open.push(*unit),

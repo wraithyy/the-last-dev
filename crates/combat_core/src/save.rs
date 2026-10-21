@@ -78,6 +78,8 @@ pub struct SaveData {
     pub ladder: crate::sprint::LadderView,
     /// Best medal per minigame key (optional key; older saves have none).
     pub minigames: Vec<(String, crate::minigame::Medal)>,
+    /// Quest pickups and inspect spots already used up (`world.props` keys); optional key.
+    pub taken_props: Vec<String>,
 }
 
 fn list(v: &str) -> Vec<String> {
@@ -192,6 +194,9 @@ impl SaveData {
                 .collect();
             out.push_str(&format!("ladder={}*{}\n", self.ladder.week, rows.join("|")));
         }
+        if !self.taken_props.is_empty() {
+            out.push_str(&format!("taken_props={}\n", self.taken_props.join("|")));
+        }
         if !self.minigames.is_empty() {
             let rows: Vec<String> = self
                 .minigames
@@ -288,6 +293,7 @@ impl SaveData {
                 "pet" => s.pet = v.chars().take(crate::world::WORLD_KEY_MAX).collect(),
                 "duel_streak" => s.duel_streak = v.parse().unwrap_or(0),
                 "respecs" => s.respecs = v.parse().unwrap_or(0),
+                "taken_props" => s.taken_props = list(v),
                 "minigames" => {
                     s.minigames = list(v)
                         .iter()
@@ -468,6 +474,7 @@ impl Sim {
             raid_locks: self.raid_lockout().1,
             ladder: self.ladder_saved(),
             minigames: self.minigame_bests(player),
+            taken_props: self.taken_props(player),
         })
     }
 
@@ -577,6 +584,7 @@ impl Sim {
         self.set_raid_lockout(save.raid_week, &save.raid_locks);
         self.set_ladder(save.ladder.week, save.ladder.entries.clone());
         self.set_minigame_bests(player, &save.minigames);
+        self.restore_taken_props(player, &save.taken_props);
         let class = self.class_at(i).map(|c| c.key.clone()).unwrap_or_default();
         self.units[i].state.talents = self.content.talents.sanitize(&class, &save.talents, level);
         let title = Some(&save.title)

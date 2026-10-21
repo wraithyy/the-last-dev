@@ -32,6 +32,7 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use combat_core::{Command, Event, PropKind, line_of_sight};
 use net_proto::Emote;
+use std::collections::HashMap;
 
 const GOLD: Color = Color::srgb(1.0, 0.82, 0.3);
 const LINE: Color = Color::srgb(0.85, 0.8, 0.62);
@@ -176,6 +177,21 @@ fn hover_radius(kind: PropKind) -> f32 {
     }
 }
 
+/// Icon (an existing HUD icon, same art as the item) and halo tint of a quest pickup tag.
+fn pickup_look(tag: &str) -> (&'static str, Color) {
+    match tag {
+        "lost_lanyard" => ("demo_lanyard", Color::srgb(0.4, 0.8, 1.0)),
+        "t1_password" => ("sticky", Color::srgb(1.0, 0.9, 0.3)),
+        "t3_badge_log" => ("visitor_badge", Color::srgb(0.5, 1.0, 0.6)),
+        "t4_gantt" => ("chart", Color::srgb(0.7, 0.55, 1.0)),
+        "t5_pr" => ("pull_request", Color::srgb(0.4, 1.0, 0.9)),
+        "dc1_fan_blade" => ("fan_blade", Color::srgb(0.75, 0.8, 0.9)),
+        "dc2_tape" => ("rollback", Color::srgb(1.0, 0.55, 0.35)),
+        "lab1_usb" => ("gear_usb", Color::srgb(1.0, 0.45, 0.8)),
+        _ => ("box", Color::srgb(1.0, 0.8, 0.25)),
+    }
+}
+
 /// Rebuilds the prop list (and the parked scooters, quest pickups) whenever the zone changes.
 #[allow(clippy::too_many_arguments)] // Bevy system: one parameter per resource it reads
 fn track_zone(
@@ -187,6 +203,8 @@ fn track_zone(
     parked: Query<Entity, ZoneProps>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    assets: Res<AssetServer>,
+    mut icons: ResMut<crate::hud::IconCache>,
 ) {
     if flow.zone == props.zone || flow.zone.is_empty() {
         return;
@@ -222,39 +240,50 @@ fn track_zone(
             })
         })
         .collect();
-    // One shared glowing note-sized slab over a soft gold halo on the floor: the item's own
-    // name is in the tooltip, the halo is what catches the eye across a room.
-    let mesh = meshes.add(Cuboid::new(0.42, 0.07, 0.3));
-    let glow = materials.add(StandardMaterial {
-        base_color: Color::srgb(1.0, 0.8, 0.25),
-        emissive: LinearRgba::rgb(4.0, 2.6, 0.5),
-        ..default()
-    });
+    // Each kind of pickup is its own glowing icon slab over a tinted halo (so a lanyard never
+    // reads as a sticky note); the item's name is in the tooltip. Materials are shared per tag.
+    let mesh = meshes.add(Cuboid::new(0.5, 0.05, 0.5));
     let disc = meshes.add(Cylinder::new(0.55, 0.02));
-    let halo = materials.add(StandardMaterial {
-        base_color: Color::srgba(1.0, 0.78, 0.25, 0.28),
-        emissive: LinearRgba::rgb(1.6, 1.0, 0.2),
-        alpha_mode: AlphaMode::Blend,
-        unlit: true,
-        ..default()
-    });
+    let mut looks: HashMap<String, (Handle<StandardMaterial>, Handle<StandardMaterial>)> =
+        HashMap::new();
     for (i, p) in props.list.iter().enumerate() {
-        if p.kind == PropKind::Pickup {
-            commands.spawn((
-                QuestPickup(i, false),
-                Mesh3d(mesh.clone()),
-                MeshMaterial3d(glow.clone()),
-                Transform::from_translation(p.center),
-                Visibility::Hidden,
-            ));
-            commands.spawn((
-                QuestPickup(i, true),
-                Mesh3d(disc.clone()),
-                MeshMaterial3d(halo.clone()),
-                Transform::from_xyz(p.center.x, 0.03, p.center.z),
-                Visibility::Hidden,
-            ));
+        if p.kind != PropKind::Pickup {
+            continue;
         }
+        let tag = content.prop(p.key).map_or("", |d| d.tag.as_str());
+        let (glow, halo) = looks.entry(tag.to_string()).or_insert_with(|| {
+            let (icon, tint) = pickup_look(tag);
+            let c = tint.to_linear();
+            let glow = materials.add(StandardMaterial {
+                base_color_texture: Some(icons.get(&assets, icon)),
+                base_color: Color::WHITE,
+                emissive: LinearRgba::rgb(c.red * 0.9, c.green * 0.9, c.blue * 0.9),
+                alpha_mode: AlphaMode::Mask(0.4),
+                ..default()
+            });
+            let halo = materials.add(StandardMaterial {
+                base_color: tint.with_alpha(0.3),
+                emissive: LinearRgba::rgb(c.red * 1.6, c.green * 1.6, c.blue * 1.6),
+                alpha_mode: AlphaMode::Blend,
+                unlit: true,
+                ..default()
+            });
+            (glow, halo)
+        });
+        commands.spawn((
+            QuestPickup(i, false),
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(glow.clone()),
+            Transform::from_translation(p.center),
+            Visibility::Hidden,
+        ));
+        commands.spawn((
+            QuestPickup(i, true),
+            Mesh3d(disc.clone()),
+            MeshMaterial3d(halo.clone()),
+            Transform::from_xyz(p.center.x, 0.03, p.center.z),
+            Visibility::Hidden,
+        ));
     }
     for (i, p) in props.list.iter().enumerate() {
         if p.kind == PropKind::Scooter {
@@ -308,13 +337,16 @@ fn quest_pickups(
         })
     };
     let t = time.elapsed_secs();
+    let taken = sim.taken_props();
     let picked = std::mem::take(&mut props.picked);
     for (pick, mut tf, mut vis) in &mut q {
         let Some(spot) = props.list.get_mut(pick.0) else {
             continue;
         };
         let tag = content.prop(spot.key).map_or("", |d| d.tag.as_str());
-        spot.hidden = !wanted(tag) || picked.iter().any(|k| k == spot.key);
+        spot.hidden = !wanted(tag)
+            || picked.iter().any(|k| k == spot.key)
+            || taken.iter().any(|k| k == spot.key);
         let want = if spot.hidden {
             Visibility::Hidden
         } else {
@@ -494,7 +526,10 @@ fn prop_events(
                 }
                 if def.kind == PropKind::Pickup
                     && Some(*unit) == me
-                    && *outcome == combat_core::QUEST_PROP_COUNTED
+                    && matches!(
+                        *outcome,
+                        combat_core::QUEST_PROP_COUNTED | combat_core::QUEST_PROP_TAKEN
+                    )
                 {
                     props.picked.push(prop.clone());
                 }

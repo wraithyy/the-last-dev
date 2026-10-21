@@ -71,7 +71,7 @@ pub use pets::{PetDef, PetDrop, duck_tip};
 pub use progression::GROUP_SHARE_RANGE_M;
 pub use quests::{
     ActiveQuest, DEFEND_RANGE_M, ESCORT_DONE_M, GIVER_REACH_SLACK_M, QUEST_PROP_COUNTED,
-    QUEST_PROP_IDLE, QUEST_PROP_WRONG_ORDER, QuestLog, QuestStatus,
+    QUEST_PROP_IDLE, QUEST_PROP_TAKEN, QUEST_PROP_WRONG_ORDER, QuestLog, QuestStatus,
 };
 pub use raid::{RaidDef, RaidView, TwinsDef};
 pub use save::{SAVE_VERSION, SaveData};

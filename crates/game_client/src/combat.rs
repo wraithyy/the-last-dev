@@ -60,6 +60,12 @@ pub trait SimRead: Send + Sync {
     fn raid_view(&self) -> combat_core::RaidView;
     /// This week's Weekly Sprint ladder (the room's online, the local one offline).
     fn ladder_view(&self) -> combat_core::LadderView;
+    /// Quest pickups the local player already took, as far as this view knows them: the offline
+    /// sim knows all of them (and saves them); online the client learns them from `Interacted`
+    /// outcomes, so the default is none.
+    fn taken_props(&self) -> Vec<String> {
+        Vec::new()
+    }
 
     /// The action bar of `unit`'s class (keys 1..9, 0); the default bar for unknown units.
     fn bar_of(&self, unit: EntityId) -> &[SpellId] {
@@ -154,6 +160,9 @@ impl SimRead for Sim {
     }
     fn ladder_view(&self) -> combat_core::LadderView {
         Sim::ladder_view(self)
+    }
+    fn taken_props(&self) -> Vec<String> {
+        Sim::taken_props(self, Sim::player(self).unwrap_or(0))
     }
 }
 

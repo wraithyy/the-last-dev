@@ -20,6 +20,10 @@ use bevy::prelude::*;
 use combat_core::{Command, Content, Event, Objective, QuestDef, QuestStatus};
 
 pub const GOLD: Color = Color::srgb(1.0, 0.82, 0.3);
+/// Over the heads of story quest givers and in the main-quest labels.
+pub const MAIN_MARK: Color = Color::srgb(1.0, 0.72, 0.1);
+/// Over the heads of side quest givers.
+pub const SIDE_MARK: Color = Color::srgb(0.45, 0.8, 1.0);
 pub const GREY_MARK: Color = Color::srgb(0.62, 0.64, 0.7);
 const DONE_GREEN: Color = Color::srgb(0.4, 1.0, 0.5);
 const DONE_GREY: Color = Color::srgb(0.5, 0.53, 0.58);
@@ -286,19 +290,27 @@ pub fn giver_quests(sim: &dyn SimRead, npc_key: &str, zone: &str) -> Vec<(String
         .collect()
 }
 
-/// Yellow "?" to turn in, yellow "!" to pick up, grey "?" while work is pending. A Company
-/// Calendar chain's first quest gets no "!": the calendar board carries one for all of them.
+/// Gold marks are story (main) quests, azure ones side quests; the grey "?" for pending work
+/// is the same for both. "?" to turn in, "!" to pick up. A Company Calendar chain's first quest
+/// gets no "!": the calendar board carries one for all of them.
 pub fn giver_mark(sim: &dyn SimRead, npc_key: &str, zone: &str) -> Option<(&'static str, Color)> {
     let mut qs = giver_quests(sim, npc_key, zone);
-    let chains = &sim.content().calendar.chains;
+    let content = sim.content();
+    let chains = &content.calendar.chains;
     qs.retain(|(id, s)| {
         *s != QuestStatus::Available || !chains.iter().any(|c| c.quests.first() == Some(id))
     });
     let has = |s: QuestStatus| qs.iter().any(|(_, q)| *q == s);
+    let tint = |s: QuestStatus| {
+        let main = qs
+            .iter()
+            .any(|(id, q)| *q == s && content.quest(id).is_some_and(|d| d.main));
+        if main { MAIN_MARK } else { SIDE_MARK }
+    };
     if has(QuestStatus::Ready) {
-        Some(("?", GOLD))
+        Some(("?", tint(QuestStatus::Ready)))
     } else if has(QuestStatus::Available) {
-        Some(("!", GOLD))
+        Some(("!", tint(QuestStatus::Available)))
     } else if has(QuestStatus::Active) {
         Some(("?", GREY_MARK))
     } else {
@@ -324,13 +336,27 @@ impl QuestTrack {
     }
 }
 
-/// Tracked open quests in accept order.
+/// Tracked open quests, main quests first, each group in accept order.
 pub fn tracked<'a>(sim: &'a dyn SimRead, track: &QuestTrack) -> Vec<&'a combat_core::ActiveQuest> {
-    sim.quests()
+    let content = sim.content();
+    let mut out: Vec<_> = sim
+        .quests()
         .active
         .iter()
         .filter(|q| track.is_tracked(&q.id))
-        .collect()
+        .collect();
+    // Stable: accept order survives inside each group.
+    out.sort_by_key(|q| !content.quest(&q.id).is_some_and(|d| d.main));
+    out
+}
+
+/// "MAIN QUEST" in gold or "SIDE QUEST" in azure, for dialogs and the log.
+fn kind_tag(def: &QuestDef) -> (&'static str, Color) {
+    if def.main {
+        ("MAIN QUEST", MAIN_MARK)
+    } else {
+        ("SIDE QUEST", SIDE_MARK)
+    }
 }
 
 /// Unit keys the tracked quests still need (kill targets, droppers of wanted items, bosses of
@@ -1033,9 +1059,14 @@ fn update_dialog(
             for (k, (q, s)) in list.iter().enumerate() {
                 let (chip, color) = status_chip(*s);
                 let name = content.quest(q).map_or(q.as_str(), |d| d.name.as_str());
+                let tint = if content.quest(q).is_some_and(|d| d.main) {
+                    MAIN_MARK
+                } else {
+                    SIDE_MARK
+                };
                 let mark = match s {
-                    QuestStatus::Ready => ("?", GOLD),
-                    QuestStatus::Available => ("!", GOLD),
+                    QuestStatus::Ready => ("?", tint),
+                    QuestStatus::Available => ("!", tint),
                     _ => ("?", GREY_MARK),
                 };
                 c.spawn((
@@ -1084,7 +1115,8 @@ fn update_dialog(
             })
             .with_children(|l| {
                 l.spawn((label(ticket_id(content, &id), 12.0), TextColor(ACCENT)));
-                l.spawn((label("Story", 11.0), TextColor(DIM)));
+                let (kind, kind_color) = kind_tag(def);
+                l.spawn((label(kind, 11.0), TextColor(kind_color)));
                 // Bracketed text, not a bordered box: the box mis-sized around 10 px text.
                 l.spawn((label(format!("[{chip}]"), 10.0), TextColor(chip_color)));
             });
@@ -1158,10 +1190,13 @@ fn update_log(
     shown.log = sig;
     let content = sim.content();
     // The ticket clicked in the tracker comes first.
+    // Main quests first, then side quests; stable sorts keep accept order inside a group.
     let mut order: Vec<&combat_core::ActiveQuest> = log.active.iter().collect();
+    order.sort_by_key(|q| !content.quest(&q.id).is_some_and(|d| d.main));
     if let Some(f) = &track.focus {
         order.sort_by_key(|q| q.id != *f);
     }
+    let mut last_main = None;
     commands.entity(*root).despawn_related::<Children>();
     commands.entity(*root).with_children(|c| {
         c.spawn(Node {
@@ -1199,6 +1234,17 @@ fn update_log(
             let Some(def) = content.quest(&q.id) else {
                 continue;
             };
+            if last_main != Some(def.main) {
+                last_main = Some(def.main);
+                section(
+                    c,
+                    if def.main {
+                        "main quests"
+                    } else {
+                        "side quests"
+                    },
+                );
+            }
             let status = sim.quest_status(&q.id);
             let (chip, color) = status_chip(status);
             let focused = track.focus.as_deref() == Some(q.id.as_str());
@@ -1340,7 +1386,7 @@ fn update_tracker(
     let live_lines: usize =
         live.entries.iter().map(|e| e.2.len() + 1).sum::<usize>() + live.footer.len();
     let mut used = LINE_PX * (2 + live_lines) as f32;
-    let entries: Vec<(String, String, Vec<(String, Line)>)> = list
+    let entries: Vec<(String, String, bool, Vec<(String, Line)>)> = list
         .iter()
         .take(max)
         .filter_map(|q| {
@@ -1356,9 +1402,9 @@ fn update_tracker(
                     line.0 = format!("{} ({}:{:02})", line.0, left / 60, left % 60);
                 }
             }
-            Some((q.id.clone(), def.name.clone(), lines))
+            Some((q.id.clone(), def.name.clone(), def.main, lines))
         })
-        .take_while(|(_, _, lines)| {
+        .take_while(|(_, _, _, lines)| {
             used += LINE_PX * (lines.len() + 1) as f32 + 3.0;
             used <= room
         })
@@ -1418,7 +1464,7 @@ fn update_tracker(
         for (line, color) in &live.footer {
             text(c, format!("  {line}"), 11.0, *color);
         }
-        for (id, name, lines) in entries {
+        for (id, name, main, lines) in entries {
             let ready = lines.last().is_some_and(|(_, l)| *l == Line::Ready);
             c.spawn((
                 ActionButton(Action::Open(id)),
@@ -1431,7 +1477,11 @@ fn update_tracker(
             ))
             .with_child((
                 label(name, 13.0),
-                TextColor(if ready { GOLD } else { Color::WHITE }),
+                TextColor(match (ready, main) {
+                    (true, _) => GOLD,
+                    (false, true) => MAIN_MARK,
+                    (false, false) => Color::WHITE,
+                }),
             ));
             for (line, state) in lines {
                 let (mark, color) = match state {
@@ -1620,8 +1670,11 @@ mod tests {
         s.debug_set_quest("onboarding", QuestStatus::Active);
         assert_eq!(giver_mark(&s, "intern", "campus"), Some(("?", GREY_MARK)));
         s.debug_set_quest("onboarding", QuestStatus::Ready);
-        assert_eq!(giver_mark(&s, "intern", "campus"), Some(("?", GOLD)));
+        assert_eq!(giver_mark(&s, "intern", "campus"), Some(("?", MAIN_MARK)));
         assert!(giver_mark(&s, "intern", "lab/1").is_none());
+        // Side quests get the other tint.
+        s.debug_set_quest("onboarding", QuestStatus::Done);
+        assert_eq!(giver_mark(&s, "barista", "campus"), Some(("!", SIDE_MARK)));
     }
 
     #[test]

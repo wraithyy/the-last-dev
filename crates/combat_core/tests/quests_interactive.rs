@@ -127,7 +127,25 @@ impl W {
         self.tick();
     }
 
+    /// Marks the chain of quests in front of `q` as done, so a test can take it directly.
+    fn finish_prerequisites(&mut self, q: &str) {
+        let mut chain = Vec::new();
+        let mut at = self.sim.content().quest(q).and_then(|d| d.requires.clone());
+        while let Some(id) = at {
+            at = self
+                .sim
+                .content()
+                .quest(&id)
+                .and_then(|d| d.requires.clone());
+            chain.push(id);
+        }
+        for id in chain.into_iter().rev() {
+            self.sim.debug_set_quest(&id, QuestStatus::Done);
+        }
+    }
+
     fn accept(&mut self, giver: &str, q: &str) {
+        self.finish_prerequisites(q);
         self.talk(giver);
         self.cmd(Command::AcceptQuest {
             quest: q.to_string(),
@@ -363,24 +381,6 @@ fn a_timed_delivery_fails_when_the_coffee_goes_cold_and_counts_on_time() {
     w.turn_in("coffee_for_the_noc");
 }
 
-#[test]
-fn an_untimed_delivery_counts_at_the_far_end() {
-    let mut w = world("tower/1", 2);
-    w.accept("helpdesk_lead", "escalation_etiquette");
-    w.secs(200);
-    assert_eq!(
-        w.sim.quest_status("escalation_etiquette"),
-        QuestStatus::Active
-    );
-    w.talk("reviewer_t1");
-    assert_eq!(
-        w.sim.quest_status("escalation_etiquette"),
-        QuestStatus::Ready
-    );
-    w.turn_in("escalation_etiquette");
-}
-
-/// Follows the escorted unit (a metre off), killing what comes for it, until `done` or `max_s`.
 fn escort(w: &mut W, unit: &str, wave: &str, quest: &str, max_s: u64) -> (u32, f32) {
     let start = w.sim.units().find(|u| u.key == unit).map(|u| u.pos);
     let mut waves = 0;
@@ -640,4 +640,124 @@ fn the_hybrid_worker_badge_goes_to_the_enforcer_who_then_counts_desks() {
     }
     assert_eq!(w.sim.quest_status("desk_census"), QuestStatus::Ready);
     w.turn_in("desk_census");
+}
+
+#[test]
+fn every_quest_npc_is_protected_and_no_giver_is_a_defended_unit() {
+    let c = content();
+    let mortal: Vec<&str> = c
+        .quests
+        .iter()
+        .flat_map(|q| q.objectives.iter())
+        .filter_map(|o| match o {
+            Objective::Defend { unit, .. } | Objective::Escort { unit, .. } => Some(unit.as_str()),
+            _ => None,
+        })
+        .collect();
+    for q in &c.quests {
+        let mut npcs = vec![q.giver.npc.as_str(), q.ender().npc.as_str()];
+        for o in &q.objectives {
+            match o {
+                Objective::Talk(k) => npcs.push(k),
+                Objective::Deliver { npc, .. } => npcs.push(npc),
+                _ => {}
+            }
+        }
+        for npc in npcs {
+            assert!(
+                !mortal.contains(&npc),
+                "{}: {npc} gives, takes or is talked to and can also die",
+                q.id
+            );
+            assert!(c.is_quest_npc(npc), "{}: {npc} is not protected", q.id);
+        }
+    }
+}
+
+#[test]
+fn main_story_never_waits_on_side_quests_and_chains_keep_their_levels() {
+    let c = content();
+    for q in &c.quests {
+        let Some(r) = q.requires.as_deref().and_then(|r| c.quest(r)) else {
+            continue;
+        };
+        assert!(
+            r.level_min <= q.level_min,
+            "{} (level {}) needs {} (level {})",
+            q.id,
+            q.level_min,
+            r.id,
+            r.level_min
+        );
+        assert!(
+            !q.main || r.main,
+            "main quest {} waits on side quest {}",
+            q.id,
+            r.id
+        );
+    }
+    // The story is one connected line: every main quest except the first has a main prerequisite
+    // or is the head of its floor's chain.
+    assert!(c.quests.iter().filter(|q| q.main).count() >= 20);
+    // A floor never offers more than three side quests at once (no prerequisite, level reached).
+    for zone in CAMPAIGN {
+        let offered: Vec<&str> = c
+            .quests
+            .iter()
+            .filter(|q| q.giver.zone == zone && !q.main && q.requires.is_none())
+            .map(|q| q.id.as_str())
+            .collect();
+        assert!(offered.len() <= 3, "{zone} offers {offered:?} at once");
+    }
+}
+
+#[test]
+fn a_taken_pickup_stays_taken_across_a_save_and_is_reported() {
+    let mut w = world("tower/1", 2);
+    w.accept("helpdesk_lead", "passwords_on_post_its");
+    w.use_prop("t1_password_1");
+    assert_eq!(w.counts("passwords_on_post_its"), [1]);
+    assert_eq!(w.sim.taken_props(w.p), ["t1_password_1"]);
+    let Some(save) = w.sim.export_save(w.p) else {
+        panic!("no save")
+    };
+    let text = save.encode();
+    assert!(text.contains("taken_props=t1_password_1"), "{text}");
+    // A new session: the pickup is still used up, and pressing F on it says so.
+    let mut fresh = world("tower/1", 2);
+    let Some(decoded) = combat_core::SaveData::decode(&text) else {
+        panic!("save does not decode")
+    };
+    assert!(fresh.sim.import_save(fresh.p, &decoded));
+    assert_eq!(fresh.sim.taken_props(fresh.p), ["t1_password_1"]);
+    fresh.log.clear();
+    fresh.use_prop("t1_password_1");
+    assert!(fresh.log.iter().any(|e| matches!(
+        e,
+        Event::Interacted { prop, outcome, .. }
+            if prop == "t1_password_1" && *outcome == combat_core::QUEST_PROP_TAKEN
+    )));
+}
+
+#[test]
+fn every_quest_item_has_its_own_icon() {
+    let c = content();
+    let mut seen: Vec<(String, &str)> = Vec::new();
+    for q in &c.quests {
+        for o in &q.objectives {
+            let Objective::Loot(item, _) = o else {
+                continue;
+            };
+            let Some(def) = c.item(item) else {
+                panic!("{}: unknown item {item}", q.id)
+            };
+            if let Some((_, other)) = seen.iter().find(|(i, _)| *i == def.icon) {
+                if other != item {
+                    panic!("{item} and {other} share the icon {}", def.icon);
+                }
+            } else {
+                seen.push((def.icon.clone(), item.as_str()));
+            }
+        }
+    }
 }

@@ -159,7 +159,25 @@ impl T {
         self.tick();
     }
 
+    /// Marks the chain of quests in front of `q` as done for the first player.
+    fn finish_prerequisites(&mut self, q: &str) {
+        let mut chain = Vec::new();
+        let mut at = self.sim.content().quest(q).and_then(|d| d.requires.clone());
+        while let Some(id) = at {
+            at = self
+                .sim
+                .content()
+                .quest(&id)
+                .and_then(|d| d.requires.clone());
+            chain.push(id);
+        }
+        for id in chain.into_iter().rev() {
+            self.sim.debug_set_quest(&id, QuestStatus::Done);
+        }
+    }
+
     fn accept(&mut self, q: &str) {
+        self.finish_prerequisites(q);
         self.quest_cmd(Command::AcceptQuest {
             quest: q.to_string(),
         });
@@ -498,8 +516,10 @@ fn kill_credit_counts_only_matching_units_and_caps_at_need() {
     let mut t = t(5);
     t.load("campus");
     t.talk_to("facilities_guy");
-    // Fire Exit Strategy needs onboarding first.
-    t.accept("fire_exit_strategy");
+    // Fire Exit Strategy needs onboarding first (so no prerequisite shortcut here).
+    t.quest_cmd(Command::AcceptQuest {
+        quest: "fire_exit_strategy".into(),
+    });
     assert!(t.sim.quests().active.is_empty());
     t.onboard();
     t.talk_to("facilities_guy");
@@ -587,8 +607,8 @@ fn clear_zone_objectives_count_a_zone_cleared_before_accepting() {
 #[test]
 fn quest_content_is_validated() {
     let bad = SRC.replace(
-        "objectives: [Kill(\"gpu_cultist\", 4)]",
-        "objectives: [Kill(\"intern\", 4)]",
+        "objectives: [Kill(\"gpu_cultist\", 4),",
+        "objectives: [Kill(\"intern\", 4),",
     );
     assert!(Content::from_ron(&bad).is_err(), "kill a friendly");
     let bad = SRC.replace(
@@ -660,6 +680,57 @@ fn only_ability(c: &mut Content, key: &str, spell: u32, target: AiTarget) {
         ai.phases.clear();
         ai.melee_damage = 0;
     }
+}
+
+/// A boss fight next to a quest NPC (the playtest: "the CEO killed the woman I hand tickets in
+/// to"): enemy AoE must leave anyone a quest depends on untouched, and still hurt a bystander
+/// no quest cares about.
+#[test]
+fn enemy_aoe_never_kills_a_quest_npc() {
+    let mut t = t_with(1, |c| {
+        def_mut(c, "senior_engineer").max_hp = 100_000;
+        def_mut(c, "helpdesk_lead").max_hp = 1;
+        def_mut(c, "meatproxy").spell_power = 5_000;
+        // Responsive Layout: damages everything on the other side within 6 m of the caster.
+        only_ability(c, "meatproxy", 26, AiTarget::Caster);
+    });
+    t.load("tower/1");
+    assert!(content().is_quest_npc("helpdesk_lead"));
+    let lead = t.id_of("helpdesk_lead");
+    let Some(at) = t.sim.unit(lead).map(|u| u.pos) else {
+        panic!("no helpdesk lead")
+    };
+    let Ok(boss) = t
+        .sim
+        .spawn_unit("meatproxy", Vec3::new(at.x + 1.0, 0.0, at.z), 0.0)
+    else {
+        panic!("spawn")
+    };
+    t.move_to(Vec3::new(at.x + 4.0, 0.0, at.z), 0.0);
+    t.sim.push(Command::SetTarget {
+        unit: t.p,
+        target: Some(boss),
+    });
+    t.sim.push(Command::StartAutoAttack { unit: t.p });
+    let mut cast = false;
+    for _ in 0..200 {
+        t.tick();
+        cast |= t.has(|e| matches!(e, Event::Damage { target, .. } if *target == t.p));
+    }
+    assert!(
+        cast,
+        "the AoE must have landed on the player for this test to mean anything"
+    );
+    let Some(lead) = t.sim.unit(lead) else {
+        panic!("lead gone")
+    };
+    assert!(
+        lead.alive && lead.hp == lead.max_hp,
+        "quest NPC was hurt: {} {}/{}",
+        lead.alive,
+        lead.hp,
+        lead.max_hp
+    );
 }
 
 #[test]
@@ -930,18 +1001,20 @@ fn kills_before_accepting_count_and_reach_remote_logs_as_progress() {
     t.tick();
     t.talk_to("helpdesk_lead");
     t.log.clear();
-    t.accept("forwarded_to_ai");
-    assert_eq!(t.sim.quest_status("forwarded_to_ai"), QuestStatus::Ready);
-    let accepted = t
-        .log
-        .iter()
-        .position(|e| matches!(e, Event::QuestAccepted { quest } if quest == "forwarded_to_ai"));
+    t.accept("secrets_in_the_repo");
+    // The keys still have to be looted, but the three kills are credited on accept.
+    assert_eq!(
+        t.sim.quest_status("secrets_in_the_repo"),
+        QuestStatus::Active
+    );
+    assert_eq!(t.sim.quests().active[0].counts, [3, 0]);
+    let accepted = t.log.iter().position(
+        |e| matches!(e, Event::QuestAccepted { quest } if quest == "secrets_in_the_repo"),
+    );
     let progress = t.log.iter().position(|e| {
-        matches!(e, Event::QuestProgress { quest, count: 3, need: 3, .. } if quest == "forwarded_to_ai")
+        matches!(e, Event::QuestProgress { quest, count: 3, need: 3, objective: 0, .. } if quest == "secrets_in_the_repo")
     });
     assert!(accepted.is_some() && accepted < progress, "{:?}", t.log);
-    t.turn_in("forwarded_to_ai");
-    assert_eq!(t.sim.quest_status("forwarded_to_ai"), QuestStatus::Done);
 }
 
 #[test]
@@ -1167,7 +1240,7 @@ fn group_members_keep_their_own_logs_and_share_kill_credit() {
     t.load("tower/1");
     let p2 = t.sim.spawn_player("devops", Vec3::new(1.0, 0.0, 20.0), 0.0);
     t.talk_to("helpdesk_lead");
-    t.accept("secrets_in_the_repo");
+    t.accept("passwords_on_post_its");
     // The second member stands next to the first and takes a different ticket.
     let Some(at) = t.sim.unit(t.p).map(|u| u.pos) else {
         panic!()
@@ -1187,15 +1260,17 @@ fn group_members_keep_their_own_logs_and_share_kill_credit() {
             jumping: false,
         },
     );
+    t.sim
+        .debug_set_quest_of(p2, "autocomplete_pest_control", QuestStatus::Done);
     t.sim.apply_as(
         p2,
         Command::AcceptQuest {
-            quest: "forwarded_to_ai".into(),
+            quest: "secrets_in_the_repo".into(),
         },
     );
     t.tick();
-    assert_eq!(t.sim.quests_of(p2).active[0].id, "forwarded_to_ai");
-    assert_eq!(t.sim.quests_of(t.p).active[0].id, "secrets_in_the_repo");
+    assert_eq!(t.sim.quests_of(p2).active[0].id, "secrets_in_the_repo");
+    assert_eq!(t.sim.quests_of(t.p).active[0].id, "passwords_on_post_its");
     // A MeatProxy killed by the first member near the second counts for the second's ticket.
     let drone = t.id_of("meatproxy");
     let Some(dpos) = t.sim.unit(drone).map(|u| u.pos) else {
@@ -1211,7 +1286,7 @@ fn group_members_keep_their_own_logs_and_share_kill_credit() {
         },
     );
     t.kill(drone);
-    assert_eq!(t.sim.quests_of(p2).active[0].counts, [1]);
+    assert_eq!(t.sim.quests_of(p2).active[0].counts, [1, 0]);
     assert_eq!(t.sim.quests_of(t.p).active[0].counts, [0]);
     assert_eq!(t.sim.quests_of(p2).kills.get("meatproxy"), Some(&1));
 }
@@ -1580,6 +1655,34 @@ impl T {
                 corpse: id,
             });
             self.tick();
+        }
+        // Merged tickets also ask for kills of their own (the loot sources are already dead).
+        let kills: Vec<String> = self
+            .sim
+            .content()
+            .quest(quest)
+            .map(|q| {
+                q.objectives
+                    .iter()
+                    .filter_map(|o| match o {
+                        Objective::Kill(k, _) => Some(k.clone()),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        for key in kills {
+            while self.sim.quest_status(quest) != QuestStatus::Ready {
+                let Some(id) = self
+                    .sim
+                    .units()
+                    .find(|u| u.alive && u.hostile && u.key == key)
+                    .map(|u| u.id)
+                else {
+                    break;
+                };
+                self.kill(id);
+            }
         }
         assert_eq!(self.sim.quests().active[0].counts[0], need, "{quest} stuck");
         self.talk_to(giver);

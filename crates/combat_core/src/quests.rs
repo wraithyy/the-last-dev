@@ -23,6 +23,8 @@ const INSPECT_FACING_RAD: f32 = 1.2;
 pub const QUEST_PROP_IDLE: u32 = 0;
 pub const QUEST_PROP_COUNTED: u32 = 1;
 pub const QUEST_PROP_WRONG_ORDER: u32 = 2;
+/// A pickup or spot this player already used up: the client hides it.
+pub const QUEST_PROP_TAKEN: u32 = 3;
 
 /// A `Defend` second counts while the player stands this close to the defended unit.
 pub const DEFEND_RANGE_M: f32 = 25.0;
@@ -61,7 +63,7 @@ pub(crate) struct QuestRt {
     /// Next wave tick per defended or escorted unit key (`Defend`, `Escort`).
     next_wave: BTreeMap<String, u64>,
     /// Quest props each player has already used up (index into `world.props`): pickups taken,
-    /// spots inspected, devices an item went on. Not saved: pickups respawn per player.
+    /// spots inspected, devices an item went on. Saved per player (`taken_props`).
     used_props: BTreeMap<EntityId, BTreeSet<usize>>,
     /// Units each player already applied a `UseOn` item to.
     used_units: BTreeMap<EntityId, BTreeSet<EntityId>>,
@@ -552,7 +554,15 @@ impl Sim {
     /// `Done` (completed without reward), ignoring givers, chains and levels; silent. `Available`
     /// or `Locked` drop it from the log. False for an unknown quest or without a player.
     pub fn debug_set_quest(&mut self, id: &str, status: QuestStatus) -> bool {
-        let (Some(def), Some(pid)) = (self.content.quest(id), self.player()) else {
+        match self.player() {
+            Some(pid) => self.debug_set_quest_of(pid, id, status),
+            None => false,
+        }
+    }
+
+    /// `debug_set_quest` for any group member.
+    pub fn debug_set_quest_of(&mut self, pid: EntityId, id: &str, status: QuestStatus) -> bool {
+        let Some(def) = self.content.quest(id) else {
             return false;
         };
         let full: Vec<u32> = def.objectives.iter().map(Objective::need).collect();
@@ -720,6 +730,37 @@ impl Sim {
         }
     }
 
+    /// Keys of the pickups and inspect spots `pid` already used up, for the save.
+    pub fn taken_props(&self, pid: EntityId) -> Vec<String> {
+        let props = &self.content.world.props;
+        let mut keys: Vec<String> = self
+            .quest_rt
+            .used_props
+            .get(&pid)
+            .into_iter()
+            .flatten()
+            .filter_map(|k| props.get(*k))
+            .filter(|p| matches!(p.kind, PropKind::Pickup | PropKind::Inspect))
+            .map(|p| p.key.clone())
+            .collect();
+        keys.sort();
+        keys
+    }
+
+    /// Restores `taken_props` from a save; unknown keys (renamed content) are dropped.
+    pub(crate) fn restore_taken_props(&mut self, pid: EntityId, keys: &[String]) {
+        let used: BTreeSet<usize> = self
+            .content
+            .world
+            .props
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| keys.contains(&p.key))
+            .map(|(k, _)| k)
+            .collect();
+        self.quest_rt.used_props.insert(pid, used);
+    }
+
     /// A player used quest prop `k` (reach already checked): pickups and inspect spots count
     /// once, devices advance a sequence or take a `UseOn` item. Answers with `Interacted`
     /// (`QUEST_PROP_*` outcome) when something happened, and always for devices.
@@ -782,6 +823,8 @@ impl Sim {
         if take {
             self.quest_rt.used_props.entry(pid).or_default().insert(k);
             outcome = QUEST_PROP_COUNTED;
+        } else if used && matches!(def.kind, PropKind::Pickup | PropKind::Inspect) {
+            outcome = QUEST_PROP_TAKEN;
         }
         if outcome != QUEST_PROP_IDLE || def.kind == PropKind::Device {
             self.events.push(Event::Interacted {
