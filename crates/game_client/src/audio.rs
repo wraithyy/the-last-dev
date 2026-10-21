@@ -472,7 +472,6 @@ enum Group {
 
 struct TrackDef {
     track: Track,
-    file: &'static str,
     level: f32,
     group: Group,
 }
@@ -480,24 +479,57 @@ struct TrackDef {
 const TRACKS: &[TrackDef] = &[
     TrackDef {
         track: Track::Explore,
-        file: "audio/music/office_muzak.ogg",
         level: 0.4,
         group: Group::Music,
     },
     TrackDef {
         track: Track::Boss,
-        file: "audio/music/boss_battle.ogg",
         level: 0.45,
         group: Group::Music,
     },
     // Air-con hum: a bed, not a feature.
     TrackDef {
         track: Track::Ambient,
-        file: "audio/sfx/ambient_aircon.ogg",
         level: 0.12,
         group: Group::Sfx,
     },
 ];
+
+/// The loop for `track` in `zone`: one per floor or raid wing (docs/MUSIC.md), the night loop
+/// outdoors after dark, raid finales their own boss track. Loaded lazily, so the web build only
+/// downloads the music of zones the player visits.
+fn music_file(track: Track, zone: &str, outdoor_night: bool) -> &'static str {
+    match track {
+        Track::Ambient => "audio/sfx/ambient_aircon.ogg",
+        Track::Boss => match zone {
+            "offsite/4" => "audio/music/raid_boss_offsite.ogg",
+            "vibecon/5" => "audio/music/raid_boss_vibecon.ogg",
+            _ => "audio/music/boss_battle.ogg",
+        },
+        Track::Explore if outdoor_night => "audio/music/night.ogg",
+        Track::Explore => match zone {
+            "campus" | "offsite/3" => "audio/music/campus.ogg",
+            "parking_p3" => "audio/music/parking_p3.ogg",
+            "tower/1" | "client/1" | "openspace/1" => "audio/music/open_space.ogg",
+            "tower/3" | "teambuilding/1" => "audio/music/sales_marketing.ogg",
+            "tower/4" | "review/1" => "audio/music/pmo.ogg",
+            "tower/5" => "audio/music/c_level_penthouse.ogg",
+            "datacenter/1" | "migration/1" => "audio/music/datacenter_hall_a.ogg",
+            "datacenter/2" => "audio/music/datacenter_hall_b.ogg",
+            "lab/1" => "audio/music/lab_showroom.ogg",
+            "lab/2" | "reorg/1" => "audio/music/lab_rack_room.ogg",
+            "home/1" => "audio/music/home.ogg",
+            "offsite/1" | "offsite/2" => "audio/music/offsite_lobby.ogg",
+            "offsite/4" => "audio/music/raid_boss_offsite.ogg",
+            "vibecon/1" | "vibecon/2" | "vibecon/3" | "hackathon/1" => {
+                "audio/music/vibecon_expo.ogg"
+            }
+            "vibecon/4" => "audio/music/vibecon_afterparty.ogg",
+            "vibecon/5" => "audio/music/raid_boss_vibecon.ogg",
+            _ => "audio/music/office_muzak.ogg",
+        },
+    }
+}
 
 #[derive(Resource)]
 struct AudioSettings {
@@ -654,7 +686,6 @@ impl Sfx {
 #[derive(Resource)]
 struct Bank {
     clips: HashMap<Snd, Vec<Handle<AudioSource>>>,
-    tracks: HashMap<Track, Handle<AudioSource>>,
     last_played: HashMap<Snd, f32>,
     pending: Vec<Sfx>,
     rng: u64,
@@ -676,6 +707,7 @@ struct SfxVoice;
 #[derive(Component)]
 struct MusicVoice {
     track: Track,
+    file: &'static str,
     fade: f32,
 }
 
@@ -716,13 +748,8 @@ fn load_bank(mut commands: Commands, assets: Res<AssetServer>) {
         .iter()
         .map(|d| (d.snd, d.files.iter().map(|f| assets.load(*f)).collect()))
         .collect();
-    let tracks = TRACKS
-        .iter()
-        .map(|t| (t.track, assets.load(t.file)))
-        .collect();
     commands.insert_resource(Bank {
         clips,
-        tracks,
         last_played: HashMap::new(),
         pending: Vec::new(),
         rng: 0x9E37_79B9_7F4A_7C15,
@@ -1128,50 +1155,57 @@ fn drive_music(
     unlocked: Res<Unlocked>,
     settings: Res<AudioSettings>,
     flow: Res<GameFlow>,
+    day: Res<crate::live::DayNight>,
+    assets: Res<AssetServer>,
     sim: SimView,
     bank: Option<Res<Bank>>,
     mut voices: Query<(Entity, &mut MusicVoice, Option<&mut AudioSink>)>,
     mut commands: Commands,
 ) {
-    let Some(bank) = bank.filter(|_| unlocked.0) else {
+    if bank.is_none() || !unlocked.0 {
         return;
-    };
+    }
     let mood = mood(&flow, &*sim);
     let step = time.delta_secs() / CROSSFADE_SECS;
+    let night = flow.outdoor && day.darkness > 0.6;
     for t in TRACKS {
         let want = wants(t.track, mood);
-        let Some((entity, mut voice, sink)) =
-            voices.iter_mut().find(|(_, v, _)| v.track == t.track)
-        else {
-            if want && let Some(handle) = bank.tracks.get(&t.track) {
-                commands.spawn((
-                    MusicVoice {
-                        track: t.track,
-                        fade: 0.0,
-                    },
-                    AudioPlayer::new(handle.clone()),
-                    // Silent until the fade-in below; the sink appears one frame later.
-                    PlaybackSettings::LOOP.with_volume(Volume::Linear(0.0)),
+        let file = music_file(t.track, &flow.zone, night);
+        let mut have = false;
+        for (entity, mut voice, sink) in voices.iter_mut().filter(|(_, v, _)| v.track == t.track) {
+            let current = voice.file == file;
+            have |= current;
+            let on = want && current;
+            voice.fade = approach(voice.fade, if on { 1.0 } else { 0.0 }, step);
+            // The boss loop restarts from its beginning on every fight; a zone's old loop goes
+            // once it has crossfaded out.
+            if voice.fade == 0.0 && !on && (t.track == Track::Boss || !current) {
+                commands.entity(entity).despawn();
+                continue;
+            }
+            if let Some(mut sink) = sink {
+                sink.set_volume(Volume::Linear(
+                    voice.fade * t.level * settings.effective(t.group),
                 ));
+                // A silent loop keeps its position instead of decoding for nothing.
+                match (voice.fade == 0.0 && !on, sink.is_paused()) {
+                    (true, false) => sink.pause(),
+                    (false, true) => sink.play(),
+                    _ => {}
+                }
             }
-            continue;
-        };
-        voice.fade = approach(voice.fade, if want { 1.0 } else { 0.0 }, step);
-        // The boss loop restarts from its beginning on every fight.
-        if voice.fade == 0.0 && !want && t.track == Track::Boss {
-            commands.entity(entity).despawn();
-            continue;
         }
-        if let Some(mut sink) = sink {
-            sink.set_volume(Volume::Linear(
-                voice.fade * t.level * settings.effective(t.group),
+        if want && !have {
+            commands.spawn((
+                MusicVoice {
+                    track: t.track,
+                    file,
+                    fade: 0.0,
+                },
+                AudioPlayer::new(assets.load(file)),
+                // Silent until the fade-in above; the sink appears one frame later.
+                PlaybackSettings::LOOP.with_volume(Volume::Linear(0.0)),
             ));
-            // A silent loop keeps its position instead of decoding for nothing.
-            match (voice.fade == 0.0 && !want, sink.is_paused()) {
-                (true, false) => sink.pause(),
-                (false, true) => sink.play(),
-                _ => {}
-            }
         }
     }
 }
@@ -1331,8 +1365,17 @@ mod tests {
                 assert!(asset(f).exists(), "{f}");
             }
         }
-        for t in TRACKS {
-            assert!(asset(t.file).exists(), "{}", t.file);
+        let Ok(content) = combat_core::Content::from_ron(include_str!("../../../content/game.ron"))
+        else {
+            panic!("content");
+        };
+        for zone in &content.zones {
+            for t in TRACKS {
+                for night in [false, true] {
+                    let f = music_file(t.track, &zone.id, night);
+                    assert!(asset(f).exists(), "{} -> {f}", zone.id);
+                }
+            }
         }
     }
 

@@ -379,6 +379,23 @@ All audio is CC0 (https://creativecommons.org/publicdomain/zero/1.0/); attributi
 | Air-con ambience (low-passed) | 30 CC0 SFX loops, https://opengameart.org/content/30-cc0-sfx-loops | rubberduck | CC0 |
 | Exploration music (assets/audio/music/office_muzak.ogg) | Elevator Music, https://opengameart.org/content/elevator-music | Alex McCulloch (Pro Sensory) | CC0 |
 | Boss music (assets/audio/music/boss_battle.ogg) | Boss Battle Music (Epic Boss Battle, seamlessly looping), https://opengameart.org/content/boss-battle-music | Juhani Junkala (uploaded by SubspaceAudio) | CC0 |
+| Zone music (assets/audio/music/campus.ogg) | Floating Cities, https://incompetech.com/music/royalty-free/music.html | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Zone music (assets/audio/music/parking_p3.ogg) | Limit 70, https://incompetech.com/music/royalty-free/music.html | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Zone music (assets/audio/music/open_space.ogg) | Wallpaper, https://incompetech.com/music/royalty-free/music.html | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Zone music (assets/audio/music/sales_marketing.ogg) | Funkorama, https://incompetech.com/music/royalty-free/music.html | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Zone music (assets/audio/music/pmo.ogg) | Covert Affair, https://incompetech.com/music/royalty-free/music.html | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Zone music (assets/audio/music/c_level_penthouse.ogg) | Tyrant, https://incompetech.com/music/royalty-free/music.html | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Zone music (assets/audio/music/datacenter_hall_a.ogg) | Mesmerizing Galaxy, https://incompetech.com/music/royalty-free/music.html | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Zone music (assets/audio/music/datacenter_hall_b.ogg) | Ouroboros, https://incompetech.com/music/royalty-free/music.html | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Zone music (assets/audio/music/lab_rack_room.ogg) | Crypto, https://incompetech.com/music/royalty-free/music.html | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Zone music (assets/audio/music/home.ogg) | Evening, https://incompetech.com/music/royalty-free/music.html | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Zone music (assets/audio/music/offsite_lobby.ogg) | Lobby Time, https://incompetech.com/music/royalty-free/music.html | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Zone music (assets/audio/music/vibecon_expo.ogg) | Brain Dance, https://incompetech.com/music/royalty-free/music.html | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Zone music (assets/audio/music/vibecon_afterparty.ogg) | Ethernight Club, https://incompetech.com/music/royalty-free/music.html | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Zone music (assets/audio/music/night.ogg) | Aftermath, https://incompetech.com/music/royalty-free/music.html | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Zone music (assets/audio/music/lab_showroom.ogg) | Moonlit Skyline, https://www.nihilore.com/downtempo | Nihilore (James Opie) | CC BY 4.0 |
+| Raid boss music (assets/audio/music/raid_boss_vibecon.ogg) | Wasteland Overdrive, https://opengameart.org/content/wasteland-overdrive | Matthew Pablo (uploaded by XCVG) | CC BY 3.0 |
+| Raid boss music (assets/audio/music/raid_boss_offsite.ogg) | Perpetual Tension, https://opengameart.org/content/perpetual-tension | Zander Noriega | CC BY 3.0 |
 
 ## Cursors
 

@@ -1,0 +1,6 @@
+"Wasteland Overdrive" by Matthew Pablo (http://www.matthewpablo.com)
+Source: https://opengameart.org/content/wasteland-overdrive (uploaded by XCVG)
+
+Licence: CC-BY 3.0, https://creativecommons.org/licenses/by/3.0/
+
+Changes made: converted to OGG Vorbis (lower bitrate).

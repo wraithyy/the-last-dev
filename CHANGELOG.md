@@ -12,6 +12,7 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 - Security Engineer stealth openers: while Tailgating, four bar keys turn into Supply Chain Attack (a big opener from behind), Rubber Ducky (a 4 s stun from a USB stick found in the car park), Phishing Call (keeps a regular enemy on the phone for up to 30 s until hit) and Keylogger (a damage-over-time with a 3 s silence).
 - DevOps SIGSTOP now also puts its target in Maintenance Mode for 4 s (any hit wakes it).
+- A soundtrack: every tower floor, the datacenter halls, the lab, the car park, the campus, the home office and each raid wing have their own music (no more elevator muzak everywhere), a night track outdoors after dark, and the raid finales get their own boss themes. Tracks crossfade when you change zones and the web version only downloads the music of places you visit.
 
 ### Changed
 

@@ -1,0 +1,15 @@
+Music by Kevin MacLeod (incompetech.com)
+
+Licensed under Creative Commons: By Attribution 4.0 License
+https://creativecommons.org/licenses/by/4.0/
+
+Tracks used (source: https://incompetech.com/music/royalty-free/music.html):
+Floating Cities, Limit 70, Wallpaper, Funkorama, Covert Affair, Tyrant,
+Mesmerizing Galaxy, Ouroboros, Crypto, Evening, Lobby Time, Brain Dance,
+Ethernight Club, Aftermath
+
+Licence terms and catalog metadata: https://incompetech.com/music/royalty-free/licenses/
+and https://incompetech.com/music/royalty-free/pieces.json (every piece lists
+licence https://creativecommons.org/licenses/by/4.0/, composer Kevin MacLeod).
+
+Changes made: converted from MP3 to OGG Vorbis (lower bitrate).
