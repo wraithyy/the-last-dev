@@ -59,6 +59,16 @@ const classes = [
     text: 'Ninety percent cleaning data, ten percent explaining the chart. Stacks slow damage, spreads it around, waits for significance.',
     abilities: 'Linear Regression, Overfitting, Early Stopping',
   },
+  {
+    name: 'Security Engineer', role: 'Melee',
+    text: 'The only one who did not click the link. Sneaks in, stacks Exploit Chain, finishes before anyone notices.',
+    abilities: 'Shoulder Surf, Phishing Link, Zero-Day, Privilege Escalation, Tailgating',
+  },
+  {
+    name: 'COBOL Greybeard', role: 'Melee',
+    text: 'The only one who can read the system the whole company runs on. Slow, heavy and unkillable; spends Seniority on big strikes.',
+    abilities: 'GOTO, Punch Card, Batch Job, Read the Manual, Rewrite It in COBOL, Core Dump',
+  },
 ];
 
 const controls = [
@@ -170,6 +180,17 @@ const stack = [
         </span>
       </div>
     </section>
+    <div class="wrap install">
+      <p class="muted"><strong>Runs on WebGPU:</strong> Chrome, Edge or Safari 26+. Your browser doesn't have it? It's obsolete. So are you, according to the AI roadmap.</p>
+      <div class="install-box">
+        <div>
+          <h3>Install it. Recommended.</h3>
+          <p class="muted">Fullscreen, no browser chrome, offline play, launches like a game. It's the only app on your work laptop IT didn't approve.</p>
+          <p class="muted small">Chrome or Edge (desktop and Android): open the game and press its Install button. iOS Safari: Share, then Add to Home Screen.</p>
+        </div>
+        <a class="btn btn-ghost" href={`${GAME}?install`}>Install the game<Fragment set:html={arrow} /></a>
+      </div>
+    </div>
     <script is:inline>
       // Click-to-load: the wasm build is large, so nobody downloads it just by opening the landing page.
       const player = document.querySelector('.player');
@@ -225,7 +246,7 @@ const stack = [
     <section id="roles" class="wrap section reveal">
       <h2>Pick a role. The AI will ignore it.</h2>
       <figure class="roles-shot">
-        <Image src={rolesStage} alt="The six playable roles on the role picker stage: Fullstack, Frontend, Backend, DevOps, QA and Data Scientist" widths={[800, 1280]} sizes="(min-width: 1200px) 1136px, 100vw" />
+        <Image src={rolesStage} alt="The eight playable roles on the role picker stage: Fullstack, Frontend, Backend, DevOps, QA, Data Scientist, Security and COBOL Greybeard" widths={[800, 1280]} sizes="(min-width: 1200px) 1136px, 100vw" />
       </figure>
       <div class="roles">
         {classes.map((c, i) => (
@@ -242,6 +263,7 @@ const stack = [
           </article>
         ))}
       </div>
+      <p class="muted small">Every role also owns a few world props: only DevOps can restart the frozen rack, only the Greybeard can revive the mainframe. The Fullstack Engineer can try any of them, and might break it.</p>
     </section>
 
     <section id="coop" class="wrap section reveal">

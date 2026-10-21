@@ -26,6 +26,10 @@
   #toast { position: fixed; left: 50%; top: calc(12px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 10;
     padding: 8px 12px; border-radius: 8px; background: #20242e; border: 1px solid #5cd1db; color: #ccd; font-size: 14px;
     display: flex; align-items: center; gap: 12px; }
+  #install { position: fixed; right: calc(12px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 10;
+    max-width: 34ch; padding: 6px 12px; border-radius: 8px; background: #20242e; border: 1px solid #5cd1db; color: #5cd1db;
+    font: 13px ui-monospace, Menlo, Consolas, monospace; cursor: pointer; text-align: left; touch-action: manipulation; }
+  #install[hidden] { display: none; }
   #toast[hidden] { display: none; }
   #toast button { font: inherit; padding: 4px 10px; border-radius: 6px; border: 1px solid #5cd1db; background: #5cd1db; color: #101216; cursor: pointer; }
   #status { position: fixed; top: 12px; left: 12px; font-size: 14px; opacity: .8; white-space: pre-wrap; pointer-events: none; }
@@ -44,6 +48,7 @@
 <div id="nogpu" hidden><p></p><small>Chrome, Edge or Safari 26+ run the full game.</small></div>
 <div id="status">Loading…</div>
 <div id="tip"></div>
+<button id="install" type="button" hidden></button>
 <div id="rotate">Rotate your phone for the best view</div>
 <div id="toast" hidden><span>New sprint available.</span><button id="reload" type="button">Reload</button></div>
 <script>
@@ -190,6 +195,35 @@ if (!(await hasWebGpu())) {
     else fail('Failed to start the game: ' + (e && e.message || e) + '\nDid you run scripts/build-web.sh?');
   }
 }
+</script>
+<script>
+// Install button: the landing page cannot raise the prompt for a game outside its own scope, so the game page does.
+(() => {
+  const btn = document.getElementById('install');
+  if (matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone) return;
+  let deferred = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferred = e;
+    btn.textContent = '> install the game';
+    btn.hidden = false;
+  });
+  btn.addEventListener('click', async () => {
+    if (deferred) {
+      deferred.prompt();
+      await deferred.userChoice.catch(() => {});
+      deferred = null;
+    }
+    btn.hidden = true;
+  });
+  window.addEventListener('appinstalled', () => { btn.hidden = true; });
+  // iOS Safari has no install event; Share > Add to Home Screen is the only way, so say so when the landing sent us here.
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (ios && new URLSearchParams(location.search).has('install')) {
+    btn.textContent = 'Install: Share, then Add to Home Screen (tap to hide)';
+    btn.hidden = false;
+  }
+})();
 </script>
 <script>
 // Offline cache + update prompt. A new build waits until the player agrees, never swaps mid-game.

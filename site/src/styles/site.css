@@ -84,6 +84,11 @@
   .route .muted { font-size: 0.925rem; }
 
   .roles-shot { margin: 40px 0 0; }
+  .install { margin-top: 20px; }
+  .install p { margin: 0; }
+  .install-box { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: center; justify-content: space-between; margin-top: 16px; padding: 16px 20px; border: 1px solid var(--line); border-radius: var(--r-md); }
+  .install-box h3 { font-size: 1.05rem; margin-bottom: 4px; }
+  .install-box > div { max-width: 62ch; display: grid; gap: 6px; }
   .role > kbd { justify-self: start; }
   .roles { display: grid; gap: 32px; margin-top: 40px; }
   .role { display: grid; grid-template-columns: auto 1fr; gap: 8px 20px; align-items: start; }
