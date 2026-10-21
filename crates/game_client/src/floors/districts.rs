@@ -407,6 +407,7 @@ pub(super) fn build(p: &mut Plan) {
     super::dressing::build(p);
     shuttles(p);
     ill_marie(p);
+    picnic_dedication(p);
     for (k, (x, z)) in PACKS.into_iter().enumerate() {
         let at = v(x, 0.0, z);
         p.anchor(PACK_NAMES[k], at, yaw_towards(at, v(x * 0.8, 0.0, z * 0.8)));
@@ -424,6 +425,60 @@ pub(super) fn build(p: &mut Plan) {
 /// Ill Marie's pavement "desk" on the boulevard every new hire walks up from the South Gate:
 /// loud enough to be seen from the road (tissue tower, steaming humidifier, a bin of used
 /// tissues), off the walking line so she never gets in the way.
+/// A dedication, tucked away on the lawn east of the lake: the author's wife
+/// and daughter on a picnic, on a bench facing the water, with a chequered blanket, a
+/// basket and two flowers, a big one and a small one.
+fn picnic_dedication(p: &mut Plan) {
+    // Far from every enemy pack and patrol, facing the lake.
+    let (x, z, yaw) = (-114.0, 10.0, -FRAC_PI_2);
+    p.framed(v(x, 0.0, z), yaw, |p| {
+        // Local frame: the bench faces +z, the blanket lies in front of it.
+        bench(p, 0.0, 0.0, 0.0);
+        p.boxed(v(0.2, 0.17, 2.0), v(0.38, 0.3, 0.55), Mat::Wood, false);
+        p.boxed(v(0.2, 0.42, 2.0), v(0.36, 0.2, 0.05), Mat::Wood, false);
+        super::models::put(
+            p,
+            &super::models::FLOWER_YELLOW,
+            v(-1.3, 0.0, -0.4),
+            1.0,
+            7.0,
+            false,
+        );
+        super::models::put(
+            p,
+            &super::models::FLOWER_RED,
+            v(1.3, 0.0, -0.4),
+            2.0,
+            4.5,
+            false,
+        );
+    });
+    // Slabs take world positions, so the chequered blanket is turned by hand.
+    let turn = Quat::from_rotation_y(yaw);
+    for i in 0..4 {
+        for j in 0..4 {
+            let mat = if (i + j) % 2 == 0 {
+                Mat::Red
+            } else {
+                Mat::White
+            };
+            let at = turn * Vec3::new(-0.75 + i as f32 * 0.5, 0.0, 1.2 + j as f32 * 0.5);
+            p.slab(v(x + at.x, 0.02, z + at.z), yaw, v(0.5, 0.01, 0.5), mat);
+        }
+    }
+    // Seats are matched in world space: the bench's two slots sit 0.45 m either side; the
+    // free one is for the player.
+    let side = turn * Vec3::X * 0.45;
+    p.occupy("npc_picnic_wife", v(x, 0.0, z) - side);
+    // The daughter stands by the blanket and runs about from there (friendly wander).
+    let play = turn * Vec3::new(1.4, 0.0, 2.6);
+    p.anchor(
+        "npc_picnic_daughter",
+        v(x + play.x, 0.0, z + play.z),
+        yaw + PI,
+    );
+}
+
 fn ill_marie(p: &mut Plan) {
     let (x, z) = (7.5, 118.0);
     p.prop(&DESK, v(x, 0.0, z), -FRAC_PI_2, true);

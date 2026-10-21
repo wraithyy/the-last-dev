@@ -733,6 +733,20 @@ fn enemy_aoe_never_kills_a_quest_npc() {
     );
 }
 
+/// The picnic family by the lake sits near the goose's patrol; enemy hits skip them the same
+/// way they skip quest NPCs.
+#[test]
+fn the_picnic_family_is_untouchable() {
+    for key in ["picnic_wife", "picnic_daughter"] {
+        assert!(
+            content()
+                .unit_def(key)
+                .is_some_and(|d| d.untouchable && !d.hostile),
+            "{key}"
+        );
+    }
+}
+
 #[test]
 fn alignment_training_reflects_spells_but_not_auto_attacks() {
     let mut t = t_with(10, |c| {

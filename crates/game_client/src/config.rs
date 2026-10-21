@@ -85,7 +85,7 @@ pub const SIM_SEED: u64 = 0x5EED_0000_C0DE;
 // HUD layout (logical px)
 pub const FRAME_W: f32 = 250.0;
 pub const FRAME_BAR_H: f32 = 13.0;
-pub const PORTRAIT_SIZE: f32 = 44.0;
+pub const PORTRAIT_SIZE: f32 = 64.0;
 pub const ACTION_SLOT: f32 = 46.0;
 pub const ACTION_GAP: f32 = 5.0;
 pub const AURA_ICON: f32 = 30.0;

@@ -24,6 +24,9 @@ const CAMERA_FRAMES: u32 = 2;
 /// Give up (letter fallback) when the model never shows up, e.g. a failed asset load.
 const TIMEOUT: u32 = 240;
 const MAX_CACHED: usize = 48;
+/// Aim point above the head bone and camera distance, both as shares of the unit height.
+const HEAD_LIFT: f32 = 0.09;
+const CAMERA_DIST: f32 = 0.55;
 const STAGES: usize = 6;
 
 type Slots = [Option<Handle<Image>>; STAGES];
@@ -106,6 +109,8 @@ fn capture(
     prims: Query<(), With<PrimRig>>,
     cameras: Query<(), With<Camera>>,
     entities: &bevy::ecs::entity::Entities,
+    children: Query<&Children>,
+    bones: Query<(&Name, &GlobalTransform)>,
 ) {
     let portraits = &mut *portraits;
     if portraits.job.is_none() {
@@ -169,9 +174,16 @@ fn capture(
         job.warm = if ready { job.warm + 1 } else { 0 };
         if job.warm >= WARMUP {
             let height = catalog::unit_visual(&job.look.0).height.max(0.3);
-            let head = STAGE + Vec3::new(0.0, height * 0.88, 0.0);
-            // Slightly from the left so the face is not flat-lit; transparent clear so the
-            // frame's role/hostility tint shows through behind the head.
+            // The head bone sits at the neck joint; aim a little above it so the face, hair and
+            // headphones fill the frame. Primitive rigs have no bones and use a fixed share.
+            let head = children
+                .iter_descendants(job.rig)
+                .find_map(|e| bones.get(e).ok().filter(|(n, _)| n.as_str() == "Head"))
+                .map_or(STAGE + Vec3::new(0.0, height * 0.88, 0.0), |(_, t)| {
+                    Vec3::new(STAGE.x, t.translation().y + height * HEAD_LIFT, STAGE.z)
+                });
+            // Slightly from the left so the face is not flat-lit; transparent clear so only the
+            // head shows on the HUD.
             job.camera = Some(
                 commands
                     .spawn((
@@ -182,8 +194,10 @@ fn capture(
                             ..default()
                         },
                         RenderTarget::Image(job.image.clone().into()),
-                        Transform::from_translation(head + Vec3::new(-0.08, 0.03, 0.7) * height)
-                            .looking_at(head, Vec3::Y),
+                        Transform::from_translation(
+                            head + Vec3::new(-0.06, 0.02, CAMERA_DIST) * height,
+                        )
+                        .looking_at(head, Vec3::Y),
                     ))
                     .id(),
             );

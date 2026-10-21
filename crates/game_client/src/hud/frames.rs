@@ -13,7 +13,7 @@ use crate::targeting::Target;
 use bevy::prelude::*;
 use combat_core::{AuraView, CastError, CastView, EntityId, Event};
 
-const FRAME_H: f32 = 50.0;
+const FRAME_H: f32 = 64.0;
 // Leaves room for the controls hint line above the frames.
 const FRAME_TOP: f32 = 26.0;
 const FRAME_GAP: f32 = 14.0;
@@ -79,8 +79,12 @@ struct Smooth {
 }
 #[derive(Component)]
 struct PoolRow(Who, Pool);
+/// The avatar disc; the bool is set once the portrait shows, which drops the disc styling.
 #[derive(Component)]
-struct Disc(Who);
+struct Disc(Who, bool);
+/// Highlight over the letter disc, hidden behind a portrait.
+#[derive(Component)]
+struct Gloss(Who);
 /// The cached portrait image inside a disc; hidden until the capture exists.
 #[derive(Component)]
 struct PortraitImg(Who);
@@ -276,7 +280,7 @@ fn spawn_frame(commands: &mut Commands, who: Who, left: f32) {
         .with_children(|frame| {
             frame
                 .spawn((
-                    Disc(who),
+                    Disc(who, false),
                     Node {
                         width: px(PORTRAIT_SIZE),
                         height: px(PORTRAIT_SIZE),
@@ -289,7 +293,6 @@ fn spawn_frame(commands: &mut Commands, who: Who, left: f32) {
                     },
                     BorderColor::all(AVATAR_RIM),
                     BackgroundColor(Color::srgb(0.2, 0.3, 0.7)),
-                    BoxShadow::new(Color::srgba(0.0, 0.0, 0.0, 0.6), px(0), px(1), px(0), px(4)),
                 ))
                 .with_children(|d| {
                     d.spawn((
@@ -298,13 +301,13 @@ fn spawn_frame(commands: &mut Commands, who: Who, left: f32) {
                             position_type: PositionType::Absolute,
                             width: percent(100),
                             height: percent(100),
-                            border_radius: BorderRadius::MAX,
                             display: Display::None,
                             ..default()
                         },
                         ImageNode::default(),
                     ));
                     d.spawn((
+                        Gloss(who),
                         Node {
                             position_type: PositionType::Absolute,
                             width: percent(100),
@@ -904,6 +907,8 @@ fn update_portraits(
     mut portraits: ResMut<super::portraits::Portraits>,
     mut images: Query<(&PortraitImg, &mut ImageNode, &mut Node)>,
     mut letters: Query<(&Letter, &mut Visibility)>,
+    mut glosses: Query<(&Gloss, &mut Node), Without<PortraitImg>>,
+    mut discs: Query<&mut Disc>,
 ) {
     for who in [Who::Player, Who::Target] {
         let handle = tracked(who, &*sim, &target, &units)
@@ -932,6 +937,21 @@ fn update_portraits(
                 Display::None
             };
             put!(node.display, show);
+        }
+        for (g, mut node) in &mut glosses {
+            if g.0 == who {
+                let gloss = if handle.is_some() {
+                    Display::None
+                } else {
+                    Display::Flex
+                };
+                put!(node.display, gloss);
+            }
+        }
+        for mut disc in &mut discs {
+            if disc.0 == who && disc.1 != handle.is_some() {
+                disc.1 = handle.is_some();
+            }
         }
         for (l, mut vis) in &mut letters {
             if l.0 == who {
@@ -1153,11 +1173,14 @@ fn update_frames(
             Field::Mana => set_text(&mut text, &format!("{} / {}", u.mana, u.max_mana)),
         }
     }
-    for (Disc(who), mut bg, mut rim) in &mut discs {
+    for (Disc(who, bare), mut bg, mut rim) in &mut discs {
         let Some(u) = state(*who) else { continue };
         let flashing = flash.left > 0.0 && flash.unit == Some(u.id);
         let want = BorderColor::all(if flashing {
             Color::WHITE
+        } else if *bare {
+            // A portrait is just the head; the boss tag already says PROD or ELITE.
+            Color::NONE
         } else if u.boss || copy::is_elite(&u.key) {
             ACCENT_WARM
         } else {
@@ -1171,13 +1194,14 @@ fn update_frames(
             (_, true) => Color::srgb(0.5, 0.14, 0.2),
             (_, false) => Color::srgb(0.2, 0.5, 0.3),
         }
-        // Dark backdrop: the portrait is transparent around the head and shows this tint.
         .mix(&Color::BLACK, 0.55);
         // A pulsing white-orange flash that fades over PHASE_FLASH_SECS.
         bg.0 = if flashing {
             let k = flash.left / PHASE_FLASH_SECS;
             let pulse = 0.5 + 0.5 * (time.elapsed_secs() * 18.0).sin();
             base.mix(&ACCENT_WARM.mix(&Color::WHITE, pulse), k)
+        } else if *bare {
+            Color::NONE
         } else {
             base
         };

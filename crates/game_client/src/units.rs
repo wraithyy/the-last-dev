@@ -97,6 +97,16 @@ pub fn spawn_visual(
             Visibility::default(),
         ))
         .id();
+    let curls = match key {
+        "picnic_wife" => Some("curls_long"),
+        "picnic_daughter" => Some("curls_short"),
+        _ => None,
+    };
+    if let Some(kit) = curls {
+        commands
+            .entity(e)
+            .insert(crate::gear::Accessories(kit.to_string()));
+    }
     if key == "scooter_exec" {
         // Standing on his own scooter: the deck sits under the feet.
         commands.spawn((

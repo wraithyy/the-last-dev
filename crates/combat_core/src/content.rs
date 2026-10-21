@@ -923,6 +923,9 @@ pub struct UnitDef {
     /// Presentation hint for idle friendly NPCs.
     #[serde(default)]
     pub idle_pose: Option<IdlePose>,
+    /// Friendly NPCs enemy damage never touches, like quest NPCs (`Sim::deal_damage`).
+    #[serde(default)]
+    pub untouchable: bool,
     #[serde(default)]
     pub frontal_shield: Option<FrontalShield>,
     /// Named rare: elite nameplate and a guaranteed better drop.

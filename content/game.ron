@@ -3576,6 +3576,52 @@
         // ---- friendly ----
         // Ill Marie: reads as a "came in sick" gag, sets up Ilmari (docs/ILMARI_RAID.md). Flavour
         // only: a seat on the South Gate boulevard, a few lines, one optional errand.
+        // A dedication: the author's wife and daughter on a picnic in Wellness Park.
+        (
+            key: "picnic_wife", name: "Beautiful Wife", title: "Head of Everything Important", level: 10, hostile: false,
+            max_hp: 500, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: Some(Sitting), untouchable: true,
+            yells: (
+                talk: [
+                    "We're having a picnic. No laptops. Yes, that includes the 'quick check'.",
+                    "Whatever the CEO says, no AI makes sandwiches like these. Have one.",
+                    "Go on, save the company. We'll keep a seat for you on the bench.",
+                    "Every roadmap changes. This picnic is the one thing that ships every weekend.",
+                    "You look tired. Sit for a minute. The servers will still be on fire afterwards.",
+                ],
+                ambient_ms: 70000,
+                ambient: [
+                    "Sweetie, leave some strawberries for the ducks.",
+                    "Look, the lake. No meetings on the lake.",
+                    "Phones in the basket, everyone. That's the only policy here.",
+                ],
+            ),
+        ),
+        (
+            key: "picnic_daughter", name: "Sweet Daughter", title: "Chief Strawberry Officer", level: 10, hostile: false,
+            max_hp: 500, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            untouchable: true,
+            yells: (
+                talk: [
+                    "My dad's a developer too. He says the AI writes the code and he writes the apologies.",
+                    "I drew you a bug. A real one: six legs and no stack trace.",
+                    "We saved you the last strawberry. Don't tell the chatbot, it'll want the recipe.",
+                    "Mum says no work talk at picnics. That means you too.",
+                    "When I grow up I'll be the one who reads the code. Somebody has to.",
+                ],
+                ambient_ms: 80000,
+                ambient: [
+                    "Mum, can we feed the ducks? They look like they need a sprint break.",
+                    "This is the best day. No Wi-Fi and nobody notices.",
+                    "I'm making a daisy chain. It has zero dependencies.",
+                    "Mum, watch! I can run faster than the CI pipeline!",
+                ],
+            ),
+        ),
         (
             key: "ill_marie", name: "Ill Marie", title: "Working Through It", level: 2, hostile: false,
             max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
@@ -9846,6 +9892,8 @@
                 (anchor: "npc_colleague", unit: "burnt_out_colleague"),
                 // Every new hire walks past her on the way up from the South Gate.
                 (anchor: "npc_ill_marie", unit: "ill_marie"),
+                (anchor: "npc_picnic_wife", unit: "picnic_wife"),
+                (anchor: "npc_picnic_daughter", unit: "picnic_daughter"),
                 // Body Leasing easter egg: the vendor's account manager between the plaza and the annex.
                 (anchor: "npc_am", unit: "bl_account_manager"),
                 // Company Calendar quest chains (E5): their givers around the campus.

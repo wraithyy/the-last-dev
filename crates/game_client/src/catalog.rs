@@ -1990,6 +1990,34 @@ static TABLE: &[(&str, UnitVisual)] = &[
         ),
     ),
     (
+        "picnic_wife",
+        v(
+            CASUAL_F,
+            1.7,
+            "Beautiful Wife",
+            "<Head of Everything Important>",
+            &[
+                paint("Hair", 0.36, 0.22, 0.12),
+                paint("Shirt", 0.95, 0.85, 0.35),
+                paint("Pants", 0.25, 0.32, 0.5),
+            ],
+        ),
+    ),
+    (
+        "picnic_daughter",
+        v(
+            CASUAL_F,
+            1.05,
+            "Sweet Daughter",
+            "<Chief Strawberry Officer>",
+            &[
+                paint("Hair", 0.93, 0.8, 0.48),
+                paint("Shirt", 0.95, 0.45, 0.55),
+                paint("Pants", 0.3, 0.45, 0.35),
+            ],
+        ),
+    ),
+    (
         "ill_marie",
         v(
             CASUAL_F,

@@ -166,6 +166,28 @@ fn attach_accessories(
             })
         };
         match kit.0.as_str() {
+            // Curly hair for the picnic dedication (the base model's hair is straight): a mop of
+            // small balls over the top and back of the head, down to the shoulders when long.
+            "curls_long" | "curls_short" => {
+                let long = kit.0 == "curls_long";
+                let color = if long {
+                    Color::srgb(0.36, 0.22, 0.12)
+                } else {
+                    Color::srgb(0.93, 0.8, 0.48)
+                };
+                let hair = mat(color, 0.9);
+                let ball = meshes.add(Sphere::new(0.15).mesh().uv(8, 6));
+                commands.entity(head).with_children(|c| {
+                    for at in curl_spots(long) {
+                        c.spawn((
+                            Mesh3d(ball.clone()),
+                            MeshMaterial3d(hair.clone()),
+                            Transform::from_translation(at),
+                            NotShadowCaster,
+                        ));
+                    }
+                });
+            }
             "frontend" => {
                 let frame = mat(Color::srgb(0.95, 0.2, 0.6), 0.4);
                 let lens = materials.add(StandardMaterial {
@@ -806,5 +828,46 @@ fn animate_steam(
             0.04 * (t * 1.7 + s.0 * 4.0).cos(),
         );
         tf.scale = Vec3::splat((0.045 + 0.02 * d) * rise * active);
+    }
+}
+
+/// Head-bone positions of the curls: a golden-angle spiral over a shell round the skull that
+/// leaves the face open, plus, for long hair, rings at the back and sides down to the shoulders.
+fn curl_spots(long: bool) -> Vec<Vec3> {
+    const CENTER: Vec3 = Vec3::new(0.0, 0.45, -0.04);
+    const R: f32 = 0.6;
+    let n = 70;
+    let mut out: Vec<Vec3> = (0..n)
+        .map(|i| {
+            let y = 1.0 - (i as f32 + 0.5) / n as f32 * 1.4;
+            let r = (1.0 - y * y).max(0.0).sqrt();
+            let a = i as f32 * 2.399_963;
+            Vec3::new(r * a.cos(), y, r * a.sin())
+        })
+        // The face: forward and below the hairline stays bare.
+        .filter(|d| !(d.z > 0.35 && d.y < 0.55))
+        .map(|d| CENTER + d * R)
+        .collect();
+    if long {
+        for k in 0..4 {
+            let y = CENTER.y - 0.35 - k as f32 * 0.17;
+            let ring = 14;
+            for j in 0..ring {
+                // Back half and the sides only, so the hair falls behind the shoulders.
+                let a = std::f32::consts::PI * (0.15 + 0.7 * j as f32 / (ring - 1) as f32);
+                let r = R * (0.95 + 0.05 * k as f32);
+                out.push(Vec3::new(r * a.cos(), y, -r * a.sin() + 0.05));
+            }
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod curl_tests {
+    #[test]
+    fn long_curls_reach_lower_than_short_ones() {
+        let low = |v: Vec<bevy::math::Vec3>| v.iter().map(|p| p.y).fold(f32::MAX, f32::min);
+        assert!(low(super::curl_spots(true)) < low(super::curl_spots(false)) - 0.3);
     }
 }

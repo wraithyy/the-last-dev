@@ -1651,7 +1651,8 @@ impl Sim {
             && self
                 .index(source)
                 .is_some_and(|si| self.units[si].state.hostile)
-            && self.content.is_quest_npc(&self.content.units[t.def].key)
+            && (self.content.units[t.def].untouchable
+                || self.content.is_quest_npc(&self.content.units[t.def].key))
         {
             return;
         }
