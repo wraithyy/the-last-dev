@@ -239,7 +239,9 @@ impl Sim {
                 let crit_pct = self.content.units[self.units[ci].def].crit_pct;
                 let mut amount = self.power(ci, *base, *coefficient_pct);
                 amount = self.perk_amount(ci, ti, spell.id, amount, false);
-                amount = amount * (100 + self.opener_bonus_pct(ci, ti, spell)) / 100;
+                amount = amount
+                    * (100 + self.opener_bonus_pct(ci, ti, spell) + self.spend_bonus_pct)
+                    / 100;
                 let mut combo = false;
                 let stacks = consume_aura.as_ref().and_then(|c| {
                     self.units[ti]

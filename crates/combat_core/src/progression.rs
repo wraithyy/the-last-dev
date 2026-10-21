@@ -73,11 +73,17 @@ impl Sim {
             } else {
                 (i64::from(base_hp) * (100 + hp_aura_pct).max(10) / 100) as u32
             };
-            u.state.max_mana = d.max_mana + mana + t.max_mana;
+            u.state.max_mana = if d.fixed_mana {
+                d.max_mana
+            } else {
+                d.max_mana + mana + t.max_mana
+            };
             // Paragon: Promotion ranks add a small capped share of HP and mana.
             let paragon = u64::from(self.content.endgame.paragon_pct(u.state.career.rank));
             u.state.max_hp = (u64::from(u.state.max_hp) * (100 + paragon) / 100) as u32;
-            u.state.max_mana = (u64::from(u.state.max_mana) * (100 + paragon) / 100) as u32;
+            if !d.fixed_mana {
+                u.state.max_mana = (u64::from(u.state.max_mana) * (100 + paragon) / 100) as u32;
+            }
             u.sp = d.spell_power + sp + t.spell_power;
             u.dmg_pct = 100;
         } else {

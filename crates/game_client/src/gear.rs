@@ -2,7 +2,7 @@
 //! carries a coffee mug in the left fist; every class skin (player, teammates, role picker,
 //! lineup) gets its class kit: Fullstack headphones resting on the neck, Frontend glasses,
 //! Backend big over-ear headphones, a DevOps pager on the belt, a QA clipboard on the other hip,
-//! a Data Scientist's lanyard with a glowing chart badge, a Security Engineer's sunglasses and VISITOR lanyard. Offsets are in bone space
+//! a Data Scientist's lanyard with a glowing chart badge, a Security Engineer's sunglasses and VISITOR lanyard, a COBOL Greybeard's beard, reading glasses and tie. Offsets are in bone space
 //! (model units; the model root is scaled).
 //!
 //! While the player channels Coffee Break the left arm is posed procedurally (two-bone IK
@@ -358,6 +358,81 @@ fn attach_accessories(
                             Transform::from_xyz(0.0, 0.08, 0.012),
                         ));
                     });
+                });
+            }
+            "cobol" => {
+                // Grey beard and moustache, round gold reading glasses low on the nose, and a
+                // dark red tie over the cardigan: forty years of the same outfit.
+                let fur = mat(Color::srgb(0.7, 0.7, 0.73), 0.9);
+                let tie = mat(Color::srgb(0.55, 0.06, 0.1), 0.6);
+                let wire = materials.add(StandardMaterial {
+                    base_color: Color::srgb(0.85, 0.65, 0.2),
+                    perceptual_roughness: 0.3,
+                    metallic: 0.8,
+                    ..default()
+                });
+                let lens = materials.add(StandardMaterial {
+                    base_color: Color::srgba(0.8, 0.92, 1.0, 0.3),
+                    alpha_mode: AlphaMode::Blend,
+                    perceptual_roughness: 0.1,
+                    ..default()
+                });
+                let rim = meshes.add(Torus::new(0.1, 0.125));
+                let glass = meshes.add(Cylinder::new(0.105, 0.01));
+                let bridge = meshes.add(Cuboid::new(0.12, 0.025, 0.025));
+                let beard = meshes.add(Sphere::new(0.3));
+                let stache = meshes.add(Cuboid::new(0.34, 0.07, 0.07));
+                let blade = meshes.add(Cuboid::new(0.14, 0.42, 0.03));
+                let knot = meshes.add(Cuboid::new(0.1, 0.09, 0.05));
+                commands.entity(head).with_children(|c| {
+                    for side in [-1.0f32, 1.0] {
+                        let at = Transform::from_xyz(side * 0.17, GLASSES_Y - 0.04, GLASSES_Z)
+                            .with_rotation(Quat::from_rotation_x(FRAC_PI_2));
+                        c.spawn((
+                            Mesh3d(rim.clone()),
+                            MeshMaterial3d(wire.clone()),
+                            at,
+                            NotShadowCaster,
+                        ));
+                        c.spawn((
+                            Mesh3d(glass.clone()),
+                            MeshMaterial3d(lens.clone()),
+                            at,
+                            NotShadowCaster,
+                        ));
+                    }
+                    c.spawn((
+                        Mesh3d(bridge),
+                        MeshMaterial3d(wire),
+                        Transform::from_xyz(0.0, GLASSES_Y - 0.02, GLASSES_Z),
+                        NotShadowCaster,
+                    ));
+                    c.spawn((
+                        Mesh3d(beard),
+                        MeshMaterial3d(fur.clone()),
+                        Transform::from_xyz(0.0, 0.02, 0.3).with_scale(Vec3::new(1.2, 1.15, 0.8)),
+                        NotShadowCaster,
+                    ));
+                    c.spawn((
+                        Mesh3d(stache),
+                        MeshMaterial3d(fur),
+                        Transform::from_xyz(0.0, 0.2, 0.5),
+                        NotShadowCaster,
+                    ));
+                });
+                commands.entity(neck).with_children(|c| {
+                    c.spawn((
+                        Mesh3d(blade),
+                        MeshMaterial3d(tie.clone()),
+                        Transform::from_xyz(0.0, -0.58, 0.38),
+                        NotShadowCaster,
+                    ));
+                    c.spawn((
+                        Mesh3d(knot),
+                        MeshMaterial3d(tie),
+                        Transform::from_xyz(0.0, -0.32, 0.37),
+                        NotShadowCaster,
+                    ));
                 });
             }
             "data_scientist" => {

@@ -36,6 +36,8 @@ const FLASH_SECS: f32 = 0.35;
 const STALE_SECS: f32 = 1.5;
 /// Shared (stack) telegraphs are gold: standing in them is the right call.
 const SHARE: [f32; 3] = [1.0, 0.82, 0.2];
+/// Telegraphs of friendly casters (the player's Batch Job) are cyan, not danger red.
+const OWN: [f32; 3] = [0.36, 0.82, 0.86];
 const KICK_RED: Color = Color::srgb(1.0, 0.15, 0.1);
 const LABEL_W: f32 = 320.0;
 
@@ -205,20 +207,28 @@ fn spawn_decals(
         match ev {
             Event::TelegraphStarted {
                 id,
+                source,
                 spell,
                 shape,
                 pos,
                 facing,
                 resolve_ms,
                 cover,
-                ..
             } => {
                 let def = sim
                     .content()
                     .spell(*spell)
                     .and_then(|s| s.telegraph.clone());
                 let split = def.as_ref().is_some_and(|d| d.split);
-                let color = if split { SHARE } else { danger };
+                // A ring the player's own spell paints (Batch Job) is not a danger to dodge.
+                let mine = sim.unit(*source).is_some_and(|u| !u.hostile);
+                let color = if split {
+                    SHARE
+                } else if mine {
+                    OWN
+                } else {
+                    danger
+                };
                 let pos = on_ground(&terrain.0, v3(*pos));
                 // Stacked decals each get their own height so they do not z-fight.
                 let lift = 0.03 + (id % 8) as f32 * 0.004;

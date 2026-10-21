@@ -1,7 +1,7 @@
 //! Playable classes on the client: the chosen class (persisted), the player's skin and kit,
 //! and the "Choose your role" picker (first launch, or Esc menu > Change role).
 //!
-//! `WOW_CLASS=fullstack|frontend|backend|devops|qa|data_scientist|security` skips the picker for that run;
+//! `WOW_CLASS=fullstack|frontend|backend|devops|qa|data_scientist|security|cobol` skips the picker for that run;
 //! `WOW_PICKER=1` opens it even when a role is stored.
 
 use crate::anim::{Character, ModelKind};
@@ -70,7 +70,7 @@ struct ChangeRoleText;
 const STAGE: Vec3 = Vec3::new(0.0, -500.0, 0.0);
 const STAGE_W: u32 = 1280;
 const STAGE_H: u32 = 440;
-const SPACING: f32 = 1.45;
+const SPACING: f32 = 1.28;
 
 pub fn role_color(role: Role) -> Color {
     match role {
@@ -385,9 +385,13 @@ fn spawn_picker_ui(commands: &mut Commands, picker: &Picker, image: Handle<Image
             ));
             // A grid, not a flex row: flex measured the wrapped card text too short with six
             // narrow cards. The cards keep their height; the stage above is what shrinks.
+            // Past seven cards a single row gets too narrow to read (and to tap): two rows.
+            let n = picker.cards.len();
+            let columns = if n > 7 { n.div_ceil(2) } else { n };
             root.spawn(Node {
                 display: Display::Grid,
-                grid_template_columns: RepeatedGridTrack::flex(picker.cards.len() as u16, 1.0),
+                grid_template_columns: RepeatedGridTrack::flex(columns as u16, 1.0),
+                row_gap: px(8),
                 width: percent(100),
                 max_width: px(1200),
                 column_gap: px(8),
@@ -550,6 +554,7 @@ fn picker_input(
         KeyCode::Digit5,
         KeyCode::Digit6,
         KeyCode::Digit7,
+        KeyCode::Digit8,
     ]
     .iter()
     .position(|k| keys.just_pressed(*k));
@@ -594,9 +599,9 @@ fn sync_picker(
         border.set_all(color);
     }
     let text = if picker.change {
-        "1-7 or click to pick. Esc cancels. Each role keeps its own save."
+        "1-8 or click to pick. Esc cancels. Each role keeps its own save."
     } else {
-        "1-7 or click to pick. Change it later from the Esc menu; each role keeps its own save."
+        "1-8 or click to pick. Change it later from the Esc menu; each role keeps its own save."
     };
     for mut t in &mut footer {
         if t.0 != text {

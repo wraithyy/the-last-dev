@@ -8,6 +8,7 @@ Simplified, WotLK-inspired rules for gameplay feel. They are **not** Blizzard's 
 raw      = base + floor(spell_power * coefficient_pct / 100)
 combo    : if the spell consumes an aura present on the target (with n stacks)
              raw = floor(raw * (100 + bonus_pct * n) / 100) // Refactor on Code Smell: +35%; !important: +60% per Specificity stack
+spend    : spells with `spend_mana_bonus_pct` (Rewrite It in COBOL 6, Y2K Remediation Contract 8): after the normal cost, every point of mana left is spent and raw = floor(raw * (100 + spent * pct + opener bonus) / 100) // full pool: 30 paid + 70 spent = +420%
 opener   : spells with `opener`: raw = floor(raw * (100 + stealth_bonus_pct if the caster has a stealth aura + behind_bonus_pct if the caster is outside the target's front 180 degrees) / 100) // Zero-Day: +150% / +50%
 hit      : roll below(100) < spell_hit_pct (96); first roll, a miss ends the spell before anything below
 crit     : roll below(100) < crit_pct   (rolled on every hit, crit or not)
@@ -104,6 +105,7 @@ Yells (boss and player spell yells) are presentation-only: line selection is a r
 - Revert Commit heals up to the player's HP sampled 5 s earlier (one sample per second, kept 8 s); it never lowers HP.
 - Stealth (`AuraDef::stealth_aggro_pct`, Tailgating 15): an idle hostile aggros a stealthed player only within `max(1.5 m, aggro_m * pct / 100)`. Dealing a non-DoT hit to an enemy, taking damage or applying a harmful aura to an enemy removes it; applying it removes the player from every non-boss threat table. `stealth_slow_pct` (30) scales `speed_pct`: `(100 + bonus) * (100 - slow) / 100`, so the server's movement budget shrinks with it. `break_on_damage` auras (Wrong Number) end on direct damage, not on DoT ticks.
 - Security Engineer: 330 HP / 240 mana / 20 SP, crit 9%, auto attack 12-17 every 1.6 s at 4 m.
+- COBOL Greybeard: 400 HP / 100 Seniority / 22 SP, crit 6%, auto attack 29-40 every 2.6 s at 4 m; class armour -15% damage taken, level HP +30%. Seniority is the mana pool with `fixed_mana` (max 100 at every level, no trophy or Paragon bonus), `mana_regen_per_5s_combat` 25, `mana_on_hit` 4 (own direct hits that deal damage) and `mana_on_hurt` 3 (direct hits taken); out of combat the normal percent tick refills it.
 - Players may cast only their class bar, its resurrect and Coffee Break (`NotLearned` otherwise).
 
 ## Trophies

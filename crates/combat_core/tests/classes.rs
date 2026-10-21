@@ -140,12 +140,13 @@ fn classes_spawn_with_their_own_stats_bars_and_auto_attacks() {
             "devops",
             "qa",
             "data_scientist",
-            "security"
+            "security",
+            "cobol"
         ]
     );
     let mut sim = Sim::new(content(), 1);
     assert_eq!(sim.spawn_player("rockstar", Vec3::default(), 0.0), 0);
-    // A room holds five players, so the sixth and seventh class get a sim of their own.
+    // A room holds five players, so the sixth to eighth class get a sim of their own.
     let mut spare = Sim::new(content(), 1);
     let ids: Vec<EntityId> = keys
         .iter()
@@ -176,6 +177,7 @@ fn classes_spawn_with_their_own_stats_bars_and_auto_attacks() {
             ("qa_engineer".to_string(), 320, 260),
             ("data_scientist".to_string(), 320, 280),
             ("security_engineer".to_string(), 330, 240),
+            ("cobol_greybeard".to_string(), 400, 100),
         ]
     );
     for (k, (id, key)) in ids.iter().zip(&keys).enumerate() {
@@ -183,8 +185,13 @@ fn classes_spawn_with_their_own_stats_bars_and_auto_attacks() {
         let class = s.class_of(*id).map(|c| c.key.clone());
         assert_eq!(class.as_deref(), Some(*key));
         // Two spells at level 1 (the Security Engineer starts with five: its combo needs a
-        // builder, a finisher and a stealth), each class its own bar of ten.
-        let at_start = if *key == "security" { 5 } else { 2 };
+        // builder, a finisher and a stealth; the COBOL Greybeard with six: a gap closer, two
+        // controls, a defence and two Seniority spenders), each class its own bar of ten.
+        let at_start = match *key {
+            "security" => 5,
+            "cobol" => 6,
+            _ => 2,
+        };
         assert_eq!(s.known_spells(*id).len(), at_start, "{key}");
         assert_eq!(c.class(key).map(|k| k.action_bar.len()), Some(10));
     }
@@ -200,6 +207,7 @@ fn classes_spawn_with_their_own_stats_bars_and_auto_attacks() {
     assert_eq!(range("qa_engineer"), Some(25.0));
     assert_eq!(range("data_scientist"), Some(25.0));
     assert_eq!(range("security_engineer"), Some(4.0));
+    assert_eq!(range("cobol_greybeard"), Some(4.0));
     // The tank's level HP grows 60% faster: 440 + 315 * 1.6 at level 10.
     assert!(sim.set_level_of(ids[2], 10));
     assert_eq!(sim.unit(ids[2]).map(|u| u.max_hp), Some(440 + 504));
@@ -531,6 +539,7 @@ fn every_class_can_cleanse_itself_but_not_boss_mechanics() {
         ("qa", 56),             // Revert to Last Green
         ("data_scientist", 65), // Confidence Interval
         ("security", 77),       // Incident Response
+        ("cobol", 87),          // Pension Plan
     ];
     let classes: Vec<String> = content().classes.iter().map(|c| c.key.clone()).collect();
     assert_eq!(classes.len(), cleanses.len(), "a new class needs a cleanse");
@@ -1043,4 +1052,158 @@ fn social_engineering_stuns_trash_until_hit_and_only_interrupts_a_boss() {
         sim.unit(mobs[1]).is_some_and(|u| !u.stunned),
         "bosses are immune to the stun"
     );
+}
+
+// ---- COBOL Greybeard ----
+
+const GOTO: SpellId = SpellId(81);
+const CORE_DUMP: SpellId = SpellId(86);
+const BATCH_JOB: SpellId = SpellId(83);
+const READ_MANUAL: SpellId = SpellId(84);
+const REWRITE: SpellId = SpellId(85);
+
+fn seniority(sim: &Sim, id: EntityId) -> u32 {
+    sim.unit(id).map_or(0, |u| u.mana)
+}
+
+fn cobol_no_crit(c: &mut Content) {
+    def_mut(c, "cobol_greybeard").crit_pct = 0;
+}
+
+/// Seniority is the mana pool: fixed at 100 whatever the level, spent by casts, refilled by
+/// landing and by taking hits.
+#[test]
+fn seniority_is_a_fixed_pool_that_hits_and_hurts_refill() {
+    let (mut sim, p, mobs) = arena_with("cobol", &["sales_rep"], cobol_no_crit);
+    assert_eq!(sim.unit(p).map(|u| u.max_mana), Some(100));
+    move_to(&mut sim, p, -16.0, 0.0);
+    cast_at(&mut sim, p, mobs[0], CORE_DUMP);
+    // 25 spent, +4 for the hit it landed.
+    assert_eq!(seniority(&sim, p), 100 - 25 + 4);
+
+    // Taking hits adds to it: the same fight with the bonus off ends lower.
+    let after_fight = |on_hurt: u32| {
+        let tweak = move |c: &mut Content| {
+            cobol_no_crit(c);
+            def_mut(c, "cobol_greybeard").mana_on_hurt = on_hurt;
+            def_mut(c, "cobol_greybeard").mana_regen_per_5s_combat = 0;
+        };
+        let (mut sim, p, mobs) = arena_with("cobol", &["sales_rep"], tweak);
+        move_to(&mut sim, p, -19.0, 0.0);
+        cast_at(&mut sim, p, mobs[0], BATCH_JOB);
+        for _ in 0..150 {
+            sim.tick();
+        }
+        seniority(&sim, p)
+    };
+    assert!(
+        after_fight(3) > after_fight(0),
+        "hits taken must add Seniority"
+    );
+}
+
+#[test]
+fn rewrite_it_in_cobol_spends_all_seniority_for_bonus_damage() {
+    let hit = |max_mana: u32| {
+        let tweak = move |c: &mut Content| {
+            cobol_no_crit(c);
+            def_mut(c, "cobol_greybeard").max_mana = max_mana;
+        };
+        let (mut sim, p, mobs) = arena_with("cobol", &["ceo"], tweak);
+        move_to(&mut sim, p, -16.0, 0.0);
+        let dmg = damage_of(&cast_at(&mut sim, p, mobs[0], REWRITE), p, REWRITE);
+        (dmg, seniority(&sim, p))
+    };
+    // Exactly the 30 it costs: no bonus. Full pool: +6% for each of the other 70 points.
+    let (bare, _) = hit(30);
+    let (full, left) = hit(100);
+    assert!(bare > 0);
+    let want = i64::from(bare) * 520 / 100;
+    assert!(
+        (i64::from(full) - want).abs() <= 4,
+        "full pool {full}, expected about {want} ({bare} bare)"
+    );
+    assert_eq!(
+        left, 4,
+        "everything is spent; only the hit it landed refills"
+    );
+}
+
+/// The Batch Job paints a ring, lands after 1.5 s on the target and the enemies within 5 m of
+/// it, and spares the one further out.
+#[test]
+fn batch_job_lands_late_on_everyone_around_the_target() {
+    let (mut sim, p, mobs) = arena_with(
+        "cobol",
+        &["sales_rep", "sales_rep", "sales_rep", "sales_rep"],
+        cobol_no_crit,
+    );
+    move_to(&mut sim, p, -16.0, 0.0);
+    let mut ev = cast_at(&mut sim, p, mobs[0], BATCH_JOB);
+    let rings = sim.telegraphs();
+    assert_eq!(rings.len(), 1);
+    assert!((1400..=1500).contains(&rings[0].remaining_ms));
+    assert_eq!(damage_of(&ev, p, BATCH_JOB), 0, "nothing lands at release");
+    for _ in 0..40 {
+        ev.extend(sim.tick());
+    }
+    assert_eq!(damage_of(&ev, p, BATCH_JOB), 0, "still waiting at 1.3 s");
+    for _ in 0..10 {
+        ev.extend(sim.tick());
+    }
+    let hit: Vec<bool> = mobs
+        .iter()
+        .map(|m| {
+            ev.iter().any(|e| {
+                matches!(e, Event::Damage { source, target, spell: Some(s), .. }
+                    if *source == p && target == m && *s == BATCH_JOB)
+            })
+        })
+        .collect();
+    // The mobs stand 2 m apart: 0, 2 and 4 m from the target are inside, 6 m is not.
+    assert_eq!(hit, [true, true, true, false]);
+}
+
+#[test]
+fn goto_jumps_in_and_roots_and_the_manual_blunts_the_hits() {
+    let (mut sim, p, mobs) = arena_with("cobol", &["sales_rep"], cobol_no_crit);
+    cast_at(&mut sim, p, mobs[0], GOTO);
+    assert!(pos_z(&sim, p) < -16.0, "dashed to the target");
+    assert!(stacks(&sim, mobs[0], "goto_lock") > 0, "rooted on arrival");
+
+    let taken = |manual: bool| {
+        let (mut sim, p, mobs) = arena_with("cobol", &["sales_rep"], cobol_no_crit);
+        move_to(&mut sim, p, -19.0, 0.0);
+        if manual {
+            sim.apply_as(
+                p,
+                Command::Cast {
+                    caster: p,
+                    spell: READ_MANUAL,
+                },
+            );
+            sim.tick();
+        }
+        sim.apply_as(
+            p,
+            Command::SetTarget {
+                unit: p,
+                target: Some(mobs[0]),
+            },
+        );
+        let mut total = 0;
+        for _ in 0..120 {
+            for e in sim.tick() {
+                if let Event::Damage { target, amount, .. } = e
+                    && target == p
+                {
+                    total += amount;
+                }
+            }
+        }
+        total
+    };
+    let (open, blunted) = (taken(false), taken(true));
+    assert!(open > 0, "the Sales Rep never hit");
+    assert!(blunted * 4 <= open, "{blunted} vs {open}: not an 80% cut");
 }

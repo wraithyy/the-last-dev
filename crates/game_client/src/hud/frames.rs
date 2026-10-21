@@ -980,7 +980,11 @@ fn update_frames(
         });
     }
     for (row, mut node, mut vis) in &mut rows {
-        let has_pool = state(row.0).is_some_and(|u| row.1 == Pool::Hp || u.max_mana > 0);
+        // Seniority has its own bar above the action bar (hud/seniority.rs), not a mana row.
+        let has_pool = state(row.0).is_some_and(|u| {
+            row.1 == Pool::Hp
+                || (u.max_mana > 0 && !sim.content().unit_def(&u.key).is_some_and(|d| d.fixed_mana))
+        });
         put!(
             node.display,
             if has_pool {

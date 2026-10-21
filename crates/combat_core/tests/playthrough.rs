@@ -95,8 +95,18 @@ const INCIDENT: SpellId = SpellId(77);
 const SOCIAL_ENG: SpellId = SpellId(78);
 const LATERAL: SpellId = SpellId(79);
 const EXFIL: SpellId = SpellId(80);
+const GOTO: SpellId = SpellId(81);
+const PUNCH_CARD: SpellId = SpellId(82);
+const BATCH_JOB: SpellId = SpellId(83);
+const READ_MANUAL: SpellId = SpellId(84);
+const REWRITE: SpellId = SpellId(85);
+const CORE_DUMP: SpellId = SpellId(86);
+const PENSION: SpellId = SpellId(87);
+const CODE_FREEZE: SpellId = SpellId(88);
+const UPTIME: SpellId = SpellId(89);
+const MAINT_WINDOW: SpellId = SpellId(90);
 /// Every playable class; `bot_covers_every_class` keeps it in step with the content.
-const CLASSES: [&str; 7] = [
+const CLASSES: [&str; 8] = [
     "fullstack",
     "frontend",
     "backend",
@@ -104,6 +114,7 @@ const CLASSES: [&str; 7] = [
     "qa",
     "data_scientist",
     "security",
+    "cobol",
 ];
 /// Shields of linked raid bosses: the open member is the only one worth hitting.
 const LINK_SHIELDS: [&str; 2] = ["synergy_shield", "panel_muted"];
@@ -301,6 +312,7 @@ impl Bot {
             "qa" => (BLOCKER, BLOCKER),
             "data_scientist" => (EARLY_STOP, EARLY_STOP),
             "security" => (DISABLE, SOCIAL_ENG),
+            "cobol" => (PUNCH_CARD, PUNCH_CARD),
             _ => (RPR, DUCK),
         }
     }
@@ -426,7 +438,7 @@ impl Bot {
         let Some(t) = self.target.and_then(|t| self.sim.unit(t)).cloned() else {
             return false;
         };
-        let melee = matches!(self.class, "frontend" | "backend" | "security");
+        let melee = matches!(self.class, "frontend" | "backend" | "security" | "cobol");
         let (far, near) = if melee { (4.5, 3.0) } else { (27.0, 24.0) };
         let d = combat_core::distance(t.pos, self.pos);
         if !t.alive || d <= far {
@@ -512,6 +524,7 @@ impl Bot {
             "qa" => self.act_qa(),
             "data_scientist" => self.act_data_scientist(),
             "security" => self.act_security(),
+            "cobol" => self.act_cobol(),
             _ => self.act_fullstack(),
         }
     }
@@ -825,6 +838,52 @@ impl Bot {
         }
     }
 
+    fn act_cobol(&mut self) {
+        let Some((me, t)) = self.engage() else { return };
+        let reflecting = Self::reflecting(&t);
+        let hp_pct = me.hp * 100 / me.max_hp.max(1);
+        let deadline = me.auras.iter().any(|a| a.key == "deadline");
+        // Off the global cooldown: the manual comes out before the bar is busy.
+        if (hp_pct < 45 || deadline) && self.ready(READ_MANUAL) {
+            self.cast(READ_MANUAL);
+        }
+        if !reflecting && self.try_kick(&t, PUNCH_CARD, PUNCH_CARD) {
+            return;
+        }
+        if self.busy(&me) {
+            return;
+        }
+        let pack = self.enemies_near(5.0);
+        if (hp_pct < 55 || (reflecting && hp_pct < 80)) && self.ready(PENSION) {
+            return self.cast(PENSION);
+        }
+        if (hp_pct < 70 || pack >= 3) && self.ready(UPTIME) {
+            return self.cast(UPTIME);
+        }
+        if hp_pct < 50 && pack >= 2 && self.ready(MAINT_WINDOW) {
+            return self.cast(MAINT_WINDOW);
+        }
+        if reflecting {
+            return;
+        }
+        if combat_core::distance(me.pos, t.pos) > 6.0 && self.ready(GOTO) {
+            return self.cast(GOTO);
+        }
+        if pack >= 2 && self.ready(CODE_FREEZE) {
+            return self.cast(CODE_FREEZE);
+        }
+        // Seniority: big strikes on the tough targets, the batch job and the cleave on packs.
+        if me.mana >= 60 && t.max_hp > 400 && self.ready(REWRITE) {
+            return self.cast(REWRITE);
+        }
+        if t.hp > 150 && self.ready(BATCH_JOB) {
+            return self.cast(BATCH_JOB);
+        }
+        if pack >= 2 && self.ready(CORE_DUMP) {
+            self.cast(CORE_DUMP);
+        }
+    }
+
     fn act_security(&mut self) {
         let Some((me, t)) = self.engage() else { return };
         let reflecting = Self::reflecting(&t);
@@ -954,11 +1013,14 @@ impl Bot {
     /// Before the boss it always tops off, which does not count as a rest.
     fn rest(&mut self, before_boss: bool) {
         let hp_pct = self.rest_hp_pct;
+        // Seniority refills from every swing, so nobody waits for it like for mana.
+        let mana_pct = if self.class == "cobol" { 0 } else { 50 };
         let low = |u: &combat_core::UnitState| {
-            u.hp * 100 < u.max_hp * hp_pct || u.mana * 100 < u.max_mana * 50
+            u.hp * 100 < u.max_hp * hp_pct || u.mana * 100 < u.max_mana * mana_pct
         };
+        let full_mana = if self.class == "cobol" { 0 } else { 95 };
         let full = |u: &combat_core::UnitState| {
-            u.hp * 100 >= u.max_hp * 95 && u.mana * 100 >= u.max_mana * 95
+            u.hp * 100 >= u.max_hp * 95 && u.mana * 100 >= u.max_mana * full_mana
         };
         if !before_boss && !low(&self.me()) {
             return;
@@ -981,7 +1043,7 @@ impl Bot {
             self.report.boss_min_hp_pct = 100;
         }
         // Melee walks up into the pack's aggro radius; casters open from 20 m.
-        let gap = if matches!(self.class, "frontend" | "backend" | "security") {
+        let gap = if matches!(self.class, "frontend" | "backend" | "security" | "cobol") {
             4.0
         } else {
             20.0
@@ -1898,7 +1960,7 @@ fn sprinter(class: &'static str, seed: u64) -> Bot {
     b
 }
 
-const SPRINT_CLASSES: [&str; 7] = CLASSES;
+const SPRINT_CLASSES: [&str; 8] = CLASSES;
 
 /// Every class solo delivers sprint levels 1-3 within par over three seeds (one building per
 /// seed, so all three buildings are covered).

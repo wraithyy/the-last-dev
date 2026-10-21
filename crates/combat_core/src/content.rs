@@ -484,6 +484,10 @@ pub struct SpellDef {
     /// Backstab bonuses on the spell's direct damage.
     #[serde(default)]
     pub opener: Option<OpenerDef>,
+    /// Finisher that empties the caster's mana pool (Seniority): on top of `mana`, everything
+    /// left is spent and the direct damage rises by this percent per point spent.
+    #[serde(default)]
+    pub spend_mana_bonus_pct: u32,
 }
 
 /// Extra direct damage, in percent: from stealth, and when the caster stands behind the target
@@ -870,6 +874,16 @@ pub struct UnitDef {
     /// Friendly NPC that `Ally` spells may target (the onboarding's burnt-out colleague).
     #[serde(default)]
     pub healable: bool,
+    /// Players: the mana pool is the class's own resource (Seniority) and does not grow with
+    /// levels, trophies or Promotion ranks, so spell costs keep their meaning.
+    #[serde(default)]
+    pub fixed_mana: bool,
+    /// Mana gained for every direct hit this unit lands (not DoT ticks).
+    #[serde(default)]
+    pub mana_on_hit: u32,
+    /// Mana gained for every direct hit this unit takes.
+    #[serde(default)]
+    pub mana_on_hurt: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]

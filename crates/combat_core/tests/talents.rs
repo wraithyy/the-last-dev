@@ -138,6 +138,15 @@ impl Arena {
             }
         }
         out.extend(self.run(2));
+        // A ground telegraph (Batch Job) lands its damage later; wait for it.
+        let delay = self
+            .sim
+            .content()
+            .spell(spell)
+            .and_then(|s| s.telegraph.as_ref().map(|t| t.delay_ms));
+        if let Some(ms) = delay {
+            out.extend(self.run(ms / 33 + 2));
+        }
         out
     }
 

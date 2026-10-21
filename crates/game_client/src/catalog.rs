@@ -76,6 +76,8 @@ const QA: &str = "models/characters/QA.glb";
 const DATA_SCIENTIST: &str = "models/characters/DataScientist.glb";
 /// Reskin of Backend.glb: black hoodie, pale skin, silver hair.
 const SECURITY: &str = "models/characters/SecurityEngineer.glb";
+/// Reskin of DevOps.glb: grey hair, brown cardigan, khaki trousers.
+const COBOL: &str = "models/characters/CobolGreybeard.glb";
 const CASUAL_F: &str = "models/characters/Casual_Female.glb";
 const CASUAL2: &str = "models/characters/Casual2_Male.glb";
 const CASUAL_M: &str = "models/characters/Casual_Male.glb";
@@ -86,7 +88,7 @@ const WORKER: &str = "models/characters/Worker_Male.glb";
 const PRIM: &str = "prim/";
 
 /// Every character GLB the catalog references.
-pub const CHARACTER_MODELS: [&str; 17] = [
+pub const CHARACTER_MODELS: [&str; 18] = [
     ENGINEER,
     FRONTEND,
     BACKEND,
@@ -94,6 +96,7 @@ pub const CHARACTER_MODELS: [&str; 17] = [
     QA,
     DATA_SCIENTIST,
     SECURITY,
+    COBOL,
     SUIT_M,
     SUIT_M_BALD,
     SUIT_F,
@@ -192,6 +195,10 @@ static TABLE: &[(&str, UnitVisual)] = &[
             "<Phished Twice This Quarter>",
             &[],
         ),
+    ),
+    (
+        "cobol_greybeard",
+        v(COBOL, 1.8, "COBOL Greybeard", "<Here Since 1987>", &[]),
     ),
     (
         "intern",
@@ -3085,6 +3092,7 @@ mod tests {
         "qa_engineer",
         "data_scientist",
         "security_engineer",
+        "cobol_greybeard",
         "intern",
         "meatproxy",
         "vibe_junior",
@@ -3182,7 +3190,7 @@ mod tests {
             assert!(!vis.title.is_empty());
         }
         // Every GLB is about 1.3 MB of download; one per playable class plus ten NPC bodies.
-        assert!(CHARACTER_MODELS.len() <= 17);
+        assert!(CHARACTER_MODELS.len() <= 18);
     }
 
     #[test]

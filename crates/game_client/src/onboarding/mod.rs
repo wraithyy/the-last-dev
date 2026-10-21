@@ -463,6 +463,13 @@ fn class_tip(class: &str, slot: &dyn Fn(u8) -> (String, String)) -> Option<Strin
                 "Build Exploit Chain with {b1} ({k1}) and {b2} ({k2}), then spend it with {fin} ({kf}). {sneak} ({ks}) hides you; your first hit from stealth lands hard."
             ))
         }
+        "cobol" => {
+            let ((goto, kg), (batch, kb)) = (slot(0), slot(2));
+            let ((manual, km), (rewrite, kr)) = (slot(3), slot(4));
+            Some(format!(
+                "Seniority builds with time and every hit you land or take. Close in with {goto} ({kg}), drop a {batch} ({kb}), then spend it all on {rewrite} ({kr}). {manual} ({km}) soaks the bad moments."
+            ))
+        }
         _ => None,
     }
 }

@@ -19,6 +19,7 @@ mod minimap;
 pub(crate) mod perf;
 pub(crate) mod quests;
 pub(crate) mod scroll;
+mod seniority;
 mod trophies;
 
 /// The minimap's width, so the touch layout can park its buttons beside it.
@@ -85,7 +86,11 @@ impl Plugin for HudPlugin {
                 minimap::MinimapPlugin,
                 hovertip::HoverTipPlugin,
             ))
-            .add_plugins((perf::PerfPlugin, combo::ComboPlugin))
+            .add_plugins((
+                perf::PerfPlugin,
+                combo::ComboPlugin,
+                seniority::SeniorityPlugin,
+            ))
             .add_systems(Startup, spawn_misc)
             .add_systems(
                 Update,

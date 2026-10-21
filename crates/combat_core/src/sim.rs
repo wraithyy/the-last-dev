@@ -206,6 +206,9 @@ pub struct Sim {
     pub(crate) loot_rng: Rng,
     pub(crate) telegraphs: Vec<crate::telegraph::TelegraphRt>,
     pub(crate) next_telegraph: u32,
+    /// Percent damage bonus of the finisher being resolved (`SpellDef::spend_mana_bonus_pct`);
+    /// zero outside `resolve`.
+    pub(crate) spend_bonus_pct: u64,
     /// Trash packs of the loaded zone (co-op growth on join).
     pub(crate) zone_packs: Vec<crate::zones::PackRt>,
     /// Props, achievements and rides (`world.rs`).
@@ -257,6 +260,7 @@ impl Sim {
             loot_rng: Rng::new(seed ^ 0x5EED_0F10_07AB),
             telegraphs: Vec::new(),
             next_telegraph: 1,
+            spend_bonus_pct: 0,
             zone_packs: Vec::new(),
             fun: crate::world::WorldRt::new(seed),
             sprint: Default::default(),
@@ -1523,6 +1527,10 @@ impl Sim {
         let cooldown_ms = self.perk_cooldown(ci, spell.id, spell.cooldown_ms);
         let u = &mut self.units[ci];
         u.state.mana = u.state.mana.saturating_sub(mana);
+        if spell.spend_mana_bonus_pct > 0 {
+            self.spend_bonus_pct = u64::from(u.state.mana) * u64::from(spell.spend_mana_bonus_pct);
+            u.state.mana = 0;
+        }
         u.state.hp = u.state.hp.saturating_sub(hp_cost).max(1);
         if cooldown_ms > 0 {
             u.cooldowns
@@ -1537,8 +1545,8 @@ impl Sim {
             self.spell_yell(ci, spell);
         }
         self.note_cast(ci, spell.id);
-        // Players have no telegraphs; enemy telegraphs land later in `update_telegraphs`.
-        if spell.telegraph.is_some() && !self.is_player(caster) {
+        // Telegraphs land later in `update_telegraphs`, for either side (Batch Job).
+        if spell.telegraph.is_some() {
             let ti = target.and_then(|t| self.index(t));
             return self.start_telegraphs(ci, spell, ti);
         }
@@ -1555,6 +1563,7 @@ impl Sim {
                 }
             }
         }
+        self.spend_bonus_pct = 0;
         if let (None, [primary]) = (spell.area, targets.as_slice())
             && let Some((extra, pct)) = self.perk_splash(ci, spell, *primary)
         {
@@ -1719,6 +1728,13 @@ impl Sim {
         {
             self.break_stealth(si);
         }
+        // Seniority: landing and taking direct hits builds the resource (a no-op for 0).
+        if !dot && dealt > 0 && source != target {
+            self.gain_mana_from_hit(ti, false);
+            if let Some(si) = self.index(source) {
+                self.gain_mana_from_hit(si, true);
+            }
+        }
         let hp = self.units[ti].state.hp.saturating_sub(dealt);
         self.units[ti].state.hp = hp;
         self.raid_link_hp(ti);
@@ -1735,6 +1751,16 @@ impl Sim {
             self.duel_won(source, target);
         } else if hp == 0 {
             self.die(ti, Some(source));
+        }
+    }
+
+    /// `mana_on_hit` / `mana_on_hurt` of the unit's definition, capped at its pool.
+    fn gain_mana_from_hit(&mut self, i: usize, dealt: bool) {
+        let d = &self.content.units[self.units[i].def];
+        let gain = if dealt { d.mana_on_hit } else { d.mana_on_hurt };
+        let s = &mut self.units[i].state;
+        if gain > 0 && s.alive {
+            s.mana = (s.mana + gain).min(s.max_mana);
         }
     }
 

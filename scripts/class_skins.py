@@ -1,7 +1,7 @@
 # Builds the Frontend / Backend / DevOps player models from the Quaternius "Ultimate Animated
 # Character Pack" (CC0). Every class keeps the Casual2_Male skeleton, proportions and animations
 # (same as Engineer.glb); only outfit, hair and a few extra skinned bits differ.
-# The QA Engineer, Data Scientist and Security Engineer are reskins of three of those (RESKINS): same mesh, hood and
+# The QA Engineer, Data Scientist, Security Engineer and COBOL Greybeard are reskins of those (RESKINS): same mesh, hood and
 # hair stages, new colours and clothing texture, so they need only the built GLBs.
 # Usage: python3 -I scripts/class_skins.py "<pack>/glTF" assets/models/characters
 #        python3 -I scripts/class_skins.py --reskin assets/models/characters
@@ -47,6 +47,9 @@ RESKINS = {
                                      "Pants": (0.015, 0.015, 0.02), "Belt": (0.02, 0.02, 0.02),
                                      "Sleeves": (0.012, 0.012, 0.015), "Hood": (0.012, 0.012, 0.015)},
                          None),
+    "CobolGreybeard": ("DevOps", {"Skin": (0.76, 0.57, 0.47), "Hair": (0.66, 0.66, 0.69),
+                                  "Pants": (0.2, 0.18, 0.15), "Belt": (0.05, 0.03, 0.02)},
+                       "cardigan"),
 }
 
 
@@ -206,6 +209,19 @@ def graph_paper_png():
     return png(px)
 
 
+def cardigan_png():
+    # Brown knit cardigan: vertical ribs and a darker purl row, wrapped around the torso and arms.
+    base, rib, purl = (116, 86, 58), (88, 64, 42), (100, 74, 50)
+    px = [[base] * 16 for _ in range(16)]
+    for y in range(16):
+        for x in range(16):
+            if x % 4 == 0:
+                px[y][x] = rib
+            elif y % 8 == 7:
+                px[y][x] = purl
+    return png(px)
+
+
 def read_glb(path):
     with open(path, "rb") as f:
         data = f.read()
@@ -222,7 +238,7 @@ def reskin(outdir, name, src, colours, texture):
             m["pbrMetallicRoughness"]["baseColorFactor"] = list(colours[base]) + [1.0]
     w = Writer(doc, blob)
     if texture:
-        data = {"caution": caution_png, "graph_paper": graph_paper_png}[texture]()
+        data = {"caution": caution_png, "graph_paper": graph_paper_png, "cardigan": cardigan_png}[texture]()
         doc["images"][0]["bufferView"] = w._view(data, None)
     write_glb(doc, compact(doc, bytes(w.blob)), os.path.join(outdir, name + ".glb"))
 

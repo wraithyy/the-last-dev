@@ -25,6 +25,7 @@ The base models cover the whole cast (plus one skin per playable class); per-uni
 | assets/models/characters/QA.glb | Frontend.glb reskinned by `scripts/class_skins.py --reskin`: hi-vis yellow hoodie with a black caution band (small procedural texture), black hood and sleeves, auburn hair | QA Engineer (player) |
 | assets/models/characters/DataScientist.glb | DevOps.glb reskinned by `scripts/class_skins.py --reskin`: purple graph-paper sweater with a trend line (small procedural texture), black hair, khaki trousers | Data Scientist (player) |
 | assets/models/characters/SecurityEngineer.glb | Backend.glb reskinned by `scripts/class_skins.py --reskin`: black hoodie and hood, pale skin, silver hair | Security Engineer (player) |
+| assets/models/characters/CobolGreybeard.glb | DevOps.glb reskinned by `scripts/class_skins.py --reskin`: brown knit cardigan (small procedural texture), grey hair, khaki trousers; the beard, reading glasses and tie are runtime primitives (gear.rs) | COBOL Greybeard (player) |
 | assets/models/characters/Casual_Female.glb | Casual_Female | AI-Native Intern, Agile Coach, LinkedIn Influencer |
 | assets/models/characters/Casual2_Male.glb | Casual2_Male | Vibe Coder, Vibe-Coding Junior, Scrum Master, Crypto Bro, Growth Hacker, IT Support |
 | assets/models/characters/Casual_Male.glb | Casual_Male | MeatProxy, Copilot Drone, Chatbot Minion, Unreviewed PR |
