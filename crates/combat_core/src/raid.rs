@@ -58,6 +58,16 @@ impl TwinsDef {
     }
 }
 
+/// How often a boss lockout resets.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+pub enum LockoutPeriod {
+    /// ISO week (Monday 00:00 UTC): raids.
+    #[default]
+    Weekly,
+    /// UTC day: dungeons, short chains that can be farmed daily.
+    Daily,
+}
+
 /// Absent in minimal test content: no raid.
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct RaidDef {
@@ -79,9 +89,17 @@ pub struct RaidDef {
     /// Tier sets (`GearDef::set`) its bosses drop; empty: every raid piece.
     #[serde(default)]
     pub sets: Vec<String>,
+    /// `Daily` makes this entry a dungeon (3-player Normal, daily boss lockout); the rest of the
+    /// framework (Async scaling, loot, reputation) is shared with raids.
+    #[serde(default)]
+    pub lockout: LockoutPeriod,
 }
 
 impl RaidDef {
+    pub fn is_dungeon(&self) -> bool {
+        self.lockout == LockoutPeriod::Daily
+    }
+
     pub fn is_raid_zone(&self, zone: &str) -> bool {
         self.zones.iter().any(|z| z == zone)
     }
@@ -196,6 +214,8 @@ pub(crate) struct RaidState {
     /// QA/tests: the difficulty regardless of group size.
     force: Option<bool>,
     lock: Lockout,
+    /// Dungeon encounters: the same bookkeeping keyed by UTC day instead of ISO week.
+    lock_daily: Lockout,
     tethers: Vec<Tether>,
     next_tether_check: u64,
     /// Next twin swap; `u64::MAX` while the twins are not fighting.
@@ -208,6 +228,18 @@ pub(crate) struct RaidState {
 impl Sim {
     fn raid_week(&self) -> u32 {
         self.legacy_week()
+    }
+
+    fn raid_day(&self) -> u32 {
+        crate::live::day_index(self.unix_s())
+    }
+
+    /// The raid or dungeon whose encounter list holds `boss`.
+    fn raid_def_of_boss(&self, boss: &str) -> Option<&RaidDef> {
+        self.content
+            .raids
+            .iter()
+            .find(|r| r.bosses(&self.content).iter().any(|b| b == boss))
     }
 
     /// The raid of the loaded zone.
@@ -235,7 +267,12 @@ impl Sim {
             },
             async_mode: self.raid.async_mode,
             week,
-            locked: self.raid.lock.list(week),
+            // Dungeon and raid locks share one list; boss keys are unique across both.
+            locked: {
+                let mut l = self.raid.lock.list(week);
+                l.extend(self.raid.lock_daily.list(self.raid_day()));
+                l
+            },
             tethers: self.raid.tethers.iter().map(|t| (t.a, t.b)).collect(),
             tether_m: max.round().clamp(0.0, 255.0) as u8,
         }
@@ -243,9 +280,12 @@ impl Sim {
 
     /// True while encounter `boss` stays dead on this difficulty until the weekly reset.
     pub fn raid_locked(&self, boss: &str, async_mode: bool) -> bool {
-        self.raid
-            .lock
-            .contains(self.raid_week(), &lock_key(boss, async_mode))
+        let key = lock_key(boss, async_mode);
+        if self.raid_def_of_boss(boss).is_some_and(RaidDef::is_dungeon) {
+            self.raid.lock_daily.contains(self.raid_day(), &key)
+        } else {
+            self.raid.lock.contains(self.raid_week(), &key)
+        }
     }
 
     fn raid_broadcast(&mut self) {
@@ -651,9 +691,14 @@ impl Sim {
             return;
         }
         let key = self.units[ti].state.key.clone();
-        let week = self.raid_week();
         let async_mode = self.raid.async_mode;
-        self.raid.lock.insert(week, lock_key(&key, async_mode));
+        if self.cur_raid().is_some_and(RaidDef::is_dungeon) {
+            let day = self.raid_day();
+            self.raid.lock_daily.insert(day, lock_key(&key, async_mode));
+        } else {
+            let week = self.raid_week();
+            self.raid.lock.insert(week, lock_key(&key, async_mode));
+        }
         self.raid.tethers.clear();
         let mode = if async_mode { "async" } else { "normal" };
         let keys = [format!("raid:{key}"), format!("raid:{mode}:{key}")];
@@ -700,24 +745,40 @@ impl Sim {
         self.raid.lock.saved()
     }
 
-    /// Restores a saved lockout; unknown encounters are dropped, an old week is stale.
-    pub(crate) fn set_raid_lockout(&mut self, week: u32, keys: &[String]) {
+    /// The dungeon lockout for the save: (UTC day, encounter keys).
+    pub(crate) fn dungeon_lockout(&self) -> (u32, Vec<String>) {
+        self.raid.lock_daily.saved()
+    }
+
+    /// Saved encounter keys that still exist; the rest are dropped.
+    fn known_raid_keys(&self, keys: &[String]) -> Vec<String> {
         let bosses: Vec<String> = self
             .content
             .raids
             .iter()
             .flat_map(|r| r.bosses(&self.content))
             .collect();
-        let known: Vec<String> = keys
-            .iter()
+        keys.iter()
             .filter(|k| {
                 bosses
                     .iter()
                     .any(|b| k.strip_prefix(ASYNC_PREFIX).unwrap_or(k) == b)
             })
             .cloned()
-            .collect();
+            .collect()
+    }
+
+    /// Restores a saved lockout; unknown encounters are dropped, an old week is stale.
+    pub(crate) fn set_raid_lockout(&mut self, week: u32, keys: &[String]) {
+        let known = self.known_raid_keys(keys);
         self.raid.lock.restore(week, known);
+        self.raid_broadcast();
+    }
+
+    /// Restores a saved dungeon lockout; an old day is stale.
+    pub(crate) fn set_dungeon_lockout(&mut self, day: u32, keys: &[String]) {
+        let known = self.known_raid_keys(keys);
+        self.raid.lock_daily.restore(day, known);
         self.raid_broadcast();
     }
 

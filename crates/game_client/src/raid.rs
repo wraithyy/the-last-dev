@@ -82,7 +82,7 @@ fn qa_locks(mut sim: ResMut<CombatSim>, mut done: Local<bool>) {
 }
 
 /// Banner title and subtitle for entering the raid on a difficulty.
-pub fn difficulty_banner(raid_name: &str, async_mode: bool) -> (String, String) {
+pub fn difficulty_banner(raid_name: &str, async_mode: bool, dungeon: bool) -> (String, String) {
     if async_mode {
         (
             format!("{}: ASYNC ATTENDANCE", raid_name.to_uppercase()),
@@ -92,16 +92,33 @@ pub fn difficulty_banner(raid_name: &str, async_mode: bool) -> (String, String) 
     } else {
         (
             format!("{}: FULL PROGRAMME", raid_name.to_uppercase()),
-            "Attendance is mandatory. Each session can be attended once a week.".into(),
+            if dungeon {
+                "Attendance is mandatory. Each session can be attended once a day.".into()
+            } else {
+                "Attendance is mandatory. Each session can be attended once a week.".into()
+            },
         )
     }
 }
 
 /// The notice for walking into a room whose boss this group already beat this week.
-pub fn locked_notice(view: &RaidView, boss_name: &str, boss_key: &str) -> Option<String> {
+pub fn locked_notice(
+    view: &RaidView,
+    boss_name: &str,
+    boss_key: &str,
+    dungeon: bool,
+) -> Option<String> {
     let key = combat_core::raid::lock_key(boss_key, view.async_mode);
     view.locked_in(view.week).contains(&key).then(|| {
-        format!("{boss_name} already presented this week. The room is being 'reset' until Monday.")
+        if dungeon {
+            format!(
+                "{boss_name} already presented today. The room is being 'reset' at midnight UTC."
+            )
+        } else {
+            format!(
+                "{boss_name} already presented this week. The room is being 'reset' until Monday."
+            )
+        }
     })
 }
 
@@ -132,9 +149,10 @@ fn events(
         let entered = !view.zone.is_empty() && last.0 != view.zone;
         // One difficulty banner per visit, not per room.
         let raid = content.raid_of(&view.zone).map_or("", |r| r.name.as_str());
+        let dungeon = content.raid_of(&view.zone).is_some_and(|r| r.is_dungeon());
         let new_raid = content.raid_of(&last.0).is_none_or(|r| r.name != raid);
         if entered && (new_raid || last.1 != view.async_mode) {
-            let (title, subtitle) = difficulty_banner(raid, view.async_mode);
+            let (title, subtitle) = difficulty_banner(raid, view.async_mode, dungeon);
             banners.write(Banner {
                 title,
                 subtitle,
@@ -145,7 +163,7 @@ fn events(
             let name = content
                 .unit_def(&b.unit)
                 .map_or("The boss", |u| u.name.as_str());
-            if let Some(n) = locked_notice(view, name, &b.unit) {
+            if let Some(n) = locked_notice(view, name, &b.unit, dungeon) {
                 notices.write(UiNotice(n));
             }
         }
@@ -230,9 +248,9 @@ mod tests {
 
     #[test]
     fn the_banner_names_the_difficulty_and_locked_rooms_say_so() {
-        let (t, s) = difficulty_banner("All-Hands Offsite", true);
+        let (t, s) = difficulty_banner("All-Hands Offsite", true, false);
         assert!(t.contains("ASYNC ATTENDANCE") && s.contains("three"));
-        let (t, _) = difficulty_banner("All-Hands Offsite", false);
+        let (t, _) = difficulty_banner("All-Hands Offsite", false, false);
         assert!(t.contains("FULL PROGRAMME"));
         let view = RaidView {
             zone: "offsite/1".into(),
@@ -241,11 +259,11 @@ mod tests {
             locked: vec!["async:icebreaker_facilitator".into()],
             ..Default::default()
         };
-        assert!(locked_notice(&view, "Icebreaker", "icebreaker_facilitator").is_some());
+        assert!(locked_notice(&view, "Icebreaker", "icebreaker_facilitator", false).is_some());
         let normal = RaidView {
             async_mode: false,
             ..view
         };
-        assert!(locked_notice(&normal, "Icebreaker", "icebreaker_facilitator").is_none());
+        assert!(locked_notice(&normal, "Icebreaker", "icebreaker_facilitator", false).is_none());
     }
 }

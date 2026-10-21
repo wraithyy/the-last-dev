@@ -575,6 +575,18 @@ Measured (`tests/coop.rs`, `vibecon_takes_a_group_and_async_attendance_takes_one
 | solo DPS, Async | 177-196 s, low 47-49% | 147-157 s, low 45-48% | 128-144 s, low 47-51% | 125-150 s, low 44-48% | 166-200 s, low 33-36% | 5/5 bosses, 791-816 s, nobody died |
 | solo DPS, Normal | died (PR merges) | - | - | - | - | 0/5, wipes at the Vibe Coder |
 
+## Dungeons
+
+A dungeon is a `RaidDef` with `lockout: Daily`: a short chain of zones that reuses the raid framework (difficulty, Pair Up, loot, reputation, Async scaling).
+
+```
+players       = 3-5; normal_min_players = 3, so a solo or duo group plays Async Attendance
+lockout       = per encounter and difficulty ("async:" prefix), UTC day index (unix / 86400),
+                resets at 00:00 UTC; per room online, per save offline
+                (dungeon_locks=<day>*<key>|<key>, separate from raid_locks; optional in old saves)
+rest          = same as the raids: boss_items, async_*_pct, boss_rep, sets
+```
+
 ## Weekly Sprint ladder
 
 ```

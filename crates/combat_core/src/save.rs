@@ -74,6 +74,10 @@ pub struct SaveData {
     /// killed in it (`async:`-prefixed for Async Attendance).
     pub raid_week: u32,
     pub raid_locks: Vec<String>,
+    /// Dungeon lockout (optional key; older saves have none): the UTC day and the encounters
+    /// killed in it.
+    pub dungeon_day: u32,
+    pub dungeon_locks: Vec<String>,
     /// The local Weekly Sprint ladder (optional key; older saves have none).
     pub ladder: crate::sprint::LadderView,
     /// Best medal per minigame key (optional key; older saves have none).
@@ -183,6 +187,13 @@ impl SaveData {
                 "raid_locks={}*{}\n",
                 self.raid_week,
                 self.raid_locks.join("|")
+            ));
+        }
+        if !self.dungeon_locks.is_empty() {
+            out.push_str(&format!(
+                "dungeon_locks={}*{}\n",
+                self.dungeon_day,
+                self.dungeon_locks.join("|")
             ));
         }
         if !self.ladder.entries.is_empty() {
@@ -333,6 +344,11 @@ impl SaveData {
                     s.raid_week = w.parse().unwrap_or(0);
                     s.raid_locks = list(b);
                 }
+                "dungeon_locks" => {
+                    let (d, b) = v.split_once('*').unwrap_or(("0", ""));
+                    s.dungeon_day = d.parse().unwrap_or(0);
+                    s.dungeon_locks = list(b);
+                }
                 "legacy_locks" => {
                     let (w, b) = v.split_once('*').unwrap_or(("0", ""));
                     s.legacy_week = w.parse().unwrap_or(0);
@@ -472,6 +488,8 @@ impl Sim {
             legacy_locks: self.legacy_lockout().1,
             raid_week: self.raid_lockout().0,
             raid_locks: self.raid_lockout().1,
+            dungeon_day: self.dungeon_lockout().0,
+            dungeon_locks: self.dungeon_lockout().1,
             ladder: self.ladder_saved(),
             minigames: self.minigame_bests(player),
             taken_props: self.taken_props(player),
@@ -582,6 +600,7 @@ impl Sim {
         );
         self.set_legacy_lockout(save.legacy_week, &save.legacy_locks);
         self.set_raid_lockout(save.raid_week, &save.raid_locks);
+        self.set_dungeon_lockout(save.dungeon_day, &save.dungeon_locks);
         self.set_ladder(save.ladder.week, save.ladder.entries.clone());
         self.set_minigame_bests(player, &save.minigames);
         self.restore_taken_props(player, &save.taken_props);

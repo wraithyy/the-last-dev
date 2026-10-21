@@ -8,7 +8,8 @@
 mod common;
 
 use combat_core::{
-    Command, Content, EntityId, Event, GearSource, SaveData, Sim, SpellId, Vec3, weekly_sprint,
+    Command, Content, EntityId, Event, GearSource, LockoutPeriod, SaveData, Sim, SpellId, Vec3,
+    weekly_sprint,
 };
 use common::*;
 
@@ -419,6 +420,47 @@ fn raid_bosses_lock_per_difficulty_for_the_week_and_the_lockout_is_saved() {
         SaveData::decode(old)
             .is_some_and(|s| s.raid_locks.is_empty() && s.ladder.entries.is_empty())
     );
+}
+
+/// The offsite flipped to a dungeon: no dungeon content ships yet, the framework is what counts.
+fn as_dungeon(c: &mut Content) {
+    for r in &mut c.raids {
+        if r.name == "All-Hands Offsite" {
+            r.lockout = LockoutPeriod::Daily;
+        }
+    }
+}
+
+#[test]
+fn a_daily_lockout_holds_for_the_utc_day_and_is_saved_apart_from_the_weekly_one() {
+    let (mut sim, ids) = group(1, 10, as_dungeon);
+    load(&mut sim, "offsite/1");
+    let boss = unit_of(&sim, "icebreaker_facilitator").expect("boss");
+    assert!(sim.debug_kill(boss));
+    run(&mut sim, 1);
+    assert!(sim.raid_locked("icebreaker_facilitator", true));
+    sim.set_clock(THURSDAY + DAY - 1);
+    assert!(
+        sim.raid_locked("icebreaker_facilitator", true),
+        "same UTC day"
+    );
+    sim.set_clock(THURSDAY + DAY);
+    assert!(
+        !sim.raid_locked("icebreaker_facilitator", true),
+        "next day index unlocks, long before the week resets"
+    );
+    sim.set_clock(THURSDAY);
+    let save = sim.export_save(ids[0]).expect("save");
+    let back = SaveData::decode(&save.encode()).expect("decode");
+    assert_eq!(back.dungeon_locks, ["async:icebreaker_facilitator"]);
+    assert!(back.raid_locks.is_empty());
+    let (mut fresh, q) = group(1, 10, as_dungeon);
+    assert!(fresh.import_save(q[0], &back));
+    assert!(fresh.raid_locked("icebreaker_facilitator", true));
+    fresh.set_clock(THURSDAY + DAY);
+    assert!(!fresh.raid_locked("icebreaker_facilitator", true));
+    let old = "the-last-dev save\nversion=3\nclass=devops\nlevel=10\n";
+    assert!(SaveData::decode(old).is_some_and(|s| s.dungeon_locks.is_empty()));
 }
 
 #[test]
