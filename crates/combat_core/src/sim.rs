@@ -70,6 +70,8 @@ pub(crate) struct Unit {
     /// BTreeMap keeps tie-breaks (lowest id wins) deterministic.
     pub threat: BTreeMap<EntityId, u32>,
     pub melee_next: u64,
+    /// Diminishing returns per `CcCat`: (applications in the window, tick the window ends).
+    pub dr: [(u8, u64); crate::content::CcCat::COUNT],
     /// Persists across toggles so stop/start cannot reset the swing timer.
     pub swing_next: u64,
     /// Next use per `AiDef::abilities` entry.
@@ -478,6 +480,7 @@ impl Sim {
             moving: false,
             threat: BTreeMap::new(),
             melee_next: 0,
+            dr: [(0, 0); crate::content::CcCat::COUNT],
             swing_next: 0,
             ability_next: vec![0; n_abilities],
             ability_yell_cursor: vec![0; n_abilities],
@@ -1150,6 +1153,9 @@ impl Sim {
         if self.has_aura_flag(ci, |a| a.silence) {
             return Err(CastError::Silenced);
         }
+        if spell.stealth_only && !self.is_stealthed(ci) {
+            return Err(CastError::NeedsStealth);
+        }
         if self.now < u.lockout_until[spell.school.index()] {
             return Err(CastError::SchoolLocked);
         }
@@ -1286,7 +1292,7 @@ impl Sim {
 
     fn handle_cast(&mut self, caster: EntityId, spell_id: SpellId) {
         let Some(ci) = self.index(caster) else { return };
-        let spell_id = self.effective_spell(ci, spell_id);
+        let spell_id = self.stealth_swap(ci, self.effective_spell(ci, spell_id));
         let Some(spell) = self.content.spell(spell_id).cloned() else {
             return;
         };

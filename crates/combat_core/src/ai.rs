@@ -228,12 +228,43 @@ impl Sim {
         (100 - slow) as f32 / 100.0
     }
 
+    /// Feared: run from the caster at a jog. Stops short of the leash so the scare never turns
+    /// into an evade that heals the enemy back to full.
+    fn fear_step(&mut self, i: usize, ai: &AiDef) -> bool {
+        let content = &self.content;
+        let Some(from) = self.units[i]
+            .auras
+            .iter()
+            .find(|a| content.aura(&a.key).is_some_and(|d| d.fear))
+            .map(|a| a.source)
+        else {
+            return false;
+        };
+        let me = self.units[i].state.pos;
+        let away = self.index(from).map_or(me, |s| {
+            let src = self.units[s].state.pos;
+            Vec3::new(2.0 * me.x - src.x, me.y, 2.0 * me.z - src.z)
+        });
+        let home = self.units[i].spawn_pos;
+        let step = ai.chase_speed_mps * 0.7 * self.slow_factor(i) / TICK_HZ as f32;
+        let next = step_toward(me, away, step, 0.0);
+        if dist_xz(next, home) < ai.leash_m * 0.8 {
+            self.units[i].state.yaw = yaw_toward(me, away);
+            self.units[i].state.pos = next;
+        }
+        self.set_ai(i, AiState::Chase);
+        true
+    }
+
     fn fight(&mut self, i: usize, ai: &AiDef) {
         let top = self.top_threat(i);
         let Some(ti) = top.and_then(|t| self.index(t)) else {
             return;
         };
         self.units[i].state.target = top;
+        if self.fear_step(i, ai) {
+            return;
+        }
         if self.has_aura_flag(i, |a| a.stun) {
             return;
         }

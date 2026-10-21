@@ -397,6 +397,34 @@ impl Sim {
         *reset = now + ticks(DR_RESET_MS);
         out
     }
+
+    /// Diminishing returns outside duels, per crowd-control family on the target: full, half,
+    /// quarter, then immune until 18 s pass without a new application of that family.
+    pub(crate) fn cc_dr_ms(&mut self, ti: usize, cat: crate::content::CcCat, ms: u32) -> u32 {
+        let now = self.now;
+        let (count, reset) = &mut self.units[ti].dr[cat.index()];
+        if now >= *reset {
+            *count = 0;
+        }
+        let out = match *count {
+            0 => ms,
+            1 => ms / 2,
+            2 => ms / 4,
+            _ => 0,
+        };
+        *count = count.saturating_add(1);
+        *reset = now + ticks(DR_RESET_MS);
+        out
+    }
+
+    /// Applications of `cat` on the unit in the current window (0 when it has lapsed), for
+    /// tooltips and tests.
+    pub fn cc_dr_count(&self, id: EntityId, cat: crate::content::CcCat) -> u8 {
+        self.index(id).map_or(0, |i| {
+            let (count, reset) = self.units[i].dr[cat.index()];
+            if self.now >= reset { 0 } else { count }
+        })
+    }
 }
 
 #[cfg(test)]

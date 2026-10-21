@@ -221,7 +221,8 @@ impl Sim {
         let in_class = self
             .class_at(i)
             .is_none_or(|c| c.knows(&self.content, spell.id))
-            || self.is_variant_of_known(i, spell.id);
+            || self.is_variant_of_known(i, spell.id)
+            || self.is_stealth_variant_of_known(i, spell.id);
         in_class && spell.learn_level <= self.units[i].state.level
     }
 

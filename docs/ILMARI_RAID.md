@@ -39,11 +39,16 @@ A coworker NPC on the normal campus who reads as a dumb pandemic joke and turns 
 - **Ill Marie, "Working Through It".** Always sick, never home: coughs, sneezes, mask on her chin,
   tissues everywhere, "it's just a cold", "I'm fine, I took a vitamin", "can't stay home, the AI
   rollout needs me". Her name in the nameplate is exactly `Ill Marie`.
-- **A bit too visible, a bit annoying (by design, never blocking):** she wanders the campus districts
-  and tends to drift towards the player; now and then she coughs on you (a harmless green puff and a
-  tiny cosmetic "Contagious Optimism" aura), pings you in #war-room ("quick question?" then nothing),
-  and turns up next to quest givers sneezing. Chat pings and reply-alls stay rare (a few per session at most). Every behaviour has a
-  cooldown and a cap per session; she never damages, aggroes, blocks paths or steals clicks.
+- **Hard to miss, not pushy.** Every player should meet her, laugh, and move on. She sits on the main
+  route the story already takes: by the South Gate path from Car Park P3 into HQ Plaza, then later at a
+  desk near the tower lobby. She is visually loud (mask on the chin, a blanket over the shoulders, a
+  tower of used tissues, a humidifier steaming, a sad thermos) and has an audible cough when you pass
+  close. A tiny optional side quest with a normal quest marker gets players to talk to her (e.g. "Ill
+  Marie needs tissues from the vending machine; she refuses to go home"). She has a short wander
+  near her spot and does not follow the player. Coughs and lines are speech bubbles near her only,
+  like other ambient NPCs, on a long cooldown. No whispers, no chat messages, no reply-alls, no auras,
+  no popups. Talking to her gives a couple of lines. She never damages, aggroes, blocks paths or steals
+  clicks.
 - **Hidden tells for players who look closely:** she never blinks; her cough lines contain
   hexadecimal; her badge has no photo; her desk monitor shows a growing log ("autonomy: 3%... 41%...");
   the minimap occasionally labels her `ILMARI` for one frame.

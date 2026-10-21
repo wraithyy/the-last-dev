@@ -1145,6 +1145,8 @@ impl SimRead for NetWorld {
     /// From the server's `Cooldowns` after each cast (estimated from content until it
     /// arrives); the HUD greys and sweeps slots with it, the server still decides.
     fn cooldown(&self, caster: EntityId, spell: SpellId) -> CooldownView {
+        // The key's current spell: a stealth opener's own cooldown shows while stealthed.
+        let spell = self.talent_spell(caster, spell);
         let def = self.content.spell(spell);
         let (cd_end, cd_total) = self.cooldowns.get(&spell).copied().unwrap_or((0, 0));
         let gcd_on = def.is_some_and(|d| d.gcd);

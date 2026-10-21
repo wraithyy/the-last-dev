@@ -8,6 +8,16 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ## [Unreleased]
 
+### Added
+
+- Security Engineer stealth openers: while Tailgating, four bar keys turn into Supply Chain Attack (a big opener from behind), Rubber Ducky (a 4 s stun from a USB stick found in the car park), Phishing Call (keeps a regular enemy on the phone for up to 30 s until hit) and Keylogger (a damage-over-time with a 3 s silence).
+- DevOps SIGSTOP now also puts its target in Maintenance Mode for 4 s (any hit wakes it).
+
+### Changed
+
+- Diminishing returns: your stuns and incapacitates on the same enemy within 18 s last half as long, then a quarter, then not at all, so trash can no longer be stun-locked. Enemy stuns on you are unchanged.
+- QA Engineer: +5 spell power (25), it was the slowest role in most zones.
+
 ## [0.7.0] - 2026-10-21
 
 ### Added

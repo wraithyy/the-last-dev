@@ -97,6 +97,8 @@ AI abilities: each rule's first use is rolled `U[initial_ms]` (default the coold
 
 Yells (boss and player spell yells) are presentation-only: line selection is a round-robin cursor and never draws from the rng (see COMBAT_API.md, Yells).
 
+Crowd control and diminishing returns: an aura's family is derived from its flags (`fear` -> Fear, `stun` + `break_on_damage` -> Incapacitate, `stun` -> Stun, `silence` -> Silence, `root` -> Root). Bosses ignore Stun, Incapacitate and Fear (they only lose the cast an interrupt takes). A player's Stun, Incapacitate or Fear on an enemy diminishes per family: within 18 s of the previous one it lasts 100%, 50%, 25%, then 0% (not applied); 18 s without a new one resets the family. Enemy crowd control on players does not diminish (authored mechanics); duels keep their own shared counter (same 100/50/25/0 steps). Feared enemy AI jogs away from the caster at 70% chase speed and stops short of 80% of its leash, so a fear never causes an evade. Stealth openers (`stealth_variant`): while the caster is stealthed and has the level, the bar key casts the variant; `stealth_only` spells refuse with "You must be in stealth" otherwise.
+
 ## Classes
 
 - Base stats and auto attack come from the class `unit` (Fullstack 300 HP / 250 mana / 20 SP; Frontend 360 / 220 / 20, crit 8%; Backend 440 / 200 / 18; DevOps 290 / 300 / 22).

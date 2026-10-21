@@ -336,7 +336,8 @@ impl Sim {
 
     /// The bar spell `spell` as unit `player` casts it (talent variants applied).
     pub fn cast_spell_for(&self, player: EntityId, spell: SpellId) -> SpellId {
-        self.index(player)
-            .map_or(spell, |i| self.effective_spell(i, spell))
+        self.index(player).map_or(spell, |i| {
+            self.stealth_swap(i, self.effective_spell(i, spell))
+        })
     }
 }

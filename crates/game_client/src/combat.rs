@@ -93,10 +93,25 @@ pub trait SimRead: Send + Sync {
         self.content().talents.perks(&class, &picks)
     }
 
-    /// The bar spell as `unit` casts it under its talents (a Career Ladder variant or itself).
+    /// The bar spell as `unit` casts it right now: a Career Ladder variant, then the stealth
+    /// opener on that key while `unit` is stealthed (mirrors the sim's `stealth_swap`).
     fn talent_spell(&self, unit: EntityId, spell: SpellId) -> SpellId {
         let (class, picks) = self.talents_of(unit);
-        self.content().talents.spell_for(&class, &picks, spell)
+        let content = self.content();
+        let spell = content.talents.spell_for(&class, &picks, spell);
+        let Some(u) = self.unit(unit) else {
+            return spell;
+        };
+        let stealthed = u.auras.iter().any(|a| {
+            content
+                .aura(&a.key)
+                .is_some_and(|d| d.stealth_aggro_pct > 0)
+        });
+        let variant = content.spell(spell).and_then(|s| s.stealth_variant);
+        match variant.and_then(|v| content.spell(v)) {
+            Some(v) if stealthed && v.learn_level <= u.level => v.id,
+            _ => spell,
+        }
     }
 
     /// The resurrect of `unit`'s class.

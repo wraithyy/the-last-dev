@@ -136,6 +136,15 @@
         (key: "wrong_number", name: "Wrong Number", icon: "wrong_thread", harmful: true, stun: true,
             break_on_damage: true),
         (key: "incident_response", name: "Incident Response", icon: "incident_report", harmful: false),
+        // ---- v0.8 crowd control: Security stealth openers and the interrupt add-ons ----
+        (key: "rubber_ducky", name: "Rubber Ducky", icon: "gear_usb", harmful: true, stun: true),
+        (key: "phishing_call", name: "On a Call with IT", icon: "phished", harmful: true, stun: true,
+            break_on_damage: true),
+        (key: "keylogged", name: "Keylogged", icon: "keyboard", harmful: true, school: Physical,
+            periodic: Some((interval_ms: 2000, base: 8, coefficient_pct: 20))),
+        (key: "keylogger_mute", name: "Keystrokes Captured", icon: "keyboard", harmful: true, silence: true),
+        (key: "maintenance_mode", name: "Maintenance Mode", icon: "sigstop", harmful: true, stun: true,
+            break_on_damage: true),
         // ---- player class: COBOL Greybeard (Seniority is the mana pool, see `fixed_mana`) ----
         (key: "goto_lock", name: "GOTO 10", icon: "hook", harmful: true, root: true),
         (key: "punch_card", name: "Punch Card Jam", icon: "junk_ticket", harmful: true, stun: true),
@@ -713,8 +722,9 @@
             id: 42, name: "SIGSTOP", icon: "sigstop", school: Arcane,
             range_m: 25.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 20000,
             learn_level: 2,
-            description: "Freezes the process mid-sentence, like a demo on conference wifi. Interrupts spellcasting and locks that school for 4 sec.",
+            description: "Freezes the process mid-sentence, like a demo on conference wifi. Interrupts spellcasting, locks that school for 4 sec and puts the target in Maintenance Mode for 4 sec (any hit wakes it). Bosses only lose the cast.",
             effect: Interrupt(lockout_ms: 4000),
+            extra_effects: [Aura(aura: "maintenance_mode", duration_ms: 4000)],
             yells: [
                 "SIGSTOP. Hold that thought. Forever.",
                 "Paused. Like every roadmap.",
@@ -1073,6 +1083,7 @@
         (
             id: 71, name: "Shoulder Surf", icon: "hit_and_run", school: Physical,
             range_m: 5.0, cast_ms: 0, mana: 15, gcd: true, cooldown_ms: 0,
+            stealth_variant: Some(91),
             description: "Reads the target's screen from behind. Deals physical damage and adds a point of Exploit Chain (up to 5).",
             effect: Damage(base: 20, coefficient_pct: 40),
             extra_effects: [Aura(aura: "exploit_chain", duration_ms: 20000)],
@@ -1086,6 +1097,7 @@
         (
             id: 72, name: "Phishing Link", icon: "phishing", school: Physical,
             range_m: 12.0, cast_ms: 0, mana: 20, gcd: true, cooldown_ms: 0,
+            stealth_variant: Some(94),
             description: "A very convincing email about a free lunch. Deals physical damage every 2 sec for 12 sec and adds a point of Exploit Chain.",
             effect: Aura(aura: "phishing_link", duration_ms: 12000),
             extra_effects: [Aura(aura: "exploit_chain", duration_ms: 20000)],
@@ -1141,7 +1153,7 @@
         (
             id: 76, name: "Disable Account", icon: "locked_out", school: Physical,
             range_m: 5.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 15000,
-            learn_level: 2,
+            learn_level: 2, stealth_variant: Some(92),
             description: "Your account has been locked for suspicious activity. Interrupts spellcasting and locks that school for 4 sec.",
             effect: Interrupt(lockout_ms: 4000),
             yells: [
@@ -1166,7 +1178,7 @@
         (
             id: 78, name: "Social Engineering", icon: "wrong_thread", school: Physical,
             range_m: 6.0, cast_ms: 0, mana: 30, gcd: true, cooldown_ms: 24000,
-            learn_level: 4,
+            learn_level: 4, stealth_variant: Some(93),
             description: "Calls the target pretending to be IT. Interrupts its cast; a regular enemy forgets you for 6 sec until it is hit. Bosses only lose the cast.",
             effect: Aura(aura: "wrong_number", duration_ms: 6000),
             extra_effects: [Interrupt(lockout_ms: 2000)],
@@ -1203,6 +1215,60 @@
                 "Copying the customer database. Titled 'Holiday Photos'.",
                 "Exfiltrated at 2 a.m. Nobody was watching. Nobody ever is.",
                 "The DLP tool flagged it. The DLP tool is also on my list.",
+            ],
+        ),
+
+        // ---- Security stealth openers: the same bar keys, pressed while Tailgating ----
+        (
+            id: 91, name: "Supply Chain Attack", icon: "box", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 25, gcd: true, cooldown_ms: 0,
+            learn_level: 2, stealth_only: true,
+            description: "Stealth only (replaces Shoulder Surf while Tailgating). Ships the exploit inside a trusted dependency. Deals heavy physical damage, +60% from behind, and adds two points of Exploit Chain.",
+            effect: Damage(base: 60, coefficient_pct: 90),
+            extra_effects: [Aura(aura: "exploit_chain", duration_ms: 20000), Aura(aura: "exploit_chain", duration_ms: 20000)],
+            opener: Some((behind_bonus_pct: 60)),
+            yells: [
+                "Patched in version 4.2.1. You are on 4.2.0.",
+                "It came from npm. Everyone trusts npm.",
+                "Signed, sealed, compromised.",
+            ],
+        ),
+        (
+            id: 92, name: "Rubber Ducky", icon: "gear_usb", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 20, gcd: true, cooldown_ms: 20000,
+            learn_level: 3, stealth_only: true,
+            description: "Stealth only (replaces Disable Account while Tailgating). A USB stick found in the car park, plugged in out of curiosity. Stuns for 4 sec and adds two points of Exploit Chain. Bosses are not curious.",
+            effect: Aura(aura: "rubber_ducky", duration_ms: 4000),
+            extra_effects: [Aura(aura: "exploit_chain", duration_ms: 20000), Aura(aura: "exploit_chain", duration_ms: 20000)],
+            yells: [
+                "Found it in the car park. Labelled 'Salaries 2026'.",
+                "It types faster than you. It types 'rm -rf'.",
+                "Curiosity plugged the cat.",
+            ],
+        ),
+        (
+            id: 93, name: "Phishing Call", icon: "phished", school: Physical,
+            range_m: 8.0, cast_ms: 0, mana: 25, gcd: true, cooldown_ms: 15000,
+            learn_level: 5, stealth_only: true,
+            description: "Stealth only (replaces Social Engineering while Tailgating). Hi, this is IT, can you confirm your password? A regular enemy stays on the phone for up to 30 sec; any hit ends the call. Bosses never pick up.",
+            effect: Aura(aura: "phishing_call", duration_ms: 30000),
+            yells: [
+                "Hi, this is IT. Can you confirm your password? Slowly.",
+                "We noticed unusual activity. You. Stay on the line.",
+                "Your call is important to us. Please hold. Forever.",
+            ],
+        ),
+        (
+            id: 94, name: "Keylogger", icon: "keyboard", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 25, gcd: true, cooldown_ms: 15000,
+            learn_level: 7, stealth_only: true,
+            description: "Stealth only (replaces Phishing Link while Tailgating). Every keystroke, logged. Silences for 3 sec, deals physical damage every 2 sec for 12 sec and adds a point of Exploit Chain.",
+            effect: Aura(aura: "keylogged", duration_ms: 12000),
+            extra_effects: [Aura(aura: "keylogger_mute", duration_ms: 3000), Aura(aura: "exploit_chain", duration_ms: 20000)],
+            yells: [
+                "hunter2. Of course it is hunter2.",
+                "Every keystroke. Even the deleted ones.",
+                "Your password has a capital letter. Brave.",
             ],
         ),
 
@@ -3466,7 +3532,7 @@
         ),
         (
             key: "qa_engineer", name: "QA Engineer", title: "Reopened Your Ticket", level: 1, hostile: false,
-            max_hp: 320, max_mana: 260, spell_power: 20, crit_pct: 6, haste_pct: 0,
+            max_hp: 320, max_mana: 260, spell_power: 25, crit_pct: 6, haste_pct: 0,
             mana_regen_per_5s_combat: 65,
             xp_reward: 0, loot: [], ai: None,
             auto_attack: Some((

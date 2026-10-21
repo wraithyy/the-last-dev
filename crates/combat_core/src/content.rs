@@ -221,6 +221,56 @@ pub struct AuraDef {
     /// Ends the moment the bearer takes direct damage (Wrong Number); DoT ticks do not.
     #[serde(default)]
     pub break_on_damage: bool,
+    /// Fear: author it together with `stun` (no casting or swings); enemy AI also runs away
+    /// from the caster instead of standing still.
+    #[serde(default)]
+    pub fear: bool,
+}
+
+/// Crowd-control family for diminishing returns: repeats within one family shorten, families
+/// do not share a counter (a stun after a fear lands in full).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CcCat {
+    Stun,
+    Incapacitate,
+    Fear,
+    Silence,
+    Root,
+}
+
+impl CcCat {
+    pub const COUNT: usize = 5;
+
+    pub fn index(self) -> usize {
+        self as usize
+    }
+
+    /// Families a boss shrugs off entirely (it only loses the current cast).
+    pub fn boss_immune(self) -> bool {
+        matches!(self, CcCat::Stun | CcCat::Incapacitate | CcCat::Fear)
+    }
+}
+
+impl AuraDef {
+    /// Derived from the flags so existing content needs no new field.
+    pub fn cc_cat(&self) -> Option<CcCat> {
+        if !self.harmful {
+            return None;
+        }
+        if self.fear {
+            Some(CcCat::Fear)
+        } else if self.stun && self.break_on_damage {
+            Some(CcCat::Incapacitate)
+        } else if self.stun {
+            Some(CcCat::Stun)
+        } else if self.silence {
+            Some(CcCat::Silence)
+        } else if self.root {
+            Some(CcCat::Root)
+        } else {
+            None
+        }
+    }
 }
 
 /// Dispel category of an aura, shown on the debuff so players know what can clear it.
@@ -488,6 +538,13 @@ pub struct SpellDef {
     /// left is spent and the direct damage rises by this percent per point spent.
     #[serde(default)]
     pub spend_mana_bonus_pct: u32,
+    /// Pressed while the caster is in stealth, the bar key casts this spell instead (rogue-style
+    /// openers on the same key), once the caster's level unlocks it.
+    #[serde(default)]
+    pub stealth_variant: Option<SpellId>,
+    /// Castable only from stealth.
+    #[serde(default)]
+    pub stealth_only: bool,
 }
 
 /// Extra direct damage, in percent: from stealth, and when the caster stands behind the target

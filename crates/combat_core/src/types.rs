@@ -37,6 +37,8 @@ pub enum CastError {
     TargetNotDead,
     /// Mounting in a zone without `ZoneDef::scooters`.
     NoScooters,
+    /// A stealth opener pressed outside stealth.
+    NeedsStealth,
 }
 
 impl CastError {
@@ -64,6 +66,7 @@ impl CastError {
             CastError::InCombat => "Can't do that while in combat.",
             CastError::TargetNotDead => "Your target is not dead. Yet.",
             CastError::NoScooters => "No scooters in the office. (Facilities)",
+            CastError::NeedsStealth => "You must be in stealth. Try Tailgating.",
         }
     }
 }

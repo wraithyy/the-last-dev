@@ -1054,6 +1054,109 @@ fn social_engineering_stuns_trash_until_hit_and_only_interrupts_a_boss() {
     );
 }
 
+const SUPPLY_CHAIN: SpellId = SpellId(91);
+
+fn cast_failures(ev: &[Event], spell: SpellId) -> Vec<CastError> {
+    ev.iter()
+        .filter_map(|e| match e {
+            Event::CastFailed {
+                spell: s, reason, ..
+            } if *s == spell => Some(*reason),
+            _ => None,
+        })
+        .collect()
+}
+
+/// In Tailgating the Shoulder Surf key casts Supply Chain Attack (two points of Exploit Chain);
+/// outside stealth the opener itself refuses.
+#[test]
+fn stealth_turns_bar_keys_into_openers_that_need_stealth() {
+    let (mut sim, p, mobs) = arena_with("security", &["sales_rep"], no_crit);
+    move_to(&mut sim, p, -16.0, 0.0);
+    let ev = cast_at(&mut sim, p, mobs[0], SUPPLY_CHAIN);
+    assert_eq!(
+        cast_failures(&ev, SUPPLY_CHAIN),
+        vec![CastError::NeedsStealth]
+    );
+    assert!(sim.debug_apply_aura(p, "tailgating", 60_000));
+    let ev = cast_at(&mut sim, p, mobs[0], SHOULDER_SURF);
+    assert!(
+        damage_of(&ev, p, SUPPLY_CHAIN) > 0,
+        "the key cast the opener"
+    );
+    assert_eq!(stacks(&sim, mobs[0], "exploit_chain"), 2);
+    for _ in 0..60 {
+        sim.tick();
+    }
+    let ev = cast_at(&mut sim, p, mobs[0], SHOULDER_SURF);
+    assert!(
+        damage_of(&ev, p, SHOULDER_SURF) > 0,
+        "out of stealth the key is itself again"
+    );
+}
+
+/// Phishing Call (the Social Engineering key in stealth) keeps trash on the phone far longer
+/// than a fight lasts, ends on the first hit, and never lands on a boss.
+#[test]
+fn phishing_call_holds_trash_until_hit_and_skips_bosses() {
+    let (mut sim, p, mobs) = arena_with("security", &["sales_rep", "ceo"], no_crit);
+    move_to(&mut sim, p, -14.0, 0.0);
+    assert!(sim.debug_apply_aura(p, "tailgating", 60_000));
+    cast_at(&mut sim, p, mobs[0], SOCIAL_ENG);
+    assert!(has_aura(&sim, mobs[0], "phishing_call"));
+    for _ in 0..600 {
+        sim.tick();
+    }
+    assert!(
+        has_aura(&sim, mobs[0], "phishing_call"),
+        "still on the call after 20 s"
+    );
+    move_to(&mut sim, p, -16.0, 0.0);
+    cast_at(&mut sim, p, mobs[0], SHOULDER_SURF);
+    sim.tick();
+    assert!(
+        !has_aura(&sim, mobs[0], "phishing_call"),
+        "a hit ends the call"
+    );
+    assert!(sim.debug_apply_aura(p, "tailgating", 60_000));
+    move_to(&mut sim, p, -15.0, 0.0);
+    cast_at(&mut sim, p, mobs[1], SOCIAL_ENG);
+    assert!(
+        !has_aura(&sim, mobs[1], "phishing_call"),
+        "bosses never pick up"
+    );
+}
+
+/// Stuns on the same enemy within 18 s run full, half, quarter, then not at all; the window
+/// resets after 18 s without one.
+#[test]
+fn repeated_stuns_on_an_enemy_diminish_then_reset() {
+    let (mut sim, _p, mobs) = arena_with("security", &["sales_rep"], no_crit);
+    let m = mobs[0];
+    let run = |sim: &mut Sim, ms: u32| {
+        assert!(sim.debug_apply_aura(m, "rubber_ducky", 4000));
+        let full = ms * 30 / 1000;
+        // The unit view refreshes on the tick, so the first tick counts as one stunned tick.
+        sim.tick();
+        let mut lasted = u32::from(has_aura(sim, m, "rubber_ducky"));
+        while has_aura(sim, m, "rubber_ducky") && lasted < 200 {
+            sim.tick();
+            lasted += 1;
+        }
+        assert_eq!(lasted, full, "expected {ms} ms");
+    };
+    run(&mut sim, 4000);
+    run(&mut sim, 2000);
+    run(&mut sim, 1000);
+    run(&mut sim, 0);
+    assert_eq!(sim.cc_dr_count(m, combat_core::CcCat::Stun), 4);
+    for _ in 0..(18 * 30) {
+        sim.tick();
+    }
+    assert_eq!(sim.cc_dr_count(m, combat_core::CcCat::Stun), 0);
+    run(&mut sim, 4000);
+}
+
 // ---- COBOL Greybeard ----
 
 const GOTO: SpellId = SpellId(81);

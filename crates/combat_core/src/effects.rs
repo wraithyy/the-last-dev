@@ -30,6 +30,25 @@ impl Sim {
         self.has_aura_flag(i, |a| a.stealth_aggro_pct > 0)
     }
 
+    /// The stealth opener a press of `spell` becomes while unit `i` is stealthed and has the
+    /// level for it; otherwise `spell` itself.
+    pub(crate) fn stealth_swap(&self, i: usize, spell: SpellId) -> SpellId {
+        let variant = self.content.spell(spell).and_then(|s| s.stealth_variant);
+        match variant.and_then(|v| self.content.spell(v)) {
+            Some(v) if self.is_stealthed(i) && v.learn_level <= self.units[i].state.level => v.id,
+            _ => spell,
+        }
+    }
+
+    /// A stealth opener counts as learned when a spell the unit knows swaps into it.
+    pub(crate) fn is_stealth_variant_of_known(&self, i: usize, spell: SpellId) -> bool {
+        self.bar_at(i).iter().any(|b| {
+            self.content
+                .spell(*b)
+                .is_some_and(|s| s.stealth_variant == Some(spell))
+        })
+    }
+
     /// Percent of its aggro range an idle hostile still notices unit `i` from (100 when visible).
     pub(crate) fn stealth_aggro_pct(&self, i: usize) -> u32 {
         self.units[i]
@@ -647,7 +666,8 @@ impl Sim {
         let Some(def) = self.content.aura(key).cloned() else {
             return;
         };
-        if def.stun && self.units[ti].state.boss {
+        let cc = def.cc_cat();
+        if self.units[ti].state.boss && (def.stun || cc.is_some_and(|c| c.boss_immune())) {
             return;
         }
         // Outside a duel players never debuff each other (a cast that outlived the duel).
@@ -659,6 +679,14 @@ impl Sim {
         }
         let duration_ms = if pvp && (def.stun || def.silence) {
             match self.duel_cc_ms(ti, duration_ms) {
+                0 => return,
+                ms => ms,
+            }
+        } else if let Some(c) = cc.filter(|c| c.boss_immune() && !self.is_player(Self::id_of(ti))) {
+            // Only players' lockdowns on enemies diminish (no stun-locking trash). Enemy stuns on
+            // players are authored boss mechanics and stay full; silences and roots on trash stay
+            // full so caster packs and kiting play as before. Duels use their own counter above.
+            match self.cc_dr_ms(ti, c, duration_ms) {
                 0 => return,
                 ms => ms,
             }

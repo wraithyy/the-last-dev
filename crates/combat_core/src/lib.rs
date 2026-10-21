@@ -45,7 +45,7 @@ pub use calendar::{
     CalendarChain, CalendarDef, CalendarGame, CalendarReward, ChainStatus, TICKET_BOARD_MULT,
 };
 pub use content::{
-    AiAbility, AiDef, AiTarget, ApplyAura, Area, AuraDef, AutoAttackDef, ClassDef, Config,
+    AiAbility, AiDef, AiTarget, ApplyAura, Area, AuraDef, AutoAttackDef, CcCat, ClassDef, Config,
     ConsumeAura, Content, ContentError, DispelType, Effect, EnrageDef, Execute, FleeDef,
     FrontalShield, ITEM_DESC_MAX, ITEM_STACK_CAP, IdlePose, ItemBonus, ItemDef, ItemTotals,
     LevelDef, LootEntry, MAX_ACTION_BAR, MobScaling, Objective, OpenerDef, PackDef, PeriodicDef,
