@@ -1,7 +1,7 @@
 //! What the office says back: chat lines for prop outcomes. The sim picks `outcome` (with its
 //! own rng for cosmetic props), so every co-op peer reads the same line.
 
-use combat_core::{Content, PropDef, PropKind};
+use combat_core::{Content, PROP_DONE, PROP_FULLSTACK, PROP_REFUSED, PropDef, PropKind};
 
 /// `items[n % len]`; never panics on an empty list.
 fn pick<'a>(items: &[&'a str], n: u32) -> &'a str {
@@ -212,9 +212,146 @@ const COFFEE_OK: [&str; 4] = [
     "The machine recognises you and brews 'your usual'. You have never been here. Fresh Brew for 2 min.",
 ];
 
+/// Stock refusals by the user's class, for class props that name no line for it (`{}` is the
+/// prop's name).
+const REFUSE: [(&str, [&str; 2]); 7] = [
+    (
+        "frontend",
+        [
+            "It has no CSS. You decline to touch the {}.",
+            "The {} is not your component. It is not even in the design system.",
+        ],
+    ),
+    (
+        "backend",
+        [
+            "You glare at the {}. It does not expose an endpoint.",
+            "Not a service, not your problem. The {} stays as it is.",
+        ],
+    ),
+    (
+        "devops",
+        [
+            "The {} has no Dockerfile. There is nothing you can help with.",
+            "You would automate the {}, but it is not in the Terraform.",
+        ],
+    ),
+    (
+        "qa",
+        [
+            "You test the {} thoroughly. Nothing happens, which is the worst result.",
+            "The {} works exactly as specified. The specification is missing.",
+        ],
+    ),
+    (
+        "data_scientist",
+        [
+            "The {} does not have enough data. You say so, loudly.",
+            "You ask for the dataset behind the {}. They send a PDF.",
+        ],
+    ),
+    (
+        "security",
+        [
+            "Out of scope, per the pentest agreement. The {} lives to see another quarter.",
+            "You inspect the {} for vulnerabilities. It is not yours to exploit.",
+        ],
+    ),
+    (
+        "cobol",
+        [
+            "The {} was not written in your language. You leave it to the youngsters.",
+            "Not a COBOL job. The {} remains exactly as it was in 1987.",
+        ],
+    ),
+];
+
+/// A class prop that broke (the roll of `FULLSTACK_FAIL_PCT` or its own `fail_pct`).
+const BROKEN: [&str; 3] = [
+    "You poke the {}. It makes a noise you will not forget. Try again later.",
+    "The {} breaks in a way that is, technically, your fault. Try again later.",
+    "You read half the docs and the {} shows you why. Retry later.",
+];
+
+/// The local player's line for a class prop: a refusal for the wrong class, the effect line
+/// for the right one, and the Fullstack way of getting there.
+fn class_prop_line(def: &PropDef, outcome: u32, nth: u32, class: &str) -> String {
+    let roll = (outcome & 0xFFFF) as usize;
+    if outcome & PROP_REFUSED != 0 {
+        let own: Vec<&String> = def
+            .refuse
+            .iter()
+            .filter(|(c, _)| c == class)
+            .map(|(_, l)| l)
+            .collect();
+        if !own.is_empty() {
+            return own[roll % own.len()].clone();
+        }
+        let stock = REFUSE
+            .iter()
+            .find(|(c, _)| *c == class)
+            .map_or(["The {} does not respond to you."; 2], |(_, l)| *l);
+        return stock[roll % stock.len()].replace("{}", &def.name);
+    }
+    let fullstack = outcome & PROP_FULLSTACK != 0;
+    match outcome & 3 {
+        0 => {
+            let line = BROKEN[(roll >> 2) % BROKEN.len()].replace("{}", &def.name);
+            if fullstack {
+                format!("Fullstack moment. {line}")
+            } else {
+                line
+            }
+        }
+        PROP_DONE => format!(
+            "The {} has nothing left for you. You took it all already.",
+            def.name
+        ),
+        _ => {
+            let line = def
+                .lines
+                .get(nth as usize % def.lines.len().max(1))
+                .cloned()
+                .unwrap_or_else(|| format!("You use the {}.", def.name));
+            if fullstack {
+                format!("{line} (Fullstack way: it works, mostly, for half as long.)")
+            } else {
+                line
+            }
+        }
+    }
+}
+
+/// The tooltip's second line of a class prop: who may use it, and what else to know.
+pub fn class_tip(def: &PropDef, content: &Content) -> String {
+    let name = content
+        .classes
+        .iter()
+        .find(|c| c.key == def.class)
+        .map_or(def.class.as_str(), |c| c.name.as_str());
+    let mut tip = format!("Requires: {name}. Fullstack can try: slower, may break it.");
+    if def.once {
+        tip.push_str(" One-time.");
+    }
+    if def.party {
+        tip.push_str(" Helps the whole team.");
+    }
+    tip
+}
+
 /// The local player's line for a prop outcome; `nth` counts this player's uses, so props
-/// whose outcome repeats (a successful brew) still vary their line.
-pub fn mine(def: &PropDef, outcome: u32, nth: u32, content: &Content) -> Option<String> {
+/// whose outcome repeats (a successful brew) still vary their line. `class` is the player's
+/// class key (class props answer differently to each).
+pub fn mine(
+    def: &PropDef,
+    outcome: u32,
+    nth: u32,
+    class: &str,
+    content: &Content,
+) -> Option<String> {
+    if def.kind == PropKind::Class {
+        return Some(class_prop_line(def, outcome, nth, class));
+    }
     let n = outcome;
     let own_lines = !def.lines.is_empty()
         && !matches!(
@@ -304,6 +441,8 @@ pub fn mine(def: &PropDef, outcome: u32, nth: u32, content: &Content) -> Option<
             "The {} hums at you. Nothing to do here right now.",
             def.name
         ),
+        // Answered at the top of the function.
+        PropKind::Class => String::new(),
     })
 }
 
@@ -323,8 +462,11 @@ pub fn reward_name(def: &PropDef, outcome: u32, content: &Content) -> String {
 }
 
 /// A teammate's use, when it is worth a line in everyone's chat.
-pub fn witnessed(def: &PropDef, name: &str) -> Option<String> {
+pub fn witnessed(def: &PropDef, outcome: u32, name: &str) -> Option<String> {
     match def.kind {
+        PropKind::Class if def.party && outcome & PROP_REFUSED == 0 && outcome & 3 == 1 => {
+            Some(format!("{name} used the {} for the whole team.", def.name))
+        }
         PropKind::FireAlarm => Some(format!("{name} pulled the fire alarm. Run. Or fight.")),
         PropKind::Scooter => Some(format!("{name} borrowed an e-scooter with their face.")),
         PropKind::AiCar => Some(format!(
@@ -361,6 +503,7 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::Pickup => "Pick up",
         PropKind::Inspect => "Photograph it for the report",
         PropKind::Device => "Operate",
+        PropKind::Class => "Use",
     };
     let extra = match def.kind {
         PropKind::FireAlarm => "WARNING: every enemy on this floor will come for you.".to_string(),
@@ -415,6 +558,32 @@ mod tests {
     }
 
     #[test]
+    fn class_props_refuse_in_character_and_every_class_has_stock_lines() {
+        let c = match Content::from_ron(include_str!("../../../../content/game.ron")) {
+            Ok(c) => c,
+            Err(e) => panic!("{e}"),
+        };
+        let Some(p) = c.prop("fe_billboard") else {
+            panic!("no fe_billboard")
+        };
+        let line = mine(p, PROP_REFUSED | 7, 0, "devops", &c).unwrap_or_default();
+        assert_eq!(line, "I'd need a Figma license for that. And a ticket.");
+        // A class the prop names no line for falls back to the stock pool, with the prop's name.
+        let stock = mine(p, PROP_REFUSED | 7, 0, "qa", &c).unwrap_or_default();
+        assert!(stock.contains(&p.name), "{stock}");
+        for class in c.classes.iter().filter(|k| k.key != "fullstack") {
+            let l = mine(p, PROP_REFUSED, 0, &class.key, &c).unwrap_or_default();
+            assert!(
+                !l.contains("does not respond"),
+                "{} has no stock lines",
+                class.key
+            );
+        }
+        let broke = mine(p, PROP_FULLSTACK, 0, "fullstack", &c).unwrap_or_default();
+        assert!(broke.starts_with("Fullstack moment."), "{broke}");
+    }
+
+    #[test]
     fn every_prop_of_the_shipped_content_has_lines_and_a_tooltip() {
         let c = match Content::from_ron(include_str!("../../../../content/game.ron")) {
             Ok(c) => c,
@@ -422,7 +591,7 @@ mod tests {
         };
         for p in &c.world.props {
             for n in [0, 1, 2, 3, 65535] {
-                let line = mine(p, n, 0, &c).unwrap_or_default();
+                let line = mine(p, n, 0, "", &c).unwrap_or_default();
                 assert!(!line.is_empty(), "{} {n}", p.key);
             }
             assert!(!tooltip(p).0.is_empty());
@@ -438,13 +607,13 @@ mod tests {
                 panic!("no prop {key}");
             };
             for n in 1..6 {
-                let line = mine(p, n, n, &c).unwrap_or_default();
+                let line = mine(p, n, n, "", &c).unwrap_or_default();
                 assert!(p.lines.contains(&line), "{key}: {line}");
             }
         }
         if let Some(p) = c.prop("coffee_exec") {
             assert_eq!(
-                mine(p, 0, 3, &c).as_deref(),
+                mine(p, 0, 3, "", &c).as_deref(),
                 Some("Descaling required. Since 2019.")
             );
         }

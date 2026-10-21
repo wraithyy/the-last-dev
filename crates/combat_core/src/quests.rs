@@ -730,6 +730,18 @@ impl Sim {
         }
     }
 
+    /// Whether `pid` already used up prop `k` (index into `WorldDef::props`).
+    pub(crate) fn prop_used(&self, pid: EntityId, k: usize) -> bool {
+        self.quest_rt
+            .used_props
+            .get(&pid)
+            .is_some_and(|s| s.contains(&k))
+    }
+
+    pub(crate) fn mark_prop_used(&mut self, pid: EntityId, k: usize) {
+        self.quest_rt.used_props.entry(pid).or_default().insert(k);
+    }
+
     /// Keys of the pickups and inspect spots `pid` already used up, for the save.
     pub fn taken_props(&self, pid: EntityId) -> Vec<String> {
         let props = &self.content.world.props;
@@ -740,7 +752,10 @@ impl Sim {
             .into_iter()
             .flatten()
             .filter_map(|k| props.get(*k))
-            .filter(|p| matches!(p.kind, PropKind::Pickup | PropKind::Inspect))
+            .filter(|p| {
+                matches!(p.kind, PropKind::Pickup | PropKind::Inspect)
+                    || (p.kind == PropKind::Class && p.once)
+            })
             .map(|p| p.key.clone())
             .collect();
         keys.sort();

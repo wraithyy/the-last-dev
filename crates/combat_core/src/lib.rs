@@ -97,6 +97,9 @@ pub use types::{
     AiState, Audience, AuraEnd, AuraView, Career, CastError, CastView, Command, CooldownView,
     Event, ItemError, UnitState,
 };
-pub use world::{AchievementDef, PropDef, PropKind, SecretNpc, Trigger, WorldDef};
+pub use world::{
+    AchievementDef, FULLSTACK_FAIL_PCT, PROP_DONE, PROP_FULLSTACK, PROP_OK, PROP_REFUSED, PropDef,
+    PropKind, SecretNpc, Trigger, WorldDef,
+};
 pub use world_events::{WorldEventDef, WorldEventPhase};
 pub use zones::{TRASH_RESPAWN_MS, ZoneLinkView};

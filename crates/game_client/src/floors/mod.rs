@@ -6,6 +6,7 @@
 
 mod campus;
 pub mod carpark;
+mod class_spots;
 mod client;
 pub mod corporate;
 mod datacenter;

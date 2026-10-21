@@ -75,11 +75,29 @@ pub struct Props {
 }
 
 /// Entities drawn per zone by this module (parked scooters, quest pickups).
-type ZoneProps = Or<(With<ParkedScooter>, With<QuestPickup>)>;
+type ZoneProps = Or<(With<ParkedScooter>, With<QuestPickup>, With<ClassMarker>)>;
 
 /// A glowing quest pickup on the floor (index into `Props::list`); `true` for its halo disc.
 #[derive(Component)]
 struct QuestPickup(usize, bool);
+
+/// The class-coloured diamond (or halo ring) over a class prop: who may use it, at a glance.
+#[derive(Component)]
+struct ClassMarker;
+
+/// Marker colour of a class key (the roles' colours are taken by the party frames).
+fn class_color(key: &str) -> Color {
+    match key {
+        "devops" => Color::srgb(0.35, 0.95, 0.5),
+        "frontend" => Color::srgb(1.0, 0.45, 0.7),
+        "backend" => Color::srgb(0.45, 0.62, 1.0),
+        "qa" => Color::srgb(1.0, 0.75, 0.3),
+        "data_scientist" => Color::srgb(0.72, 0.5, 1.0),
+        "security" => Color::srgb(1.0, 0.3, 0.3),
+        "cobol" => Color::srgb(0.3, 0.9, 0.9),
+        _ => Color::WHITE,
+    }
+}
 
 /// The prop under the cursor (index into `Props::list`), for the cursor icon and the tooltip.
 #[derive(Resource, Default)]
@@ -168,6 +186,7 @@ fn hover_radius(kind: PropKind) -> f32 {
         | PropKind::VrDemo
         | PropKind::ShuttleStop
         | PropKind::Inspect
+        | PropKind::Class
         | PropKind::Device => 0.9,
         PropKind::Pickup => 0.6,
         PropKind::QuietRoom => 1.2,
@@ -283,6 +302,34 @@ fn track_zone(
             MeshMaterial3d(halo.clone()),
             Transform::from_xyz(p.center.x, 0.03, p.center.z),
             Visibility::Hidden,
+        ));
+    }
+    let diamond = meshes.add(Cuboid::new(0.2, 0.2, 0.2));
+    let ring = meshes.add(Annulus::new(0.62, 0.78));
+    for p in props.list.iter().filter(|p| p.kind == PropKind::Class) {
+        let class = content.prop(p.key).map_or("", |d| d.class.as_str());
+        let color = class_color(class);
+        let c = color.to_linear();
+        let glow = materials.add(StandardMaterial {
+            base_color: color,
+            emissive: LinearRgba::rgb(c.red * 3.0, c.green * 3.0, c.blue * 3.0),
+            unlit: true,
+            ..default()
+        });
+        commands.spawn((
+            ClassMarker,
+            Mesh3d(diamond.clone()),
+            MeshMaterial3d(glow.clone()),
+            Transform::from_xyz(p.center.x, p.center.y + 1.0, p.center.z)
+                .with_rotation(Quat::from_euler(EulerRot::XYZ, 0.6, 0.78, 0.0)),
+        ));
+        // An outline on the floor in front of the console, where the use spot is.
+        commands.spawn((
+            ClassMarker,
+            Mesh3d(ring.clone()),
+            MeshMaterial3d(glow),
+            Transform::from_xyz(p.stand.x, p.stand.y + 0.04, p.stand.z)
+                .with_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
         ));
     }
     for (i, p) in props.list.iter().enumerate() {
@@ -548,10 +595,14 @@ fn prop_events(
                 }
                 let line = if Some(*unit) == me {
                     props.uses += 1;
-                    lines::mine(def, *outcome, props.uses, sim.content())
+                    let class = sim
+                        .unit(*unit)
+                        .and_then(|u| sim.content().class_of_unit(&u.key))
+                        .map_or("", |c| c.key.as_str());
+                    lines::mine(def, *outcome, props.uses, class, sim.content())
                 } else {
                     let name = sim.unit(*unit).map_or("A colleague", |u| u.name.as_str());
-                    lines::witnessed(def, name)
+                    lines::witnessed(def, *outcome, name)
                 };
                 if let Some(text) = line {
                     let color = match def.kind {
@@ -671,6 +722,9 @@ fn show_tip(
     } else {
         def.action.as_str()
     };
+    if p.kind == PropKind::Class {
+        extra = lines::class_tip(def, sim.content());
+    }
     if p.kind == PropKind::DaysSign {
         let days = ((time.elapsed_secs() - props.days_reset) / DAY_SECS).max(0.0) as u32;
         extra = format!("{}: {days}", def.name);
@@ -694,6 +748,8 @@ fn show_tip(
                 set_text(&mut text, &extra);
                 color.0 = if p.kind == PropKind::FireAlarm {
                     WARN
+                } else if p.kind == PropKind::Class {
+                    class_color(&def.class)
                 } else {
                     DIM
                 };

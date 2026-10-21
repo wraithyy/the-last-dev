@@ -16,6 +16,9 @@ use crate::types::{AiState, AuraEnd, CastError, Event, ItemError};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
+mod class_props;
+pub use class_props::{FULLSTACK_FAIL_PCT, PROP_DONE, PROP_FULLSTACK, PROP_OK, PROP_REFUSED};
+
 /// A `Stand` achievement counts while the player is this close to the prop's anchor.
 pub const STAND_RADIUS_M: f32 = 3.0;
 /// Two uses of the same kind of prop further apart than this start a new streak.
@@ -74,6 +77,8 @@ pub enum PropKind {
     Inspect,
     /// A machine a quest has you operate (`Objective::Sequence`, `Objective::UseOn`).
     Device,
+    /// A prop only one class can use (`PropDef::class`): bonus only, never needed by a quest.
+    Class,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -118,6 +123,21 @@ pub struct PropDef {
     /// Quest props: the group a `Collect`, `Inspect` or `UseOn` objective names.
     #[serde(default)]
     pub tag: String,
+    /// `Class` props: the class key that may use it (Fullstack tries any, slowly and clumsily).
+    #[serde(default)]
+    pub class: String,
+    /// `Class` props: refusal lines for other classes, (class key, line); stock lines otherwise.
+    #[serde(default)]
+    pub refuse: Vec<(String, String)>,
+    /// `Class` props: usable once per player (a cache or an unlock), kept in `taken_props`.
+    #[serde(default)]
+    pub once: bool,
+    /// `Class` props: the effect lands on every living player of the zone, not just the user.
+    #[serde(default)]
+    pub party: bool,
+    /// `Class` props: Kudos paid out. With `to` set, a shortcut to that prop's stand spot.
+    #[serde(default)]
+    pub kudos: u32,
 }
 
 /// A friendly unit spawned at a layout anchor of one zone, outside `ZoneDef::friendly`.
@@ -205,6 +225,24 @@ impl WorldDef {
             }
             if let Some(n) = p.items.iter().find(|n| c.economy.goods(n).is_none()) {
                 return bad(format!("prop {} gives unknown goods {n}", p.key));
+            }
+            if p.kind == PropKind::Class {
+                let shortcut_ok = p.to.is_empty()
+                    || self
+                        .props
+                        .iter()
+                        .any(|o| o.key == p.to && o.zone == p.zone && o.key != p.key);
+                if c.classes.iter().all(|k| k.key != p.class)
+                    || p.refuse
+                        .iter()
+                        .any(|(k, _)| c.classes.iter().all(|c| c.key != *k))
+                    || !shortcut_ok
+                {
+                    return bad(format!(
+                        "class prop {} needs a known class, refusal classes and a shortcut target in its zone",
+                        p.key
+                    ));
+                }
             }
             let stop = |k: &str| {
                 self.props
@@ -502,6 +540,9 @@ impl Sim {
             PropKind::Pickup | PropKind::Inspect | PropKind::Device
         ) {
             return self.use_quest_prop(player, k);
+        }
+        if def.kind == PropKind::Class {
+            return self.use_class_prop(pi, k);
         }
         // Mirrored controls in a fight would be a griefing tool, not a joke; a shuttle would be
         // a free escape.
