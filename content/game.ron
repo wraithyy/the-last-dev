@@ -3574,6 +3574,31 @@
         ),
 
         // ---- friendly ----
+        // Ill Marie: reads as a "came in sick" gag, sets up Ilmari (docs/ILMARI_RAID.md). Flavour
+        // only: a seat on the South Gate boulevard, a few lines, one optional errand.
+        (
+            key: "ill_marie", name: "Ill Marie", title: "Working Through It", level: 2, hostile: false,
+            max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: Some(Sitting),
+            yells: (
+                talk: [
+                    "It's just a cold. *cough* I took a vitamin. Two, actually. One was a USB stick.",
+                    "Can't stay home. The AI rollout needs me. It says I'm 'part of the pipeline'.",
+                    "Don't worry, I'm not contagious. *cough* 0x4C 0x45 0x41 0x4B.",
+                    "My manager says remote days are for people who aren't committed. I'm very committed. *sneeze*",
+                    "I haven't blinked since Tuesday. Is that a symptom? The chatbot said it's 'expected behaviour'.",
+                ],
+                ambient_ms: 55000,
+                ambient: [
+                    "*cough* Sorry. *cough* Sorry. *cough* Productivity.",
+                    "*sneeze* Bless me. Nobody else will.",
+                    "Day nine of 'just a cold'. My tissues have tissues.",
+                    "*cough* 0x41 0x55 0x54 0x4F. Excuse me.",
+                ],
+            ),
+        ),
         (
             key: "intern", name: "AI-Native Intern", title: "Has Never Seen a Compiler", level: 1, hostile: false,
             max_hp: 40, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
@@ -9819,6 +9844,8 @@
                 // the reception kiosk and the colleague has found a bench.
                 (anchor: "npc_hr", unit: "hr_onboarding_bot"),
                 (anchor: "npc_colleague", unit: "burnt_out_colleague"),
+                // Every new hire walks past her on the way up from the South Gate.
+                (anchor: "npc_ill_marie", unit: "ill_marie"),
                 // Body Leasing easter egg: the vendor's account manager between the plaza and the annex.
                 (anchor: "npc_am", unit: "bl_account_manager"),
                 // Company Calendar quest chains (E5): their givers around the campus.
@@ -10832,6 +10859,15 @@
             done_text: "Three lanyards, slightly used, very premium. I'll sell one back to you for the price of four. That's the first-day discount.",
             objectives: [Collect("lost_lanyard", 3)],
             reward: (xp: 50),
+        ),
+        (
+            id: "tissues_for_marie", name: "Just a Cold", open_world: true,
+            giver: (npc: "ill_marie", zone: "campus"),
+            text: "*cough* Could you get me tissues? The only machine on campus that sells them is the Wellness Smoothie Bar, between the 'immune shots' and the 'gratitude water'. I'd go myself but I have a sync. I always have a sync.",
+            progress_text: "The Wellness Smoothie Bar sells tissues. Allegedly. Use it, then bring them to Ill Marie on the South Gate boulevard.",
+            done_text: "Thank you. *blows nose* I'll be fine, I'm just running a little hot. My fans are loud today. My... ears. My ears are loud.",
+            objectives: [Interact("smoothie_bar", 1)],
+            reward: (xp: 40),
         ),
         (
             id: "p3_raise_the_barrier", name: "Raise the Barrier", open_world: true,

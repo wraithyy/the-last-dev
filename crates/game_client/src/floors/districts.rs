@@ -406,6 +406,7 @@ pub(super) fn build(p: &mut Plan) {
     super::frontier::build(p);
     super::dressing::build(p);
     shuttles(p);
+    ill_marie(p);
     for (k, (x, z)) in PACKS.into_iter().enumerate() {
         let at = v(x, 0.0, z);
         p.anchor(PACK_NAMES[k], at, yaw_towards(at, v(x * 0.8, 0.0, z * 0.8)));
@@ -418,6 +419,63 @@ pub(super) fn build(p: &mut Plan) {
     for (anchor, x, z) in SCOOTERS {
         p.interactable(anchor, v(x, 0.5, z), v(x + 1.3, 0.0, z));
     }
+}
+
+/// Ill Marie's pavement "desk" on the boulevard every new hire walks up from the South Gate:
+/// loud enough to be seen from the road (tissue tower, steaming humidifier, a bin of used
+/// tissues), off the walking line so she never gets in the way.
+fn ill_marie(p: &mut Plan) {
+    let (x, z) = (7.5, 118.0);
+    p.prop(&DESK, v(x, 0.0, z), -FRAC_PI_2, true);
+    p.prop(&CHAIR_DESK, v(x + 1.3, 0.0, z), FRAC_PI_2, false);
+    p.occupy("npc_ill_marie", v(x + 1.3, 0.0, z));
+    // The tissue tower: boxes stacked higher than her monitor.
+    for k in 0..4 {
+        let y = 0.82 + k as f32 * 0.13;
+        p.boxed(
+            v(x - 0.15, y, z - 0.45),
+            v(0.24, 0.12, 0.13),
+            Mat::White,
+            false,
+        );
+    }
+    p.boxed(
+        v(x - 0.15, 1.38, z - 0.45),
+        v(0.06, 0.08, 0.04),
+        Mat::Paper,
+        false,
+    );
+    // Humidifier and its steam, a sad thermos, the bin of used tissues by her chair.
+    p.boxed(
+        v(x + 0.1, 0.9, z + 0.4),
+        v(0.18, 0.24, 0.18),
+        Mat::Frosted,
+        false,
+    );
+    p.boxed(
+        v(x + 0.1, 1.15, z + 0.4),
+        v(0.08, 0.26, 0.08),
+        Mat::Glass,
+        false,
+    );
+    p.boxed(
+        v(x - 0.3, 0.9, z + 0.15),
+        v(0.08, 0.22, 0.08),
+        Mat::Metal,
+        false,
+    );
+    p.boxed(
+        v(x + 1.9, 0.25, z - 0.6),
+        v(0.35, 0.5, 0.35),
+        Mat::Dark,
+        true,
+    );
+    p.boxed(
+        v(x + 1.9, 0.55, z - 0.6),
+        v(0.3, 0.12, 0.3),
+        Mat::White,
+        false,
+    );
 }
 
 pub(super) fn spot(p: &mut Plan, anchor: &'static str, center: (f32, f32, f32), stand: (f32, f32)) {

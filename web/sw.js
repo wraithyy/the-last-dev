@@ -59,6 +59,9 @@ async function warm() {
   try {
     const cache = await caches.open(CACHE);
     for (const p of self.PRECACHE) {
+      // Zone music (~27 MB) is cached only when a zone plays it: offline the visited zones keep
+      // their loop, the rest are silent, and nobody downloads the whole soundtrack on mobile data.
+      if (p.startsWith('assets/audio/music/')) continue;
       const url = scoped(p);
       if (await cache.match(url)) continue;
       try {

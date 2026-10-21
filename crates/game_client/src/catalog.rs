@@ -1989,6 +1989,21 @@ static TABLE: &[(&str, UnitVisual)] = &[
             ],
         ),
     ),
+    (
+        "ill_marie",
+        v(
+            CASUAL_F,
+            1.7,
+            "Ill Marie",
+            "<Working Through It>",
+            &[
+                // Greenish pallor and a loud red cardigan: visible from the boulevard.
+                paint("Skin", 0.74, 0.78, 0.6),
+                paint("Shirt", 0.8, 0.14, 0.16),
+                paint("Pants", 0.3, 0.28, 0.32),
+            ],
+        ),
+    ),
     // ---- VibeCon (raid): lanyard neon on black, the founders in vests ----
     (
         "vc_registration",
