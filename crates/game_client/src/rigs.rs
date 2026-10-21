@@ -919,11 +919,20 @@ fn build_rigs(
             }
         });
         let body = body.id();
-        commands.entity(entity).add_child(body).insert(RigState {
+        let state = RigState {
             body,
             shelled,
             open: 0.0,
             reveal: false,
+        };
+        // The rig's owner can be despawned before these commands apply (a scene swapped in the
+        // same frame); then the freshly built body goes too instead of erroring and leaking.
+        commands.queue(move |world: &mut World| {
+            if let Ok(mut owner) = world.get_entity_mut(entity) {
+                owner.add_child(body).insert(state);
+            } else if let Ok(orphan) = world.get_entity_mut(body) {
+                orphan.despawn();
+            }
         });
     }
 }

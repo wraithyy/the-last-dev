@@ -36,6 +36,15 @@ const DEFAULT_RTT_S: f64 = 0.15;
 /// A predicted cast the server never answered (dropped by the rate limiter) is let go after this.
 const PREDICTION_TIMEOUT_S: f64 = 2.0;
 
+/// Latest round trip, its jitter and the room's own tick p99 (from `TickStat`).
+#[derive(Default, Clone, Copy)]
+pub struct LinkStats {
+    pub rtt_s: f64,
+    pub jitter_s: f64,
+    pub pongs: u32,
+    pub tick_p99_us: Option<u32>,
+}
+
 /// A cast shown before the server confirmed it (see `NetWorld::predict_cast`).
 #[derive(Clone, Copy, Debug)]
 struct Prediction {
@@ -180,6 +189,8 @@ pub struct NetWorld {
     last_advance: Option<f64>,
     /// Smoothed round trip to the server from Ping/Pong, seconds.
     rtt_s: f64,
+    /// Raw link figures for the `~/perf` window.
+    pub link: LinkStats,
     quests: QuestLog,
     cleared: BTreeSet<String>,
     bosses_killed: BTreeSet<String>,
@@ -231,6 +242,7 @@ impl NetWorld {
             tick_at: (0, 0.0),
             last_advance: None,
             rtt_s: DEFAULT_RTT_S,
+            link: LinkStats::default(),
             quests: QuestLog::default(),
             cleared: BTreeSet::new(),
             bosses_killed: BTreeSet::new(),
@@ -632,7 +644,28 @@ impl NetWorld {
         let rtt = now - sent_ms as f64 / 1000.0;
         if (0.0..5.0).contains(&rtt) {
             self.rtt_s = 0.7 * self.rtt_s + 0.3 * rtt;
+            let l = &mut self.link;
+            if l.pongs > 0 {
+                l.jitter_s = 0.8 * l.jitter_s + 0.2 * (rtt - l.rtt_s).abs();
+            }
+            l.rtt_s = rtt;
+            l.pongs += 1;
         }
+    }
+
+    /// Smoothed round trip in seconds.
+    pub fn rtt_avg_s(&self) -> f64 {
+        self.rtt_s
+    }
+
+    /// Seconds since the last movement update from the server, if any arrived yet.
+    pub fn snapshot_age_s(&self, now: f64) -> Option<f64> {
+        self.last_positions_at.map(|t| (now - t).max(0.0))
+    }
+
+    /// How far behind the server other players are drawn, seconds.
+    pub fn interp_delay_s(&self) -> f64 {
+        INTERP_DELAY_S + self.update_interval
     }
 
     pub fn receive_events(&mut self, tick: u64, events: Vec<Event>, now: f64) {

@@ -147,7 +147,7 @@ impl Plugin for FloorsPlugin {
             .add_systems(Startup, spawn_sun)
             // Same frame as the sim floor swap, so movement never slides against old blockers.
             .add_systems(Update, load_floor.after(crate::game::FloorSwap))
-            .add_systems(Update, (blink_leds, water::animate));
+            .add_systems(Update, (blink_leds, water::animate, cap_point_lights));
     }
 }
 
@@ -228,6 +228,47 @@ fn blink_leds(
                 m.emissive = e;
             }
         }
+    }
+}
+
+/// Only the lights nearest the camera stay on: every extra clustered light costs each
+/// lit fragment, and WebGL2 has a hard uniform budget for them.
+#[allow(clippy::type_complexity)] // Bevy query tuple
+fn cap_point_lights(
+    time: Res<Time>,
+    settings: Res<crate::settings::Settings>,
+    cam: Query<&GlobalTransform, With<crate::camera::OrbitCamera>>,
+    mut lights: Query<(&GlobalTransform, &mut Visibility), (With<PointLight>, With<FloorEntity>)>,
+    mut next: Local<f32>,
+) {
+    // Light positions are static, so a few updates per second are enough.
+    *next -= time.delta_secs();
+    if *next > 0.0 {
+        return;
+    }
+    *next = 0.25;
+    let Some(cam) = cam.iter().next() else { return };
+    let max = settings.quality.max_lights();
+    if lights.iter().len() <= max {
+        for (_, mut v) in &mut lights {
+            v.set_if_neq(Visibility::Inherited);
+        }
+        return;
+    }
+    let eye = cam.translation();
+    let mut dist: Vec<f32> = lights
+        .iter()
+        .map(|(t, _)| t.translation().distance_squared(eye))
+        .collect();
+    dist.sort_by(f32::total_cmp);
+    let cutoff = dist[max - 1];
+    for (t, mut v) in &mut lights {
+        let on = t.translation().distance_squared(eye) <= cutoff;
+        v.set_if_neq(if on {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        });
     }
 }
 

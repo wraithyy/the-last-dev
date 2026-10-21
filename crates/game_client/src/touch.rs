@@ -236,13 +236,18 @@ fn is_mobile() -> bool {
 }
 
 /// Phones render at most 1.5x the CSS size: a 3x device pixel ratio would shade 4x the pixels
-/// for no visible gain at arm's length.
+/// for no visible gain at arm's length. Desktop browsers stop at 2x (a 3x or 4x zoomed display
+/// otherwise multiplies the shaded pixels for nothing); `settings::apply_render_scale` refines
+/// this per quality preset.
 pub fn initial_resolution() -> bevy::window::WindowResolution {
     let res = bevy::window::WindowResolution::default();
     #[cfg(target_arch = "wasm32")]
-    if is_mobile() {
+    {
         let dpr = web_sys::window().map_or(1.0, |w| w.device_pixel_ratio() as f32);
-        return res.with_scale_factor_override(dpr.clamp(1.0, 1.5));
+        let cap = if is_mobile() { 1.5 } else { 2.0 };
+        if dpr > cap || is_mobile() {
+            return res.with_scale_factor_override(dpr.clamp(1.0, cap));
+        }
     }
     res
 }

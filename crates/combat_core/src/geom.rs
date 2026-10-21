@@ -49,6 +49,94 @@ pub fn line_of_sight(a: Vec3, b: Vec3, blockers: &[Aabb]) -> bool {
     !blockers.iter().any(|bx| segment_hits(a, b, bx))
 }
 
+/// Uniform XZ grid over blockers. `clear` gives the same answer as `line_of_sight` on the same
+/// slice: it only skips boxes whose XZ extent cannot touch the segment's XZ bounding box.
+#[derive(Clone, Debug, Default)]
+pub struct BlockerGrid {
+    boxes: Vec<Aabb>,
+    cells: Vec<Vec<u32>>,
+    min_x: f32,
+    min_z: f32,
+    nx: usize,
+    nz: usize,
+}
+
+const CELL_M: f32 = 8.0;
+
+impl BlockerGrid {
+    pub fn new(boxes: Vec<Aabb>) -> Self {
+        let finite = |b: &Aabb| {
+            [b.min.x, b.min.z, b.max.x, b.max.z]
+                .iter()
+                .all(|v| v.is_finite())
+        };
+        if boxes.is_empty() || !boxes.iter().all(finite) {
+            // Non-finite input: keep the linear scan so behaviour stays identical.
+            return Self {
+                boxes,
+                ..Self::default()
+            };
+        }
+        let min_x = boxes.iter().map(|b| b.min.x).fold(f32::MAX, f32::min);
+        let min_z = boxes.iter().map(|b| b.min.z).fold(f32::MAX, f32::min);
+        let max_x = boxes.iter().map(|b| b.max.x).fold(f32::MIN, f32::max);
+        let max_z = boxes.iter().map(|b| b.max.z).fold(f32::MIN, f32::max);
+        let nx = (((max_x - min_x) / CELL_M) as usize + 1).min(512);
+        let nz = (((max_z - min_z) / CELL_M) as usize + 1).min(512);
+        let mut grid = Self {
+            boxes,
+            cells: vec![Vec::new(); nx * nz],
+            min_x,
+            min_z,
+            nx,
+            nz,
+        };
+        for (i, b) in grid.boxes.iter().enumerate() {
+            let (x0, x1) = (grid.col(b.min.x), grid.col(b.max.x));
+            let (z0, z1) = (grid.row(b.min.z), grid.row(b.max.z));
+            for z in z0..=z1 {
+                for x in x0..=x1 {
+                    grid.cells[z * nx + x].push(i as u32);
+                }
+            }
+        }
+        grid
+    }
+
+    // Clamping keeps out-of-grid coordinates on the border cells, which is conservative.
+    fn col(&self, x: f32) -> usize {
+        (((x - self.min_x) / CELL_M).max(0.0) as usize).min(self.nx - 1)
+    }
+
+    fn row(&self, z: f32) -> usize {
+        (((z - self.min_z) / CELL_M).max(0.0) as usize).min(self.nz - 1)
+    }
+
+    /// True when no blocker lies on the segment (same meaning as `line_of_sight`).
+    pub fn clear(&self, a: Vec3, b: Vec3) -> bool {
+        if self.cells.is_empty() || ![a.x, a.z, b.x, b.z].iter().all(|v| v.is_finite()) {
+            return line_of_sight(a, b, &self.boxes);
+        }
+        let (x0, x1) = (self.col(a.x.min(b.x)), self.col(a.x.max(b.x)));
+        let (z0, z1) = (self.row(a.z.min(b.z)), self.row(a.z.max(b.z)));
+        // A long segment touching more cells than there are boxes is cheaper to scan linearly.
+        if (x1 - x0 + 1) * (z1 - z0 + 1) > self.boxes.len() {
+            return line_of_sight(a, b, &self.boxes);
+        }
+        for z in z0..=z1 {
+            for x in x0..=x1 {
+                if self.cells[z * self.nx + x]
+                    .iter()
+                    .any(|&i| segment_hits(a, b, &self.boxes[i as usize]))
+                {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+}
+
 fn segment_hits(a: Vec3, b: Vec3, bx: &Aabb) -> bool {
     let mut t0 = 0.0_f32;
     let mut t1 = 1.0_f32;
@@ -151,5 +239,33 @@ mod tests {
             Vec3::new(0.0, 0.0, -5.0),
             &[wall()]
         ));
+    }
+
+    #[test]
+    fn grid_matches_linear_scan() {
+        let mut seed = 12345_u32;
+        let mut rnd = |lo: f32, hi: f32| {
+            seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+            lo + (seed >> 8) as f32 / (1u32 << 24) as f32 * (hi - lo)
+        };
+        let boxes: Vec<Aabb> = (0..300)
+            .map(|_| {
+                let (x, z) = (rnd(-100.0, 100.0), rnd(-100.0, 100.0));
+                Aabb {
+                    min: Vec3::new(x, 0.0, z),
+                    max: Vec3::new(x + rnd(0.5, 12.0), rnd(1.0, 6.0), z + rnd(0.5, 12.0)),
+                }
+            })
+            .collect();
+        let grid = BlockerGrid::new(boxes.clone());
+        for _ in 0..20_000 {
+            let a = Vec3::new(rnd(-130.0, 130.0), rnd(0.0, 3.0), rnd(-130.0, 130.0));
+            let b = Vec3::new(
+                a.x + rnd(-40.0, 40.0),
+                rnd(0.0, 3.0),
+                a.z + rnd(-40.0, 40.0),
+            );
+            assert_eq!(grid.clear(a, b), line_of_sight(a, b, &boxes));
+        }
     }
 }

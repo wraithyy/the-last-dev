@@ -26,6 +26,7 @@ pub type CodeGen = fn() -> Option<String>;
 pub const CANNOT_JOIN: &str = "cannot join";
 /// Recent tick durations kept for the p99 in `/healthz`.
 const TICK_SAMPLES: usize = 4096;
+const ROOM_TICK_SAMPLES: usize = 80;
 
 pub const TICK_HZ: u64 = 30;
 const CMD_QUEUE: usize = 1024;
@@ -373,6 +374,8 @@ async fn run_room(
     state.public = public;
     state.title = title;
     let mut ticks = 0u64;
+    // This room's own recent tick durations (about 4 s), for the members' `~/perf` window.
+    let mut recent_us: VecDeque<u32> = VecDeque::with_capacity(ROOM_TICK_SAMPLES);
     let mut joins = 0u32;
     let mut players: HashMap<PlayerId, mpsc::Sender<Bytes>> = HashMap::new();
     let mut empty_since = Some(Instant::now());
@@ -425,7 +428,17 @@ async fn run_room(
                 let started = std::time::Instant::now();
                 let out = state.tick();
                 if !players.is_empty() {
-                    inner.record_tick(u32::try_from(started.elapsed().as_micros()).unwrap_or(u32::MAX));
+                    let us = u32::try_from(started.elapsed().as_micros()).unwrap_or(u32::MAX);
+                    inner.record_tick(us);
+                    if recent_us.len() == ROOM_TICK_SAMPLES {
+                        recent_us.pop_front();
+                    }
+                    recent_us.push_back(us);
+                    if ticks.is_multiple_of(SUMMARY_EVERY_TICKS) {
+                        let mut v: Vec<u32> = recent_us.iter().copied().collect();
+                        v.sort_unstable();
+                        state.announce_tick_p99(v[v.len() * 99 / 100]);
+                    }
                 }
                 dispatch(&tag, &mut players, &mut state, out);
                 ticks += 1;

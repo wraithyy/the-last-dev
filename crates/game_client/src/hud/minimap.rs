@@ -3,7 +3,7 @@
 //! a handful of UI nodes (a pool of dots) and never renders to a texture.
 
 use super::map::{CANVAS_H, CANVAS_W, rasterise};
-use super::{ACCENT, ACCENT_WARM, DIM, PANEL_EDGE, giver_mark, label, set_text};
+use super::{ACCENT, ACCENT_WARM, DIM, PANEL_EDGE, giver_mark, label, put, set_text};
 use crate::combat::{SimReady, SimView};
 use crate::floors::build_zone;
 use crate::game::{GameFlow, zone_label};
@@ -35,6 +35,15 @@ const DOOR_LOCKED: Color = Color::srgb(1.0, 0.42, 0.36);
 /// The board's stand spot; the map uses it too.
 pub const CALENDAR_ANCHOR: &str = "prop:company_calendar";
 const CAL_PX: f32 = 15.0;
+
+/// Minimap marks, rescanned every `MARK_PERIOD` seconds instead of every frame.
+#[derive(Default)]
+struct MarkCache {
+    at: f32,
+    zoom: usize,
+    marks: Vec<(Vec2, Kind)>,
+}
+const MARK_PERIOD: f32 = 0.1;
 
 #[derive(Resource)]
 struct Radar {
@@ -266,6 +275,7 @@ fn spawn_radar(
         });
 }
 
+#[derive(Clone, Copy)]
 enum Kind {
     /// `quest`: a tracked quest still needs it (drawn yellow, at any distance in view).
     Hostile {
@@ -301,9 +311,9 @@ fn calendar_pin(
         return;
     };
     let v = to_view(p, me, (MM / 2.0) / half);
-    pin.display = Display::Flex;
-    pin.left = px(MM / 2.0 + v.x - CAL_PX / 2.0);
-    pin.top = px(MM / 2.0 + v.y - CAL_PX / 2.0);
+    put!(pin.display, Display::Flex);
+    put!(pin.left, px(MM / 2.0 + v.x - CAL_PX / 2.0));
+    put!(pin.top, px(MM / 2.0 + v.y - CAL_PX / 2.0));
     bang.set_if_neq(if cal.news {
         Visibility::Inherited
     } else {
@@ -354,6 +364,7 @@ fn update_radar(
         Without<RadarImage>,
     >,
     mut glyphs: Query<(&RadarGlyph, &mut Text, &mut TextColor)>,
+    mut cache: Local<MarkCache>,
     (mut zone_text, mut coords): (
         Single<&mut Text, (With<RadarZone>, Without<RadarGlyph>, Without<RadarCoords>)>,
         Single<
@@ -403,13 +414,13 @@ fn update_radar(
     // The raster is CANVAS_W x CANVAS_H canvas px at `scale` px per metre.
     let k = px_per_m / radar.scale;
     let at = to_view(radar.lo, me, px_per_m);
-    image.1.width = px(CANVAS_W * k);
-    image.1.height = px(CANVAS_H * k);
-    image.1.left = px(MM / 2.0 + at.x);
-    image.1.top = px(MM / 2.0 + at.y);
+    put!(image.1.width, px(CANVAS_W * k));
+    put!(image.1.height, px(CANVAS_H * k));
+    put!(image.1.left, px(MM / 2.0 + at.x));
+    put!(image.1.top, px(MM / 2.0 + at.y));
 
     // Facing is (-sin yaw, -cos yaw) in (x, z); the arrow art points at -z.
-    arrow.rotation = Rot2::radians(-player.yaw);
+    put!(arrow.rotation, Rot2::radians(-player.yaw));
     // A Legacy floor keeps its affix in view where the coordinates usually are.
     let (coords_text, coords_color) = &mut *coords;
     let legacy = sim.legacy_view();
@@ -417,86 +428,94 @@ fn update_radar(
     {
         Some(affix) => {
             set_text(coords_text, &format!("LEGACY  {affix}"));
-            coords_color.0 = crate::legacy::LEGACY;
+            put!(coords_color.0, crate::legacy::LEGACY);
         }
         None => {
             set_text(
                 coords_text,
                 &format!("x {:>4.0}  z {:>4.0}", player.pos.x, player.pos.z),
             );
-            coords_color.0 = DIM;
+            put!(coords_color.0, DIM);
         }
     }
 
     let half = RADII[radar.zoom];
     let in_view = |p: Vec2| (p - me).abs().max_element() <= half;
-    let mut marks: Vec<(Vec2, Kind)> = Vec::new();
-    let wanted = super::quests::objective_units(&*sim, &track);
-    for u in sim.units() {
-        let p = Vec2::new(u.pos.x, u.pos.z);
-        if Some(u.id) == sim.player() || !in_view(p) {
-            continue;
+    // The unit scan (quest lookups per giver) is the costly part and dots are 5-12 px, so it
+    // runs at 10 Hz; dot positions below still follow the player every frame.
+    let now = time.elapsed_secs();
+    if now - cache.at >= MARK_PERIOD || now < cache.at || cache.zoom != radar.zoom {
+        let mut marks = std::mem::take(&mut cache.marks);
+        marks.clear();
+        let wanted = super::quests::objective_units(&*sim, &track);
+        for u in sim.units() {
+            let p = Vec2::new(u.pos.x, u.pos.z);
+            if Some(u.id) == sim.player() || !in_view(p) {
+                continue;
+            }
+            if u.lootable {
+                marks.push((p, Kind::Loot));
+            } else if !u.alive {
+                continue;
+            } else if sim.players().contains(&u.id) {
+                marks.push((p, Kind::Party));
+            } else if u.hostile {
+                let quest = wanted.contains(&u.key);
+                if quest || p.distance(me) <= HOSTILE_RANGE {
+                    marks.push((
+                        p,
+                        Kind::Hostile {
+                            boss: u.boss,
+                            quest,
+                        },
+                    ));
+                }
+            } else if let Some((g, c)) = giver_mark(&*sim, &u.key, &flow.zone) {
+                marks.push((p, Kind::Glyph(g, c)));
+            }
         }
-        if u.lootable {
-            marks.push((p, Kind::Loot));
-        } else if !u.alive {
-            continue;
-        } else if sim.players().contains(&u.id) {
-            marks.push((p, Kind::Party));
-        } else if u.hostile {
-            let quest = wanted.contains(&u.key);
-            if quest || p.distance(me) <= HOSTILE_RANGE {
+        for l in sim.zone_links(&flow.zone) {
+            let Some((_, pos, _)) = flow.anchors.iter().find(|a| a.0 == l.anchor) else {
+                continue;
+            };
+            let p = Vec2::new(pos.x, pos.z);
+            if in_view(p) {
+                let open = l.unlocked || flow.unlock_all;
                 marks.push((
                     p,
-                    Kind::Hostile {
-                        boss: u.boss,
-                        quest,
-                    },
+                    Kind::Glyph("#", if open { DOOR_OPEN } else { DOOR_LOCKED }),
                 ));
             }
-        } else if let Some((g, c)) = giver_mark(&*sim, &u.key, &flow.zone) {
-            marks.push((p, Kind::Glyph(g, c)));
         }
-    }
-    for l in sim.zone_links(&flow.zone) {
-        let Some((_, pos, _)) = flow.anchors.iter().find(|a| a.0 == l.anchor) else {
-            continue;
+        // The Board Meeting's spot while its countdown runs (the boss itself is a boss dot later).
+        if live.boss_in(time.elapsed_secs()).is_some_and(|s| s > 0)
+            && let Some((_, pos, _)) = flow.anchors.iter().find(|a| a.0 == "world_boss")
+        {
+            let p = Vec2::new(pos.x, pos.z);
+            if in_view(p) {
+                marks.push((p, Kind::Glyph("B", ACCENT_WARM)));
+            }
+        }
+        // Draw order is pool order: hostiles at the bottom, the group on top.
+        let rank = |k: &Kind| match k {
+            Kind::Hostile { quest: false, .. } => 0,
+            Kind::Hostile { quest: true, .. } => 1,
+            Kind::Loot => 2,
+            Kind::Glyph(..) => 3,
+            Kind::Party => 4,
         };
-        let p = Vec2::new(pos.x, pos.z);
-        if in_view(p) {
-            let open = l.unlocked || flow.unlock_all;
-            marks.push((
-                p,
-                Kind::Glyph("#", if open { DOOR_OPEN } else { DOOR_LOCKED }),
-            ));
-        }
+        marks.sort_by_key(|(_, k)| rank(k));
+        marks.truncate(POOL);
+        cache.marks = marks;
+        cache.at = now;
+        cache.zoom = radar.zoom;
     }
-    // The Board Meeting's spot while its countdown runs (the boss itself is a boss dot later).
-    if live.boss_in(time.elapsed_secs()).is_some_and(|s| s > 0)
-        && let Some((_, pos, _)) = flow.anchors.iter().find(|a| a.0 == "world_boss")
-    {
-        let p = Vec2::new(pos.x, pos.z);
-        if in_view(p) {
-            marks.push((p, Kind::Glyph("B", ACCENT_WARM)));
-        }
-    }
-    // Draw order is pool order: hostiles at the bottom, the group on top.
-    let rank = |k: &Kind| match k {
-        Kind::Hostile { quest: false, .. } => 0,
-        Kind::Hostile { quest: true, .. } => 1,
-        Kind::Loot => 2,
-        Kind::Glyph(..) => 3,
-        Kind::Party => 4,
-    };
-    marks.sort_by_key(|(_, k)| rank(k));
-    marks.truncate(POOL);
+    let marks = &cache.marks;
 
     let mut shown: [Option<(&'static str, Color)>; POOL] = [None; POOL];
     for (dot, mut node, mut bg, mut border, mut tf) in &mut dots {
         let Some((p, kind)) = marks.get(dot.0) else {
-            if node.display != Display::None {
-                node.display = Display::None;
-            }
+            put!(node.display, Display::None);
             continue;
         };
         let (size, fill, edge, turn, glyph) = match kind {
@@ -516,24 +535,30 @@ fn update_radar(
             Kind::Glyph(g, c) => (12.0, Color::NONE, Color::NONE, 0.0, Some((*g, *c))),
         };
         let v = to_view(*p, me, px_per_m);
-        node.display = Display::Flex;
-        node.width = px(size);
-        node.height = px(size);
-        node.left = px(MM / 2.0 + v.x - size / 2.0);
-        node.top = px(MM / 2.0 + v.y - size / 2.0);
-        node.border = if glyph.is_some() {
-            UiRect::ZERO
-        } else {
-            UiRect::all(px(1))
-        };
-        node.border_radius = if turn == 0.0 && glyph.is_none() {
-            BorderRadius::MAX
-        } else {
-            BorderRadius::ZERO
-        };
-        bg.0 = fill;
-        *border = BorderColor::all(edge);
-        tf.rotation = Rot2::degrees(turn);
+        put!(node.display, Display::Flex);
+        put!(node.width, px(size));
+        put!(node.height, px(size));
+        put!(node.left, px(MM / 2.0 + v.x - size / 2.0));
+        put!(node.top, px(MM / 2.0 + v.y - size / 2.0));
+        put!(
+            node.border,
+            if glyph.is_some() {
+                UiRect::ZERO
+            } else {
+                UiRect::all(px(1))
+            }
+        );
+        put!(
+            node.border_radius,
+            if turn == 0.0 && glyph.is_none() {
+                BorderRadius::MAX
+            } else {
+                BorderRadius::ZERO
+            }
+        );
+        put!(bg.0, fill);
+        put!(*border, BorderColor::all(edge));
+        put!(tf.rotation, Rot2::degrees(turn));
         shown[dot.0] = glyph;
     }
     for (g, mut text, mut color) in &mut glyphs {

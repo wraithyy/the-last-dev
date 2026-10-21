@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 22;
+pub const PROTOCOL_VERSION: u16 = 23;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -170,6 +170,11 @@ pub enum ServerMsg {
     },
     Pong {
         t: u64,
+    },
+    /// Once a second: p99 of this room's own recent tick durations, in microseconds (the
+    /// client's `~/perf` window shows it). Nothing about other rooms or the host.
+    TickStat {
+        p99_us: u32,
     },
     RoomList {
         rooms: Vec<RoomInfo>,
@@ -808,9 +813,10 @@ impl Msg for ServerMsg {
                     })
             }
             ServerMsg::RoomSettings { title, .. } => title_ok(title),
-            ServerMsg::PlayerLeft { .. } | ServerMsg::Emoted { .. } | ServerMsg::Pong { .. } => {
-                true
-            }
+            ServerMsg::PlayerLeft { .. }
+            | ServerMsg::Emoted { .. }
+            | ServerMsg::Pong { .. }
+            | ServerMsg::TickStat { .. } => true,
         };
         if ok {
             Ok(self)
@@ -1568,6 +1574,7 @@ mod tests {
                 target: Some(3),
             },
             ServerMsg::Pong { t: 123_456 },
+            ServerMsg::TickStat { p99_us: 1234 },
             ServerMsg::Events {
                 tick: 9,
                 events: sprint_events(),

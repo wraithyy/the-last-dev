@@ -5,7 +5,7 @@
 
 use crate::content::{AiDef, AiTarget, School, YellKind, ticks};
 use crate::effects::dist_xz;
-use crate::geom::{Vec3, distance, line_of_sight};
+use crate::geom::{Vec3, distance};
 use crate::sim::{Hit, Sim};
 use crate::targeting::EntityId;
 use crate::time::TICK_HZ;
@@ -147,15 +147,18 @@ impl Sim {
             }
             return;
         }
-        let dead: Vec<EntityId> = self.units[i]
-            .threat
-            .keys()
-            .copied()
-            .filter(|t| self.index(*t).is_none_or(|ti| !self.units[ti].state.alive))
-            .collect();
-        for t in dead {
+        let mut dead = std::mem::take(&mut self.dead_scratch);
+        dead.extend(
+            self.units[i]
+                .threat
+                .keys()
+                .copied()
+                .filter(|t| self.index(*t).is_none_or(|ti| !self.units[ti].state.alive)),
+        );
+        for t in dead.drain(..) {
             self.units[i].threat.remove(&t);
         }
+        self.dead_scratch = dead;
         match self.units[i].state.ai {
             Some(AiState::Evade) => self.evade_step(i, ai),
             _ if self.units[i].threat.is_empty() => {
@@ -185,7 +188,7 @@ impl Sim {
             if self.units[p].state.alive
                 && d <= ai.aggro_m
                 && best.is_none_or(|(_, bd)| d < bd)
-                && line_of_sight(me, them, &self.blockers)
+                && self.los.clear(me, them)
             {
                 best = Some((p, d));
             }
@@ -353,7 +356,7 @@ impl Sim {
             u.state.alive
                 && !u.despawned
                 && distance(me, u.state.pos) <= range
-                && line_of_sight(me, u.state.pos, &s.blockers)
+                && s.los.clear(me, u.state.pos)
         };
         match rule {
             AiTarget::Caster => Some(i),

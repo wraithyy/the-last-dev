@@ -241,6 +241,11 @@ impl RoomState {
         }
     }
 
+    /// Tells the members how long this room's ticks take (p99, microseconds).
+    pub fn announce_tick_p99(&mut self, p99_us: u32) {
+        self.broadcast(None, &ServerMsg::TickStat { p99_us });
+    }
+
     fn infos(&self) -> Vec<PlayerInfo> {
         self.members
             .values()

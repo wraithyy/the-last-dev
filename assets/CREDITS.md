@@ -8,7 +8,7 @@ Both packs are CC0 (https://creativecommons.org/publicdomain/zero/1.0/); attribu
 
 Ultimate Animated Character Pack (Nov 2019) by Quaternius (https://quaternius.com), CC0. The original License.txt is
 assets/models/LICENSE-quaternius.txt. The glTF files were repacked into single .glb files
-(scripts/gltf_to_glb.py), and the "Skin" and "Face" material colours were changed to skin tones and dark eyes. Suit_Male_Bald.glb (the CEO) is derived from Suit_Male by scripts/ceo_hair.py: short hair, receding hairline, grey-to-black vertex colours.
+(scripts/gltf_to_glb.py), and the "Skin" and "Face" material colours were changed to skin tones and dark eyes. Suit_Male_Bald.glb (the CEO) is derived from Suit_Male by scripts/ceo_hair.py: short hair, receding hairline, grey-to-black vertex colours. All character .glb files were then passed through `gltf-transform resample` (lossless-tolerance keyframe reduction, 1e-4) to shrink the animation data; the Quaternius licence allows modification.
 
 The base models cover the whole cast (plus one skin per playable class); per-unit shirt, hair and skin colours are applied at runtime
 (`crates/game_client/src/catalog.rs`). Skin tones differ per base model for variety.

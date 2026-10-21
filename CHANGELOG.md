@@ -8,6 +8,22 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ## [Unreleased]
 
+### Added
+
+- Graphics presets Low, Medium, High and Ultra, with render scale, MSAA, shadow and view-distance overrides in Settings.
+- The game picks a quality preset on first start and offers a lower one when the frame rate stays under 30.
+- A `~/perf $ top` window (F6) with frame times, scene counts, memory and, online, ping, jitter and server tick.
+
+### Changed
+
+- Faster rendering: distant NPCs and extra lamps are no longer drawn, and the HUD only redraws what changed.
+- The web version downloads less before the first scene and caches the rest in the background.
+- After an update the web version keeps every model and sound that did not change, so offline play keeps working.
+
+### Fixed
+
+- A first visit to the web version no longer reloads the page by itself once the offline cache is ready.
+
 ## [0.6.0] - 2026-10-20
 
 ### Added

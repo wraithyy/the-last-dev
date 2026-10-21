@@ -57,6 +57,10 @@ pub enum Action {
     Mute,
     MinimapZoomIn,
     MinimapZoomOut,
+    /// `~/perf $ top`: cycles off, compact, full.
+    Perf,
+    /// Accepts the "drop to a lower preset" offer the perf watchdog shows.
+    QualityDown,
 }
 
 /// Panel column a group is drawn in.
@@ -122,6 +126,8 @@ impl Action {
             Mute,
             MinimapZoomIn,
             MinimapZoomOut,
+            Perf,
+            QualityDown,
         ]);
         v.extend((0..3).map(Gadget));
         v.extend((0..10).map(Slot));
@@ -166,6 +172,8 @@ impl Action {
             Mute => "mute".into(),
             MinimapZoomIn => "minimap_zoom_in".into(),
             MinimapZoomOut => "minimap_zoom_out".into(),
+            Perf => "perf".into(),
+            QualityDown => "quality_down".into(),
         }
     }
 
@@ -206,6 +214,8 @@ impl Action {
             Mute => "mute".into(),
             MinimapZoomIn => "minimap zoom in".into(),
             MinimapZoomOut => "minimap zoom out".into(),
+            Perf => "~/perf window".into(),
+            QualityDown => "accept lower quality offer".into(),
         }
     }
 
@@ -219,9 +229,8 @@ impl Action {
             Slot(_) => Group::Bar,
             NumSlot(_) => Group::Numpad,
             QuestLog | Map | Trophies | CharacterSheet | Career | Pets | Endgame | Calendar
-            | Chat | CombatLog | Meter | Emotes | Mute | MinimapZoomIn | MinimapZoomOut => {
-                Group::Windows
-            }
+            | Chat | CombatLog | Meter | Emotes | Mute | MinimapZoomIn | MinimapZoomOut | Perf
+            | QualityDown => Group::Windows,
         }
     }
 
@@ -271,6 +280,9 @@ impl Action {
             Mute => KeyCode::KeyM,
             MinimapZoomIn => KeyCode::Equal,
             MinimapZoomOut => KeyCode::Minus,
+            // Function keys are physical positions, so every layout agrees on them.
+            Perf => KeyCode::F6,
+            QualityDown => KeyCode::F7,
         }
     }
 }

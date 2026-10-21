@@ -2,7 +2,7 @@
 
 use super::logs::{ChatKind, ChatLog, CombatLog, LogBuf, classify_yell};
 use super::loot::Shown;
-use super::{KEY_RIM, KEY_TOP, KEY_TOP_HI, PANEL_EDGE, label, set_text, vgrad};
+use super::{KEY_RIM, KEY_TOP, KEY_TOP_HI, PANEL_EDGE, label, put, set_text, vgrad};
 use crate::combat::{CombatEvent, PendingCommands, SimRead, SimReady, SimView, UiNotice};
 use crate::config::*;
 use crate::copy;
@@ -835,7 +835,10 @@ fn update_error(
     banner.left = (banner.left - time.delta_secs()).max(0.0);
     let (t, color) = &mut *text;
     set_text(t, &banner.text);
-    color.0 = Color::srgba(1.0, 0.18, 0.12, (banner.left / ERROR_TEXT_SECS).min(1.0));
+    put!(
+        color.0,
+        Color::srgba(1.0, 0.18, 0.12, (banner.left / ERROR_TEXT_SECS).min(1.0))
+    );
 }
 
 fn update_death(
@@ -848,7 +851,10 @@ fn update_death(
         .player()
         .and_then(|id| sim.unit(id))
         .is_some_and(|u| !u.alive);
-    panel.display = if dead { Display::Flex } else { Display::None };
+    put!(
+        panel.display,
+        if dead { Display::Flex } else { Display::None }
+    );
     if dead && buttons.iter().any(|i| *i == Interaction::Pressed) {
         pending.0.push(Command::RespawnPlayer);
     }
@@ -891,12 +897,12 @@ fn update_xp(
                 )
             }
         };
-        fill.width = percent(width);
+        put!(fill.width, percent(width));
         set_text(&mut text, &line);
         return;
     }
     let pct = (100.0 * u.xp as f32 / u.xp_to_next as f32).clamp(0.0, 100.0);
-    fill.width = percent(pct);
+    put!(fill.width, percent(pct));
     set_text(
         &mut text,
         &format!(

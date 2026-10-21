@@ -292,6 +292,7 @@ pub(crate) fn start_game(
     }
     let zone = std::env::var("WOW_ZONE")
         .ok()
+        .or_else(|| crate::debug::bench_spec().map(|b| b.zone.to_owned()))
         .or_else(|| env_u8("WOW_FLOOR").map(|f| format!("tower/{f}")))
         .filter(|z| sim.0.content().zone(z).is_some())
         .unwrap_or_else(|| "campus".into());
@@ -314,7 +315,10 @@ pub(crate) fn start_game(
 }
 
 fn debug_player_at() -> Option<(f32, f32, f32, f32)> {
-    let v = std::env::var("WOW_PLAYER_AT").ok()?;
+    let Ok(v) = std::env::var("WOW_PLAYER_AT") else {
+        let (x, z, yaw) = crate::debug::bench_spec()?.player_at?;
+        return Some((x, z, yaw.to_radians(), 0.0));
+    };
     let n: Vec<f32> = v.split(',').filter_map(|p| p.trim().parse().ok()).collect();
     match n[..] {
         [x, z, yaw] => Some((x, z, yaw.to_radians(), 0.0)),

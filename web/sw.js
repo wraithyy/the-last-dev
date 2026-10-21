@@ -10,25 +10,73 @@ const INDEX = scoped('./');
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
+    // Only the shell is precached so a first visit downloads what the first scene needs, not all
+    // assets. Everything else is cached on first fetch and filled in by the 'warm' message below.
     // The shell must be complete or the install fails (and the old build keeps running).
-    const core = self.PRECACHE.filter((p) => p === 'index.html' || p.startsWith('pkg/') || p === 'manifest.webmanifest');
-    await cache.addAll(['./', ...core.map(scoped)]);
-    // Assets are best effort: on a quota error the game still streams them from the network.
-    for (const p of self.PRECACHE) {
-      if (core.includes(p)) continue;
-      try {
-        await cache.add(scoped(p));
-      } catch (e) {
-        console.warn('[sw] cache full or fetch failed, continuing online:', p, e && e.name);
-        break;
-      }
+    await cache.addAll(['./', ...self.PRECACHE.filter(isShell).map(scoped)]);
+    await cache.put(HASHES_KEY, new Response(JSON.stringify(self.HASHES || {})));
+    // An update must not leave an offline player without models: carry over every asset whose
+    // content did not change since the build that cached it. Best effort; misses refill later.
+    try {
+      await carryOver(cache);
+    } catch (e) {
+      console.warn('[sw] carry-over skipped:', e && e.name);
     }
   })());
 });
 
+// Never served: the fetch handler only answers listed paths.
+const HASHES_KEY = scoped('__hashes__.json');
+
+async function carryOver(cache) {
+  const want = self.HASHES || {};
+  for (const name of await caches.keys()) {
+    if (!name.startsWith('last-dev-') || name === CACHE) continue;
+    const old = await caches.open(name);
+    const meta = await old.match(HASHES_KEY);
+    if (!meta) continue;
+    const had = await meta.json();
+    for (const p of self.PRECACHE) {
+      if (isShell(p) || !want[p] || had[p] !== want[p]) continue;
+      const url = scoped(p);
+      if (await cache.match(url)) continue;
+      const hit = await old.match(url);
+      if (hit) await cache.put(url, hit);
+    }
+  }
+}
+
+function isShell(p) {
+  return p === 'index.html' || p.startsWith('pkg/') || p === 'manifest.webmanifest' || p.startsWith('icons/');
+}
+
+// After the first scene is playing the page asks for the rest, so offline play works after one session.
+// Best effort and sequential: a quota error or dropped connection just stops it.
+let warming = false;
+async function warm() {
+  if (warming) return;
+  warming = true;
+  try {
+    const cache = await caches.open(CACHE);
+    for (const p of self.PRECACHE) {
+      const url = scoped(p);
+      if (await cache.match(url)) continue;
+      try {
+        await cache.add(url);
+      } catch (e) {
+        console.warn('[sw] warm-up stopped:', p, e && e.name);
+        break;
+      }
+    }
+  } finally {
+    warming = false;
+  }
+}
+
 // No skipWaiting on install: the page shows a toast and asks, so a build never swaps mid-game.
 self.addEventListener('message', (event) => {
   if (event.data === 'skip-waiting') self.skipWaiting();
+  if (event.data === 'warm') event.waitUntil(warm());
 });
 
 self.addEventListener('activate', (event) => {
@@ -61,8 +109,13 @@ self.addEventListener('fetch', (event) => {
     })());
   } else if (listed.has(key)) {
     event.respondWith((async () => {
-      const hit = await caches.match(key, { cacheName: CACHE });
-      return hit || fetch(req);
+      const cache = await caches.open(CACHE);
+      const hit = await cache.match(key);
+      if (hit) return hit;
+      const res = await fetch(req);
+      // Only complete responses: a 206 or an error must never be served later as the file.
+      if (res.status === 200) cache.put(key, res.clone()).catch(() => {});
+      return res;
     })());
   }
 });

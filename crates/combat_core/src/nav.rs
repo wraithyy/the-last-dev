@@ -354,6 +354,8 @@ fn search(
 impl Sim {
     pub(crate) fn rebuild_nav(&mut self) {
         self.nav = Nav::build(&self.blockers, &self.terrain);
+        self.los = crate::geom::BlockerGrid::new(self.blockers.clone());
+        self.los_padded = crate::geom::BlockerGrid::new(crate::wander::padded(&self.blockers));
         for u in &mut self.units {
             u.nav.reset();
         }

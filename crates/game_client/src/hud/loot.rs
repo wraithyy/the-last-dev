@@ -10,8 +10,8 @@
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
 use super::{
-    ACCENT, DIM, IconCache, KEY_RIM, KEY_TOP, KEY_TOP_HI, drop_shadow, label, panel_bg, set_text,
-    vgrad,
+    ACCENT, DIM, IconCache, KEY_RIM, KEY_TOP, KEY_TOP_HI, drop_shadow, label, panel_bg, put,
+    set_text, vgrad,
 };
 use crate::combat::{PendingCommands, SimReady, SimView};
 use crate::copy;
@@ -459,7 +459,7 @@ fn update_loot(
         commands.entity(e).despawn();
     }
     if !loot.open {
-        window.display = Display::None;
+        put!(window.display, Display::None);
         inspect.loot = false;
         inspect.name = None;
         return;

@@ -66,6 +66,8 @@ impl Plugin for FloatingTextPlugin {
     }
 }
 
+const MAX_FLOAT_TEXTS: usize = 48;
+
 struct Spec {
     text: String,
     size: f32,
@@ -86,7 +88,11 @@ fn spawn_texts(
     player: Single<&SimUnit, With<Player>>,
     units: Query<(Entity, &SimUnit)>,
     mut counter: Local<usize>,
+    live: Query<(), With<FloatText>>,
 ) {
+    // A raid tick can emit dozens of hits; past this many on screen the oldest are still
+    // fading, so extra numbers only add layout and text-shaping cost.
+    let mut room = MAX_FLOAT_TEXTS.saturating_sub(live.iter().count());
     // Interrupts show immediately; Damage/Miss arrive via the presentation queue (at impact).
     let interrupts = raw.read().map(|CombatEvent(ev)| ev).filter(|ev| {
         matches!(
@@ -271,6 +277,10 @@ fn spawn_texts(
             .map_or(PLAYER_HEIGHT, |u| head_height(&u.key))
             + FLOAT_TEXT_HEAD_GAP;
         for spec in specs {
+            if room == 0 {
+                break;
+            }
+            room -= 1;
             commands.spawn((
                 FloatText {
                     anchor,
@@ -334,10 +344,10 @@ fn place_texts(
             .map_or(ft.fallback, |t| t.translation)
             + Vec3::Y * ft.anchor_y;
         let Ok(screen) = cam.world_to_viewport(cam_tf, world) else {
-            *vis = Visibility::Hidden;
+            vis.set_if_neq(Visibility::Hidden);
             continue;
         };
-        *vis = Visibility::Inherited;
+        vis.set_if_neq(Visibility::Inherited);
         node.left = px(screen.x / scale - TEXT_BOX_W / 2.0 + ft.offset.x);
         node.top = px(screen.y / scale - FLOAT_TEXT_RISE * k + ft.offset.y);
         // Hold full opacity for the first half, then fade.

@@ -87,7 +87,8 @@ impl Onboarding {
     pub fn class_loaded(&mut self, pending: bool) {
         self.pending = pending;
         self.run = None;
-        self.want = pending;
+        // A benchmark picks its own zone; a fresh save must not pull it to P3 or start the tour.
+        self.want = pending && crate::debug::bench_spec().is_none();
         self.redirected = false;
     }
 }

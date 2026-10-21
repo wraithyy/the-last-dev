@@ -17,6 +17,10 @@
 //! - `WOW_BOSS_PCT=<pct>@<secs>`: the zone boss drops to that HP percent at that time (phase shots).
 //! - `WOW_FPS=1`: log average frame time and drawn mesh count every 3 s (vsync caps the rate, so read the ms).
 //!   `WOW_SHOW_FPS=1` turns the on-screen FPS readout on for the run (settings.rs).
+//! - `WOW_BENCH=lake|plaza|campus|carpark|raid|tower1`: perf benchmark (see `docs/PERF.md`). Starts in
+//!   that scenario's zone/spot, orbits the camera, warms up `WOW_BENCH_WARMUP` s (default 5, after
+//!   the first frame), records `WOW_BENCH_FRAMES` frames (default 600), logs one `BENCH ...` line, exits.
+//!   Native: uncapped present mode and update loop, 1600x900 window (`WOW_BENCH_SCALE=2` emulates retina). Web: `?bench=<name>` (line goes to the console).
 //! - `WOW_HOVER_SLOT=<0-9>`: show that action slot's tooltip without a pointer.
 //!
 //! Floor, level and start-position hooks live in `game.rs`, the autofight bot in `combat.rs`.
@@ -42,6 +46,9 @@ use crate::combat::{CombatSim, PendingCommands, SimReady};
 use crate::input::{PlayerInput, TrophiesOpen};
 use crate::player::PlayerBody;
 use bevy::camera::RenderTarget;
+use bevy::diagnostic::{
+    DiagnosticsStore, EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin,
+};
 use bevy::prelude::*;
 use bevy::render::render_resource::TextureFormat;
 use bevy::render::view::screenshot::{Screenshot, save_to_disk};
@@ -120,6 +127,20 @@ impl Plugin for DebugPlugin {
                         *player.1 = Visibility::Hidden;
                     }
                 },
+            );
+        }
+        if let Some(spec) = bench_spec() {
+            // An unfocused window (a benchmark started from a terminal) is throttled to 60 Hz by
+            // the default winit settings, whatever the present mode.
+            app.insert_resource(bevy::winit::WinitSettings::continuous());
+            app.add_plugins((
+                FrameTimeDiagnosticsPlugin::default(),
+                EntityCountDiagnosticsPlugin::default(),
+            ))
+            .insert_resource(Bench::new(spec))
+            .add_systems(
+                PostUpdate,
+                run_bench.before(bevy::transform::TransformSystems::Propagate),
             );
         }
         if env::var("WOW_FPS").is_ok() {
@@ -627,4 +648,200 @@ mod tests {
             ]
         );
     }
+}
+
+/// One benchmark scenario: where to start and how the camera orbits.
+#[derive(Clone, Copy)]
+pub struct BenchSpec {
+    pub name: &'static str,
+    pub zone: &'static str,
+    /// Player start `(x, z, yaw_deg)`; `None` keeps the zone spawn.
+    pub player_at: Option<(f32, f32, f32)>,
+    /// Orbit centre; `None` follows the player.
+    pub target: Option<Vec3>,
+    pub radius: f32,
+    pub height: f32,
+}
+
+const BENCHES: [BenchSpec; 6] = [
+    // Wellness Park: lake at (-150, -5), water radius ~20.
+    BenchSpec {
+        name: "lake",
+        zone: "campus",
+        player_at: Some((-120.0, -5.0, 90.0)),
+        target: Some(Vec3::new(-150.0, 0.0, -5.0)),
+        radius: 35.0,
+        height: 10.0,
+    },
+    BenchSpec {
+        name: "plaza",
+        zone: "campus",
+        player_at: Some((-13.5, 0.0, 0.0)),
+        target: None,
+        radius: 14.0,
+        height: 5.0,
+    },
+    // Whole campus (x -230..232, z -166..166) from above the middle.
+    BenchSpec {
+        name: "campus",
+        zone: "campus",
+        player_at: Some((0.0, 0.0, 0.0)),
+        target: Some(Vec3::ZERO),
+        radius: 240.0,
+        height: 140.0,
+    },
+    BenchSpec {
+        name: "carpark",
+        zone: "parking_p3",
+        player_at: None,
+        target: None,
+        radius: 12.0,
+        height: 4.0,
+    },
+    BenchSpec {
+        name: "raid",
+        zone: "vibecon/1",
+        player_at: None,
+        target: None,
+        radius: 12.0,
+        height: 4.0,
+    },
+    BenchSpec {
+        name: "tower1",
+        zone: "tower/1",
+        player_at: None,
+        target: None,
+        radius: 10.0,
+        height: 3.0,
+    },
+];
+
+/// `WOW_BENCH=<name>` natively, `?bench=<name>` in the web page URL.
+pub fn bench_spec() -> Option<BenchSpec> {
+    #[cfg(not(target_arch = "wasm32"))]
+    let name = env::var("WOW_BENCH").ok()?;
+    #[cfg(target_arch = "wasm32")]
+    let name = web_sys::window()?
+        .location()
+        .search()
+        .ok()?
+        .trim_start_matches('?')
+        .split('&')
+        .find_map(|p| p.strip_prefix("bench=").map(str::to_owned))?;
+    let spec = BENCHES.into_iter().find(|b| b.name == name);
+    if spec.is_none() {
+        warn!("bench: unknown scenario {name:?}");
+    }
+    spec
+}
+
+/// Fixed benchmark window (logical px) so runs compare; the scale factor stays the display's.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn bench_resolution() -> Option<(u32, u32)> {
+    bench_spec().map(|_| (1600, 900))
+}
+
+#[derive(Resource)]
+struct Bench {
+    spec: BenchSpec,
+    warmup: f32,
+    frames_wanted: usize,
+    /// Frame times in ms, recorded after the warmup.
+    samples: Vec<f32>,
+    /// Frames seen so far, to make the first one the warmup's zero.
+    start: Option<f32>,
+    done: bool,
+}
+
+impl Bench {
+    fn new(spec: BenchSpec) -> Self {
+        let num = |k: &str| env::var(k).ok().and_then(|v| v.parse::<f32>().ok());
+        Bench {
+            spec,
+            warmup: num("WOW_BENCH_WARMUP").unwrap_or(5.0),
+            frames_wanted: num("WOW_BENCH_FRAMES").map_or(600, |n| n as usize),
+            samples: Vec::new(),
+            start: None,
+            done: false,
+        }
+    }
+}
+
+/// Nearest-rank percentile of a sorted slice.
+fn pct(sorted: &[f32], p: f32) -> f32 {
+    let i = ((sorted.len() as f32 * p).ceil() as usize).clamp(1, sorted.len());
+    sorted[i - 1]
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_bench(
+    time: Res<Time>,
+    mut bench: ResMut<Bench>,
+    diagnostics: Res<DiagnosticsStore>,
+    player: Single<&Transform, (With<crate::player::Player>, Without<OrbitCamera>)>,
+    mut cam: Single<&mut Transform, With<OrbitCamera>>,
+    meshes: Query<&ViewVisibility, With<Mesh3d>>,
+    points: Query<&ViewVisibility, With<PointLight>>,
+    spots: Query<&ViewVisibility, With<SpotLight>>,
+    window: Single<&Window>,
+    mut exit: MessageWriter<AppExit>,
+) {
+    if bench.done {
+        return;
+    }
+    let now = time.elapsed_secs();
+    let start = *bench.start.get_or_insert(now);
+    let t = now - start;
+    // Slow full turn every ~40 s, so culling and LOD both see changing views.
+    let ang = t * std::f32::consts::TAU / 40.0;
+    let spec = bench.spec;
+    let centre = spec.target.unwrap_or(player.translation + Vec3::Y * 1.5);
+    let eye = centre
+        + Vec3::new(
+            ang.cos() * spec.radius,
+            spec.height,
+            ang.sin() * spec.radius,
+        );
+    **cam = Transform::from_translation(eye).looking_at(centre, Vec3::Y);
+
+    if t < bench.warmup {
+        return;
+    }
+    bench.samples.push(time.delta_secs() * 1000.0);
+    if bench.samples.len() < bench.frames_wanted {
+        return;
+    }
+    bench.done = true;
+    let mut s = bench.samples.clone();
+    s.sort_by(f32::total_cmp);
+    let avg = s.iter().sum::<f32>() / s.len() as f32;
+    let entities = diagnostics
+        .get(&EntityCountDiagnosticsPlugin::ENTITY_COUNT)
+        .and_then(|d| d.value())
+        .unwrap_or(0.0);
+    let vis = |it: &mut dyn Iterator<Item = &ViewVisibility>| it.filter(|v| v.get()).count();
+    info!(
+        "BENCH scenario={} frames={} avg_ms={avg:.2} p50_ms={:.2} p95_ms={:.2} p99_ms={:.2} max_ms={:.2} fps={:.1} entities={entities:.0} meshes={} meshes_visible={} point_lights={} point_visible={} spot_lights={} spot_visible={} window={}x{}@{:.1}x",
+        spec.name,
+        s.len(),
+        pct(&s, 0.5),
+        pct(&s, 0.95),
+        pct(&s, 0.99),
+        s[s.len() - 1],
+        1000.0 / avg,
+        meshes.iter().count(),
+        vis(&mut meshes.iter()),
+        points.iter().count(),
+        vis(&mut points.iter()),
+        spots.iter().count(),
+        vis(&mut spots.iter()),
+        window.physical_width(),
+        window.physical_height(),
+        window.scale_factor(),
+    );
+    // The page stays open on the web; the caller reads the console line.
+    #[cfg(not(target_arch = "wasm32"))]
+    exit.write(AppExit::Success);
+    #[cfg(target_arch = "wasm32")]
+    let _ = &mut exit;
 }

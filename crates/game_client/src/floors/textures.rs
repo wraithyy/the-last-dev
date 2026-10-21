@@ -206,7 +206,7 @@ pub fn tex_material(tex: Tex, image: Handle<Image>) -> StandardMaterial {
         perceptual_roughness: 0.6,
         unlit: unlit(tex),
         alpha_mode: if tex == Tex::Cobweb {
-            AlphaMode::Blend
+            AlphaMode::Mask(0.35)
         } else {
             AlphaMode::Opaque
         },

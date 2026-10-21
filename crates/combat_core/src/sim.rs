@@ -8,7 +8,7 @@ use crate::content::{
     AiDef, AuraDef, Content, ContentError, ItemTotals, Objective, School, SpellDef, SpellId,
     SpellTarget, YELL_KINDS, YellKind, ticks,
 };
-use crate::geom::{Aabb, Vec3, in_range, line_of_sight};
+use crate::geom::{Aabb, BlockerGrid, Vec3, in_range};
 use crate::nav::{Nav, NavAgent};
 use crate::quests::QuestLog;
 use crate::rng::Rng;
@@ -179,6 +179,11 @@ pub struct Sim {
     pub(crate) now: u64,
     pub(crate) units: Vec<Unit>,
     pub(crate) blockers: Vec<Aabb>,
+    /// Broadphase over `blockers` and over the clearance-padded copy wander uses; rebuilt with the nav.
+    pub(crate) los: BlockerGrid,
+    pub(crate) los_padded: BlockerGrid,
+    /// Reused by `ai_unit` so pruning dead threat entries does not allocate every tick.
+    pub(crate) dead_scratch: Vec<EntityId>,
     pub(crate) nav: Nav,
     /// `None` acts as the first player at apply time, so `push` before `spawn_player` still works.
     pub(crate) pending: Vec<(Option<EntityId>, Command)>,
@@ -234,6 +239,9 @@ impl Sim {
             now: 0,
             units: Vec::new(),
             blockers: Vec::new(),
+            los: BlockerGrid::default(),
+            los_padded: BlockerGrid::default(),
+            dead_scratch: Vec::new(),
             nav: Nav::default(),
             pending: Vec::new(),
             events: Vec::new(),
@@ -1243,7 +1251,7 @@ impl Sim {
         if !in_range(u.pos, t.pos, spell.range_m) {
             return Err(CastError::OutOfRange);
         }
-        if !line_of_sight(u.pos, t.pos, &self.blockers) {
+        if !self.los.clear(u.pos, t.pos) {
             return Err(CastError::NoLineOfSight);
         }
         Ok(())

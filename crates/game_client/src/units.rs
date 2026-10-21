@@ -279,7 +279,8 @@ fn setup_sleep_assets(
         material: materials.add(StandardMaterial {
             base_color_texture: Some(img),
             unlit: true,
-            alpha_mode: AlphaMode::Blend,
+            // Cut-out glyph: masked sprites skip the transparent sort.
+            alpha_mode: AlphaMode::Mask(0.4),
             cull_mode: None,
             ..default()
         }),

@@ -3,7 +3,7 @@
 
 use super::{
     ACCENT, ACCENT_WARM, DIM, DebugHoverSlot, IconCache, KEY_RIM, KEY_SIDE, KEY_TOP, KEY_TOP_HI,
-    PANEL_EDGE, asset_key, drop_shadow, fmt_secs, gloss, label, panel_bg, set_text, vgrad,
+    PANEL_EDGE, asset_key, drop_shadow, fmt_secs, gloss, label, panel_bg, put, set_text, vgrad,
 };
 use crate::combat::{
     PendingCommands, SimRead, SimReady, SimUnit, SimView, UiNotice, can_act, cast_coffee_break,
@@ -954,13 +954,16 @@ fn update_attack(
         .and_then(|u| sim.content().unit_def(&u.key))
         .and_then(|d| d.auto_attack.as_ref())
         .map_or(0, |a| a.swing_ms);
-    swing.width = match state {
-        Some(u) if on && swing_ms > 0 && u.swing_remaining_ms > 0 => {
-            let done = 1.0 - (u.swing_remaining_ms as f32 / swing_ms as f32).clamp(0.0, 1.0);
-            percent(100.0 * done)
+    put!(
+        swing.width,
+        match state {
+            Some(u) if on && swing_ms > 0 && u.swing_remaining_ms > 0 => {
+                let done = 1.0 - (u.swing_remaining_ms as f32 / swing_ms as f32).clamp(0.0, 1.0);
+                percent(100.0 * done)
+            }
+            _ => percent(0),
         }
-        _ => percent(0),
-    };
+    );
 }
 
 fn click_coffee(
@@ -1032,15 +1035,22 @@ fn update_coffee(
         Interaction::Hovered => HOVER,
         Interaction::None => Color::NONE,
     };
-    gauge.width = match channel {
-        Some(c) => {
-            percent(100.0 * (1.0 - c.elapsed_ms as f32 / c.total_ms.max(1) as f32).clamp(0.0, 1.0))
+    put!(
+        gauge.width,
+        match channel {
+            Some(c) => {
+                percent(
+                    100.0 * (1.0 - c.elapsed_ms as f32 / c.total_ms.max(1) as f32).clamp(0.0, 1.0),
+                )
+            }
+            None if view.cd_total_ms > 0 => {
+                percent(
+                    100.0 * (view.cd_remaining_ms as f32 / view.cd_total_ms as f32).clamp(0.0, 1.0),
+                )
+            }
+            None => percent(0),
         }
-        None if view.cd_total_ms > 0 => {
-            percent(100.0 * (view.cd_remaining_ms as f32 / view.cd_total_ms as f32).clamp(0.0, 1.0))
-        }
-        None => percent(0),
-    };
+    );
 }
 
 fn click_extras(
@@ -1162,7 +1172,7 @@ fn update_extras(
             None if cd.cd_total_ms > 0 => cd.cd_remaining_ms as f32 / cd.cd_total_ms as f32,
             None => 0.0,
         };
-        node.width = percent(100.0 * frac.clamp(0.0, 1.0));
+        put!(node.width, percent(100.0 * frac.clamp(0.0, 1.0)));
     }
 }
 
@@ -1239,9 +1249,12 @@ fn update_rez(
         .unit(me)
         .and_then(|u| u.cast)
         .filter(|c| c.spell == spell.id);
-    gauge.width = percent(cast.map_or(0.0, |c| {
-        100.0 * (c.elapsed_ms as f32 / c.total_ms.max(1) as f32).clamp(0.0, 1.0)
-    }));
+    put!(
+        gauge.width,
+        percent(cast.map_or(0.0, |c| {
+            100.0 * (c.elapsed_ms as f32 / c.total_ms.max(1) as f32).clamp(0.0, 1.0)
+        }))
+    );
 }
 
 /// Top and bottom offsets of a keycap face; pressing sinks it by `TRAVEL`.
@@ -1389,11 +1402,14 @@ fn update_slots(
                     Some(id) if v.learned => sweep_fraction(&*sim, me, id),
                     _ => 0.0,
                 };
-                node.display = if remaining > 0.0 {
-                    Display::Flex
-                } else {
-                    Display::None
-                };
+                put!(
+                    node.display,
+                    if remaining > 0.0 {
+                        Display::Flex
+                    } else {
+                        Display::None
+                    }
+                );
                 // Read first: get_mut would mark the asset changed and re-upload it every frame.
                 if let Some(handle) = material
                     && materials
@@ -1647,10 +1663,10 @@ fn update_tooltip(
         None
     };
     let Some(content) = content else {
-        tip.display = Display::None;
+        put!(tip.display, Display::None);
         return;
     };
-    tip.display = Display::Flex;
+    put!(tip.display, Display::Flex);
     // The attack control sits right of the bar, so its tooltip is anchored there instead of mid-bar.
     tip.margin.left = px(if hovered_slot.is_some() {
         -TOOLTIP_W / 2.0

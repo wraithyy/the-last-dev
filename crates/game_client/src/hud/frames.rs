@@ -3,7 +3,7 @@
 use super::banners::Banner;
 use super::{
     ACCENT_WARM, BAR_BG, DIM, HP_GREEN, IconCache, MANA_BLUE, PANEL_BOTTOM, PANEL_EDGE, PANEL_TOP,
-    TipSource, fmt_secs, gloss, label, set_text, vgrad,
+    TipSource, fmt_secs, gloss, label, put, set_text, vgrad,
 };
 use crate::combat::{CombatEvent, SimRead, SimReady, SimUnit, SimView};
 use crate::config::*;
@@ -550,10 +550,10 @@ fn update_burnout_strip(
         if node.width != w {
             node.width = w;
         }
-        color.0 = base.mix(&Color::WHITE, beat * 0.35);
+        put!(color.0, base.mix(&Color::WHITE, beat * 0.35));
     }
     for mut edge in &mut track {
-        *edge = BorderColor::all(PANEL_EDGE.mix(&BURNOUT_HIGH, beat));
+        put!(*edge, BorderColor::all(PANEL_EDGE.mix(&BURNOUT_HIGH, beat)));
     }
     let head = format!("{}  {}%", name.to_uppercase(), b / 10);
     for mut t in &mut texts.p0() {
@@ -937,14 +937,20 @@ fn update_frames(
             (None, false, _) => "ELITE".to_string(),
         };
         set_text(&mut text, &tag);
-        color.0 = role(*who).map_or(ACCENT_WARM, crate::classes::role_color);
+        put!(
+            color.0,
+            role(*who).map_or(ACCENT_WARM, crate::classes::role_color)
+        );
     }
     for (root, mut node) in &mut roots {
-        node.display = if state(root.0).is_some() {
-            Display::Flex
-        } else {
-            Display::None
-        };
+        put!(
+            node.display,
+            if state(root.0).is_some() {
+                Display::Flex
+            } else {
+                Display::None
+            }
+        );
     }
     for (tag, mut node, mut vis, mut rim, mut bg) in &mut tags {
         // Players wear their role tag on a neutral plate; bosses keep the red PROD plate.
@@ -958,12 +964,15 @@ fn update_frames(
                 vgrad(Color::srgb(0.4, 0.08, 0.06), Color::srgb(0.16, 0.03, 0.03)),
             ),
         };
-        rim.set_all(edge);
+        put!(*rim, BorderColor::all(edge));
         if *bg != plate {
             *bg = plate;
         }
         let shown = boss(tag.0);
-        node.display = if shown { Display::Flex } else { Display::None };
+        put!(
+            node.display,
+            if shown { Display::Flex } else { Display::None }
+        );
         vis.set_if_neq(if shown {
             Visibility::Inherited
         } else {
@@ -972,11 +981,14 @@ fn update_frames(
     }
     for (row, mut node, mut vis) in &mut rows {
         let has_pool = state(row.0).is_some_and(|u| row.1 == Pool::Hp || u.max_mana > 0);
-        node.display = if has_pool {
-            Display::Flex
-        } else {
-            Display::None
-        };
+        put!(
+            node.display,
+            if has_pool {
+                Display::Flex
+            } else {
+                Display::None
+            }
+        );
         // Gradient children of a Display::None node keep drawing with their last layout otherwise.
         vis.set_if_neq(if has_pool {
             Visibility::Inherited
@@ -1025,17 +1037,20 @@ fn update_frames(
                 if font.font_size != size {
                     font.font_size = size;
                 }
-                color.0 = if !u.alive {
-                    Color::srgb(0.6, 0.6, 0.6)
-                } else if *who == Who::Player {
-                    Color::WHITE
-                } else if sim.players().contains(&u.id) {
-                    crate::nameplates::PARTY_BLUE
-                } else if u.hostile {
-                    Color::srgb(1.0, 0.25, 0.2)
-                } else {
-                    Color::srgb(0.35, 1.0, 0.4)
-                };
+                put!(
+                    color.0,
+                    if !u.alive {
+                        Color::srgb(0.6, 0.6, 0.6)
+                    } else if *who == Who::Player {
+                        Color::WHITE
+                    } else if sim.players().contains(&u.id) {
+                        crate::nameplates::PARTY_BLUE
+                    } else if u.hostile {
+                        Color::srgb(1.0, 0.25, 0.2)
+                    } else {
+                        Color::srgb(0.35, 1.0, 0.4)
+                    }
+                );
             }
             // A worn achievement or promotion title (players) replaces the unit's own subtitle.
             Field::Title => set_text(
@@ -1249,7 +1264,10 @@ fn update_cast_bars(
         if let Some(mut tip) = tip {
             tip.cast = pick(root.0).as_ref().and_then(|v| v.cast);
         }
-        node.display = if shown { Display::Flex } else { Display::None };
+        put!(
+            node.display,
+            if shown { Display::Flex } else { Display::None }
+        );
         vis.set_if_neq(if shown {
             Visibility::Inherited
         } else {
@@ -1258,7 +1276,7 @@ fn update_cast_bars(
     }
     for (mut fill, mut node, mut bg) in &mut fills {
         if let Some(v) = pick(fill.who) {
-            node.width = percent(v.fill * 100.0);
+            put!(node.width, percent(v.fill * 100.0));
             if fill.color != v.color {
                 fill.color = v.color;
                 *bg = glossy(v.color);
@@ -1267,12 +1285,15 @@ fn update_cast_bars(
     }
     for (CastSpark(who), mut node) in &mut sparks {
         if let Some(v) = pick(*who) {
-            node.display = if v.spark && v.fill > 0.0 && v.fill < 1.0 {
-                Display::Flex
-            } else {
-                Display::None
-            };
-            node.left = percent(v.fill * 100.0);
+            put!(
+                node.display,
+                if v.spark && v.fill > 0.0 && v.fill < 1.0 {
+                    Display::Flex
+                } else {
+                    Display::None
+                }
+            );
+            put!(node.left, percent(v.fill * 100.0));
         }
     }
     for (CastIcon(who), mut img) in &mut icon_nodes {
@@ -1295,11 +1316,14 @@ fn update_cast_bars(
         }
     }
     for mut node in &mut shield {
-        node.display = if tgt.as_ref().is_some_and(|v| v.shield) {
-            Display::Flex
-        } else {
-            Display::None
-        };
+        put!(
+            node.display,
+            if tgt.as_ref().is_some_and(|v| v.shield) {
+                Display::Flex
+            } else {
+                Display::None
+            }
+        );
     }
 }
 
@@ -1345,17 +1369,23 @@ fn update_auras(
     for (AuraSlot(row, i), mut node, mut border, mut tip) in &mut slots {
         let aura = get(*row, *i);
         tip.aura = aura.cloned();
-        node.display = if aura.is_some() {
-            Display::Flex
-        } else {
-            Display::None
-        };
-        if let Some(a) = aura {
-            *border = BorderColor::all(if a.harmful {
-                Color::srgb(0.8, 0.15, 0.15)
+        put!(
+            node.display,
+            if aura.is_some() {
+                Display::Flex
             } else {
-                Color::srgb(0.3, 0.75, 0.35)
-            });
+                Display::None
+            }
+        );
+        if let Some(a) = aura {
+            put!(
+                *border,
+                BorderColor::all(if a.harmful {
+                    Color::srgb(0.8, 0.15, 0.15)
+                } else {
+                    Color::srgb(0.3, 0.75, 0.35)
+                })
+            );
         }
     }
     for (AuraPart(row, i, _), mut img) in &mut images {

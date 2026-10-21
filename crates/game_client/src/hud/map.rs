@@ -2,7 +2,7 @@
 //! floor and walls) with the player, quest givers, the boss and the doors on it, next to the zone
 //! graph with each zone's state. Built only while open.
 
-use super::{ACCENT, DIM, PANEL_EDGE, drop_shadow, giver_mark, label, panel_bg, set_text};
+use super::{ACCENT, DIM, PANEL_EDGE, drop_shadow, giver_mark, label, panel_bg, put, set_text};
 use crate::combat::{SimRead, SimReady, SimView};
 use crate::floors::{FloorLayout, build_zone};
 use crate::game::{GameFlow, lock_reason, zone_label};
@@ -433,11 +433,14 @@ fn update_map(
     if !paused.0 && binds.just(&keys, crate::keybinds::Action::Map) {
         windows.map = !windows.map;
     }
-    root.display = if windows.map {
-        Display::Flex
-    } else {
-        Display::None
-    };
+    put!(
+        root.display,
+        if windows.map {
+            Display::Flex
+        } else {
+            Display::None
+        }
+    );
     if !windows.map {
         view.shown.clear();
         return;
@@ -461,8 +464,8 @@ fn update_map(
         );
     }
     let p = view.to_canvas(player.translation);
-    dot.left = px(p.x - 4.5);
-    dot.top = px(p.y - 4.5);
+    put!(dot.left, px(p.x - 4.5));
+    put!(dot.top, px(p.y - 4.5));
 
     // Givers, boss, quest targets and doors: rebuilt only when something on them changes.
     let wanted = super::quests::objective_units(&*sim, &track);

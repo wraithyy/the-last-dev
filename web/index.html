@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-title" content="Last Dev">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="modulepreload" href="./pkg/game_client.js">
+<link rel="preload" href="./pkg/game_client_bg.wasm" as="fetch" crossorigin>
 <title>The Last Dev</title>
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <style>
@@ -153,8 +155,11 @@ if ('serviceWorker' in navigator) {
     document.getElementById('reload').onclick = () => worker.postMessage('skip-waiting');
   };
   let reloading = false;
+  // The first install claims this page mid-load; reloading then would abort every asset fetch.
+  // Only a swap to a newer build (the player clicked reload) needs a fresh page.
+  const hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloading) return;
+    if (reloading || !hadController) return;
     reloading = true;
     location.reload();
   });
@@ -169,6 +174,12 @@ if ('serviceWorker' in navigator) {
           if (w.state === 'installed' && navigator.serviceWorker.controller) offerReload(w);
         });
       });
+      // Fill the offline cache once the game is up and the player has had a quiet while; skipped on
+      // data-saver connections, where assets still cache as they are used.
+      const warmLater = () => setTimeout(() => {
+        if (!navigator.connection || !navigator.connection.saveData) navigator.serviceWorker.ready.then((r) => r.active && r.active.postMessage('warm'));
+      }, 20000);
+      warmLater();
       setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
     }).catch((e) => console.warn('Service worker unavailable (needs https or localhost):', e));
   });

@@ -2,7 +2,7 @@
 //! in the look of the action bar tooltip: `fn name() -> Kind`, a stats line, a `///` doc line.
 
 use super::actionbar::spell_signature;
-use super::{ACCENT, DIM, asset_key, drop_shadow, label, panel_bg, set_text};
+use super::{ACCENT, DIM, asset_key, drop_shadow, label, panel_bg, put, set_text};
 use crate::combat::{SimReady, SimView};
 use bevy::prelude::*;
 use combat_core::content::DispelType;
@@ -314,9 +314,11 @@ fn update_tip(
     mut names: Query<&mut TextSpan, (With<HoverName>, Without<HoverSig>)>,
     mut sigs: Query<&mut TextSpan, (With<HoverSig>, Without<HoverName>)>,
     mut lines: Query<(&HoverLine, &mut Text)>,
+    mut forced: Local<Option<Option<String>>>,
 ) {
     // QA hook: `WOW_HOVER_TIP=<tag>` pretends the pointer rests on the first node with that tag.
-    let forced = std::env::var("WOW_HOVER_TIP").ok();
+    // Read once: an env lookup allocates, and this system runs every frame.
+    let forced = forced.get_or_insert_with(|| std::env::var("WOW_HOVER_TIP").ok());
     let live = |s: &TipSource| s.aura.is_some() || s.cast.is_some() || s.burnout.is_some();
     let hit = sources
         .iter()
@@ -336,10 +338,10 @@ fn update_tip(
         Some((t, node, gt))
     });
     let Some((t, node, gt)) = shown else {
-        tip.display = Display::None;
+        put!(tip.display, Display::None);
         return;
     };
-    tip.display = Display::Flex;
+    put!(tip.display, Display::Flex);
     // Physical px to node units (window factor and UiScale divided out), centre to edges.
     let k = node.inverse_scale_factor();
     let (centre, size) = (gt.translation * k, node.size() * k);
@@ -347,8 +349,11 @@ fn update_tip(
         .logical_viewport_size()
         .map_or(window.width(), |v| v.x)
         / ui_scale.0.max(0.01);
-    tip.left = px((centre.x - TIP_W / 2.0).clamp(4.0, (view_w - TIP_W - 4.0).max(4.0)));
-    tip.top = px(centre.y + size.y / 2.0 + GAP + 12.0);
+    put!(
+        tip.left,
+        px((centre.x - TIP_W / 2.0).clamp(4.0, (view_w - TIP_W - 4.0).max(4.0)))
+    );
+    put!(tip.top, px(centre.y + size.y / 2.0 + GAP + 12.0));
     for mut span in &mut names {
         if span.0 != t.name {
             span.0.clone_from(&t.name);

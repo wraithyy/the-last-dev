@@ -2016,7 +2016,12 @@ fn cones(
                 if let Some(mut slot) = meshes.get_mut(&m.0) {
                     *slot = mesh;
                 }
-                if let Some(mut mm) = materials.get_mut(&mat.0) {
+                // Only touch the asset on a real change: a write re-prepares the material.
+                if materials
+                    .get(&mat.0)
+                    .is_some_and(|mm| mm.base_color != color)
+                    && let Some(mut mm) = materials.get_mut(&mat.0)
+                {
                     mm.base_color = color;
                 }
             }

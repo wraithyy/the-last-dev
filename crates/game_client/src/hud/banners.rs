@@ -2,7 +2,7 @@
 //! notification toasts (spell learned). Banners queue so they never overprint.
 
 use super::actionbar::spell_signature;
-use super::{ACCENT, DIM, PANEL_EDGE, drop_shadow, label, panel_bg, set_text};
+use super::{ACCENT, DIM, PANEL_EDGE, drop_shadow, label, panel_bg, put, set_text};
 use crate::combat::{CombatEvent, SimReady, SimView};
 use crate::floors::LoadZone;
 use bevy::prelude::*;
@@ -242,7 +242,7 @@ fn show_banner(
         queue.current = queue.queue.pop_front().map(|b| (b, 0.0));
     }
     let Some((banner, age)) = queue.current.as_mut() else {
-        root.display = Display::None;
+        put!(root.display, Display::None);
         return;
     };
     *age += time.delta_secs();
@@ -250,7 +250,7 @@ fn show_banner(
     let alpha = (t / BANNER_FADE_IN)
         .min((BANNER_SECS - t) / BANNER_FADE_OUT)
         .clamp(0.0, 1.0);
-    root.display = Display::Flex;
+    put!(root.display, Display::Flex);
     set_text(&mut title.0, &banner.title);
     title.1.0 = banner.color.with_alpha(alpha);
     set_text(&mut subtitle.0, &banner.subtitle);

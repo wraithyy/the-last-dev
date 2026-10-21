@@ -7,7 +7,7 @@
 use super::scroll::{ScrollList, key_of};
 use super::{
     ACCENT, BAR_BG, Banner, DIM, IconCache, PANEL_EDGE, asset_key, drop_shadow, label, panel_bg,
-    set_text,
+    put, set_text,
 };
 use crate::combat::{CombatEvent, PendingCommands, SimRead, SimReady, SimView, Talked};
 use crate::copy;
@@ -461,7 +461,8 @@ impl Plugin for QuestsPlugin {
                     handle_actions,
                     update_dialog,
                     update_log,
-                    update_tracker,
+                    // Rebuilds strings and the tree from sim state; 10 Hz is plenty.
+                    update_tracker.run_if(super::every(0.1)),
                     quest_events,
                     trophy_hint,
                 )
@@ -973,7 +974,7 @@ fn update_dialog(
         .unwrap_or_default();
     if !near || list.is_empty() {
         windows.dialog = None;
-        node.display = Display::None;
+        put!(node.display, Display::None);
         state.shown.clear();
         return;
     }
@@ -984,7 +985,7 @@ fn update_dialog(
     {
         state.selected = None;
     }
-    node.display = Display::Flex;
+    put!(node.display, Display::Flex);
     let content = sim.content();
     let counts: Vec<u32> = sim
         .quests()
@@ -1141,11 +1142,11 @@ fn update_log(
     let (root, node, scroll) = &mut *window;
     scroll.fit = Some(chat_clear(touch.active));
     if !windows.log {
-        node.display = Display::None;
+        put!(node.display, Display::None);
         shown.log.clear();
         return;
     }
-    node.display = Display::Flex;
+    put!(node.display, Display::Flex);
     let log = sim.quests();
     let sig = format!(
         "{:?}|{:?}|{:?}|{:?}",
@@ -1304,11 +1305,14 @@ fn update_tracker(
         && !windows.map
         && !sprint.active
         && !minigame.active;
-    node.display = if visible {
-        Display::Flex
-    } else {
-        Display::None
-    };
+    put!(
+        node.display,
+        if visible {
+            Display::Flex
+        } else {
+            Display::None
+        }
+    );
     let max = if touch.active {
         TRACKER_MAX_TOUCH
     } else {
@@ -1554,7 +1558,10 @@ fn quest_events(
     }
     shown.toast_age += time.delta_secs();
     let alpha = (1.0 - (shown.toast_age - TOAST_SECS * 0.6) / (TOAST_SECS * 0.4)).clamp(0.0, 1.0);
-    toast_color.0 = GOLD.with_alpha(if toast_text.0.is_empty() { 0.0 } else { alpha });
+    put!(
+        toast_color.0,
+        GOLD.with_alpha(if toast_text.0.is_empty() { 0.0 } else { alpha })
+    );
     if alpha == 0.0 && !toast_text.0.is_empty() {
         toast_text.0.clear();
     }

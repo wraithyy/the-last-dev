@@ -31,7 +31,7 @@ use bevy::prelude::*;
 #[allow(unused_imports)]
 pub use emotes::{EmoteRequest, ToggleEmoteMenu};
 pub use lobby::Lobby;
-pub use session::{GameMode, LeaveRequest, MoveInput, online_step};
+pub use session::{GameMode, LeaveRequest, MoveInput, clock, online_step};
 pub use store::{
     load_class, load_hud, load_keys, load_settings, save_class, save_hud, save_keys, save_settings,
 };

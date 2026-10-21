@@ -7,7 +7,7 @@
 use crate::combat::{SimReady, SimUnit, SimView};
 use crate::config::head_height;
 use crate::copy;
-use crate::hud::{ACCENT_WARM, BAR_BG, label};
+use crate::hud::{ACCENT_WARM, BAR_BG, label, put};
 use crate::player::Player;
 use crate::targeting::Target;
 use crate::units::Unit;
@@ -18,6 +18,8 @@ use std::collections::HashMap;
 const PLATE_W: f32 = 180.0;
 const PLATE_RANGE: f32 = 40.0;
 const PLATE_GAP: f32 = 0.3;
+/// Plates solved and drawn per frame, nearest first (the target always sorts first).
+const MAX_PLATES: usize = 30;
 const BAR_W: f32 = 110.0;
 /// Group members, as WoW's party blue, so a colleague never reads as an NPC.
 pub const PARTY_BLUE: Color = Color::srgb(0.35, 0.65, 1.0);
@@ -57,8 +59,10 @@ impl Plugin for NameplatePlugin {
                 spawn_plates,
                 recolor_plates,
                 place_plates.in_set(PlatePlacement),
-                update_marks,
-                update_titles,
+                // Quest state changes on accept/turn-in, not per frame; each call walks the quest
+                // list per plate, so 4 Hz keeps the markers current at a fraction of the cost.
+                update_marks.run_if(crate::hud::every(0.25)),
+                update_titles.run_if(crate::hud::every(0.25)),
             )
                 .chain()
                 .in_set(SimReady),
@@ -342,7 +346,8 @@ fn place_plates(
     mut tops: ResMut<PlateTops>,
     window: Single<&Window>,
     camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
-    transforms: Query<&Transform, With<SimUnit>>,
+    transforms: Query<(&Transform, Option<&InheritedVisibility>), With<SimUnit>>,
+    mut cands: Local<Vec<Candidate>>,
     mut plates: Query<(
         Entity,
         &mut Nameplate,
@@ -363,12 +368,17 @@ fn place_plates(
     let view_h = cam.logical_viewport_size().map_or(window.height(), |v| v.y);
     let dt = time.delta_secs();
     tops.0.clear();
-    let mut cands: Vec<Candidate> = Vec::new();
+    cands.clear();
     for (e, plate, computed, _, _, mut vis, _) in &mut plates {
-        let Ok(tf) = transforms.get(plate.anchor) else {
+        let Ok((tf, inherited)) = transforms.get(plate.anchor) else {
             commands.entity(e).despawn();
             continue;
         };
+        // A unit hidden on purpose (cutscene, pooled) must not leave its plate floating.
+        if inherited.is_some_and(|v| !v.get()) {
+            vis.set_if_neq(Visibility::Hidden);
+            continue;
+        }
         // A lootable corpse keeps its plate so the gold name marks it.
         let alive = sim.unit(plate.sim).is_some_and(|u| u.alive || u.lootable);
         let world = tf.translation + Vec3::Y * plate.height;
@@ -405,6 +415,14 @@ fn place_plates(
     }
 
     cands.sort_by_key(|c| c.key);
+    // Beyond the nearest few dozen a plate is unreadable anyway, and the overlap solver is
+    // quadratic in the plate count.
+    let keep = MAX_PLATES.min(cands.len());
+    for c in cands.drain(keep..) {
+        if let Ok((_, _, _, _, _, mut vis, _)) = plates.get_mut(c.entity) {
+            vis.set_if_neq(Visibility::Hidden);
+        }
+    }
     let boxes: Vec<PlateBox> = cands
         .iter()
         .map(|c| PlateBox {
@@ -446,9 +464,9 @@ fn place_plates(
         vis.set_if_neq(Visibility::Inherited);
         // The target's plate is drawn over any plate stacked next to it.
         z.set_if_neq(GlobalZIndex(if c.targeted { 6 } else { 5 }));
-        node.left = px(c.x / scale - PLATE_W / 2.0);
-        node.bottom = px((view_h - c.y + plate.offset) / scale);
-        tf_ui.scale = Vec2::splat(plate.k);
+        put!(node.left, px(c.x / scale - PLATE_W / 2.0));
+        put!(node.bottom, px((view_h - c.y + plate.offset) / scale));
+        put!(tf_ui.scale, Vec2::splat(plate.k));
         // Scaling is about the centre, so the visible top edge sits half the shrink lower.
         let h_unscaled = c.h / c.base_k;
         let top = c.y - plate.offset - h_unscaled * (1.0 + plate.k) / 2.0;

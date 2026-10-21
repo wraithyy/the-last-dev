@@ -15,7 +15,7 @@ use crate::net::Lobby;
 use crate::touch::TouchMode;
 use bevy::camera::visibility::VisibilityRange;
 use bevy::input::InputSystems;
-use bevy::light::DirectionalLightShadowMap;
+use bevy::light::{CascadeShadowConfig, DirectionalLightShadowMap};
 use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use bevy::ui::{FocusPolicy, RelativeCursorPosition};
@@ -26,23 +26,44 @@ pub const FOV_MAX: f32 = 90.0;
 pub const FOV_DEFAULT: f32 = 45.0;
 pub const UI_SCALE_MIN: f32 = 0.6;
 pub const UI_SCALE_MAX: f32 = 2.0;
+pub const RENDER_SCALE_MIN: f32 = 0.5;
+pub const RENDER_SCALE_MAX: f32 = 1.0;
+pub const VIEW_DIST_MIN: f32 = 0.4;
+pub const VIEW_DIST_MAX: f32 = 1.5;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Quality {
     Low,
     Medium,
     High,
+    Ultra,
 }
 
 impl Quality {
-    pub const ALL: [Quality; 3] = [Quality::Low, Quality::Medium, Quality::High];
+    pub const ALL: [Quality; 4] = [Quality::Low, Quality::Medium, Quality::High, Quality::Ultra];
 
-    fn key(self) -> &'static str {
+    pub fn key(self) -> &'static str {
         match self {
             Quality::Low => "low",
             Quality::Medium => "medium",
             Quality::High => "high",
+            Quality::Ultra => "ultra",
         }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Quality::Low => "Low",
+            Quality::Medium => "Medium",
+            Quality::High => "High",
+            Quality::Ultra => "Ultra",
+        }
+    }
+
+    /// One preset cheaper, if there is one.
+    pub fn lower(self) -> Option<Quality> {
+        let i = Quality::ALL.iter().position(|q| *q == self)?;
+        i.checked_sub(1).map(|i| Quality::ALL[i])
     }
 
     pub fn shadows(self) -> bool {
@@ -50,11 +71,40 @@ impl Quality {
     }
 
     pub fn shadow_map(self) -> usize {
-        if self == Quality::High { 2048 } else { 1024 }
+        match self {
+            Quality::Low | Quality::Medium => 1024,
+            Quality::High => 2048,
+            Quality::Ultra => 4096,
+        }
+    }
+
+    /// Far edge of the single shadow cascade, metres.
+    pub fn shadow_range(self) -> f32 {
+        match self {
+            Quality::Low | Quality::Medium => 40.0,
+            Quality::High => 60.0,
+            Quality::Ultra => 90.0,
+        }
     }
 
     pub fn bloom(self) -> bool {
         self != Quality::Low
+    }
+
+    /// WebGL2 only guarantees 1 or 4 samples, so there is no 2x step.
+    pub fn msaa(self) -> bool {
+        matches!(self, Quality::High | Quality::Ultra)
+    }
+
+    /// Share of the physical resolution the 3D view is rendered at (browser only, see
+    /// `apply_render_scale`).
+    pub fn render_scale(self) -> f32 {
+        match self {
+            Quality::Low => 0.6,
+            Quality::Medium => 0.75,
+            Quality::High => 0.9,
+            Quality::Ultra => 1.0,
+        }
     }
 
     /// Share of the authored decor view distance.
@@ -63,6 +113,77 @@ impl Quality {
             Quality::Low => 0.6,
             Quality::Medium => 0.8,
             Quality::High => 1.0,
+            Quality::Ultra => 1.3,
+        }
+    }
+
+    /// Metres within which NPCs are animated and drawn; for the unit systems to read through
+    /// `Settings::npc_range`.
+    pub fn npc_range(self) -> f32 {
+        match self {
+            Quality::Low => 45.0,
+            Quality::Medium => 60.0,
+            Quality::High => 80.0,
+            Quality::Ultra => 110.0,
+        }
+    }
+
+    /// Most point lights worth lighting at once (WebGL2 uniform budget on the low end).
+    #[allow(dead_code)] // consumed by the render round's light, water and particle code
+    pub fn max_lights(self) -> usize {
+        match self {
+            Quality::Low => 2,
+            Quality::Medium => 4,
+            Quality::High => 8,
+            Quality::Ultra => 16,
+        }
+    }
+
+    /// 0 flat colour, 1 animated surface, 2 animated with highlights.
+    #[allow(dead_code)] // consumed by the render round's light, water and particle code
+    pub fn water_level(self) -> u8 {
+        match self {
+            Quality::Low => 0,
+            Quality::Medium => 1,
+            Quality::High | Quality::Ultra => 2,
+        }
+    }
+
+    /// Multiplier on how many particles an effect spawns.
+    #[allow(dead_code)] // consumed by the render round's light, water and particle code
+    pub fn particles(self) -> f32 {
+        match self {
+            Quality::Low => 0.35,
+            Quality::Medium => 0.65,
+            Quality::High | Quality::Ultra => 1.0,
+        }
+    }
+}
+
+/// How much of the `~/perf $ top` window shows.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PerfMode {
+    Off,
+    Compact,
+    Full,
+}
+
+impl PerfMode {
+    pub const ALL: [PerfMode; 3] = [PerfMode::Off, PerfMode::Compact, PerfMode::Full];
+
+    fn key(self) -> &'static str {
+        match self {
+            PerfMode::Off => "off",
+            PerfMode::Compact => "compact",
+            PerfMode::Full => "full",
+        }
+    }
+
+    pub fn next(self) -> PerfMode {
+        match self {
+            PerfMode::Off => PerfMode::Compact,
+            PerfMode::Compact => PerfMode::Full,
+            PerfMode::Full => PerfMode::Off,
         }
     }
 }
@@ -102,7 +223,13 @@ pub struct Settings {
     pub colorblind: Colorblind,
     /// No camera shake, no spell flashes, no cutscene camera drift.
     pub reduce_motion: bool,
-    pub show_fps: bool,
+    pub perf: PerfMode,
+    /// Advanced overrides of single preset values; `None` follows the preset.
+    pub render_scale: Option<f32>,
+    pub msaa: Option<bool>,
+    pub shadows: Option<bool>,
+    /// Share of the authored view distance (decor and NPCs).
+    pub view_dist: Option<f32>,
     /// A corpse loots fully on open and the loot window only appears for what did not fit.
     pub auto_loot: bool,
 }
@@ -115,27 +242,80 @@ impl Settings {
             ui_scale: None,
             colorblind: Colorblind::Off,
             reduce_motion: false,
-            show_fps: false,
+            perf: PerfMode::Off,
+            render_scale: None,
+            msaa: None,
+            shadows: None,
+            view_dist: None,
             auto_loot: mobile,
         }
     }
 
+    pub fn shadows(&self) -> bool {
+        self.shadows.unwrap_or_else(|| self.quality.shadows())
+    }
+
+    pub fn msaa(&self) -> bool {
+        self.msaa.unwrap_or_else(|| self.quality.msaa())
+    }
+
+    pub fn render_scale(&self) -> f32 {
+        self.render_scale
+            .unwrap_or_else(|| self.quality.render_scale())
+    }
+
+    /// Share of the authored decor view distance.
+    pub fn decor_range(&self) -> f32 {
+        self.view_dist.unwrap_or_else(|| self.quality.decor_range())
+    }
+
+    /// Metres within which NPCs are worth animating and drawing.
+    #[allow(dead_code)] // read by the unit systems of the render round
+    pub fn npc_range(&self) -> f32 {
+        self.quality.npc_range() * self.decor_range() / self.quality.decor_range()
+    }
+
+    /// A preset pick drops the single-value overrides.
+    pub fn set_quality(&mut self, q: Quality) {
+        self.quality = q;
+        self.render_scale = None;
+        self.msaa = None;
+        self.shadows = None;
+        self.view_dist = None;
+    }
+
     pub fn encode(&self) -> String {
+        let opt = |v: Option<String>| v.unwrap_or_else(|| "auto".into());
         format!(
-            "quality={}\nfov={:.0}\nui_scale={}\ncolorblind={}\nreduce_motion={}\nshow_fps={}\nauto_loot={}\n",
+            "quality={}\nfov={:.0}\nui_scale={}\ncolorblind={}\nreduce_motion={}\nperf={}\nauto_loot={}\nrender_scale={}\nmsaa={}\nshadows={}\nview_dist={}\n",
             self.quality.key(),
             self.fov_deg,
             self.ui_scale.map_or("auto".into(), |s| format!("{s:.2}")),
             self.colorblind.key(),
             u8::from(self.reduce_motion),
-            u8::from(self.show_fps),
+            self.perf.key(),
             u8::from(self.auto_loot),
+            opt(self.render_scale.map(|v| format!("{v:.2}"))),
+            opt(self.msaa.map(|v| u8::from(v).to_string())),
+            opt(self.shadows.map(|v| u8::from(v).to_string())),
+            opt(self.view_dist.map(|v| format!("{v:.2}"))),
         )
     }
 
     /// Unknown keys and bad values keep the platform default; numbers are clamped.
     pub fn decode(text: &str, mobile: bool) -> Self {
         let mut s = Settings::defaults(mobile);
+        let num = |v: &str, lo: f32, hi: f32| {
+            v.parse::<f32>()
+                .ok()
+                .filter(|f| f.is_finite())
+                .map(|f| f.clamp(lo, hi))
+        };
+        let flag = |v: &str| match v {
+            "1" => Some(true),
+            "0" => Some(false),
+            _ => None,
+        };
         for line in text.lines() {
             let Some((k, v)) = line.split_once('=') else {
                 continue;
@@ -167,7 +347,17 @@ impl Settings {
                     }
                 }
                 "reduce_motion" => s.reduce_motion = v == "1",
-                "show_fps" => s.show_fps = v == "1",
+                // Older files stored a plain FPS toggle.
+                "show_fps" if v == "1" => s.perf = PerfMode::Compact,
+                "perf" => {
+                    if let Some(m) = PerfMode::ALL.into_iter().find(|m| m.key() == v) {
+                        s.perf = m;
+                    }
+                }
+                "render_scale" => s.render_scale = num(v, RENDER_SCALE_MIN, RENDER_SCALE_MAX),
+                "view_dist" => s.view_dist = num(v, VIEW_DIST_MIN, VIEW_DIST_MAX),
+                "msaa" => s.msaa = flag(v),
+                "shadows" => s.shadows = flag(v),
                 "auto_loot" => s.auto_loot = v == "1",
                 _ => {}
             }
@@ -246,8 +436,12 @@ enum Ctl {
     Fov(i8),
     Ui(i8),
     UiAuto,
+    Render(i8),
+    View(i8),
+    Msaa,
+    Shadows,
     Motion,
-    Fps,
+    Perf(PerfMode),
     AutoLoot,
 }
 
@@ -255,6 +449,8 @@ enum Ctl {
 enum SliderKind {
     Fov,
     Ui,
+    Render,
+    View,
 }
 
 #[derive(Component)]
@@ -269,8 +465,6 @@ struct ToggleText(Ctl);
 struct OpenMenu;
 #[derive(Component)]
 struct PanelRoot;
-#[derive(Component)]
-struct FpsText;
 /// Preview swatches: (what, which palette colour).
 #[derive(Component, Clone, Copy)]
 enum Swatch {
@@ -299,10 +493,12 @@ impl Plugin for SettingsPlugin {
             .world()
             .get_resource::<TouchMode>()
             .is_some_and(|t| t.mobile);
-        let stored = crate::net::load_settings()
+        let saved = crate::net::load_settings();
+        // First run: no saved quality, so the perf module measures a few seconds and picks one.
+        let first_run = saved.as_deref().is_none_or(|t| !t.contains("quality="));
+        let mut settings = saved
             .map(|t| Settings::decode(&t, mobile))
             .unwrap_or_else(|| Settings::defaults(mobile));
-        let mut settings = stored;
         if let Some(q) = std::env::var("WOW_QUALITY").ok().and_then(|v| {
             Quality::ALL
                 .into_iter()
@@ -320,12 +516,24 @@ impl Plugin for SettingsPlugin {
         if let Ok(v) = std::env::var("WOW_AUTO_LOOT") {
             settings.auto_loot = v.trim() == "1";
         }
-        // QA: perf screenshots with the readout on, without touching the stored settings.
+        // QA: perf screenshots with the window on, without touching the stored settings.
         if std::env::var_os("WOW_SHOW_FPS").is_some() {
-            settings.show_fps = true;
+            settings.perf = PerfMode::Compact;
+        }
+        if let Some(m) = std::env::var("WOW_PERF").ok().and_then(|v| {
+            PerfMode::ALL
+                .into_iter()
+                .find(|m| m.key() == v.trim().to_lowercase())
+        }) {
+            settings.perf = m;
         }
         let open = std::env::var_os("WOW_SETTINGS").is_some();
-        app.insert_resource(palette(settings.colorblind))
+        // A forced quality (QA, bench) is an answer already.
+        let detect = first_run
+            && std::env::var_os("WOW_QUALITY").is_none()
+            && crate::debug::bench_spec().is_none();
+        app.insert_resource(crate::hud::perf::AutoQuality::new(detect, mobile))
+            .insert_resource(palette(settings.colorblind))
             .insert_resource(settings)
             .insert_resource(PanelState { open })
             .add_systems(Startup, spawn_ui)
@@ -339,11 +547,12 @@ impl Plugin for SettingsPlugin {
                     panel_visuals,
                     apply_render,
                     apply_decor_range,
-                    fps_readout,
                     calm_fx,
                 )
                     .chain(),
             );
+        #[cfg(target_arch = "wasm32")]
+        app.add_systems(Update, apply_render_scale);
     }
 }
 
@@ -450,19 +659,6 @@ fn spawn_ui(mut commands: Commands) {
             ),
         ],
     ));
-    commands.spawn((
-        FpsText,
-        Node {
-            position_type: PositionType::Absolute,
-            bottom: px(4),
-            right: px(8),
-            display: Display::None,
-            ..default()
-        },
-        GlobalZIndex(70),
-        label("", 11.0),
-        TextColor(ACCENT),
-    ));
     commands
         .spawn((
             PanelRoot,
@@ -513,27 +709,29 @@ fn spawn_ui(mut commands: Commands) {
                 p.spawn(row()).with_children(|r| {
                     r.spawn(row_label("quality"));
                     for q in Quality::ALL {
-                        let name = match q {
-                            Quality::Low => "Low",
-                            Quality::Medium => "Medium",
-                            Quality::High => "High",
-                        };
-                        r.spawn(button(Ctl::Quality(q), name, 13.0));
+                        r.spawn(button(Ctl::Quality(q), q.name(), 13.0));
                     }
                 });
                 p.spawn((
                     label(
-                        "   low: no shadows, no bloom, short decor distance",
+                        "   low: no shadows, bloom or MSAA, short view distance. ultra: all of it, far.",
                         10.0,
                     ),
                     TextColor(DIM),
                 ));
-                for (kind, name) in [(SliderKind::Fov, "field of view"), (SliderKind::Ui, "UI scale")] {
+                for (kind, name) in [
+                    (SliderKind::Fov, "field of view"),
+                    (SliderKind::Ui, "UI scale"),
+                    (SliderKind::Render, "render scale"),
+                    (SliderKind::View, "view distance"),
+                ] {
                     p.spawn(row()).with_children(|r| {
                         r.spawn(row_label(name));
                         let (minus, plus) = match kind {
                             SliderKind::Fov => (Ctl::Fov(-1), Ctl::Fov(1)),
                             SliderKind::Ui => (Ctl::Ui(-1), Ctl::Ui(1)),
+                            SliderKind::Render => (Ctl::Render(-1), Ctl::Render(1)),
+                            SliderKind::View => (Ctl::View(-1), Ctl::View(1)),
                         };
                         r.spawn(button(minus, "-", 13.0));
                         r.spawn(slider(kind));
@@ -551,6 +749,19 @@ fn spawn_ui(mut commands: Commands) {
                         }
                     });
                 }
+                p.spawn(row()).with_children(|r| {
+                    r.spawn(row_label("MSAA 4x"));
+                    r.spawn(button(Ctl::Msaa, "", 13.0));
+                    r.spawn(row_label("shadows"));
+                    r.spawn(button(Ctl::Shadows, "", 13.0));
+                });
+                p.spawn((
+                    label(
+                        "   render scale applies in the browser only; picking a preset resets these five",
+                        10.0,
+                    ),
+                    TextColor(DIM),
+                ));
                 p.spawn(row()).with_children(|r| {
                     r.spawn(row_label("colourblind"));
                     for c in Colorblind::ALL {
@@ -608,8 +819,17 @@ fn spawn_ui(mut commands: Commands) {
                 p.spawn(row()).with_children(|r| {
                     r.spawn(row_label("reduce motion"));
                     r.spawn(button(Ctl::Motion, "", 13.0));
-                    r.spawn(row_label("show FPS"));
-                    r.spawn(button(Ctl::Fps, "", 13.0));
+                });
+                p.spawn(row()).with_children(|r| {
+                    r.spawn(row_label("~/perf window"));
+                    for m in PerfMode::ALL {
+                        let name = match m {
+                            PerfMode::Off => "Off",
+                            PerfMode::Compact => "Compact",
+                            PerfMode::Full => "Full",
+                        };
+                        r.spawn(button(Ctl::Perf(m), name, 13.0));
+                    }
                 });
                 p.spawn(row()).with_children(|r| {
                     r.spawn(row_label("auto loot"));
@@ -634,6 +854,7 @@ fn panel_input(
     touch: Res<TouchMode>,
     mut state: ResMut<PanelState>,
     mut settings: ResMut<Settings>,
+    mut auto: ResMut<crate::hud::perf::AutoQuality>,
     buttons: Query<(&Interaction, &ToggleText), Changed<Interaction>>,
     mut menu: Single<&mut Node, (With<OpenMenu>, Without<PanelRoot>)>,
     mut root: Single<&mut Node, (With<PanelRoot>, Without<OpenMenu>)>,
@@ -654,7 +875,11 @@ fn panel_input(
             _ if !state.open => {}
             Ctl::Close => state.open = false,
             Ctl::Reset => *s = Settings::defaults(touch.mobile),
-            Ctl::Quality(q) => s.quality = q,
+            Ctl::Quality(q) => {
+                s.set_quality(q);
+                // A manual pick settles the question the auto-detect was about to answer.
+                auto.cancel();
+            }
             Ctl::Colorblind(c) => s.colorblind = c,
             Ctl::Fov(d) => s.fov_deg = (s.fov_deg + f32::from(d) * 5.0).clamp(FOV_MIN, FOV_MAX),
             Ctl::Ui(d) => {
@@ -662,8 +887,18 @@ fn panel_input(
                 s.ui_scale = Some((cur + f32::from(d) * 0.1).clamp(UI_SCALE_MIN, UI_SCALE_MAX));
             }
             Ctl::UiAuto => s.ui_scale = None,
+            Ctl::Render(d) => {
+                let v = s.render_scale() + f32::from(d) * 0.05;
+                s.render_scale = Some(v.clamp(RENDER_SCALE_MIN, RENDER_SCALE_MAX));
+            }
+            Ctl::View(d) => {
+                let v = s.decor_range() + f32::from(d) * 0.1;
+                s.view_dist = Some(v.clamp(VIEW_DIST_MIN, VIEW_DIST_MAX));
+            }
+            Ctl::Msaa => s.msaa = Some(!s.msaa()),
+            Ctl::Shadows => s.shadows = Some(!s.shadows()),
             Ctl::Motion => s.reduce_motion = !s.reduce_motion,
-            Ctl::Fps => s.show_fps = !s.show_fps,
+            Ctl::Perf(m) => s.perf = m,
             Ctl::AutoLoot => s.auto_loot = !s.auto_loot,
         }
     }
@@ -712,6 +947,21 @@ fn sliders(
                     settings.ui_scale = Some(v);
                 }
             }
+            SliderKind::Render => {
+                let v = ((RENDER_SCALE_MIN + t * (RENDER_SCALE_MAX - RENDER_SCALE_MIN)) * 20.0)
+                    .round()
+                    / 20.0;
+                if settings.render_scale != Some(v) {
+                    settings.render_scale = Some(v);
+                }
+            }
+            SliderKind::View => {
+                let v =
+                    ((VIEW_DIST_MIN + t * (VIEW_DIST_MAX - VIEW_DIST_MIN)) * 10.0).round() / 10.0;
+                if settings.view_dist != Some(v) {
+                    settings.view_dist = Some(v);
+                }
+            }
         }
     }
 }
@@ -752,10 +1002,12 @@ fn panel_visuals(
     for (t, mut border, kids) in &mut buttons {
         let on = match t.0 {
             Ctl::Quality(q) => Some(s.quality == q),
+            Ctl::Msaa => Some(s.msaa()),
+            Ctl::Shadows => Some(s.shadows()),
+            Ctl::Perf(m) => Some(s.perf == m),
             Ctl::Colorblind(c) => Some(s.colorblind == c),
             Ctl::UiAuto => Some(s.ui_scale.is_none()),
             Ctl::Motion => Some(s.reduce_motion),
-            Ctl::Fps => Some(s.show_fps),
             Ctl::AutoLoot => Some(s.auto_loot),
             _ => None,
         };
@@ -765,7 +1017,7 @@ fn panel_visuals(
             KEY_RIM
         };
         border.set_all(c);
-        if matches!(t.0, Ctl::Motion | Ctl::Fps | Ctl::AutoLoot)
+        if matches!(t.0, Ctl::Motion | Ctl::Msaa | Ctl::Shadows | Ctl::AutoLoot)
             && let Some(k) = kids.first()
             && let Ok(mut text) = texts.get_mut(*k)
         {
@@ -775,10 +1027,14 @@ fn panel_visuals(
     let fov_t = (s.fov_deg - FOV_MIN) / (FOV_MAX - FOV_MIN);
     let ui = s.ui_scale.unwrap_or(1.0);
     let ui_t = (ui - UI_SCALE_MIN) / (UI_SCALE_MAX - UI_SCALE_MIN);
+    let render_t = (s.render_scale() - RENDER_SCALE_MIN) / (RENDER_SCALE_MAX - RENDER_SCALE_MIN);
+    let view_t = (s.decor_range() - VIEW_DIST_MIN) / (VIEW_DIST_MAX - VIEW_DIST_MIN);
     for (f, mut node) in &mut fills {
         let t = match f.0 {
             SliderKind::Fov => fov_t,
             SliderKind::Ui => ui_t,
+            SliderKind::Render => render_t,
+            SliderKind::View => view_t,
         };
         node.width = percent(t.clamp(0.0, 1.0) * 100.0);
     }
@@ -788,6 +1044,8 @@ fn panel_visuals(
             SliderKind::Ui => s
                 .ui_scale
                 .map_or("auto".into(), |u| format!("{:.0}%", u * 100.0)),
+            SliderKind::Render => format!("{:.0}%", s.render_scale() * 100.0),
+            SliderKind::View => format!("{:.0}%", s.decor_range() * 100.0),
         };
         if let Ok(mut t) = texts.get_mut(e) {
             set_text(&mut t, &text);
@@ -816,20 +1074,26 @@ fn panel_visuals(
     }
 }
 
-/// Shadows, shadow resolution, bloom and field of view.
+/// Shadows, shadow resolution and distance, bloom, MSAA and field of view.
 fn apply_render(
     mut commands: Commands,
     settings: Res<Settings>,
     mut shadow_map: ResMut<DirectionalLightShadowMap>,
-    mut lights: Query<&mut DirectionalLight>,
-    mut cams: Query<(Entity, Has<Bloom>, &mut Projection), With<OrbitCamera>>,
+    mut lights: Query<(&mut DirectionalLight, Option<&mut CascadeShadowConfig>)>,
+    mut cams: Query<(Entity, Has<Bloom>, Option<&Msaa>, &mut Projection), With<OrbitCamera>>,
     new_bloom: Query<(), Added<Bloom>>,
 ) {
     let q = settings.quality;
+    let shadows = settings.shadows();
     // One sun, re-spawned with each floor: checked every frame, written only on a difference.
-    for mut l in &mut lights {
-        if l.shadow_maps_enabled != q.shadows() {
-            l.shadow_maps_enabled = q.shadows();
+    for (mut l, cascade) in &mut lights {
+        if l.shadow_maps_enabled != shadows {
+            l.shadow_maps_enabled = shadows;
+        }
+        if let Some(mut c) = cascade
+            && c.bounds.first().is_some_and(|b| *b != q.shadow_range())
+        {
+            c.bounds = vec![q.shadow_range()];
         }
     }
     if !settings.is_changed() && new_bloom.is_empty() {
@@ -838,7 +1102,12 @@ fn apply_render(
     if shadow_map.size != q.shadow_map() {
         shadow_map.size = q.shadow_map();
     }
-    for (e, has_bloom, mut proj) in &mut cams {
+    let msaa = if settings.msaa() {
+        Msaa::Sample4
+    } else {
+        Msaa::Off
+    };
+    for (e, has_bloom, cur_msaa, mut proj) in &mut cams {
         // arena.rs grades every new camera with bloom; Low takes it away again.
         if has_bloom && !q.bloom() {
             commands.entity(e).remove::<Bloom>();
@@ -847,6 +1116,9 @@ fn apply_render(
                 intensity: 0.12,
                 ..Bloom::NATURAL
             });
+        }
+        if cur_msaa.copied().unwrap_or_default() != msaa {
+            commands.entity(e).try_insert(msaa);
         }
         if let Projection::Perspective(p) = &mut *proj {
             let fov = settings.fov_deg.to_radians();
@@ -857,12 +1129,32 @@ fn apply_render(
     }
 }
 
+/// Browser only: fewer canvas pixels for the same page size. A native window is tied to its
+/// display's pixels, so there the render scale setting has no effect.
+#[cfg(target_arch = "wasm32")]
+fn apply_render_scale(
+    settings: Res<Settings>,
+    touch: Res<TouchMode>,
+    mut window: Single<&mut Window>,
+) {
+    if !settings.is_changed() && !touch.is_changed() {
+        return;
+    }
+    let dpr = web_sys::window().map_or(1.0, |w| w.device_pixel_ratio() as f32);
+    // Same ceilings as `touch::initial_resolution`: phones 1.5x, desktops 2x the CSS size.
+    let base = dpr.clamp(1.0, if touch.mobile { 1.5 } else { 2.0 });
+    let want = (base * settings.render_scale()).max(0.5);
+    if (window.resolution.scale_factor() - want).abs() > 0.01 {
+        window.resolution.set_scale_factor_override(Some(want));
+    }
+}
+
 fn apply_decor_range(
     mut commands: Commands,
     settings: Res<Settings>,
     mut ranges: Query<(Entity, &mut VisibilityRange, Option<&DecorBase>)>,
 ) {
-    let k = settings.quality.decor_range();
+    let k = settings.decor_range();
     let changed = settings.is_changed();
     for (e, mut r, base) in &mut ranges {
         let base = match base {
@@ -891,36 +1183,6 @@ fn calm_fx(settings: Res<Settings>, mut budget: ResMut<crate::spell_fx::FxBudget
     }
 }
 
-fn fps_readout(
-    settings: Res<Settings>,
-    time: Res<Time>,
-    mut avg: Local<f32>,
-    mut text: Single<(&mut Text, &mut Node), With<FpsText>>,
-) {
-    let (text, node) = &mut *text;
-    let want = if settings.show_fps {
-        Display::Flex
-    } else {
-        Display::None
-    };
-    if node.display != want {
-        node.display = want;
-    }
-    if !settings.show_fps {
-        return;
-    }
-    let dt = time.delta_secs().max(1e-4);
-    *avg = if *avg <= 0.0 {
-        dt
-    } else {
-        *avg * 0.95 + dt * 0.05
-    };
-    set_text(
-        text,
-        &format!("{:.0} fps  {:.1} ms", 1.0 / *avg, *avg * 1000.0),
-    );
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -933,7 +1195,11 @@ mod tests {
             ui_scale: Some(1.25),
             colorblind: Colorblind::Tritanopia,
             reduce_motion: true,
-            show_fps: true,
+            perf: PerfMode::Full,
+            render_scale: Some(0.75),
+            msaa: Some(false),
+            shadows: Some(true),
+            view_dist: Some(1.2),
             auto_loot: true,
         };
         assert_eq!(Settings::decode(&s.encode(), false), s);
@@ -946,7 +1212,7 @@ mod tests {
         assert_eq!(Settings::decode("", true).quality, Quality::Low);
         assert_eq!(Settings::decode("", false).quality, Quality::High);
         let s = Settings::decode(
-            "quality=ultra\nfov=999\nui_scale=NaN\ncolorblind=x\nreduce_motion=yes\njunk\n",
+            "quality=extreme\nfov=999\nui_scale=NaN\ncolorblind=x\nreduce_motion=yes\njunk\n",
             false,
         );
         assert_eq!(s.quality, Quality::High);
@@ -974,14 +1240,38 @@ mod tests {
 
     #[test]
     fn presets_get_cheaper_downwards() {
-        let [low, mid, high] = Quality::ALL;
-        assert!(!low.shadows() && !low.bloom());
-        assert!(mid.shadows() && high.shadows());
+        let [low, mid, high, ultra] = Quality::ALL;
+        assert!(!low.shadows() && !low.bloom() && !low.msaa());
+        assert!(mid.shadows() && high.shadows() && high.msaa() && ultra.msaa());
         assert!(low.decor_range() < high.decor_range());
         assert!(mid.shadow_map() < high.shadow_map());
+        for w in Quality::ALL.windows(2) {
+            let [a, b] = [w[0], w[1]];
+            assert!(a.render_scale() <= b.render_scale());
+            assert!(a.npc_range() < b.npc_range());
+            assert!(a.max_lights() < b.max_lights());
+            assert!(a.shadow_map() <= b.shadow_map());
+            assert_eq!(b.lower(), Some(a));
+        }
+        assert_eq!(low.lower(), None);
         for q in Quality::ALL {
             assert!(q.shadow_map().is_power_of_two());
         }
+    }
+
+    #[test]
+    fn overrides_win_until_a_preset_is_picked() {
+        let mut s = Settings::defaults(false);
+        s.msaa = Some(false);
+        s.view_dist = Some(0.5);
+        assert!(!s.msaa());
+        assert!((s.npc_range() - s.quality.npc_range() * 0.5).abs() < 1e-3);
+        s.set_quality(Quality::Ultra);
+        assert!(s.msaa());
+        assert_eq!(s.render_scale(), 1.0);
+        let old = Settings::decode("show_fps=1\nrender_scale=0.1\n", false);
+        assert_eq!(old.perf, PerfMode::Compact);
+        assert_eq!(old.render_scale, Some(RENDER_SCALE_MIN));
     }
 
     #[test]

@@ -93,6 +93,14 @@ pub struct NetClient {
     conn: Option<backend::Conn>,
     /// The URL being dialed and when its first attempt started, for cold-start retries.
     dial: Option<(String, Instant)>,
+    /// Frames and bytes sent and received since start, for the `~/perf` window.
+    traffic: Traffic,
+}
+
+#[derive(Default)]
+struct Traffic {
+    tx: [std::sync::atomic::AtomicU64; 2],
+    rx: [u64; 2],
 }
 
 impl NetClient {
@@ -127,7 +135,27 @@ impl NetClient {
 
     /// False when there is no open connection to send on.
     pub fn send(&self, frame: Vec<u8>) -> bool {
-        self.state == NetState::Connected && self.conn.as_ref().is_some_and(|c| c.send(frame))
+        use std::sync::atomic::Ordering::Relaxed;
+        let n = frame.len() as u64;
+        let ok =
+            self.state == NetState::Connected && self.conn.as_ref().is_some_and(|c| c.send(frame));
+        if ok {
+            self.traffic.tx[0].fetch_add(1, Relaxed);
+            self.traffic.tx[1].fetch_add(n, Relaxed);
+        }
+        ok
+    }
+
+    /// (msgs out, bytes out, msgs in, bytes in), counted from the connection's start.
+    pub fn traffic(&self) -> [u64; 4] {
+        use std::sync::atomic::Ordering::Relaxed;
+        let t = &self.traffic;
+        [
+            t.tx[0].load(Relaxed),
+            t.tx[1].load(Relaxed),
+            t.rx[0],
+            t.rx[1],
+        ]
     }
 
     /// Drains pending transport events and advances `state`. Call once per frame.
@@ -145,6 +173,12 @@ impl NetClient {
             .as_ref()
             .map(backend::Conn::drain)
             .unwrap_or_default();
+        for e in &events {
+            if let NetEvent::Frame(b) = e {
+                self.traffic.rx[0] += 1;
+                self.traffic.rx[1] += b.len() as u64;
+            }
+        }
         let url = self.dial.as_ref().map_or("", |(u, _)| u.as_str());
         if let NetState::Connecting { since } = self.state
             && self.state.timed_out(since.elapsed(), connect_timeout(url))

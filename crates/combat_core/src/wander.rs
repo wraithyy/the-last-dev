@@ -7,7 +7,7 @@
 use crate::ai::{step_toward, yaw_toward};
 use crate::content::{IdlePose, ticks};
 use crate::effects::dist_xz;
-use crate::geom::{Aabb, Vec3, line_of_sight};
+use crate::geom::{Aabb, Vec3};
 use crate::rng::Rng;
 use crate::sim::Sim;
 use crate::targeting::EntityId;
@@ -57,7 +57,7 @@ impl Wander {
 }
 
 /// Blockers grown by the clearance, so a straight segment test also keeps the margin.
-fn padded(blockers: &[Aabb]) -> Vec<Aabb> {
+pub(crate) fn padded(blockers: &[Aabb]) -> Vec<Aabb> {
     blockers
         .iter()
         .map(|b| Aabb {
@@ -76,7 +76,6 @@ impl Sim {
         if !self.wandering {
             return;
         }
-        let padded = padded(&self.blockers);
         for i in 0..self.units.len() {
             let Some((radius, speed, pause)) = self.wander_profile(i) else {
                 let w = &mut self.units[i].wander;
@@ -94,7 +93,7 @@ impl Sim {
             match self.units[i].wander.goal {
                 Some(goal) => self.walk_to(i, goal, speed, pause),
                 None if self.now >= self.units[i].wander.next_at => {
-                    self.pick_goal(i, radius, pause, &padded);
+                    self.pick_goal(i, radius, pause);
                 }
                 None => {}
             }
@@ -167,7 +166,7 @@ impl Sim {
         }
     }
 
-    fn pick_goal(&mut self, i: usize, radius: f32, pause: (u32, u32), padded: &[Aabb]) {
+    fn pick_goal(&mut self, i: usize, radius: f32, pause: (u32, u32)) {
         let home = self.units[i].spawn_pos;
         let friendly = !self.units[i].state.hostile;
         if friendly && self.units[i].wander.away {
@@ -185,7 +184,7 @@ impl Sim {
             let d = min_leg + rng.below(1001) as f32 / 1000.0 * (radius - min_leg);
             let cand = Vec3::new(home.x + angle.cos() * d, home.y, home.z + angle.sin() * d);
             let near_anchor = anchor.is_none_or(|a| dist_xz(cand, a) <= PACK_LEASH_M);
-            if near_anchor && line_of_sight(pos, cand, padded) {
+            if near_anchor && self.los_padded.clear(pos, cand) {
                 let w = &mut self.units[i].wander;
                 w.goal = Some(cand);
                 w.away = friendly;

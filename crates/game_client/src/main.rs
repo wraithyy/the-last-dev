@@ -51,6 +51,19 @@ use bevy::window::WindowPlugin;
 use combat_core::TICK_HZ;
 
 fn window() -> Window {
+    #[cfg(not(target_arch = "wasm32"))]
+    let mut resolution = touch::initial_resolution();
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some((w, h)) = debug::bench_resolution() {
+        resolution = bevy::window::WindowResolution::new(w, h);
+        // WOW_BENCH_SCALE=2 emulates a retina display on a 1x monitor.
+        if let Some(f) = std::env::var("WOW_BENCH_SCALE")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+        {
+            resolution = resolution.with_scale_factor_override(f);
+        }
+    }
     Window {
         title: config::WINDOW_TITLE.into(),
         // Browser-only settings: embed in the page canvas, and keep right-click /
@@ -61,74 +74,88 @@ fn window() -> Window {
         fit_canvas_to_parent: true,
         #[cfg(target_arch = "wasm32")]
         prevent_default_event_handling: true,
+        #[cfg(not(target_arch = "wasm32"))]
+        resolution,
+        #[cfg(target_arch = "wasm32")]
         resolution: touch::initial_resolution(),
+        // Vsync would cap every scenario at the display rate and hide the real frame cost.
+        #[cfg(not(target_arch = "wasm32"))]
+        present_mode: if debug::bench_spec().is_some() {
+            bevy::window::PresentMode::Immediate
+        } else {
+            default()
+        },
         ..default()
     }
 }
 
 fn main() {
-    App::new()
-        .add_plugins(
-            DefaultPlugins
-                .set(WindowPlugin {
-                    primary_window: Some(window()),
-                    ..default()
-                })
-                // We ship no .meta files; probing for them costs a 404 per asset on the web.
-                .set(AssetPlugin {
-                    meta_check: AssetMetaCheck::Never,
-                    ..default()
-                }),
-        )
-        .add_systems(Update, scale_ui)
-        .insert_resource(Time::<Fixed>::from_hz(f64::from(TICK_HZ)))
-        .add_plugins((
-            arena::ArenaPlugin,
-            floors::FloorsPlugin,
-            input::InputPlugin,
-            player::PlayerPlugin,
-            camera::CameraPlugin,
-            units::UnitsPlugin,
-            targeting::TargetingPlugin,
-            hud::HudPlugin,
-            anim::AnimPlugin,
-            combat::CombatPlugin,
-            vfx::VfxPlugin,
-            spell_fx::SpellFxPlugin,
-            presentation::PresentationPlugin,
-            floating_text::FloatingTextPlugin,
-        ))
-        .add_plugins((
-            game::GamePlugin,
-            hair::HairPlugin,
-            gear::GearPlugin,
-            nameplates::NameplatePlugin,
-            debug::DebugPlugin,
-            audio::GameAudioPlugin,
-            loot_fx::LootFxPlugin,
-            rigs::RigsPlugin,
-            yell::YellPlugin,
-        ))
-        .add_plugins((
-            net::NetPlugin,
-            touch::TouchPlugin,
-            classes::ClassesPlugin,
-            keybinds::KeybindsPlugin,
-            telegraph_fx::TelegraphFxPlugin,
-            economy::EconomyPlugin,
-            office::OfficePlugin,
-            sprint::SprintPlugin,
-            onboarding::OnboardingPlugin,
-        ))
-        // After TouchPlugin: the settings default to Low on phones.
-        .add_plugins((settings::SettingsPlugin, cutscene::CutscenePlugin))
-        .add_plugins(social::SocialPlugin)
-        .add_plugins(live::LivePlugin)
-        .add_plugins(legacy::LegacyPlugin)
-        .add_plugins(raid::RaidPlugin)
-        .add_plugins(minigame::MinigamePlugin)
-        .add_plugins(calendar::CalendarPlugin)
-        .run();
+    let mut app = App::new();
+    // A command on an entity despawned the same frame should cost a log line, not the player's
+    // session; debug builds and tests keep Bevy's panic so such bugs still surface.
+    #[cfg(not(debug_assertions))]
+    app.set_error_handler(bevy::ecs::error::warn);
+    app.add_plugins(
+        DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(window()),
+                ..default()
+            })
+            // We ship no .meta files; probing for them costs a 404 per asset on the web.
+            .set(AssetPlugin {
+                meta_check: AssetMetaCheck::Never,
+                ..default()
+            }),
+    )
+    .add_systems(Update, scale_ui)
+    .insert_resource(Time::<Fixed>::from_hz(f64::from(TICK_HZ)))
+    .add_plugins((
+        arena::ArenaPlugin,
+        floors::FloorsPlugin,
+        input::InputPlugin,
+        player::PlayerPlugin,
+        camera::CameraPlugin,
+        units::UnitsPlugin,
+        targeting::TargetingPlugin,
+        hud::HudPlugin,
+        anim::AnimPlugin,
+        combat::CombatPlugin,
+        vfx::VfxPlugin,
+        spell_fx::SpellFxPlugin,
+        presentation::PresentationPlugin,
+        floating_text::FloatingTextPlugin,
+    ))
+    .add_plugins((
+        game::GamePlugin,
+        hair::HairPlugin,
+        gear::GearPlugin,
+        nameplates::NameplatePlugin,
+        debug::DebugPlugin,
+        audio::GameAudioPlugin,
+        loot_fx::LootFxPlugin,
+        rigs::RigsPlugin,
+        yell::YellPlugin,
+    ))
+    .add_plugins((
+        net::NetPlugin,
+        touch::TouchPlugin,
+        classes::ClassesPlugin,
+        keybinds::KeybindsPlugin,
+        telegraph_fx::TelegraphFxPlugin,
+        economy::EconomyPlugin,
+        office::OfficePlugin,
+        sprint::SprintPlugin,
+        onboarding::OnboardingPlugin,
+    ))
+    // After TouchPlugin: the settings default to Low on phones.
+    .add_plugins((settings::SettingsPlugin, cutscene::CutscenePlugin))
+    .add_plugins(social::SocialPlugin)
+    .add_plugins(live::LivePlugin)
+    .add_plugins(legacy::LegacyPlugin)
+    .add_plugins(raid::RaidPlugin)
+    .add_plugins(minigame::MinigamePlugin)
+    .add_plugins(calendar::CalendarPlugin)
+    .run();
 }
 
 /// HUD sizes are authored for a 900 px tall window; scale up on bigger screens.

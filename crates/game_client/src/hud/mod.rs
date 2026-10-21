@@ -15,6 +15,7 @@ mod loot;
 mod map;
 mod meter;
 mod minimap;
+pub(crate) mod perf;
 pub(crate) mod quests;
 pub(crate) mod scroll;
 mod trophies;
@@ -83,6 +84,7 @@ impl Plugin for HudPlugin {
                 minimap::MinimapPlugin,
                 hovertip::HoverTipPlugin,
             ))
+            .add_plugins(perf::PerfPlugin)
             .add_systems(Startup, spawn_misc)
             .add_systems(
                 Update,
@@ -430,6 +432,32 @@ pub fn gloss(alpha: f32) -> impl Bundle {
 pub fn set_text(text: &mut Text, value: &str) {
     if text.0 != value {
         value.clone_into(&mut text.0);
+    }
+}
+
+/// Assigns a component field only when the value differs. A plain assignment goes through
+/// `DerefMut`, which flags the component changed every frame and makes Bevy UI re-sync layout.
+macro_rules! put {
+    ($place:expr, $value:expr) => {{
+        let v = $value;
+        if $place != v {
+            $place = v;
+        }
+    }};
+}
+pub(crate) use put;
+
+/// Run condition: true on its first call, then at most once per `secs` of wall time. For HUD
+/// refreshes that rebuild strings or trees from sim state; no input is read in those systems.
+pub fn every(secs: f32) -> impl FnMut(Res<Time<Real>>, Local<Option<f32>>) -> bool {
+    move |time, mut last| {
+        let now = time.elapsed_secs();
+        if last.is_none_or(|l| now - l >= secs || now < l) {
+            *last = Some(now);
+            true
+        } else {
+            false
+        }
     }
 }
 

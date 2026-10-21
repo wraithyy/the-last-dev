@@ -229,6 +229,7 @@ impl Plugin for AnimPlugin {
                     attach_players,
                     apply_paints,
                     pose_lean,
+                    cull_far_models,
                     drive,
                 )
                     .chain(),
@@ -410,6 +411,73 @@ fn attach_players(
     }
 }
 
+const NPC_RANGE_HYSTERESIS: f32 = 6.0;
+
+/// Marks a character whose model is hidden for distance; HUD code can skip it.
+#[derive(Component)]
+pub struct FarCulled;
+
+/// Distance-culls skinned NPC models (the player, the target and anything in combat or casting always draw).
+/// The range comes from the quality settings.
+#[allow(clippy::type_complexity)] // Bevy query tuple
+fn cull_far_models(
+    mut commands: Commands,
+    settings: Res<crate::settings::Settings>,
+    target: Res<crate::targeting::Target>,
+    cam: Query<&GlobalTransform, With<crate::camera::OrbitCamera>>,
+    chars: Query<
+        (
+            Entity,
+            &GlobalTransform,
+            &Children,
+            Has<FarCulled>,
+            &crate::units::Unit,
+            Option<&CombatAnim>,
+        ),
+        // Only world units: the role-picker stage, cutscene actors and debug lineups live far
+        // from the gameplay camera and must never be culled against it.
+        (With<Character>, Without<PlayerBody>),
+    >,
+    mut roots: Query<&mut Visibility, With<ModelRoot>>,
+) {
+    let Some(cam) = cam.iter().next() else {
+        return;
+    };
+    let eye = cam.translation();
+    let range = settings.npc_range();
+    for (e, gt, children, was_far, unit, ca) in &chars {
+        let d = gt.translation().distance(eye);
+        // Enemies in combat and anyone mid-cast stay drawn at any distance: ranged
+        // casters and adds must be readable.
+        let engaged = (unit.alive && unit.fighting) || ca.is_some_and(|c| c.casting);
+        let far = if engaged || target.0 == Some(e) {
+            false
+        } else if was_far {
+            d > range - NPC_RANGE_HYSTERESIS
+        } else {
+            d > range
+        };
+        let want = if far {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
+        for c in children.iter() {
+            if let Ok(mut v) = roots.get_mut(c) {
+                v.set_if_neq(want);
+            }
+        }
+        if far != was_far {
+            // try_*: a unit can be despawned (zone swap, corpse cleanup) in the same frame.
+            if far {
+                commands.entity(e).try_insert(FarCulled);
+            } else {
+                commands.entity(e).try_remove::<FarCulled>();
+            }
+        }
+    }
+}
+
 /// Anything faster than this in one frame is a teleport (respawn, evade), not running.
 const TELEPORT_SPEED: f32 = 40.0;
 const VEL_SMOOTHING: f32 = 10.0;
@@ -426,12 +494,22 @@ fn drive(
         Option<&WorldPose>,
     )>,
     mut players: Query<(&mut AnimationPlayer, &mut AnimationTransitions, &AnimLink)>,
+    culled: Query<(), With<FarCulled>>,
 ) {
     let dt = time.delta_secs();
     if dt <= 0.0 {
         return;
     }
     for (mut player, mut tr, link) in &mut players {
+        // Bevy skips paused clips when sampling, so far NPCs cost no skinning-pose work.
+        if culled.contains(link.owner) {
+            if !player.all_paused() {
+                player.pause_all();
+            }
+            continue;
+        } else if player.all_paused() {
+            player.resume_all();
+        }
         let Ok((tf, ca, mut st, body, pose, world)) = owners.get_mut(link.owner) else {
             continue;
         };

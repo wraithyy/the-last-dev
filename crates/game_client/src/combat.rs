@@ -372,7 +372,7 @@ fn tick_sim(
         for cmd in pending.0.drain(..) {
             sim.0.push(cmd);
         }
-        sim.0.tick()
+        crate::hud::perf::time_sim(|| sim.0.tick())
     };
     let view: &dyn SimRead = match net.as_deref() {
         Some(n) => n,
