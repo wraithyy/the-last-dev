@@ -26,6 +26,65 @@ impl Sim {
             .any(|a| self.content.aura(&a.key).is_some_and(&f))
     }
 
+    pub(crate) fn is_stealthed(&self, i: usize) -> bool {
+        self.has_aura_flag(i, |a| a.stealth_aggro_pct > 0)
+    }
+
+    /// Percent of its aggro range an idle hostile still notices unit `i` from (100 when visible).
+    pub(crate) fn stealth_aggro_pct(&self, i: usize) -> u32 {
+        self.units[i]
+            .auras
+            .iter()
+            .filter_map(|a| self.content.aura(&a.key))
+            .filter(|d| d.stealth_aggro_pct > 0)
+            .map(|d| d.stealth_aggro_pct)
+            .min()
+            .unwrap_or(100)
+    }
+
+    /// Direct damage wakes a unit up from Wrong Number and the like.
+    pub(crate) fn break_on_damage_auras(&mut self, i: usize) {
+        let keys: Vec<String> = self.units[i]
+            .auras
+            .iter()
+            .filter(|a| self.content.aura(&a.key).is_some_and(|d| d.break_on_damage))
+            .map(|a| a.key.clone())
+            .collect();
+        for k in keys {
+            self.remove_aura(i, &k, AuraEnd::Consumed);
+        }
+    }
+
+    pub(crate) fn break_stealth(&mut self, i: usize) {
+        let keys: Vec<String> = self.units[i]
+            .auras
+            .iter()
+            .filter(|a| {
+                self.content
+                    .aura(&a.key)
+                    .is_some_and(|d| d.stealth_aggro_pct > 0)
+            })
+            .map(|a| a.key.clone())
+            .collect();
+        for k in keys {
+            self.remove_aura(i, &k, AuraEnd::Consumed);
+        }
+    }
+
+    /// Backstab bonus in percent for `spell` hitting unit `ti` from unit `ci`.
+    fn opener_bonus_pct(&self, ci: usize, ti: usize, spell: &SpellDef) -> u64 {
+        let Some(o) = spell.opener else { return 0 };
+        let mut pct = 0;
+        if self.is_stealthed(ci) {
+            pct += o.stealth_bonus_pct;
+        }
+        let (t, c) = (&self.units[ti].state, &self.units[ci].state);
+        if !crate::geom::is_facing(t.pos, t.yaw, c.pos, std::f32::consts::FRAC_PI_2) {
+            pct += o.behind_bonus_pct;
+        }
+        u64::from(pct)
+    }
+
     /// Sum of a per-stack aura modifier on unit `i`.
     fn aura_sum(&self, i: usize, f: impl Fn(&AuraDef) -> i32) -> i64 {
         self.units[i]
@@ -180,6 +239,7 @@ impl Sim {
                 let crit_pct = self.content.units[self.units[ci].def].crit_pct;
                 let mut amount = self.power(ci, *base, *coefficient_pct);
                 amount = self.perk_amount(ci, ti, spell.id, amount, false);
+                amount = amount * (100 + self.opener_bonus_pct(ci, ti, spell)) / 100;
                 let mut combo = false;
                 let stacks = consume_aura.as_ref().and_then(|c| {
                     self.units[ti]
@@ -641,6 +701,21 @@ impl Sim {
         }
         if def.max_hp_pct != 0 {
             self.refresh_max_hp(ti);
+        }
+        // Throwing a debuff at an enemy gives a stealthed caster away, like a hit does.
+        if def.harmful
+            && let Some(s) = si.filter(|&s| s != ti && self.is_stealthed(s))
+            && self.units[ti].state.hostile != self.units[s].state.hostile
+        {
+            self.break_stealth(s);
+        }
+        // Stealth also works as a vanish: non-boss enemies lose the bearer from their tables
+        // and walk home.
+        if def.stealth_aggro_pct > 0 && self.is_player(Self::id_of(ti)) {
+            let id = Self::id_of(ti);
+            for u in self.units.iter_mut().filter(|u| !u.state.boss) {
+                u.threat.remove(&id);
+            }
         }
         // A debuff pulls like a hit does (a DoT must not wait for its first tick to aggro).
         let pulls = def.harmful

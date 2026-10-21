@@ -210,6 +210,17 @@ pub struct AuraDef {
     /// Enemy AI moves this much slower (the largest wins); bosses included.
     #[serde(default)]
     pub slow_pct: u32,
+    /// Stealth (Tailgating): idle hostiles notice the bearer only within this percent of their
+    /// aggro range (0 = not a stealth aura). Dealing a hit, taking damage or throwing a harmful
+    /// aura at an enemy ends it; applying it also drops the bearer from non-boss threat tables.
+    #[serde(default)]
+    pub stealth_aggro_pct: u32,
+    /// Players: movement is this percent slower while it lasts (the largest wins).
+    #[serde(default)]
+    pub stealth_slow_pct: u32,
+    /// Ends the moment the bearer takes direct damage (Wrong Number); DoT ticks do not.
+    #[serde(default)]
+    pub break_on_damage: bool,
 }
 
 /// Dispel category of an aura, shown on the debuff so players know what can clear it.
@@ -470,6 +481,19 @@ pub struct SpellDef {
     /// Must-interrupt: completing it wipes or heavily punishes; the HUD marks the cast bar.
     #[serde(default)]
     pub kick: bool,
+    /// Backstab bonuses on the spell's direct damage.
+    #[serde(default)]
+    pub opener: Option<OpenerDef>,
+}
+
+/// Extra direct damage, in percent: from stealth, and when the caster stands behind the target
+/// (outside its front 180 degrees). Both add up.
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+pub struct OpenerDef {
+    #[serde(default)]
+    pub stealth_bonus_pct: u32,
+    #[serde(default)]
+    pub behind_bonus_pct: u32,
 }
 
 /// Where a telegraph is painted at release.

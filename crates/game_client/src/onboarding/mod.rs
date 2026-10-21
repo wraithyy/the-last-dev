@@ -440,16 +440,29 @@ fn observe(
     }
 }
 
-/// The new classes' openers are debuffs, not damage: say so on the role tip.
-fn class_tip(class: &str, spell2: &(String, String)) -> Option<String> {
-    let (name, key) = spell2;
+/// The newer classes play differently from their role: say so on the role tip. `slot` names
+/// the spell and key on bar slot `i`.
+fn class_tip(class: &str, slot: &dyn Fn(u8) -> (String, String)) -> Option<String> {
     match class {
-        "qa" => Some(format!(
-            "File a {name} ({key}) first: every report makes the target take 6% more damage, up to three."
-        )),
-        "data_scientist" => Some(format!(
-            "Stack {name} ({key}) up to three times first; it keeps ticking while you cast."
-        )),
+        "qa" => {
+            let (name, key) = slot(1);
+            Some(format!(
+                "File a {name} ({key}) first: every report makes the target take 6% more damage, up to three."
+            ))
+        }
+        "data_scientist" => {
+            let (name, key) = slot(1);
+            Some(format!(
+                "Stack {name} ({key}) up to three times first; it keeps ticking while you cast."
+            ))
+        }
+        "security" => {
+            let ((b1, k1), (b2, k2)) = (slot(0), slot(1));
+            let ((fin, kf), (sneak, ks)) = (slot(3), slot(4));
+            Some(format!(
+                "Build Exploit Chain with {b1} ({k1}) and {b2} ({k2}), then spend it with {fin} ({kf}). {sneak} ({ks}) hides you; your first hit from stealth lands hard."
+            ))
+        }
         _ => None,
     }
 }
@@ -539,7 +552,7 @@ fn ctx(sim: &CombatSim, p: EntityId, binds: &Keybinds, touch: bool) -> Ctx {
         role_spell,
         taunt: bar_spell(sim, p, |s| matches!(s.effect, Effect::Taunt))
             .map(|(_, name, lvl)| (name, lvl)),
-        class_tip: class_tip(&class_key(sim, p), &slot(1)),
+        class_tip: class_tip(&class_key(sim, p), &slot),
     }
 }
 

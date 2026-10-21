@@ -85,14 +85,25 @@ const CROSS_VAL: SpellId = SpellId(67);
 const P_HACK: SpellId = SpellId(68);
 const SWEEP: SpellId = SpellId(69);
 const RETRAIN: SpellId = SpellId(70);
+const SHOULDER_SURF: SpellId = SpellId(71);
+const PHISHING_LINK: SpellId = SpellId(72);
+const ZERO_DAY: SpellId = SpellId(73);
+const PRIV_ESC: SpellId = SpellId(74);
+const TAILGATING: SpellId = SpellId(75);
+const DISABLE: SpellId = SpellId(76);
+const INCIDENT: SpellId = SpellId(77);
+const SOCIAL_ENG: SpellId = SpellId(78);
+const LATERAL: SpellId = SpellId(79);
+const EXFIL: SpellId = SpellId(80);
 /// Every playable class; `bot_covers_every_class` keeps it in step with the content.
-const CLASSES: [&str; 6] = [
+const CLASSES: [&str; 7] = [
     "fullstack",
     "frontend",
     "backend",
     "devops",
     "qa",
     "data_scientist",
+    "security",
 ];
 /// Shields of linked raid bosses: the open member is the only one worth hitting.
 const LINK_SHIELDS: [&str; 2] = ["synergy_shield", "panel_muted"];
@@ -289,6 +300,7 @@ impl Bot {
             "devops" => (SIGSTOP, SIGSTOP),
             "qa" => (BLOCKER, BLOCKER),
             "data_scientist" => (EARLY_STOP, EARLY_STOP),
+            "security" => (DISABLE, SOCIAL_ENG),
             _ => (RPR, DUCK),
         }
     }
@@ -414,7 +426,7 @@ impl Bot {
         let Some(t) = self.target.and_then(|t| self.sim.unit(t)).cloned() else {
             return false;
         };
-        let melee = matches!(self.class, "frontend" | "backend");
+        let melee = matches!(self.class, "frontend" | "backend" | "security");
         let (far, near) = if melee { (4.5, 3.0) } else { (27.0, 24.0) };
         let d = combat_core::distance(t.pos, self.pos);
         if !t.alive || d <= far {
@@ -499,6 +511,7 @@ impl Bot {
             "devops" => self.act_devops(),
             "qa" => self.act_qa(),
             "data_scientist" => self.act_data_scientist(),
+            "security" => self.act_security(),
             _ => self.act_fullstack(),
         }
     }
@@ -812,6 +825,48 @@ impl Bot {
         }
     }
 
+    fn act_security(&mut self) {
+        let Some((me, t)) = self.engage() else { return };
+        let reflecting = Self::reflecting(&t);
+        if !reflecting && self.try_kick(&t, DISABLE, SOCIAL_ENG) {
+            return;
+        }
+        if self.busy(&me) {
+            return;
+        }
+        let hp_pct = me.hp * 100 / me.max_hp.max(1);
+        let deadline = me.auras.iter().any(|a| a.key == "deadline");
+        let shielded = me.auras.iter().any(|a| a.key == "incident_response");
+        if (hp_pct < 55 || deadline || (reflecting && !shielded)) && self.ready(INCIDENT) {
+            return self.cast(INCIDENT);
+        }
+        if reflecting {
+            return;
+        }
+        let (points, _) = Self::stacks(&t, "exploit_chain");
+        let (_, poison_left) = Self::stacks(&t, "phishing_link");
+        let t_pct = t.hp * 100 / t.max_hp.max(1);
+        if combat_core::distance(me.pos, t.pos) > 6.0 && self.ready(LATERAL) {
+            return self.cast(LATERAL);
+        }
+        // Finish at four points (or earlier when it kills); the heavy finisher first.
+        if (points >= 4 || (points >= 2 && t_pct <= 30)) && self.ready(EXFIL) {
+            return self.cast(EXFIL);
+        }
+        if (points >= 4 || (points >= 1 && t.hp <= 150)) && self.ready(PRIV_ESC) {
+            return self.cast(PRIV_ESC);
+        }
+        if t.hp > 250 && poison_left < 3000 && self.ready(PHISHING_LINK) {
+            return self.cast(PHISHING_LINK);
+        }
+        if self.ready(ZERO_DAY) {
+            return self.cast(ZERO_DAY);
+        }
+        if self.ready(SHOULDER_SURF) {
+            self.cast(SHOULDER_SURF);
+        }
+    }
+
     fn act_fullstack(&mut self) {
         let me = self.me();
         if !me.alive || me.stunned {
@@ -926,7 +981,7 @@ impl Bot {
             self.report.boss_min_hp_pct = 100;
         }
         // Melee walks up into the pack's aggro radius; casters open from 20 m.
-        let gap = if matches!(self.class, "frontend" | "backend") {
+        let gap = if matches!(self.class, "frontend" | "backend" | "security") {
             4.0
         } else {
             20.0
@@ -945,7 +1000,17 @@ impl Bot {
             .map(|u| u.id);
         let Some(first) = first else { return };
         self.report.pulls += 1;
+        // Out of combat the Security Engineer sneaks in and opens with Zero-Day from stealth,
+        // before the first auto attack gives it away.
+        let sneak = self.class == "security" && !boss && self.ready(TAILGATING);
+        if sneak {
+            self.cast(TAILGATING);
+            self.tick();
+        }
         self.set_target(first);
+        if sneak {
+            self.cast(ZERO_DAY);
+        }
         self.tick();
         let t0 = self.sim.now().0;
         self.fight_until_calm();
@@ -1833,7 +1898,7 @@ fn sprinter(class: &'static str, seed: u64) -> Bot {
     b
 }
 
-const SPRINT_CLASSES: [&str; 6] = CLASSES;
+const SPRINT_CLASSES: [&str; 7] = CLASSES;
 
 /// Every class solo delivers sprint levels 1-3 within par over three seeds (one building per
 /// seed, so all three buildings are covered).

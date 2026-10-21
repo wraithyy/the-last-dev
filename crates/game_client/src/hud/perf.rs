@@ -689,11 +689,32 @@ fn auto_detect(
     settings.set_quality(q);
     // Rewrites the file even when the preset equals the default, so this runs once per device.
     settings.set_changed();
+    let subtitle = if q == Quality::Low {
+        roast(auto.elapsed)
+    } else {
+        "(overruled by management)"
+    };
     banners.write(Banner {
         title: format!("Quality auto-set to {}", q.name()),
-        subtitle: "(overruled by management)".into(),
+        subtitle: subtitle.into(),
         color: ACCENT,
     });
+}
+
+/// Said when the machine is the reason for a downgrade; picked by time, so it varies per run.
+const ROASTS: [&str; 8] = [
+    "Your PC was benchmarked. The AI suggests replacing it. Then you.",
+    "Hardware flagged as legacy. HR opened a parallel review of your own specs.",
+    "Running on Low. Like your chances in the next reorg.",
+    "Your GPU is on a performance improvement plan. So is its owner.",
+    "The AI renders this faster in its head. It is also cheaper than you.",
+    "Budget hardware detected. Finance is proud. Nobody else is.",
+    "Shadows are now reserved for the C-level floor.",
+    "Your laptop asked for a raise in frames. Denied, like yours.",
+];
+
+fn roast(seed_secs: f32) -> &'static str {
+    ROASTS[(seed_secs * 1000.0) as usize % ROASTS.len()]
 }
 
 fn watchdog(
@@ -723,7 +744,7 @@ fn watchdog(
             auto.cooldown = OFFER_COOLDOWN_SECS;
             banners.write(Banner {
                 title: format!("Quality lowered to {}", target.name()),
-                subtitle: "(the AI approves the downgrade)".into(),
+                subtitle: roast(time.elapsed_secs()).into(),
                 color: ACCENT,
             });
         } else if left <= 0.0 {

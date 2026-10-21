@@ -30,6 +30,9 @@ pub(crate) fn step_toward(pos: Vec3, to: Vec3, step: f32, stop: f32) -> Vec3 {
     )
 }
 
+/// Closest a stealthed player can get to an idle hostile before it notices.
+const STEALTH_MIN_REACH_M: f32 = 1.5;
+
 impl Sim {
     pub(crate) fn add_threat(&mut self, ti: usize, source: EntityId, amount: u32) {
         // Self-inflicted damage (Phishing Test) must not make a unit hunt itself.
@@ -185,8 +188,10 @@ impl Sim {
         for p in self.players.iter().filter_map(|p| self.index(*p)) {
             let them = self.units[p].state.pos;
             let d = dist_xz(me, them);
+            // Stealth shrinks the range; the floor keeps bumping into a mob a bad idea.
+            let reach = ai.aggro_m * self.stealth_aggro_pct(p) as f32 / 100.0;
             if self.units[p].state.alive
-                && d <= ai.aggro_m
+                && d <= reach.max(STEALTH_MIN_REACH_M).min(ai.aggro_m)
                 && best.is_none_or(|(_, bd)| d < bd)
                 && self.los.clear(me, them)
             {

@@ -549,12 +549,14 @@ mod tests {
             "devops",
             "qa",
             "data_scientist",
+            "security",
         ] {
             assert!(reg.knows_class(class), "{class}");
         }
         assert!(!reg.knows_class("product_manager"));
         let a = reg.create_and_join("Quinn", "qa").unwrap();
         assert!(reg.join(&a.code, "Dee", "data_scientist").is_ok());
+        assert!(reg.join(&a.code, "Sam", "security").is_ok());
     }
 
     #[test]

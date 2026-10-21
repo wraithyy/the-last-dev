@@ -164,13 +164,14 @@ fn headphones(c: &mut ChildSpawnerCommands, assets: &UnitAssets, h: f32) {
 struct Lineup(u32);
 
 /// Player skins in class order (`Content::classes`): (class key, unit key).
-pub const CLASS_SKINS: [(&str, &str); 6] = [
+pub const CLASS_SKINS: [(&str, &str); 7] = [
     ("fullstack", "senior_engineer"),
     ("frontend", "frontend_dev"),
     ("backend", "backend_dev"),
     ("devops", "devops_eng"),
     ("qa", "qa_engineer"),
     ("data_scientist", "data_scientist"),
+    ("security", "security_engineer"),
 ];
 
 /// A player skin with its class kit and a fixed hair stage, for display only.

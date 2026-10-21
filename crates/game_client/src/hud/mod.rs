@@ -6,6 +6,7 @@
 pub(crate) mod actionbar;
 mod banners;
 mod career;
+mod combo;
 mod endgame;
 mod feed;
 mod frames;
@@ -84,7 +85,7 @@ impl Plugin for HudPlugin {
                 minimap::MinimapPlugin,
                 hovertip::HoverTipPlugin,
             ))
-            .add_plugins(perf::PerfPlugin)
+            .add_plugins((perf::PerfPlugin, combo::ComboPlugin))
             .add_systems(Startup, spawn_misc)
             .add_systems(
                 Update,

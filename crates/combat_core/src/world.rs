@@ -7,7 +7,7 @@
 //! that changes state (buffs, Kudos, items, aggro, achievements) is decided here; purely
 //! cosmetic props still go through the sim so co-op peers see the same random line.
 
-use crate::content::{Content, ContentError, Effect, SpellDef, SpellId, ticks};
+use crate::content::{AuraDef, Content, ContentError, Effect, SpellDef, SpellId, ticks};
 use crate::geom::{Vec3, in_range};
 use crate::rng::Rng;
 use crate::sim::{Sim, SpawnOpts};
@@ -258,12 +258,10 @@ impl Content {
     /// so a sprint on a scooter is not a rocket. Client prediction and the server's movement
     /// budget both use it.
     pub fn speed_pct<'a>(&self, auras: impl IntoIterator<Item = &'a str>) -> u32 {
-        100 + auras
-            .into_iter()
-            .filter_map(|k| self.aura(k))
-            .map(|a| a.speed_pct)
-            .max()
-            .unwrap_or(0)
+        let defs: Vec<&AuraDef> = auras.into_iter().filter_map(|k| self.aura(k)).collect();
+        let bonus = defs.iter().map(|a| a.speed_pct).max().unwrap_or(0);
+        let slow = defs.iter().map(|a| a.stealth_slow_pct).max().unwrap_or(0);
+        (100 + bonus) * (100 - slow.min(90)) / 100
     }
 
     pub fn is_mount(&self, aura: &str) -> bool {

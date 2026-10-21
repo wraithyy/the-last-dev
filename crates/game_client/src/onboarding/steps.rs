@@ -323,7 +323,12 @@ pub fn copy(t: &Tutorial, c: &Ctx) -> Option<Copy> {
             ),
             Role::Melee => (
                 "melee tip: positioning",
-                "Stay on the dummy, but when a Compliance Zone circle appears under you, step out before it lands.".into(),
+                format!(
+                    "Stay on the dummy, but when a Compliance Zone circle appears under you, step out before it lands.{}",
+                    c.class_tip
+                        .as_ref()
+                        .map_or(String::new(), |t| format!(" {t}"))
+                ),
                 "Melee lives in the blast radius. The trick is leaving it before the invite lands.",
             ),
             Role::Ranged => (

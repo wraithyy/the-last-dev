@@ -1704,6 +1704,20 @@ impl Sim {
         }
         if amount > 0 {
             self.dismount(ti);
+            if self.is_player(target) {
+                self.break_stealth(ti);
+            }
+            if !dot {
+                self.break_on_damage_auras(ti);
+            }
+        }
+        // Hitting an enemy ends the attacker's stealth; its own DoT ticks do not.
+        if !dot
+            && source != target
+            && self.content.units[self.units[ti].def].ai.is_some()
+            && let Some(si) = self.index(source).filter(|_| self.is_player(source))
+        {
+            self.break_stealth(si);
         }
         let hp = self.units[ti].state.hp.saturating_sub(dealt);
         self.units[ti].state.hp = hp;

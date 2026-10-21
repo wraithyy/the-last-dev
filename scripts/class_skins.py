@@ -1,7 +1,7 @@
 # Builds the Frontend / Backend / DevOps player models from the Quaternius "Ultimate Animated
 # Character Pack" (CC0). Every class keeps the Casual2_Male skeleton, proportions and animations
 # (same as Engineer.glb); only outfit, hair and a few extra skinned bits differ.
-# The QA Engineer and Data Scientist are reskins of two of those (RESKINS): same mesh, hood and
+# The QA Engineer, Data Scientist and Security Engineer are reskins of three of those (RESKINS): same mesh, hood and
 # hair stages, new colours and clothing texture, so they need only the built GLBs.
 # Usage: python3 -I scripts/class_skins.py "<pack>/glTF" assets/models/characters
 #        python3 -I scripts/class_skins.py --reskin assets/models/characters
@@ -43,6 +43,10 @@ RESKINS = {
     "DataScientist": ("DevOps", {"Skin": (0.55, 0.36, 0.25), "Hair": (0.02, 0.02, 0.025),
                                  "Pants": (0.42, 0.36, 0.24), "Belt": (0.12, 0.07, 0.03)},
                       "graph_paper"),
+    "SecurityEngineer": ("Backend", {"Skin": (0.78, 0.60, 0.50), "Hair": (0.50, 0.52, 0.58),
+                                     "Pants": (0.015, 0.015, 0.02), "Belt": (0.02, 0.02, 0.02),
+                                     "Sleeves": (0.012, 0.012, 0.015), "Hood": (0.012, 0.012, 0.015)},
+                         None),
 }
 
 

@@ -69,7 +69,7 @@ Every class has an interrupt by level 3 (Kill Query moved from 4 to 3); Rollback
 
 ## Classes
 
-Four roles, picked on first launch ("Choose your role"; Esc > Change role restarts the run). Each has ten spells unlocked over levels 1-9 and can finish the offline campaign solo.
+Seven roles, picked on first launch ("Choose your role"; Esc > Change role restarts the run). Each has ten spells unlocked over levels 1-9 and can finish the offline campaign solo.
 
 | Class | Role | Kit (level) | Signature |
 |---|---|---|---|
@@ -77,6 +77,9 @@ Four roles, picked on first launch ("Choose your role"; Esc > Change role restar
 | Frontend Developer | MELEE | Pixel Push 1, CSS Combo 1, !important 2, Lighthouse Audit 3, Hot Reload 4, Dark Mode 5, Responsive Layout 6, Infinite Scroll 7, Center the Div 8, Rewrite It in a New Framework 9 | stacks Specificity (5), cashes it in with !important; dash, self-heal defensive |
 | Backend Engineer | TANK | Blocking Call 1, Rate Limiter 1, Who Touched Prod? 2, Connection Pool 3, Kill Query 3, Database Lock 5, Horizontal Scaling 6, Retry With Exponential Backoff 7, Cache Invalidation 8, DROP TABLE 9 | 350% threat, armour, taunt, AoE threat, temporary max HP |
 | DevOps Engineer | HEALER | kill -9 1, Hotfix 1, SIGSTOP 2, Auto-scaling 3, Chaos Monkey 4, Revert Commit 5, Feature Flag Off 6, Circuit Breaker 7, Blue-Green Deploy 8, terraform destroy 9 | ally heals, HoT, group heal, restore HP of 5 s ago, own faster resurrect (Restart Pod) |
+| Security Engineer | MELEE | Shoulder Surf 1, Phishing Link 1, Zero-Day 1, Privilege Escalation 1, Tailgating 1, Disable Account 2, Incident Response 3, Social Engineering 4, Lateral Movement 6, Data Exfiltration 8 | Exploit Chain combo (5), stealth, backstab openers; the only one in the department who did not click the link |
+
+**Security Engineer (melee stealth).** Builders (Shoulder Surf +1, Phishing Link +1 and a poison DoT, Zero-Day +2, Lateral Movement +1 and a dash) stack the harmful `exploit_chain` aura on the target, up to 5, 20 s; the finishers Privilege Escalation (+35% per point) and Data Exfiltration (+45% per point, +100% below 30% HP) spend all of it. The meter is shown as five keycap pips over the action bar. **Tailgating** (30 s cooldown) is stealth: idle enemies notice you from 15% of their aggro range (never closer than 1.5 m), you walk 30% slower, and a hit dealt, damage taken or a debuff thrown at an enemy ends it (your own DoT ticks do not). Used in a fight it also drops you from non-boss threat tables. Zero-Day deals +150% from stealth and +50% from behind the target. Social Engineering stuns a regular enemy for 6 s until it is hit (bosses only lose the cast), Incident Response heals, shields and cleanses. Stealth is a sim aura, so the server and co-op teammates see it (a translucent character) without a protocol field of its own.
 
 ## Player progression
 

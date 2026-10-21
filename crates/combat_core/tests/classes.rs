@@ -139,12 +139,13 @@ fn classes_spawn_with_their_own_stats_bars_and_auto_attacks() {
             "backend",
             "devops",
             "qa",
-            "data_scientist"
+            "data_scientist",
+            "security"
         ]
     );
     let mut sim = Sim::new(content(), 1);
     assert_eq!(sim.spawn_player("rockstar", Vec3::default(), 0.0), 0);
-    // A room holds five players, so the sixth class gets a sim of its own.
+    // A room holds five players, so the sixth and seventh class get a sim of their own.
     let mut spare = Sim::new(content(), 1);
     let ids: Vec<EntityId> = keys
         .iter()
@@ -174,14 +175,17 @@ fn classes_spawn_with_their_own_stats_bars_and_auto_attacks() {
             ("devops_eng".to_string(), 290, 300),
             ("qa_engineer".to_string(), 320, 260),
             ("data_scientist".to_string(), 320, 280),
+            ("security_engineer".to_string(), 330, 240),
         ]
     );
     for (k, (id, key)) in ids.iter().zip(&keys).enumerate() {
         let s = if k < 5 { &sim } else { &spare };
         let class = s.class_of(*id).map(|c| c.key.clone());
         assert_eq!(class.as_deref(), Some(*key));
-        // Two spells at level 1, each class its own bar of ten.
-        assert_eq!(s.known_spells(*id).len(), 2, "{key}");
+        // Two spells at level 1 (the Security Engineer starts with five: its combo needs a
+        // builder, a finisher and a stealth), each class its own bar of ten.
+        let at_start = if *key == "security" { 5 } else { 2 };
+        assert_eq!(s.known_spells(*id).len(), at_start, "{key}");
         assert_eq!(c.class(key).map(|k| k.action_bar.len()), Some(10));
     }
     // Melee classes melee, the casters wand.
@@ -195,6 +199,7 @@ fn classes_spawn_with_their_own_stats_bars_and_auto_attacks() {
     assert_eq!(range("devops_eng"), Some(25.0));
     assert_eq!(range("qa_engineer"), Some(25.0));
     assert_eq!(range("data_scientist"), Some(25.0));
+    assert_eq!(range("security_engineer"), Some(4.0));
     // The tank's level HP grows 60% faster: 440 + 315 * 1.6 at level 10.
     assert!(sim.set_level_of(ids[2], 10));
     assert_eq!(sim.unit(ids[2]).map(|u| u.max_hp), Some(440 + 504));
@@ -525,6 +530,7 @@ fn every_class_can_cleanse_itself_but_not_boss_mechanics() {
         ("devops", 46),         // Feature Flag Off
         ("qa", 56),             // Revert to Last Green
         ("data_scientist", 65), // Confidence Interval
+        ("security", 77),       // Incident Response
     ];
     let classes: Vec<String> = content().classes.iter().map(|c| c.key.clone()).collect();
     assert_eq!(classes.len(), cleanses.len(), "a new class needs a cleanse");
@@ -589,7 +595,16 @@ fn the_postmortem_consumable_cleanses_any_class_on_the_shared_cooldown() {
 /// A level-10 `class` at the origin facing -Z and plain melee `units` (abilities stripped) in
 /// a row 20 m ahead, 2 m apart. Hits always land; every spell is learned; no regen, no yells.
 fn arena(class: &str, units: &[&str]) -> (Sim, EntityId, Vec<EntityId>) {
+    arena_with(class, units, |_| {})
+}
+
+fn arena_with(
+    class: &str,
+    units: &[&str],
+    tweak: impl FnOnce(&mut Content),
+) -> (Sim, EntityId, Vec<EntityId>) {
     let mut c = content();
+    tweak(&mut c);
     c.config.white_hit_pct = 100;
     c.config.spell_hit_pct = 100;
     c.config.regen.hp_pct = 0;
@@ -797,4 +812,235 @@ fn new_class_saves_round_trip_with_their_talents() {
             "{class}"
         );
     }
+}
+
+// ---- Security Engineer ----
+
+const SHOULDER_SURF: SpellId = SpellId(71);
+const ZERO_DAY: SpellId = SpellId(73);
+const PRIV_ESC: SpellId = SpellId(74);
+const TAILGATING: SpellId = SpellId(75);
+const SOCIAL_ENG: SpellId = SpellId(78);
+
+fn no_crit(c: &mut Content) {
+    def_mut(c, "security_engineer").crit_pct = 0;
+}
+
+fn move_to(sim: &mut Sim, p: EntityId, z: f32, yaw: f32) {
+    sim.apply_as(
+        p,
+        Command::PlayerMoved {
+            pos: Vec3::new(0.0, 0.0, z),
+            yaw,
+            moving: false,
+            jumping: false,
+        },
+    );
+    sim.tick();
+}
+
+fn has_aura(sim: &Sim, id: EntityId, key: &str) -> bool {
+    stacks(sim, id, key) > 0
+}
+
+fn damage_of(ev: &[Event], p: EntityId, spell: SpellId) -> u32 {
+    ev.iter()
+        .find_map(|e| match e {
+            Event::Damage {
+                source,
+                spell: Some(s),
+                amount,
+                ..
+            } if *source == p && *s == spell => Some(*amount),
+            _ => None,
+        })
+        .unwrap_or(0)
+}
+
+/// An idle Sales Rep (aggro range 7 m) 20 m ahead notices a player at 6 m, but not one in
+/// Tailgating, until the player attacks.
+#[test]
+fn tailgating_hides_from_idle_enemies_until_you_attack() {
+    let notices = |stealth: bool| {
+        let (mut sim, p, mobs) = arena_with("security", &["sales_rep"], no_crit);
+        if stealth {
+            sim.apply_as(
+                p,
+                Command::Cast {
+                    caster: p,
+                    spell: TAILGATING,
+                },
+            );
+            sim.tick();
+        }
+        move_to(&mut sim, p, -14.0, 0.0);
+        for _ in 0..30 {
+            sim.tick();
+        }
+        sim.unit(mobs[0]).and_then(|u| u.target).is_some()
+            || sim
+                .unit(mobs[0])
+                .is_some_and(|u| u.ai != Some(combat_core::AiState::Idle))
+    };
+    assert!(notices(false), "a visible player at 6 m must be noticed");
+    assert!(!notices(true), "a stealthed player at 6 m must not be");
+
+    let (mut sim, p, mobs) = arena_with("security", &["sales_rep"], no_crit);
+    cast_at(&mut sim, p, mobs[0], TAILGATING);
+    move_to(&mut sim, p, -16.0, 0.0);
+    assert!(has_aura(&sim, p, "tailgating"));
+    // Four metres away it still does not notice; the first hit gives the player away.
+    for _ in 0..30 {
+        sim.tick();
+    }
+    assert!(has_aura(&sim, p, "tailgating"));
+    cast_at(&mut sim, p, mobs[0], SHOULDER_SURF);
+    assert!(!has_aura(&sim, p, "tailgating"), "attacking ends stealth");
+}
+
+#[test]
+fn stealth_is_slower_to_walk_and_taking_damage_ends_it() {
+    let c = content();
+    assert_eq!(c.speed_pct(["tailgating"]), 70);
+    assert_eq!(c.speed_pct(std::iter::empty()), 100);
+    let (mut sim, p, _mobs) = arena_with("security", &["sales_rep"], no_crit);
+    assert!(sim.debug_apply_aura(p, "tailgating", 60_000));
+    assert_eq!(sim.move_speed_pct(p), 70);
+    // Closer than the stealth floor (1.5 m) the Sales Rep notices and swings: the hit ends it.
+    move_to(&mut sim, p, -19.0, 0.0);
+    let mut hurt = false;
+    for _ in 0..120 {
+        hurt |= sim
+            .tick()
+            .iter()
+            .any(|e| matches!(e, Event::Damage { target, .. } if *target == p));
+    }
+    assert!(hurt, "the Sales Rep never hit the player");
+    assert!(!has_aura(&sim, p, "tailgating"), "damage ends stealth");
+}
+
+/// Casting Tailgating mid-fight drops trash from the threat table; a boss stays on you.
+#[test]
+fn tailgating_in_a_fight_is_a_vanish_for_trash_but_not_for_bosses() {
+    let (mut sim, p, mobs) = arena_with("security", &["sales_rep", "ceo"], no_crit);
+    move_to(&mut sim, p, -16.0, 0.0);
+    cast_at(&mut sim, p, mobs[0], SHOULDER_SURF);
+    cast_at(&mut sim, p, mobs[1], SHOULDER_SURF);
+    for _ in 0..20 {
+        sim.tick();
+    }
+    assert!(sim.unit(mobs[0]).is_some_and(|u| u.in_combat));
+    sim.apply_as(
+        p,
+        Command::Cast {
+            caster: p,
+            spell: TAILGATING,
+        },
+    );
+    for _ in 0..10 {
+        sim.tick();
+    }
+    let rep = sim.unit(mobs[0]);
+    assert!(
+        rep.is_some_and(|u| u.target.is_none() || u.ai == Some(combat_core::AiState::Evade)),
+        "trash should lose the player: {rep:?}"
+    );
+    assert_eq!(sim.unit(mobs[1]).and_then(|u| u.target), Some(p));
+}
+
+#[test]
+fn zero_day_hits_harder_from_stealth_and_from_behind() {
+    // The mob faces -Z: standing at +Z of it is behind it, at -Z in front.
+    let hit = |stealth: bool, behind: bool| {
+        let (mut sim, p, mobs) = arena_with("security", &["sales_rep"], no_crit);
+        if stealth {
+            sim.apply_as(
+                p,
+                Command::Cast {
+                    caster: p,
+                    spell: TAILGATING,
+                },
+            );
+            sim.tick();
+        }
+        if behind {
+            move_to(&mut sim, p, -16.0, 0.0);
+        } else {
+            move_to(&mut sim, p, -24.0, std::f32::consts::PI);
+        }
+        let ev = cast_at(&mut sim, p, mobs[0], ZERO_DAY);
+        damage_of(&ev, p, ZERO_DAY)
+    };
+    let (front, behind, stealth_front, both) = (
+        hit(false, false),
+        hit(false, true),
+        hit(true, false),
+        hit(true, true),
+    );
+    assert!(front > 0);
+    let near =
+        |got: u32, pct: u32| (i64::from(got) - i64::from(front) * i64::from(pct) / 100).abs() <= 2;
+    assert!(near(behind, 150), "behind {behind} vs front {front}");
+    assert!(
+        near(stealth_front, 250),
+        "stealth {stealth_front} vs front {front}"
+    );
+    assert!(near(both, 300), "both {both} vs front {front}");
+}
+
+/// Zero-Day builds two points, Shoulder Surf one; five is the cap and Privilege Escalation
+/// spends them all for 35% more damage each.
+#[test]
+fn exploit_chain_builds_to_five_and_privilege_escalation_spends_it() {
+    let (mut sim, p, mobs) = arena_with("security", &["ceo"], no_crit);
+    move_to(&mut sim, p, -16.0, 0.0);
+    let plain = damage_of(&cast_at(&mut sim, p, mobs[0], PRIV_ESC), p, PRIV_ESC);
+    assert_eq!(stacks(&sim, mobs[0], "exploit_chain"), 0);
+    for _ in 0..50 {
+        sim.tick();
+    }
+    cast_at(&mut sim, p, mobs[0], ZERO_DAY);
+    assert_eq!(stacks(&sim, mobs[0], "exploit_chain"), 2);
+    for _ in 0..4 {
+        for _ in 0..50 {
+            sim.tick();
+        }
+        cast_at(&mut sim, p, mobs[0], SHOULDER_SURF);
+    }
+    assert_eq!(stacks(&sim, mobs[0], "exploit_chain"), 5, "capped at five");
+    for _ in 0..50 {
+        sim.tick();
+    }
+    let full = damage_of(&cast_at(&mut sim, p, mobs[0], PRIV_ESC), p, PRIV_ESC);
+    assert_eq!(stacks(&sim, mobs[0], "exploit_chain"), 0);
+    let want = plain * 275 / 100;
+    assert!(
+        (i64::from(full) - i64::from(want)).abs() <= 3,
+        "five points {full}, expected about {want} ({plain} bare)"
+    );
+}
+
+#[test]
+fn social_engineering_stuns_trash_until_hit_and_only_interrupts_a_boss() {
+    let (mut sim, p, mobs) = arena_with("security", &["sales_rep", "ceo"], no_crit);
+    move_to(&mut sim, p, -16.0, 0.0);
+    cast_at(&mut sim, p, mobs[0], SOCIAL_ENG);
+    assert!(sim.unit(mobs[0]).is_some_and(|u| u.stunned));
+    for _ in 0..50 {
+        sim.tick();
+    }
+    assert!(sim.unit(mobs[0]).is_some_and(|u| u.stunned), "still lost");
+    cast_at(&mut sim, p, mobs[0], SHOULDER_SURF);
+    assert!(
+        sim.unit(mobs[0]).is_some_and(|u| !u.stunned),
+        "a hit wakes it up"
+    );
+    for _ in 0..80 {
+        sim.tick();
+    }
+    cast_at(&mut sim, p, mobs[1], SOCIAL_ENG);
+    assert!(
+        sim.unit(mobs[1]).is_some_and(|u| !u.stunned),
+        "bosses are immune to the stun"
+    );
 }

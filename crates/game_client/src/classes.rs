@@ -1,7 +1,7 @@
 //! Playable classes on the client: the chosen class (persisted), the player's skin and kit,
 //! and the "Choose your role" picker (first launch, or Esc menu > Change role).
 //!
-//! `WOW_CLASS=fullstack|frontend|backend|devops|qa|data_scientist` skips the picker for that run;
+//! `WOW_CLASS=fullstack|frontend|backend|devops|qa|data_scientist|security` skips the picker for that run;
 //! `WOW_PICKER=1` opens it even when a role is stored.
 
 use crate::anim::{Character, ModelKind};
@@ -70,7 +70,7 @@ struct ChangeRoleText;
 const STAGE: Vec3 = Vec3::new(0.0, -500.0, 0.0);
 const STAGE_W: u32 = 1280;
 const STAGE_H: u32 = 440;
-const SPACING: f32 = 1.75;
+const SPACING: f32 = 1.45;
 
 pub fn role_color(role: Role) -> Color {
     match role {
@@ -140,8 +140,8 @@ fn cards_of(content: &Content) -> Vec<ClassCard> {
                 .filter_map(|id| spell(*id))
                 .collect();
             // One later signature move per class makes the card say what the role is about.
-            let signature = c.action_bar.get(2).and_then(|id| spell(*id)).into_iter();
-            abilities.extend(signature);
+            let signature = c.action_bar.get(2).and_then(|id| spell(*id));
+            abilities.extend(signature.filter(|s| !abilities.contains(s)));
             if c.resurrect != combat_core::SpellId(13) {
                 abilities.extend(spell(c.resurrect));
             }
@@ -549,6 +549,7 @@ fn picker_input(
         KeyCode::Digit4,
         KeyCode::Digit5,
         KeyCode::Digit6,
+        KeyCode::Digit7,
     ]
     .iter()
     .position(|k| keys.just_pressed(*k));
@@ -593,9 +594,9 @@ fn sync_picker(
         border.set_all(color);
     }
     let text = if picker.change {
-        "1-6 or click to pick. Esc cancels. Each role keeps its own save."
+        "1-7 or click to pick. Esc cancels. Each role keeps its own save."
     } else {
-        "1-6 or click to pick. Change it later from the Esc menu; each role keeps its own save."
+        "1-7 or click to pick. Change it later from the Esc menu; each role keeps its own save."
     };
     for mut t in &mut footer {
         if t.0 != text {

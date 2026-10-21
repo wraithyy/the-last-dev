@@ -520,6 +520,7 @@ fn class_name(key: &str) -> String {
         "devops" => "the DevOps",
         "qa" => "the QA",
         "data_scientist" => "the Data Scientist",
+        "security" => "the Security Engineer",
         _ => "someone",
     }
     .to_string()

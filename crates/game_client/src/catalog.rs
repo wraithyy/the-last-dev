@@ -74,6 +74,8 @@ const DEVOPS: &str = "models/characters/DevOps.glb";
 /// Reskins of Frontend.glb / DevOps.glb (scripts/class_skins.py --reskin).
 const QA: &str = "models/characters/QA.glb";
 const DATA_SCIENTIST: &str = "models/characters/DataScientist.glb";
+/// Reskin of Backend.glb: black hoodie, pale skin, silver hair.
+const SECURITY: &str = "models/characters/SecurityEngineer.glb";
 const CASUAL_F: &str = "models/characters/Casual_Female.glb";
 const CASUAL2: &str = "models/characters/Casual2_Male.glb";
 const CASUAL_M: &str = "models/characters/Casual_Male.glb";
@@ -84,13 +86,14 @@ const WORKER: &str = "models/characters/Worker_Male.glb";
 const PRIM: &str = "prim/";
 
 /// Every character GLB the catalog references.
-pub const CHARACTER_MODELS: [&str; 16] = [
+pub const CHARACTER_MODELS: [&str; 17] = [
     ENGINEER,
     FRONTEND,
     BACKEND,
     DEVOPS,
     QA,
     DATA_SCIENTIST,
+    SECURITY,
     SUIT_M,
     SUIT_M_BALD,
     SUIT_F,
@@ -177,6 +180,16 @@ static TABLE: &[(&str, UnitVisual)] = &[
             1.8,
             "Data Scientist",
             "<Significant at p = 0.06>",
+            &[],
+        ),
+    ),
+    (
+        "security_engineer",
+        v(
+            SECURITY,
+            1.8,
+            "Security Engineer",
+            "<Phished Twice This Quarter>",
             &[],
         ),
     ),
@@ -3071,6 +3084,7 @@ mod tests {
         "devops_eng",
         "qa_engineer",
         "data_scientist",
+        "security_engineer",
         "intern",
         "meatproxy",
         "vibe_junior",
@@ -3168,7 +3182,7 @@ mod tests {
             assert!(!vis.title.is_empty());
         }
         // Every GLB is about 1.3 MB of download; one per playable class plus ten NPC bodies.
-        assert!(CHARACTER_MODELS.len() <= 16);
+        assert!(CHARACTER_MODELS.len() <= 17);
     }
 
     #[test]

@@ -48,9 +48,10 @@ pub use content::{
     AiAbility, AiDef, AiTarget, ApplyAura, Area, AuraDef, AutoAttackDef, ClassDef, Config,
     ConsumeAura, Content, ContentError, DispelType, Effect, EnrageDef, Execute, FleeDef,
     FrontalShield, ITEM_DESC_MAX, ITEM_STACK_CAP, IdlePose, ItemBonus, ItemDef, ItemTotals,
-    LevelDef, LootEntry, MAX_ACTION_BAR, MobScaling, Objective, PackDef, PeriodicDef, PhaseDef,
-    QuestDef, QuestGiver, QuestReward, Role, School, SpellDef, SpellId, SpellTarget, TelegraphAt,
-    TelegraphDef, UnitDef, Unlock, XpRules, YellDef, ZoneDef, ZoneKind, ZoneLink, ZoneSpawn,
+    LevelDef, LootEntry, MAX_ACTION_BAR, MobScaling, Objective, OpenerDef, PackDef, PeriodicDef,
+    PhaseDef, QuestDef, QuestGiver, QuestReward, Role, School, SpellDef, SpellId, SpellTarget,
+    TelegraphAt, TelegraphDef, UnitDef, Unlock, XpRules, YellDef, ZoneDef, ZoneKind, ZoneLink,
+    ZoneSpawn,
 };
 pub use dailies::{BoardView, GoalSpec, GoalView, SavedTask, TaskState, TaskView};
 pub use duel::{DuelError, DuelOutcome};

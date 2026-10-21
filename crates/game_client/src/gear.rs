@@ -2,7 +2,7 @@
 //! carries a coffee mug in the left fist; every class skin (player, teammates, role picker,
 //! lineup) gets its class kit: Fullstack headphones resting on the neck, Frontend glasses,
 //! Backend big over-ear headphones, a DevOps pager on the belt, a QA clipboard on the other hip,
-//! a Data Scientist's lanyard with a glowing chart badge. Offsets are in bone space
+//! a Data Scientist's lanyard with a glowing chart badge, a Security Engineer's sunglasses and VISITOR lanyard. Offsets are in bone space
 //! (model units; the model root is scaled).
 //!
 //! While the player channels Coffee Break the left arm is posed procedurally (two-bone IK
@@ -295,6 +295,67 @@ fn attach_accessories(
                             MeshMaterial3d(fail),
                             Transform::from_xyz(0.0, 0.05, 0.03)
                                 .with_rotation(Quat::from_rotation_z(0.6)),
+                        ));
+                    });
+                });
+            }
+            "security" => {
+                // Dark sunglasses indoors, and a red VISITOR lanyard: the badge that gets
+                // you past every door nobody checks.
+                let strap = mat(Color::srgb(0.75, 0.08, 0.08), 0.6);
+                let card = mat(Color::srgb(0.95, 0.95, 0.97), 0.6);
+                let lens = materials.add(StandardMaterial {
+                    base_color: Color::srgb(0.02, 0.02, 0.03),
+                    perceptual_roughness: 0.15,
+                    metallic: 0.4,
+                    ..default()
+                });
+                let stripe = materials.add(StandardMaterial {
+                    base_color: Color::srgb(0.75, 0.08, 0.08),
+                    emissive: LinearRgba::rgb(0.8, 0.05, 0.05),
+                    ..default()
+                });
+                let pane = meshes.add(Cuboid::new(0.27, 0.15, 0.04));
+                let bridge = meshes.add(Cuboid::new(0.12, 0.04, 0.04));
+                let loop_mesh = meshes.add(Torus::new(0.33, 0.36));
+                let badge = meshes.add(Cuboid::new(0.2, 0.26, 0.02));
+                let bar = meshes.add(Cuboid::new(0.16, 0.05, 0.01));
+                commands.entity(head).with_children(|c| {
+                    for side in [-1.0f32, 1.0] {
+                        c.spawn((
+                            Mesh3d(pane.clone()),
+                            MeshMaterial3d(lens.clone()),
+                            Transform::from_xyz(side * 0.2, GLASSES_Y, GLASSES_Z),
+                            NotShadowCaster,
+                        ));
+                    }
+                    c.spawn((
+                        Mesh3d(bridge),
+                        MeshMaterial3d(lens),
+                        Transform::from_xyz(0.0, GLASSES_Y + 0.04, GLASSES_Z),
+                        NotShadowCaster,
+                    ));
+                });
+                commands.entity(neck).with_children(|c| {
+                    c.spawn((
+                        Mesh3d(loop_mesh),
+                        MeshMaterial3d(strap),
+                        Transform::from_xyz(0.0, -0.25, 0.08)
+                            .with_rotation(Quat::from_rotation_x(1.1)),
+                        NotShadowCaster,
+                    ));
+                    c.spawn((
+                        Mesh3d(badge),
+                        MeshMaterial3d(card),
+                        Transform::from_translation(BADGE_AT),
+                        NotShadowCaster,
+                    ))
+                    .with_children(|b| {
+                        // The red VISITOR band across the top of the card.
+                        b.spawn((
+                            Mesh3d(bar),
+                            MeshMaterial3d(stripe),
+                            Transform::from_xyz(0.0, 0.08, 0.012),
                         ));
                     });
                 });

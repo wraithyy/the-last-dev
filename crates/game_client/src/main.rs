@@ -38,6 +38,7 @@ mod settings;
 mod social;
 mod spell_fx;
 mod sprint;
+mod stealth;
 mod targeting;
 mod telegraph_fx;
 mod touch;
@@ -128,6 +129,7 @@ fn main() {
     .add_plugins((
         game::GamePlugin,
         hair::HairPlugin,
+        stealth::StealthPlugin,
         gear::GearPlugin,
         nameplates::NameplatePlugin,
         debug::DebugPlugin,
