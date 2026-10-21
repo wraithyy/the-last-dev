@@ -279,6 +279,7 @@ pub fn run_session(
     sim: Res<CombatSim>,
     mut net: Option<ResMut<NetWorld>>,
     mut log: MessageWriter<LogLineMsg>,
+    mut roasts: ResMut<crate::roasts::Roasts>,
     mut switch: Switch,
 ) {
     let mut fresh: Option<NetWorld> = None;
@@ -378,6 +379,7 @@ pub fn run_session(
             Outcome::Lost => {
                 lobby.set_notice(LOST_NOTICE);
                 switch.go_offline(&sim, LOST_NOTICE);
+                log.write(crate::roasts::disconnect_line(&mut roasts));
                 fresh = None;
             }
             Outcome::Nothing | Outcome::EnterRoom | Outcome::Failed => {}

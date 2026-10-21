@@ -141,7 +141,7 @@ pub const VICTORY_SUBTITLE: &str =
 /// The zone transition overlay.
 pub const LOADING_LINE: &str = "Loading next floor... the open space is extra loud today.";
 
-/// One per transition, in order.
+/// Gameplay hints; `roasts::Roasts::loading` shuffles them in with the loading roasts.
 pub const LOADING_TIPS: [&str; 12] = [
     "Tip: The AI summarised this loading screen. The summary is 40% longer.",
     "Tip: Every door on campus is guarded by a model that thinks you are a tailgater.",

@@ -33,6 +33,7 @@ mod player;
 mod presentation;
 mod raid;
 mod rigs;
+mod roasts;
 mod seat;
 mod settings;
 mod social;
@@ -152,6 +153,7 @@ fn main() {
     // After TouchPlugin: the settings default to Low on phones.
     .add_plugins((settings::SettingsPlugin, cutscene::CutscenePlugin))
     .add_plugins(social::SocialPlugin)
+    .add_plugins(roasts::RoastPlugin)
     .add_plugins(live::LivePlugin)
     .add_plugins(legacy::LegacyPlugin)
     .add_plugins(raid::RaidPlugin)

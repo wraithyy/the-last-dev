@@ -14,6 +14,8 @@
 //! - `WOW_JIRA=1`, `WOW_MAP=1`: open the `~/jira` log or the map at start.
 //! - `WOW_KILL_NEAREST=<secs>` (+ `WOW_LOOT_ADD=a|b`, `WOW_KILL_CALM=1` kills the whole room): corpse for loot shots.
 //! - `WOW_KILL_BOSS=<secs>`: the zone boss dies (as a player kill) that many seconds in.
+//! - `WOW_DIE=<secs>`: the player dies then (death panel and roast shots).
+//! - `WOW_TRAVEL=<zone>@<secs>`: fade to that zone then (loading screen and roast shots).
 //! - `WOW_BOSS_PCT=<pct>@<secs>`: the zone boss drops to that HP percent at that time (phase shots).
 //! - `WOW_FPS=1`: log average frame time and drawn mesh count every 3 s (vsync caps the rate, so read the ms).
 //!   `WOW_SHOW_FPS=1` turns the on-screen FPS readout on for the run (settings.rs).
@@ -210,6 +212,39 @@ impl Plugin for DebugPlugin {
                     let boss = sim.0.units().find(|u| u.boss && u.alive).map(|u| u.id);
                     if let Some(id) = boss {
                         sim.0.debug_kill(id);
+                    }
+                })
+                .in_set(SimReady),
+            );
+        }
+        // `WOW_DIE=<secs>`: the player dies then (no killer, so the environment roasts).
+        if let Some(at) = env::var("WOW_DIE").ok().and_then(|v| v.parse::<f32>().ok()) {
+            app.add_systems(
+                Update,
+                (move |time: Res<Time>, mut sim: ResMut<CombatSim>, mut done: Local<bool>| {
+                    if *done || time.elapsed_secs() < at {
+                        return;
+                    }
+                    *done = true;
+                    if let Some(me) = sim.0.player() {
+                        sim.0.debug_kill_player(me);
+                    }
+                })
+                .in_set(SimReady),
+            );
+        }
+        // `WOW_TRAVEL=<zone>@<secs>`: start the door fade to that zone then (loading screen shots).
+        if let Some((zone, at)) = env::var("WOW_TRAVEL").ok().and_then(|v| {
+            let (z, t) = v.split_once('@')?;
+            Some((z.to_owned(), t.parse::<f32>().ok()?))
+        }) {
+            app.add_systems(
+                Update,
+                (move |time: Res<Time>,
+                       mut flow: ResMut<crate::game::GameFlow>,
+                       mut done: Local<bool>| {
+                    if !*done && time.elapsed_secs() >= at {
+                        *done = flow.travel_to(&zone);
                     }
                 })
                 .in_set(SimReady),

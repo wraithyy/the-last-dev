@@ -150,7 +150,24 @@ if (!document.createElement('canvas').getContext('webgl2')) {
 // Offline cache + update prompt. A new build waits until the player agrees, never swaps mid-game.
 if ('serviceWorker' in navigator) {
   const toast = document.getElementById('toast');
+  // Rare enough that a random pick will do; the last one shown is remembered so it never repeats back to back.
+  const updateLines = [
+    'New version available. Unlike you, it got an upgrade.',
+    'A new build is ready. It was approved faster than your vacation.',
+    'Update available. The old version has been right-sized.',
+    'New version. The patch notes are shorter than the layoff email.',
+    'A fresh release is waiting. Reload now, or have it done to you in the next reorg.',
+  ];
+  const pickUpdateLine = () => {
+    let k = Math.floor(Math.random() * updateLines.length);
+    try {
+      if (k === Number(localStorage.getItem('updateRoast'))) k = (k + 1) % updateLines.length;
+      localStorage.setItem('updateRoast', String(k));
+    } catch (e) { /* private mode: a repeat is harmless */ }
+    return updateLines[k];
+  };
   const offerReload = (worker) => {
+    toast.querySelector('span').textContent = pickUpdateLine();
     toast.hidden = false;
     document.getElementById('reload').onclick = () => worker.postMessage('skip-waiting');
   };

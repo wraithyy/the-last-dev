@@ -122,6 +122,7 @@ the site, including the [changelog page](https://wraithyy.github.io/the-last-dev
 | `WOW_UNLOCK_ALL=1` | Open every door and elevator |
 | `WOW_JIRA=1`, `WOW_MAP=1` | Open the quest log or the map at start |
 | `WOW_KILL_BOSS=secs` | The zone boss dies (as a player kill) that many seconds in |
+| `WOW_DIE=secs`, `WOW_TRAVEL=zone@secs` | The player dies, or the door fade to that zone starts, that many seconds in (death panel and loading screen shots) |
 | `WOW_SHOT_TIMES=t1,t2,..`, `WOW_SHOT_SIZE=WxH` | Several timed screenshots (`<path>_<n>.png`); offscreen target size (e.g. 2560x1080) |
 | `WOW_FPS=1` | Log average frame time and drawn meshes every 3 s |
 | `WOW_MUTE=1` | Start with audio muted (on the web: `?mute=1` in the URL) |

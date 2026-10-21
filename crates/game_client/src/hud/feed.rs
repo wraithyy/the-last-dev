@@ -9,7 +9,7 @@ use crate::copy;
 use crate::economy::goods;
 use bevy::prelude::*;
 use combat_core::{
-    AuraEnd, BurnoutCause, Command, EntityId, Event, ITEM_STACK_CAP, QuipKind, School,
+    AuraEnd, BurnoutCause, Command, EntityId, Event, ITEM_STACK_CAP, ItemError, QuipKind, School,
 };
 
 const XP_BAR_H: f32 = 14.0;
@@ -32,6 +32,8 @@ struct ErrorText;
 struct DeathPanel;
 #[derive(Component)]
 struct RespawnButton;
+#[derive(Component)]
+struct DeathRoastText;
 
 #[derive(Component)]
 struct XpFill;
@@ -92,6 +94,16 @@ fn spawn_feed(mut commands: Commands) {
             c.spawn((
                 label("Your role has been backfilled by an AI agent.", 14.0),
                 TextColor(Color::srgb(0.75, 0.7, 0.7)),
+            ));
+            c.spawn((
+                DeathRoastText,
+                label("", 14.0),
+                TextColor(Color::srgb(0.9, 0.62, 0.3)),
+                TextLayout::justify(Justify::Center),
+                Node {
+                    max_width: px(560),
+                    ..default()
+                },
             ));
             c.spawn((
                 RespawnButton,
@@ -296,6 +308,7 @@ fn collect_events(
     mut loot: ResMut<super::loot::LootState>,
     mut toasts: MessageWriter<super::loot::LootToast>,
     settings: Res<crate::settings::Settings>,
+    mut roasts: ResMut<crate::roasts::Roasts>,
     mut best_gear: Local<Option<u64>>,
     mut xp_gains: Local<usize>,
     // Mana ticks of the running Coffee Break, reported once as a single line.
@@ -457,7 +470,11 @@ fn collect_events(
                 banner.left = ERROR_TEXT_SECS;
             }
             Event::ItemError { reason } => {
-                banner.text = reason.message().to_owned();
+                banner.text = if *reason == ItemError::NotEnoughSp {
+                    roasts.declined().to_owned()
+                } else {
+                    reason.message().to_owned()
+                };
                 banner.left = ERROR_TEXT_SECS;
             }
             Event::Proc { unit, item } => {
@@ -845,6 +862,8 @@ fn update_death(
     sim: SimView,
     mut pending: ResMut<PendingCommands>,
     mut panel: Single<&mut Node, With<DeathPanel>>,
+    mut roast: Single<&mut Text, With<DeathRoastText>>,
+    death: Res<crate::roasts::DeathRoast>,
     buttons: Query<&Interaction, (With<RespawnButton>, Changed<Interaction>)>,
 ) {
     let dead = sim
@@ -855,6 +874,7 @@ fn update_death(
         panel.display,
         if dead { Display::Flex } else { Display::None }
     );
+    set_text(&mut roast, &death.text);
     if dead && buttons.iter().any(|i| *i == Interaction::Pressed) {
         pending.0.push(Command::RespawnPlayer);
     }

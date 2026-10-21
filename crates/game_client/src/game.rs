@@ -737,6 +737,9 @@ fn run_fade(
     mut overlay: Single<(&mut BackgroundColor, &mut Visibility), With<FadeOverlay>>,
     mut line: Single<&mut TextColor, (With<FadeText>, Without<FadeTip>)>,
     mut tip: Single<(&mut Text, &mut TextColor), (With<FadeTip>, Without<FadeText>)>,
+    mut roasts: ResMut<crate::roasts::Roasts>,
+    // The `flow.tip` counter this line was drawn for; a new trip draws the next one from the bag.
+    mut shown: Local<Option<(usize, &'static str)>>,
 ) {
     let dt = time.delta_secs();
     let from = flow.zone.clone();
@@ -781,10 +784,15 @@ fn run_fade(
     overlay.0.0 = Color::srgba(0.0, 0.0, 0.0, alpha);
     line.0 = ACCENT.with_alpha(alpha);
     let (text, color) = &mut *tip;
-    set_text(
-        text,
-        copy::LOADING_TIPS[flow.tip % copy::LOADING_TIPS.len()],
-    );
+    let line = match *shown {
+        Some((n, line)) if n == flow.tip => line,
+        _ => {
+            let line = roasts.loading();
+            *shown = Some((flow.tip, line));
+            line
+        }
+    };
+    set_text(text, line);
     color.0 = DIM.with_alpha(alpha);
 }
 

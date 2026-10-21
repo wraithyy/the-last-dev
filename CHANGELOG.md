@@ -16,6 +16,8 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - An Exploit Chain meter above the action bar, a role card on the picker (key 7), a black hoodie with sunglasses and a VISITOR lanyard, and a Career Ladder with fifteen talents.
 - Graphics presets Low, Medium, High and Ultra, with render scale, MSAA, shadow and view-distance overrides in Settings.
 - The game picks a quality preset on first start and offers a lower one when the frame rate stays under 30.
+- Roasts for the moments that earn one: a different insult on every death (by boss, regular enemy, fall or burnout), escalating remarks when the same boss keeps killing you, a fresh line on every loading screen, and jabs when you idle, wipe as a group, lag, play for hours, run out of Kudos at a vendor, level slowly or lose the connection. Lines come from shuffled pools, so none repeats until the pool has run through, and none of them blocks play.
+- The web version's update toast and the offline start now have attitude too,, joining the roasts already shown when the game drops to a lower quality preset.
 - A `~/perf $ top` window (F6) with frame times, scene counts, memory and, online, ping, jitter and server tick.
 
 ### Changed
