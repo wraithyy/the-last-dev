@@ -222,7 +222,7 @@ pub struct Pickable<K> {
 }
 
 /// Own ray picking: no render-backend dependency, so it behaves the same on native and
-/// WebGL2. Living units are spheres, corpses lying boxes. Out of combat a lootable corpse under
+/// the web. Living units are spheres, corpses lying boxes. Out of combat a lootable corpse under
 /// the cursor wins over a nearer living unit (WoW-style), so a mob that wandered behind it
 /// does not steal the click. `slack` widens every volume (finger taps).
 pub fn pick_ray<K: Copy>(

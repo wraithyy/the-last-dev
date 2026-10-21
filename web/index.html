@@ -10,8 +10,6 @@
 <meta name="apple-mobile-web-app-title" content="Last Dev">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="modulepreload" href="./pkg/game_client.js">
-<link rel="preload" href="./pkg/game_client_bg.wasm" as="fetch" crossorigin>
 <title>The Last Dev</title>
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <style>
@@ -32,11 +30,18 @@
   #toast button { font: inherit; padding: 4px 10px; border-radius: 6px; border: 1px solid #5cd1db; background: #5cd1db; color: #101216; cursor: pointer; }
   #status { position: fixed; top: 12px; left: 12px; font-size: 14px; opacity: .8; white-space: pre-wrap; pointer-events: none; }
   #tip { position: fixed; top: 38px; left: 12px; font-size: 13px; font-style: italic; opacity: .6; max-width: 70ch; pointer-events: none; }
+  #nogpu { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; padding: 24px; box-sizing: border-box; background: #101216; color: #ccd; text-align: center;
+    font-family: ui-monospace, Menlo, Consolas, monospace; }
+  #nogpu[hidden] { display: none; }
+  #nogpu p { margin: 0; max-width: 60ch; font-size: 18px; line-height: 1.5; color: #5cd1db; }
+  #nogpu small { font-size: 13px; opacity: .6; }
   #status.error { color: #ff8080; opacity: 1; font-size: 16px; max-width: 80ch; }
 </style>
 </head>
 <body>
 <canvas id="bevy" tabindex="0"></canvas>
+<div id="nogpu" hidden><p></p><small>Chrome, Edge or Safari 26+ run the full game.</small></div>
 <div id="status">Loading…</div>
 <div id="tip"></div>
 <div id="rotate">Rotate your phone for the best view</div>
@@ -131,9 +136,49 @@ async function download(url) {
   return bytes;
 }
 
-if (!document.createElement('canvas').getContext('webgl2')) {
-  fail('WebGL2 is not available in this browser. Enable hardware acceleration or use a recent Chrome, Firefox or Safari.');
+const NO_GPU_LINES = [
+  "Your browser doesn't speak WebGPU. It's obsolete. So are you, according to the AI roadmap (Q3).",
+  'WebGPU not found. Your browser has been flagged as legacy. HR will contact you about your own legacy status shortly.',
+  "No WebGPU, so this browser is deprecated. Management says you're next.",
+  'WebGPU missing. Your browser is on a performance improvement plan. The AI will replace you both.',
+  'This browser predates WebGPU, the cloud and your last raise. Please do not tell the CTO.',
+  "The AI rated your browser 'end of life' and you 'end of quarter'.",
+  "No WebGPU detected. We filed a ticket to upgrade your browser. It's assigned to the AI. ETA: after your layoff.",
+];
+// Also reachable at runtime (device lost, adapter failure) so a dead GPU never leaves a frozen canvas.
+const showNoGpu = () => {
+  hideTips();
+  status.hidden = true;
+  canvas.hidden = true;
+  const box = document.getElementById('nogpu');
+  box.querySelector('p').textContent = NO_GPU_LINES[Math.floor(Math.random() * NO_GPU_LINES.length)];
+  box.hidden = false;
+};
+window.addEventListener('webgpu-lost', showNoGpu);
+
+// A present navigator.gpu is not enough: blocklisted or headless setups expose it but yield no adapter.
+async function hasWebGpu() {
+  if (!navigator.gpu) return false;
+  try {
+    const adapter = await Promise.race([navigator.gpu.requestAdapter(), new Promise((r) => setTimeout(() => r(null), 3000))]);
+    return !!adapter;
+  } catch (e) { return false; }
+}
+
+if (!(await hasWebGpu())) {
+  showNoGpu();
 } else {
+  // Wrap device creation so a lost device (GPU reset, driver crash) shows the notice instead of a frozen frame.
+  const requestDevice = GPUAdapter.prototype.requestDevice;
+  GPUAdapter.prototype.requestDevice = async function (...args) {
+    const device = await requestDevice.apply(this, args);
+    device.lost.then((info) => {
+      console.error('WebGPU device lost:', info && info.reason, info && info.message);
+      if (!info || info.reason !== 'destroyed') window.dispatchEvent(new Event('webgpu-lost'));
+    });
+    return device;
+  };
+  window.dispatchEvent(new Event('webgpu-ok'));
   canvas.focus();
   try {
     const { default: init } = await import('./pkg/game_client.js');
@@ -180,7 +225,8 @@ if ('serviceWorker' in navigator) {
     reloading = true;
     location.reload();
   });
-  window.addEventListener('load', () => {
+  // Its install precaches the whole pkg/ shell (tens of MB), so unsupported browsers must never register it.
+  window.addEventListener('webgpu-ok', () => {
     navigator.serviceWorker.register('./sw.js').then((reg) => {
       // First install has no controller yet; only an update (a controlled page) gets the toast.
       if (reg.waiting && navigator.serviceWorker.controller) offerReload(reg.waiting);

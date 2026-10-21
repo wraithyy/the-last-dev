@@ -14,7 +14,7 @@ use combat_core::EntityId;
 use std::collections::HashMap;
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, TAU};
 
-/// Hard ceiling on live particles; spawns beyond it are dropped (WebGL2 draw-call budget).
+/// Hard ceiling on live particles; spawns beyond it are dropped (draw-call budget).
 const PARTICLE_CAP: usize = 260;
 const CAGE_BARS: usize = 18;
 const KEYCAPS: usize = 8;

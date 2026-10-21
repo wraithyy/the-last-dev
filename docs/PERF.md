@@ -73,7 +73,7 @@ Chrome (ANGLE/Metal on the M2 Pro, window 3432x1259 @1x, rAF-limited): the hook 
 fresh web save always starts in Car Park P3 (zone override is not honoured there), so the one
 valid line is a carpark-like scene: `avg 16.28 ms, p95 18.1, p99 20.1, 61 fps, 4206 entities`.
 rAF caps at the display rate, so only values above 16.7 ms are informative. The web build runs
-without GPU clustering, GPU preprocessing, SSAO, OIT and atmosphere (WebGL2 downlevel).
+without GPU clustering, GPU preprocessing, SSAO, OIT and atmosphere (measured on the old WebGL2 build; the WebGPU build has them available).
 
 ## Caveats
 

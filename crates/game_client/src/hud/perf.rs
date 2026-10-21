@@ -119,29 +119,29 @@ fn memory_mb() -> Option<(f32, &'static str)> {
     None
 }
 
-/// True for CPU renderers (SwiftShader, llvmpipe): no preset above Low will do there.
-#[cfg(target_arch = "wasm32")]
-fn software_renderer() -> bool {
-    let probe = js_sys::Function::new_no_args(
-        "var c=document.createElement('canvas').getContext('webgl');\
-         if(!c)return '';var e=c.getExtension('WEBGL_debug_renderer_info');\
-         return e?String(c.getParameter(e.UNMASKED_RENDERER_WEBGL)):'';",
-    );
-    probe
-        .call0(&wasm_bindgen::JsValue::NULL)
-        .ok()
-        .and_then(|v| v.as_string())
-        .is_some_and(|r| {
-            let r = r.to_lowercase();
-            ["swiftshader", "llvmpipe", "software", "basic render"]
-                .iter()
-                .any(|s| r.contains(s))
-        })
+/// Backend label and CPU-renderer flag, written once by the render world at startup (the adapter
+/// only exists there) and read by the main-world HUD and auto-detect.
+static ADAPTER: std::sync::OnceLock<(String, bool)> = std::sync::OnceLock::new();
+
+fn record_adapter(info: Res<bevy::render::renderer::RenderAdapterInfo>) {
+    // Debug names avoid a direct wgpu dependency just for two enums.
+    let backend = match format!("{:?}", info.backend).as_str() {
+        "BrowserWebGpu" => "WebGPU".to_owned(),
+        other => other.to_owned(),
+    };
+    let software = format!("{:?}", info.device_type) == "Cpu";
+    // Browsers hide the GPU name, so WebGPU often reports an empty one.
+    let label = if info.name.is_empty() {
+        backend
+    } else {
+        format!("{backend} ({})", info.name)
+    };
+    let _ = ADAPTER.set((label, software));
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+/// True for CPU renderers (SwiftShader, llvmpipe): no preset above Low will do there.
 fn software_renderer() -> bool {
-    false
+    ADAPTER.get().is_some_and(|a| a.1)
 }
 
 /// Preset for a measured median frame rate. A vsync-capped display can only prove "at least
@@ -306,6 +306,9 @@ impl Plugin for PerfPlugin {
                 )
                     .chain(),
             );
+        if let Some(render_app) = app.get_sub_app_mut(bevy::render::RenderApp) {
+            render_app.add_systems(bevy::render::RenderStartup, record_adapter);
+        }
     }
 }
 
@@ -611,8 +614,10 @@ fn refresh(
                 format!("memory {mb:.0} MB ({what})")
             }),
             Row::Render => format!(
-                "preset {}  scale {scale}  MSAA {}  shadows {}",
+                // Single spaces: the renderer name pushed the double-spaced line past the panel.
+                "{} {} | scale {scale} | MSAA {} | shadows {}",
                 q.name(),
+                ADAPTER.get().map_or("renderer ?", |a| a.0.as_str()),
                 if settings.msaa() { "4x" } else { "off" },
                 on(settings.shadows()),
             ),

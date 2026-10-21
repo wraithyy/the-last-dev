@@ -2,7 +2,7 @@
 //! executive car park, a cafeteria pavilion, a smoking corner, the reception plaza and the
 //! building facades (tower, data center, innovation lab, client annex); the districts around
 //! it are in `districts.rs` and `frontier.rs`. Buildings are single large blockers; the
-//! entrances are the door anchors. Everything is primitives so it stays light on WebGL2.
+//! entrances are the door anchors. Everything is primitives so it stays light on weak GPUs.
 
 use super::kit::*;
 use super::layout::{FloorKind, FloorLayout, Theme, assemble, yaw_towards};

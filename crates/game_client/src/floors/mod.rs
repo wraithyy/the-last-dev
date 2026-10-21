@@ -114,7 +114,7 @@ struct FloorEntity;
 #[derive(Component)]
 struct Sun;
 
-/// Decor further than this from the camera is not drawn outdoors (WebGL2 draw-call budget);
+/// Decor further than this from the camera is not drawn outdoors (draw-call budget);
 /// the fog hides the cut. Indoors the walls already hide most of it, so the range is shorter.
 const DECOR_RANGE_OUTDOOR: f32 = 95.0;
 const DECOR_RANGE_INDOOR: f32 = 70.0;
@@ -152,7 +152,7 @@ impl Plugin for FloorsPlugin {
 }
 
 fn spawn_sun(mut commands: Commands) {
-    // One shadow-casting light only: WebGL2 budget.
+    // One shadow-casting light only: GPU budget.
     commands.spawn((
         Sun,
         DirectionalLight {
@@ -162,7 +162,7 @@ fn spawn_sun(mut commands: Commands) {
             ..default()
         },
         CascadeShadowConfigBuilder {
-            num_cascades: 1, // WebGL2 supports a single cascade
+            num_cascades: 1, // one cascade: cheapest, and phones are a target
             maximum_distance: 60.0,
             ..default()
         }
@@ -232,7 +232,7 @@ fn blink_leds(
 }
 
 /// Only the lights nearest the camera stay on: every extra clustered light costs each
-/// lit fragment, and WebGL2 has a hard uniform budget for them.
+/// lit fragment, and each costs shader time.
 #[allow(clippy::type_complexity)] // Bevy query tuple
 fn cap_point_lights(
     time: Res<Time>,
@@ -665,7 +665,7 @@ fn flat_mesh(runs: &[(f32, f32, f32, f32)], y: f32, up: bool) -> Mesh {
 }
 
 /// Grid size of the ground mesh: fine enough for the river banks and plaza ramps, coarse
-/// enough to stay one cheap draw call on WebGL2.
+/// enough to stay one cheap draw call on weak GPUs.
 const TERRAIN_CELL_M: f32 = 3.0;
 
 /// The ground over the bounds of the floor runs as one height-mapped grid (UVs in metres, like

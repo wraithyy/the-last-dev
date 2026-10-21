@@ -92,7 +92,7 @@ impl Plugin for ArenaPlugin {
 fn grade_camera(mut commands: Commands, cams: Query<Entity, Added<Camera3d>>) {
     for cam in &cams {
         commands.entity(cam).insert((
-            // AcesFitted needs no LUT texture, so it behaves the same on WebGL2.
+            // AcesFitted needs no LUT texture, so it needs no extra texture.
             Tonemapping::AcesFitted,
             Bloom {
                 intensity: 0.12,

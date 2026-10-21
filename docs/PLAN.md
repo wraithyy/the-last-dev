@@ -6,7 +6,7 @@
 |---|---|---|
 | Rust | 1.96.1 (pinned in `rust-toolchain.toml`) | Already installed locally; satisfies Bevy 0.19 MSRV 1.95. |
 | Bevy | 0.19.1, features `3d` + `ui` | Latest patch of the previous release. Bevy 0.20.0 was released 2026-10-08 and needs Rust 1.97.1; it is too fresh for the plugin ecosystem. Upgrade after Phase 5. |
-| Renderer (web) | WebGL2 (`webgl2` via Bevy `default_platform`) | Widest browser support. WebGPU is not enabled or tested. |
+| Renderer (web) | WebGPU only (`webgpu` feature, no WebGL2) | Decided after the perf round; browsers without WebGPU get a notice. |
 | wasm-bindgen | 0.2.129 (CLI version must match `Cargo.lock`) | Required by `scripts/build-web.sh`. |
 | Physics | none, custom AABB collision | Only a static office arena is needed; avoids a plugin compatibility risk (avian3d 0.7 targets a different Bevy). |
 | Web shell | plain `web/index.html` + `python3 -m http.server` | No npm, trunk or React until a UI requirement justifies them. |

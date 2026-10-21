@@ -109,7 +109,7 @@ the site, including the [changelog page](https://wraithyy.github.io/the-last-dev
 ## Versions and browser constraints
 
 - Rust 1.96.1, Bevy 0.19.1 (features `3d`, `ui`), wasm-bindgen 0.2.129. Rationale in [docs/PLAN.md](docs/PLAN.md).
-- The web build targets **WebGL2**. WebGPU is not enabled. On WebGL2, Bevy disables SSAO, OIT, atmosphere and GPU clustering (logged as warnings at startup; the game uses none of them). Directional shadows use 1 cascade.
+- The web build is **WebGPU only**, with no WebGL2 fallback: `web/index.html` checks `navigator.gpu.requestAdapter()` first and shows a notice (without downloading the wasm or registering the service worker) when it is missing. Chrome and Edge 113+, Safari 26+ and recent Firefox on supported platforms work. Directional shadows use 1 cascade; MSAA is 4x or off.
 - The release wasm is about 38 MB without `wasm-opt`, plus about 11 MB of assets.
 
 ## Debug hooks (native, env-gated)

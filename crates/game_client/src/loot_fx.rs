@@ -26,7 +26,7 @@ const SPARKLE_LIFE: f32 = 1.3;
 const PICK_EVERY: f32 = 0.15;
 /// A decaying corpse sinks this deep over the last `SINK_SECS` of its timer. Sinking under the
 /// opaque floor instead of an alpha fade keeps the shared character materials untouched (and
-/// WebGL2 has no order-independent transparency to fade skinned meshes cleanly anyway).
+/// Bevy has no cheap order-independent transparency to fade skinned meshes cleanly anyway).
 const SINK_M: f32 = 0.8;
 const SINK_SECS: f32 = 3.0;
 /// Horizontal reach of a lying body around its root, for finding the decor it rests on.

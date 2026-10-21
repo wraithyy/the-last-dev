@@ -8,12 +8,26 @@ license.workspace = true
 [dependencies]
 combat_core = { path = "../combat_core" }
 net_proto = { path = "../net_proto" }
-# 3d + ui + OGG audio only (no 2d, no other codecs); default_platform already enables webgl2.
-bevy = { version = "=0.19.1", default-features = false, features = ["3d", "ui", "bevy_audio", "vorbis", "custom_cursor"] }
+# 3d + ui + OGG audio only (no 2d, no other codecs). "3d"/"ui" would pull in default_platform and
+# with it webgl2, so their parts are spelled out: default_platform minus webgl2/x11/wayland (the
+# derive macros only find the `bevy` entry under plain [dependencies], hence the target tables
+# below add features to it rather than declaring it).
+bevy = { version = "=0.19.1", default-features = false, features = [
+    "default_app", "3d_bevy_render", "ui_bevy_render", "scene", "picking", "bevy_ui_widgets",
+    "std", "bevy_gilrs", "bevy_winit", "bevy_clipboard", "default_font", "multi_threaded",
+    "custom_cursor", "sysinfo_plugin", "bevy_audio", "vorbis",
+] }
 
 # Native co-op transport: sync websocket on its own thread; ws:// only (LAN target), no TLS stack.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+bevy = { version = "=0.19.1", default-features = false, features = ["x11", "wayland"] }
 tungstenite = { version = "0.29", default-features = false, features = ["handshake"] }
+
+# Web: WebGPU only (index.html shows a notice and never loads the wasm without navigator.gpu).
+[target.'cfg(target_arch = "wasm32")'.dependencies.bevy]
+version = "=0.19.1"
+default-features = false
+features = ["webgpu"]
 
 # Browser transport and soft keyboard; versions follow Cargo.lock (wasm-bindgen must match the CLI).
 [target.'cfg(target_arch = "wasm32")'.dependencies]

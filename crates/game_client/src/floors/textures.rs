@@ -1,6 +1,6 @@
 //! Procedural images and materials for the floors. Everything is drawn from
 //! flat shapes and a tiny 5x7 bitmap font, so no external art or font is needed
-//! and the same code runs on WebGL2.
+//! and the same code runs on weak GPUs.
 
 use super::kit::{Mat, Sign, Tex, sign_canvas};
 use super::layout::{FloorKind, Theme};

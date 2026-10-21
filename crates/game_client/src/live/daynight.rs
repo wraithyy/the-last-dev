@@ -2,7 +2,7 @@
 //! sun, ambient light, fog and sky dim towards a blue night and the office windows
 //! (`Mat::Window`) glow; indoors the lights only drop a little. Each zone load sets the day
 //! look (`floors`); this system takes whatever it set as the base and blends from there, so
-//! the zone themes stay the single source of the daytime look. WebGL2-safe: no extra lights,
+//! the zone themes stay the single source of the daytime look. cheap: no extra lights,
 //! one shared material per zone.
 
 use super::{LiveState, unix_now};

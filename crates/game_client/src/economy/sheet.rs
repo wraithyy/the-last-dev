@@ -71,7 +71,7 @@ impl Plugin for SheetPlugin {
 }
 
 fn spawn_window(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
-    // No separate view format: WebGL2 cannot reinterpret render targets.
+    // No separate view format: the target is used as is.
     let image = images.add(Image::new_target_texture(
         PREVIEW.0,
         PREVIEW.1,

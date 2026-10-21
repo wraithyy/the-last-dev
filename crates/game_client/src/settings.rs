@@ -1,6 +1,6 @@
 //! `~/settings` (Esc menu): quality preset, field of view, UI scale, colourblind palettes,
 //! reduce motion and an FPS readout. Stored per viewer (a native file next to the keybinds, or
-//! localStorage on the web); phones default to the Low preset. Everything stays WebGL2-safe:
+//! localStorage on the web); phones default to the Low preset. Everything stays phone-safe:
 //! one shadow cascade, bloom on or off.
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
@@ -91,7 +91,7 @@ impl Quality {
         self != Quality::Low
     }
 
-    /// WebGL2 only guarantees 1 or 4 samples, so there is no 2x step.
+    /// 4x only: wgpu guarantees 1 and 4 samples on every backend, so a 2x step would not be portable.
     pub fn msaa(self) -> bool {
         matches!(self, Quality::High | Quality::Ultra)
     }
@@ -128,7 +128,7 @@ impl Quality {
         }
     }
 
-    /// Most point lights worth lighting at once (WebGL2 uniform budget on the low end).
+    /// Most point lights worth lighting at once (keeps the low end cheap).
     #[allow(dead_code)] // consumed by the render round's light, water and particle code
     pub fn max_lights(self) -> usize {
         match self {

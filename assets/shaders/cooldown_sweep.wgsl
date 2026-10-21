@@ -1,7 +1,7 @@
 // Radial clock-wipe for action-button cooldowns. params.x = fraction of the
 // cooldown still remaining (1 = just started, 0 = ready). The remaining part
 // stays dark and the cleared wedge grows clockwise from 12 o'clock, like WoW.
-// A vec4 is used because WebGL2 needs 16-byte aligned uniforms.
+// A vec4 is used because 16-byte aligned uniforms.
 #import bevy_ui::ui_vertex_output::UiVertexOutput
 
 @group(1) @binding(0) var<uniform> params: vec4<f32>;

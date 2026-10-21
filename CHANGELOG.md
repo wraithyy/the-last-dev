@@ -25,6 +25,7 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ### Changed
 
+- The web version now runs on WebGPU for smoother rendering; browsers without it (Chrome, Edge or Safari 26+ have it) show a notice instead of the game.
 - Faster rendering: distant NPCs and extra lamps are no longer drawn, and the HUD only redraws what changed.
 - The web version downloads less before the first scene and caches the rest in the background.
 - After an update the web version keeps every model and sound that did not change, so offline play keeps working.

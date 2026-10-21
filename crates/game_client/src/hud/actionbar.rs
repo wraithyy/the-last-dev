@@ -56,8 +56,7 @@ const TOOLTIP_BOTTOM: f32 = 108.0;
 /// Radial clock-wipe overlay; see `assets/shaders/cooldown_sweep.wgsl`.
 #[derive(AsBindGroup, Asset, TypePath, Debug, Clone)]
 pub struct CooldownMaterial {
-    /// x = fraction of the cooldown still remaining. A Vec4 because WebGL2
-    /// needs 16-byte aligned uniforms.
+    /// x = fraction of the cooldown still remaining. A Vec4 to keep the uniform 16-byte aligned.
     #[uniform(0)]
     params: Vec4,
 }

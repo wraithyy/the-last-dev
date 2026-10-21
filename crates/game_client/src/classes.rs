@@ -212,7 +212,7 @@ fn open_picker(
     let image = assets.images.add(Image::new_target_texture(
         STAGE_W,
         STAGE_H,
-        // WebGL2 has no texture view formats, so the target is sRGB itself with no second view.
+        // The target is sRGB itself, so no second view format is needed.
         TextureFormat::Rgba8UnormSrgb,
         None,
     ));

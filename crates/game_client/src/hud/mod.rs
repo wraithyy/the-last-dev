@@ -643,7 +643,7 @@ mod tests {
         assert!(missing.is_empty(), "{missing:?}");
     }
 
-    /// WebGL2 has no 16-bit normalized textures: one such PNG makes the browser build quit on load.
+    /// Browsers have no 16-bit normalized textures: one such PNG makes the web build quit on load.
     #[test]
     fn every_png_asset_is_8_bit() {
         fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {

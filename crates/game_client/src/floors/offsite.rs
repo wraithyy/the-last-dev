@@ -1,7 +1,7 @@
 //! The All-Hands Offsite raid: a hotel conference resort in four rooms. offsite/1 is the lobby
 //! with the icebreaker stage, offsite/2 the breakout rooms around a central hall, offsite/3 an
 //! open lakeside terrace with the keynote stage, offsite/4 the grand ballroom. Everything is boxes
-//! and primitives (same budget as the lab) so it stays light on WebGL2.
+//! and primitives (same budget as the lab) so it stays light on weak GPUs.
 
 use super::kit::*;
 use super::layout::{FloorKind, FloorLayout, Theme, assemble};

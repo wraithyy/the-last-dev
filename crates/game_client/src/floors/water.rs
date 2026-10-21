@@ -1,7 +1,7 @@
 //! Lake and creek water. Not a scaled unit cube: the surface is its own thin mesh whose vertex
 //! colours carry the shading (foam at the bank, shallows, deep centre), plus one tiling ripple
 //! normal map that `animate` slides along. One shared StandardMaterial, no custom shader, so it
-//! costs a handful of quads and runs on WebGL2.
+//! costs a handful of quads and runs on weak GPUs.
 
 use bevy::asset::RenderAssetUsages;
 use bevy::image::{ImageAddressMode, ImageSampler, ImageSamplerDescriptor};

@@ -19,7 +19,7 @@ use crate::yell::AmbientSay;
 use bevy::prelude::*;
 use combat_core::live::game_minute;
 
-/// Extras further than this are not drawn (skinned meshes are the expensive part on WebGL2).
+/// Extras further than this are not drawn (skinned meshes are the expensive part on weak GPUs).
 const SHOW_M: f32 = 70.0;
 /// A passing player hears an extra within this range...
 const SAY_M: f32 = 7.0;

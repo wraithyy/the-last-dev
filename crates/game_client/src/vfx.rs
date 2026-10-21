@@ -1,4 +1,4 @@
-//! Spell visuals: simple meshes with unlit colour materials (WebGL2 friendly).
+//! Spell visuals: simple meshes with unlit colour materials (cheap on any GPU).
 //! Persistent effects (cast glow, shield, telegraph) read live sim state;
 //! one-shot effects (orb, impact, bursts) are spawned from sim events.
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.

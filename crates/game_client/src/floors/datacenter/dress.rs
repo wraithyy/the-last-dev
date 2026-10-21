@@ -381,7 +381,7 @@ pub fn floor_hole(p: &mut Plan, x: f32, z: f32, yaw: f32) {
 }
 
 /// Steam vent: a few see-through puffs stacked above a floor vent tile. Static and flat shaded,
-/// so it costs a handful of draw calls and no particles on WebGL2.
+/// so it costs a handful of draw calls and no particles on weak GPUs.
 pub fn steam(p: &mut Plan, x: f32, z: f32, puffs: usize) {
     for k in 0..puffs {
         let d = 0.55 + k as f32 * 0.22;

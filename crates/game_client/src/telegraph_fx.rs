@@ -1,7 +1,7 @@
 //! Enemy mechanics on screen: ground telegraph decals that fill until they land, cover desks
 //! for the earnings call, and an "INTERRUPT!" marker over must-interrupt casters.
 //! Event-driven (`TelegraphStarted` / `TelegraphResolved`), so it renders the same online.
-//! Unlit alpha-blended meshes and UI text only: WebGL2 friendly.
+//! Unlit alpha-blended meshes and UI text only: cheap on any GPU.
 // Bevy system signatures are inherently wide.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
