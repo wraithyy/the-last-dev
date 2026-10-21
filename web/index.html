@@ -201,6 +201,10 @@ if (!(await hasWebGpu())) {
 (() => {
   const btn = document.getElementById('install');
   if (matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone) return;
+  // Only when the landing's Install button sent us here, and only briefly: it sits over the HUD.
+  const asked = new URLSearchParams(location.search).has('install');
+  if (!asked) return;
+  setTimeout(() => { btn.hidden = true; }, 30000);
   let deferred = null;
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
@@ -219,7 +223,7 @@ if (!(await hasWebGpu())) {
   window.addEventListener('appinstalled', () => { btn.hidden = true; });
   // iOS Safari has no install event; Share > Add to Home Screen is the only way, so say so when the landing sent us here.
   const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (ios && new URLSearchParams(location.search).has('install')) {
+  if (ios) {
     btn.textContent = 'Install: Share, then Add to Home Screen (tap to hide)';
     btn.hidden = false;
   }

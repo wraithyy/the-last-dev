@@ -10,6 +10,7 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ### Added
 
+- Your unit frame and your target's frame now show a real round portrait of the character (head, hair, glasses and headphones included) instead of a letter. Your hair thins in the portrait as your health drops.
 - The landing page shows all eight roles, mentions the class props, says which browsers run the game, and has an "Install the game" button: the game installs as its own fullscreen app (Install button in the game on Chrome and Edge, Share, Add to Home Screen on iOS) instead of installing the website.
 - Class props: sixteen consoles around the campus, the car park, the tower floors, the data centre and the labs that only one role can use (DevOps restarts a frozen rack, Frontend centres the billboard, Backend raises a vending machine's rate limit, QA clips through a glitched wall, the Data Scientist reads a dashboard, Security tailgates a locked room, the COBOL Greybeard revives the mainframe). They are pure bonuses, never needed for a ticket: short team-wide buffs, floor shortcuts, hidden loot, Kudos and burnout relief, and in co-op they help everyone nearby. Other roles get an in-character refusal; the Fullstack Engineer can try any of them, slower, with a chance to break the prop. A class-coloured marker and a "Requires" tooltip show who a prop is for, and one-time finds stay found.
 - A seventh role, the Security Engineer: a melee stealth class that builds Exploit Chain points with Shoulder Surf, Phishing Link, Zero-Day and Lateral Movement, then spends them on Privilege Escalation and Data Exfiltration.
@@ -27,6 +28,7 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ### Changed
 
+- The death screen text sits on a dark band, so it stays readable over nameplates and busy scenes.
 - The web version now runs on WebGPU for smoother rendering; browsers without it (Chrome, Edge or Safari 26+ have it) show a notice instead of the game.
 - Faster rendering: distant NPCs and extra lamps are no longer drawn, and the HUD only redraws what changed.
 - The web version downloads less before the first scene and caches the rest in the background.
@@ -37,6 +39,7 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ### Fixed
 
+- In Car Park P3 the Burnt-Out Colleague and the intern no longer sit in mid-air: each now has a bench to sit on.
 - A first visit to the web version no longer reloads the page by itself once the offline cache is ready.
 - Quest givers can no longer be killed by a boss or enemy area attack, so you can always hand in your ticket.
 - Quest pickups you already collected stay gone, also after saving and reloading.

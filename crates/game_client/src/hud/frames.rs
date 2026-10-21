@@ -81,6 +81,12 @@ struct Smooth {
 struct PoolRow(Who, Pool);
 #[derive(Component)]
 struct Disc(Who);
+/// The cached portrait image inside a disc; hidden until the capture exists.
+#[derive(Component)]
+struct PortraitImg(Who);
+/// The initial letter, the fallback while the portrait is pending.
+#[derive(Component)]
+struct Letter(Who);
 #[derive(Component)]
 struct BossTag(Who);
 /// "PROD" (boss, with its phase) or "ELITE" (mini-boss).
@@ -159,6 +165,7 @@ impl Plugin for FramesPlugin {
                 (
                     collect_phase_flash,
                     update_frames,
+                    update_portraits,
                     update_burnout_strip,
                     collect_cast_flash,
                     update_cast_bars,
@@ -275,7 +282,7 @@ fn spawn_frame(commands: &mut Commands, who: Who, left: f32) {
                         height: px(PORTRAIT_SIZE),
                         flex_shrink: 0.0,
                         border: UiRect::all(px(2)),
-                        border_radius: BorderRadius::all(px(8)),
+                        border_radius: BorderRadius::MAX,
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
                         ..default()
@@ -286,12 +293,24 @@ fn spawn_frame(commands: &mut Commands, who: Who, left: f32) {
                 ))
                 .with_children(|d| {
                     d.spawn((
+                        PortraitImg(who),
+                        Node {
+                            position_type: PositionType::Absolute,
+                            width: percent(100),
+                            height: percent(100),
+                            border_radius: BorderRadius::MAX,
+                            display: Display::None,
+                            ..default()
+                        },
+                        ImageNode::default(),
+                    ));
+                    d.spawn((
                         Node {
                             position_type: PositionType::Absolute,
                             width: percent(100),
                             height: percent(45),
                             top: px(0),
-                            border_radius: BorderRadius::top(px(6)),
+                            border_radius: BorderRadius::top(px(20)),
                             ..default()
                         },
                         vgrad(
@@ -299,7 +318,7 @@ fn spawn_frame(commands: &mut Commands, who: Who, left: f32) {
                             Color::srgba(1.0, 1.0, 1.0, 0.0),
                         ),
                     ));
-                    d.spawn((TextOf(who, Field::Initial), label("", 22.0)));
+                    d.spawn((TextOf(who, Field::Initial), Letter(who), label("", 22.0)));
                     d.spawn((
                         Node {
                             position_type: PositionType::Absolute,
@@ -877,6 +896,55 @@ fn tracked(
     }
 }
 
+/// Swaps the letter for the cached portrait of whoever the frame tracks; asking is free once cached.
+fn update_portraits(
+    sim: SimView,
+    target: Res<Target>,
+    units: Query<&SimUnit>,
+    mut portraits: ResMut<super::portraits::Portraits>,
+    mut images: Query<(&PortraitImg, &mut ImageNode, &mut Node)>,
+    mut letters: Query<(&Letter, &mut Visibility)>,
+) {
+    for who in [Who::Player, Who::Target] {
+        let handle = tracked(who, &*sim, &target, &units)
+            .and_then(|id| sim.unit(id))
+            .and_then(|u| {
+                let hair = if crate::units::CLASS_SKINS.iter().any(|(_, k)| *k == u.key) {
+                    let shift = sim.content().endgame.burnout.hair_shift(u.career.burnout);
+                    crate::hair::hair_stage(u.hp, u.max_hp, shift)
+                } else {
+                    0
+                };
+                portraits.request(&u.key, hair)
+            });
+        for (img, mut image, mut node) in &mut images {
+            if img.0 != who {
+                continue;
+            }
+            if let Some(h) = &handle
+                && image.image != *h
+            {
+                image.image = h.clone();
+            }
+            let show = if handle.is_some() {
+                Display::Flex
+            } else {
+                Display::None
+            };
+            put!(node.display, show);
+        }
+        for (l, mut vis) in &mut letters {
+            if l.0 == who {
+                vis.set_if_neq(if handle.is_some() {
+                    Visibility::Hidden
+                } else {
+                    Visibility::Inherited
+                });
+            }
+        }
+    }
+}
+
 fn collect_phase_flash(
     time: Res<Time>,
     mut events: MessageReader<CombatEvent>,
@@ -1102,7 +1170,9 @@ fn update_frames(
             (Who::Player, _) => Color::srgb(0.2, 0.32, 0.75),
             (_, true) => Color::srgb(0.5, 0.14, 0.2),
             (_, false) => Color::srgb(0.2, 0.5, 0.3),
-        };
+        }
+        // Dark backdrop: the portrait is transparent around the head and shows this tint.
+        .mix(&Color::BLACK, 0.55);
         // A pulsing white-orange flash that fades over PHASE_FLASH_SECS.
         bg.0 = if flashing {
             let k = flash.left / PHASE_FLASH_SECS;

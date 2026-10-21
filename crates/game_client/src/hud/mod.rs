@@ -17,6 +17,7 @@ mod map;
 mod meter;
 mod minimap;
 pub(crate) mod perf;
+mod portraits;
 pub(crate) mod quests;
 pub(crate) mod scroll;
 mod seniority;
@@ -69,6 +70,7 @@ impl Plugin for HudPlugin {
             .add_systems(PreStartup, load_font)
             .add_systems(Update, apply_font)
             .init_resource::<DevOverlay>()
+            .add_plugins(portraits::PortraitPlugin)
             .add_plugins((
                 UiMaterialPlugin::<CooldownMaterial>::default(),
                 frames::FramesPlugin,

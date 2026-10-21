@@ -119,6 +119,12 @@ pub fn build() -> FloorLayout {
         let at = v(x, 0.0, z);
         p.anchor(name, at, yaw_towards(at, v(lx, 0.0, lz)));
     }
+    // The colleague and the intern sit by content (idle_pose); without a seat they hovered in
+    // mid-air. Each gets a bench with a slot under them, and the anchor moves onto the seat.
+    bench(&mut p, -2.05, 63.5, 0.0);
+    bench(&mut p, 5.23, 69.39, -1.03);
+    p.occupy("npc_colleague", v(-2.5, 0.0, 63.5));
+    p.occupy("npc_1", v(5.0, 0.0, 69.0));
     let boss = v(BOSS.0, 0.0, BOSS.1);
     p.anchor("boss", boss, yaw_towards(boss, v(0.0, 0.0, -60.0)));
     p.anchor("door:campus", door.0, door.1);

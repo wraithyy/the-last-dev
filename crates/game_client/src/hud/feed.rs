@@ -81,9 +81,14 @@ fn spawn_feed(mut commands: Commands) {
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 row_gap: px(12),
+                // A dark band keeps the text readable over nameplates and busy scenes.
+                padding: UiRect::vertical(px(18)),
+                border: UiRect::vertical(px(1)),
                 display: Display::None,
                 ..default()
             },
+            BackgroundColor(Color::srgba(0.02, 0.02, 0.04, 0.68)),
+            BorderColor::all(Color::srgba(0.9, 0.2, 0.2, 0.35)),
             GlobalZIndex(30),
         ))
         .with_children(|c| {
