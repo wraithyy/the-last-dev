@@ -329,6 +329,65 @@ pub static CUP_COFFEE: Model = Model::kit(
     [-0.108, -0.164],
     [0.216, 0.140, 0.287],
 );
+pub static CROISSANT: Model = Model::kit(
+    "food-kit",
+    "croissant",
+    [-0.173, -0.239],
+    [0.346, 0.194, 0.478],
+);
+pub static APPLE: Model = Model::kit("food-kit", "apple", [-0.098, -0.098], [0.196, 0.191, 0.196]);
+pub static BANANA: Model = Model::kit("food-kit", "banana", [-0.069, -0.315], [0.138, 0.196, 0.63]);
+pub static ORANGE: Model = Model::kit("food-kit", "orange", [-0.085, -0.085], [0.17, 0.167, 0.17]);
+pub static PEAR: Model = Model::kit("food-kit", "pear", [-0.098, -0.098], [0.196, 0.271, 0.196]);
+pub static GRAPES: Model = Model::kit(
+    "food-kit",
+    "grapes",
+    [-0.139, -0.119],
+    [0.279, 0.423, 0.239],
+);
+pub static STRAWBERRY: Model = Model::kit(
+    "food-kit",
+    "strawberry",
+    [-0.06, -0.06],
+    [0.12, 0.182, 0.12],
+);
+pub static WATERMELON: Model = Model::kit(
+    "food-kit",
+    "watermelon",
+    [-0.228, -0.228],
+    [0.455, 0.476, 0.455],
+);
+pub static CAKE: Model = Model::kit("food-kit", "cake", [-0.32, -0.32], [0.639, 0.273, 0.639]);
+pub static CUPCAKE: Model = Model::kit(
+    "food-kit",
+    "cupcake",
+    [-0.178, -0.154],
+    [0.355, 0.424, 0.308],
+);
+pub static DONUT: Model = Model::kit(
+    "food-kit",
+    "donut-sprinkles",
+    [-0.123, -0.141],
+    [0.245, 0.095, 0.283],
+);
+pub static MUFFIN: Model = Model::kit(
+    "food-kit",
+    "muffin",
+    [-0.152, -0.132],
+    [0.305, 0.249, 0.264],
+);
+pub static PLATE: Model = Model::kit("food-kit", "plate", [-0.446, -0.446], [0.892, 0.09, 0.892]);
+pub static BOWL: Model = Model::kit("food-kit", "bowl", [-0.251, -0.29], [0.502, 0.214, 0.58]);
+pub static GLASS: Model = Model::kit("food-kit", "glass", [-0.08, -0.092], [0.16, 0.285, 0.184]);
+pub static PIE: Model = Model::kit("food-kit", "pie", [-0.475, -0.475], [0.95, 0.15, 0.95]);
+pub static LOAF: Model = Model::kit("food-kit", "loaf", [-0.29, -0.183], [0.58, 0.442, 0.366]);
+pub static SANDWICH: Model = Model::kit(
+    "food-kit",
+    "sandwich",
+    [-0.226, -0.207],
+    [0.432, 0.168, 0.434],
+);
+
 pub static BOX_LARGE: Model = Model::kit(
     "factory-kit",
     "box-large",
@@ -343,7 +402,7 @@ pub static ROBOT_ARM_A: Model = Model::kit(
 );
 
 #[cfg(test)]
-pub static ALL: [&Model; 60] = [
+pub static ALL: [&Model; 78] = [
     &BUILDING_A,
     &BUILDING_G,
     &BUILDING_J,
@@ -404,6 +463,24 @@ pub static ALL: [&Model; 60] = [
     &CUP_COFFEE,
     &BOX_LARGE,
     &ROBOT_ARM_A,
+    &CROISSANT,
+    &APPLE,
+    &BANANA,
+    &ORANGE,
+    &PEAR,
+    &GRAPES,
+    &STRAWBERRY,
+    &WATERMELON,
+    &CAKE,
+    &CUPCAKE,
+    &DONUT,
+    &MUFFIN,
+    &PLATE,
+    &BOWL,
+    &GLASS,
+    &PIE,
+    &LOAF,
+    &SANDWICH,
 ];
 
 /// One model with its footprint centred on `pos`, front (+Z) turned by `yaw`, `unit` metres

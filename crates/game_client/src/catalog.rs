@@ -3238,6 +3238,183 @@ static TABLE: &[(&str, UnitVisual)] = &[
             &[],
         ),
     ),
+    // ---- Quarterly Business Review (dungeon): boardroom staff, stakeholders, the deck, the analyst and the Board ----
+    (
+        "exec_assistant",
+        v(
+            CASUAL_F,
+            1.7,
+            "Executive Assistant",
+            "<Owns Everyone's Calendar>",
+            &[
+                paint("Shirt", 0.9, 0.85, 0.75),
+                paint("Pants", 0.15, 0.15, 0.2),
+                paint("Hair", 0.75, 0.6, 0.3),
+            ],
+        ),
+    ),
+    (
+        "boardroom_cleaner",
+        v(
+            WORKER,
+            1.75,
+            "Cleaner of the Boardroom",
+            "<Has Heard Everything>",
+            &[paint("Shirt", 0.25, 0.45, 0.75)],
+        ),
+    ),
+    (
+        "stakeholder",
+        v(
+            SUIT_M,
+            1.85,
+            "Stakeholder",
+            "<Needs Visibility>",
+            &[
+                paint("Black", 0.2, 0.22, 0.3),
+                paint("Shirt", 0.95, 0.95, 0.95),
+                paint("Skin", 0.85, 0.65, 0.5),
+            ],
+        ),
+    ),
+    (
+        "strategy_intern",
+        v(
+            CASUAL_M,
+            1.6,
+            "Strategy Intern",
+            "<Made The Deck>",
+            &[
+                paint("Shirt", 0.3, 0.6, 0.85),
+                paint("Pants", 0.2, 0.2, 0.25),
+                paint("Hair", 0.4, 0.25, 0.1),
+            ],
+        ),
+    ),
+    (
+        "synergy_coordinator",
+        v(
+            SUIT_F,
+            1.75,
+            "Synergy Coordinator",
+            "<Aligned On Alignment>",
+            &[
+                paint("Black", 0.1, 0.5, 0.5),
+                paint("Shirt", 0.95, 0.9, 0.7),
+                paint("Hair", 0.15, 0.1, 0.1),
+            ],
+        ),
+    ),
+    (
+        "kpi_dashboard",
+        v(
+            "prim/kpi_dashboard",
+            1.7,
+            "KPI Dashboard",
+            "<Always Green>",
+            &[],
+        ),
+    ),
+    (
+        "catering_drone",
+        v("prim/drone", 1.0, "Catering Drone", "<Free Pastry>", &[]),
+    ),
+    (
+        "stale_pastry",
+        v(
+            "prim/espresso_cart",
+            0.7,
+            "Stale Croissant",
+            "<Untouched Since 07:00>",
+            &[],
+        ),
+    ),
+    (
+        "bullet_point",
+        v(
+            "prim/drone",
+            0.8,
+            "Bullet Point",
+            "<Sub-Bullet Of Slide 6>",
+            &[],
+        ),
+    ),
+    (
+        "generated_chart",
+        v(
+            "prim/delivery_robot",
+            1.2,
+            "Generated Chart",
+            "<Axes: Swapped>",
+            &[],
+        ),
+    ),
+    (
+        "slide_deck_golem",
+        v(
+            "prim/slide_golem",
+            4.2,
+            "Slide Deck Golem",
+            "<Deck_v37_FINAL_final2.pptx>",
+            &[],
+        ),
+    ),
+    (
+        "analyst_dana",
+        v(
+            SUIT_F,
+            2.1,
+            "Dana",
+            "<Who Had Claude Do The Analysis>",
+            &[
+                paint("Black", 0.35, 0.2, 0.55),
+                paint("Shirt", 0.55, 1.0, 0.8),
+                glow("Hair", 0.4, 0.9, 0.7),
+            ],
+        ),
+    ),
+    (
+        "board_chair",
+        v(
+            SUIT_M_BALD,
+            2.5,
+            "The Chair",
+            "<A Quorum of Three>",
+            &[
+                paint("Black", 0.08, 0.08, 0.1),
+                paint("Shirt", 0.95, 0.9, 0.7),
+                paint("Skin", 0.85, 0.62, 0.5),
+            ],
+        ),
+    ),
+    (
+        "board_activist",
+        v(
+            SUIT_M,
+            2.2,
+            "The Activist Investor",
+            "<Here To Improve The Multiple>",
+            &[
+                paint("Black", 0.5, 0.05, 0.08),
+                paint("Shirt", 0.15, 0.15, 0.2),
+                paint("Skin", 0.75, 0.55, 0.45),
+            ],
+        ),
+    ),
+    (
+        "board_independent",
+        v(
+            SUIT_F,
+            2.2,
+            "The Independent Director",
+            "<Same Golf Partner As The Chair>",
+            &[
+                paint("Black", 0.85, 0.85, 0.9),
+                paint("Shirt", 0.35, 0.55, 0.9),
+                paint("Hair", 0.85, 0.85, 0.85),
+            ],
+        ),
+    ),
 ];
 
 /// Primitive rig kind (see `rigs.rs`) of a unit key, `None` for character-model units.

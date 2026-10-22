@@ -2,7 +2,7 @@
 //! boss lockout with a locked boss that still spawns, the quest chain from the entrance clerk to
 //! the exit hire, and the XP ladder (full, a quarter, nothing) with its gate under half a level.
 //! The bot playthroughs (a trio on Normal, one player on Async) live in tests/coop.rs. The Migration's
-//! tests are at the end of this file.
+//! tests follow below, then the Quarterly Business Review's at the very end.
 
 mod common;
 
@@ -428,6 +428,7 @@ fn dungeon_xp_stays_under_half_a_level() {
         assert!(xp < BAR / 2, "under half a level: {xp}");
     }
     migration_xp_stays_under_half_a_level();
+    qbr_xp_stays_under_half_a_level();
 }
 
 #[test]
@@ -728,4 +729,307 @@ fn migration_xp_stays_under_half_a_level() {
         assert_eq!(lvl, M_LEVEL);
         assert!(xp < M_BAR / 2, "under half a level: {xp}");
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Quarterly Business Review: four rooms (the first without a boss), the Board as three linked
+// heads, level 9, authored bosses at 10.
+
+const Q_ROOMS: [&str; 4] = ["qbr/1", "qbr/2", "qbr/3", "qbr/4"];
+const Q_BOSSES: [&str; 3] = ["slide_deck_golem", "analyst_dana", "board_chair"];
+const Q_QUESTS: [&str; 4] = ["qbr_preread", "qbr_slides", "qbr_numbers", "qbr_aob"];
+/// Level-9 players: the dungeon's door level, and the level-9 XP bar of docs/FORMULAS.md.
+const Q_LEVEL: u8 = 9;
+const Q_BAR: u32 = 22_200;
+
+#[test]
+fn the_qbr_is_four_rooms_three_bosses_and_a_door_at_level_nine() {
+    let c = content();
+    let r = c
+        .raids
+        .iter()
+        .find(|r| r.name == "Quarterly Business Review")
+        .expect("dungeon");
+    assert!(r.is_dungeon());
+    assert_eq!(r.zones, Q_ROOMS);
+    assert_eq!(r.bosses(&c), Q_BOSSES, "room 1 is a boss-less gauntlet");
+    assert!(c.zone("qbr/1").is_some_and(|z| z.boss.is_none()));
+    let twins = r.twins.as_ref().expect("the Board is linked");
+    assert_eq!(
+        twins.members(),
+        ["board_chair", "board_activist", "board_independent"]
+    );
+    let mut trash = 0;
+    for (i, z) in Q_ROOMS.iter().enumerate() {
+        let def = c.zone(z).expect("room");
+        assert_eq!(def.level_range, (9, 10));
+        for p in &def.packs {
+            trash += p.units.len();
+            for u in &p.units {
+                assert_eq!(c.unit_def(u).map(|d| d.level), Some(9), "{u}");
+            }
+        }
+        if i > 0 {
+            let boss = c.unit_def(Q_BOSSES[i - 1]).expect("boss");
+            assert!(boss.boss && boss.level == 10);
+        }
+        let forward = def
+            .links
+            .iter()
+            .find(|l| Q_ROOMS.get(i + 1) == Some(&l.to.as_str()));
+        match (i, forward) {
+            (0, Some(l)) => assert!(l.requires.is_none(), "the gauntlet door is open"),
+            (1 | 2, Some(l)) => assert!(
+                matches!(&l.requires, Some(Unlock::BossKilled(k)) if k == Q_BOSSES[i - 1]),
+                "{z}"
+            ),
+            (3, None) => {}
+            _ => panic!("{z}: unexpected forward link"),
+        }
+        let back = if i == 0 { "campus" } else { Q_ROOMS[i - 1] };
+        assert!(
+            def.links
+                .iter()
+                .any(|l| l.to == back && l.requires.is_none()),
+            "{z}"
+        );
+    }
+    assert_eq!(trash, 20, "five types, twenty units");
+    let door = |sim: &Sim| {
+        sim.zone_links("campus")
+            .into_iter()
+            .find(|l| l.to == "qbr/1")
+            .is_some_and(|l| l.unlocked)
+    };
+    let (sim, _) = group(2, 8, |_| {});
+    assert!(!door(&sim), "level 8 stays outside");
+    let (mut sim, ids) = group(2, Q_LEVEL, |_| {});
+    assert!(door(&sim));
+    sim.set_level_of(ids[1], 8);
+    assert!(!door(&sim), "everyone needs the band's lower level");
+    let (mut solo, _) = group(1, Q_LEVEL, |_| {});
+    load(&mut solo, "qbr/2");
+    assert!(solo.raid_view().async_mode);
+    let boss = alive(&solo, "slide_deck_golem")[0];
+    assert_eq!(solo.unit(boss).map(|u| u.max_hp), Some(8_200 * 40 / 100));
+    let (mut trio, _) = group(3, Q_LEVEL, |_| {});
+    load(&mut trio, "qbr/2");
+    assert!(!trio.raid_view().async_mode);
+}
+
+#[test]
+fn the_board_spawns_as_three_linked_heads_with_exactly_one_open() {
+    let (mut sim, _) = group(3, Q_LEVEL, |_| {});
+    load(&mut sim, "qbr/4");
+    run(&mut sim, 2);
+    let heads = ["board_chair", "board_activist", "board_independent"];
+    let shut = heads
+        .iter()
+        .filter(|k| {
+            let id = alive(&sim, k)[0];
+            sim.unit(id)
+                .is_some_and(|u| u.auras.iter().any(|a| a.key == "off_the_agenda"))
+        })
+        .count();
+    assert_eq!(
+        shut, 2,
+        "one head is open, the other two are off the agenda"
+    );
+}
+
+/// Everybody steps up to the boss (20 m north of the arrival in these tests) so it is in combat
+/// and its phases follow its HP.
+fn pull(sim: &mut Sim) {
+    for p in sim.players().to_vec() {
+        move_to(sim, p, Vec3::new(0.0, 0.0, -14.0));
+    }
+    run(sim, 5);
+}
+
+#[test]
+fn the_golem_steps_through_its_slides_and_the_bullet_points_stay_capped() {
+    let (mut sim, _) = group(3, Q_LEVEL, |_| {});
+    load(&mut sim, "qbr/2");
+    let golem = alive(&sim, "slide_deck_golem")[0];
+    let max = sim.unit(golem).map_or(0, |u| u.max_hp);
+    pull(&mut sim);
+    let mut seen = Vec::new();
+    for pct in [79u32, 59, 39, 19] {
+        assert!(sim.debug_set_hp(golem, max * pct / 100));
+        run(&mut sim, 3);
+        seen.push(alive(&sim, "bullet_point").len());
+    }
+    assert_eq!(seen, [2, 4, 4, 4], "two per slide, never more than four");
+}
+
+#[test]
+fn a_synergy_coordinator_leaves_its_neighbours_aligned() {
+    let (mut sim, _) = group(1, Q_LEVEL, |_| {});
+    load(&mut sim, "qbr/1");
+    let ids = alive(&sim, "synergy_coordinator");
+    assert!(!ids.is_empty());
+    let id = ids[0];
+    let at = sim.unit(id).map_or(Vec3::new(0.0, 0.0, 0.0), |u| u.pos);
+    assert!(sim.debug_kill(id));
+    run(&mut sim, 2);
+    // Everything of the other side within 8 m of the corpse carries the ring buff.
+    let buffed = sim
+        .units()
+        .filter(|u| u.hostile && u.alive)
+        .filter(|u| combat_core::distance(u.pos, at) <= 8.0)
+        .filter(|u| u.auras.iter().any(|a| a.key == "aligned"))
+        .count();
+    let near = sim
+        .units()
+        .filter(|u| u.hostile && u.alive)
+        .filter(|u| combat_core::distance(u.pos, at) <= 8.0)
+        .count();
+    assert_eq!(buffed, near, "the pack member beside it is aligned: {near}");
+}
+
+/// Four inspections, three receipts and the Bullet Points: the whole run through the debug kill.
+fn clear_qbr(sim: &mut Sim, players: &[EntityId], quests: bool) {
+    for (i, room) in Q_ROOMS.iter().enumerate() {
+        load(sim, room);
+        if quests && i == 0 {
+            let pa = alive(sim, "exec_assistant")[0];
+            for &p in players {
+                sim.apply_as(p, Command::Talk { unit: pa });
+                for q in Q_QUESTS {
+                    sim.apply_as(p, Command::AcceptQuest { quest: q.into() });
+                }
+            }
+            run(sim, 1);
+        }
+        if quests {
+            let props: &[&str] = match i {
+                0 => &["preread_1", "preread_2"],
+                1 => &["preread_3", "preread_4"],
+                2 => &["source_receipt_1", "source_receipt_2", "source_receipt_3"],
+                _ => &[],
+            };
+            for &p in players {
+                for prop in props {
+                    sim.apply_as(
+                        p,
+                        Command::Interact {
+                            prop: (*prop).into(),
+                        },
+                    );
+                }
+            }
+        }
+        // Slide by slide, so the Golem's Bullet Points exist to be counted.
+        if i == 1 {
+            let golem = alive(sim, "slide_deck_golem")[0];
+            let max = sim.unit(golem).map_or(0, |u| u.max_hp);
+            pull(sim);
+            for pct in [79u32, 59, 39, 19] {
+                sim.debug_set_hp(golem, max * pct / 100);
+                run(sim, 3);
+                while !alive(sim, "bullet_point").is_empty() {
+                    kill(sim, "bullet_point");
+                }
+            }
+        }
+        for _ in 0..40 {
+            let Some(k) = sim
+                .units()
+                .find(|u| u.hostile && u.alive && !u.boss && u.key != "bullet_point")
+                .map(|u| u.key.clone())
+            else {
+                break;
+            };
+            kill(sim, &k);
+        }
+        if let Some(boss) = i.checked_sub(1).map(|b| Q_BOSSES[b]) {
+            kill(sim, boss);
+            // The linked heads die with their partner; anything left is killed for the quest.
+            for head in ["board_activist", "board_independent"] {
+                if !alive(sim, head).is_empty() {
+                    kill(sim, head);
+                }
+            }
+        }
+    }
+    if quests {
+        let cleaner = alive(sim, "boardroom_cleaner")[0];
+        for &p in players {
+            sim.apply_as(p, Command::Talk { unit: cleaner });
+            run(sim, 1);
+            for q in Q_QUESTS {
+                sim.apply_as(
+                    p,
+                    Command::TurnInQuest {
+                        quest: q.into(),
+                        choice: 0,
+                    },
+                );
+            }
+        }
+        run(sim, 1);
+    }
+}
+
+#[test]
+fn the_qbr_quest_set_runs_from_the_executive_assistant_to_the_cleaner() {
+    let (mut sim, ids) = group(1, Q_LEVEL, |_| {});
+    let p = ids[0];
+    let c = content();
+    for q in Q_QUESTS {
+        let def = c.quest(q).expect("quest");
+        assert_eq!(def.giver.npc, "exec_assistant");
+        assert_eq!(def.giver.zone, "qbr/1");
+        let end = def.turn_in.as_ref().expect("turn-in at the exit");
+        assert_eq!(
+            (end.npc.as_str(), end.zone.as_str()),
+            ("boardroom_cleaner", "qbr/4")
+        );
+        assert!(def.requires.is_none(), "the set runs in parallel");
+    }
+    assert!(c.quest("qbr_aob").is_some_and(|q| q.main && q.group));
+    clear_qbr(&mut sim, &[p], true);
+    let done = &sim.quests_of(p).completed;
+    for q in Q_QUESTS {
+        assert!(done.iter().any(|d| d == q), "{q} not done: {done:?}");
+    }
+    assert!(sim.quests_of(p).active.is_empty());
+}
+
+/// Part of the `dungeon_xp_stays_under_half_a_level` gate.
+fn qbr_xp_stays_under_half_a_level() {
+    // Solo, Async: the full first run with every quest.
+    let (mut sim, ids) = group(1, Q_LEVEL, |_| {});
+    clear_qbr(&mut sim, &ids, true);
+    let gained = xp_of(&sim, ids[0]);
+    let level = sim.unit(ids[0]).map_or(0, |u| u.level);
+    println!(
+        "QBR solo first run: {gained} XP of {Q_BAR} ({}%)",
+        gained * 100 / Q_BAR
+    );
+    assert_eq!(level, Q_LEVEL, "a fresh level-9 player must not reach 10");
+    assert!(gained > Q_BAR * 3 / 10, "worth doing: {gained}");
+    assert!(gained < Q_BAR / 2, "under half a level: {gained}");
+    // A four on Normal: kill XP is shared, quest XP is in full.
+    let (mut four, ids) = group(4, Q_LEVEL, |_| {});
+    clear_qbr(&mut four, &ids, true);
+    for &p in &ids {
+        let (xp, lvl) = (xp_of(&four, p), four.unit(p).map_or(0, |u| u.level));
+        println!(
+            "QBR four, one member: {xp} XP of {Q_BAR} ({}%)",
+            xp * 100 / Q_BAR
+        );
+        assert_eq!(lvl, Q_LEVEL);
+        assert!(xp < Q_BAR / 2, "under half a level: {xp}");
+    }
+    // At the cap the same run is promotion XP: well under half of the first rank's bar.
+    let (mut cap, ids) = group(1, 10, |_| {});
+    clear_qbr(&mut cap, &ids, true);
+    let rank_xp = cap.unit(ids[0]).map_or(0, |u| u.career.rank_xp);
+    let bar = content().endgame.rank_xp_to_next(0);
+    println!(
+        "QBR solo first run at level 10: {rank_xp} promotion XP of {bar} ({}%)",
+        rank_xp * 100 / bar.max(1)
+    );
+    assert!(rank_xp > 0 && rank_xp < bar / 2, "promotion XP: {rank_xp}");
 }

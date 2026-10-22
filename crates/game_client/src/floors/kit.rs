@@ -144,8 +144,44 @@ pub static BOX_CLOSED: Model =
 pub static BENCH_CUSHION: Model = Model::new("benchCushion", [0.0, -0.2], [0.4, 0.46, 0.2]);
 pub static TRASHCAN: Model = Model::new("trashcan", [-0.104, -0.112], [0.208, 0.428, 0.234]);
 
+pub static TABLE_CLOTH: Model = Model::new("tableCloth", [0.0, -0.447], [0.841, 0.327, 0.447]);
+pub static TABLE_CROSS_CLOTH: Model =
+    Model::new("tableCrossCloth", [0.0, -0.447], [0.852, 0.347, 0.447]);
+pub static LOUNGE_DESIGN_CHAIR: Model =
+    Model::new("loungeDesignChair", [0.0, -0.41], [0.73, 0.4, 0.41]);
+pub static CHAIR_ROUNDED: Model = Model::new("chairRounded", [0.0, -0.2], [0.2, 0.455, 0.2]);
+pub static LOUNGE_SOFA_CORNER: Model =
+    Model::new("loungeSofaCorner", [0.0, -0.98], [0.98, 0.46, 0.98]);
+pub static LOUNGE_SOFA_OTTOMAN: Model =
+    Model::new("loungeSofaOttoman", [0.47, -0.04], [0.44, 0.23, 0.45]);
+pub static SPEAKER: Model = Model::new("speaker", [0.0, -0.148], [0.148, 0.636, 0.148]);
+pub static TV_VINTAGE: Model = Model::new("televisionVintage", [0.0, -0.27], [0.41, 0.27, 0.27]);
+pub static KITCHEN_BAR: Model = Model::new("kitchenBar", [0.0, -0.21], [0.43, 0.42, 0.21]);
+pub static KITCHEN_CABINET: Model = Model::new("kitchenCabinet", [0.0, -0.45], [0.43, 0.45, 0.45]);
+pub static PILLOW: Model = Model::new("pillow", [0.0, -0.088], [0.23, 0.222, 0.088]);
+pub static SIDE_TABLE_DRAWERS: Model =
+    Model::new("sideTableDrawers", [-0.01, -0.21], [0.534, 0.384, 0.222]);
+pub static COFFEE_TABLE_SQUARE: Model =
+    Model::new("tableCoffeeSquare", [-0.461, -0.3], [0.4, 0.23, 0.4]);
+pub static LAMP_SQUARE_TABLE: Model =
+    Model::new("lampSquareTable", [0.0, -0.12], [0.12, 0.29, 0.12]);
+
 /// Every furniture file the floors reference, for the asset-existence test.
-pub static ALL_MODELS: [&Model; 41] = [
+pub static ALL_MODELS: [&Model; 55] = [
+    &TABLE_CLOTH,
+    &TABLE_CROSS_CLOTH,
+    &LOUNGE_DESIGN_CHAIR,
+    &CHAIR_ROUNDED,
+    &LOUNGE_SOFA_CORNER,
+    &LOUNGE_SOFA_OTTOMAN,
+    &SPEAKER,
+    &TV_VINTAGE,
+    &KITCHEN_BAR,
+    &KITCHEN_CABINET,
+    &PILLOW,
+    &SIDE_TABLE_DRAWERS,
+    &COFFEE_TABLE_SQUARE,
+    &LAMP_SQUARE_TABLE,
     &BOOKCASE_CLOSED_WIDE,
     &BOOKCASE_CLOSED,
     &BOOKCASE_OPEN,
@@ -560,6 +596,40 @@ pub enum Sign {
     MigCutover,
     MigGhost,
     MigHeart,
+    // Quarterly Business Review (dungeon).
+    QbrDoor,
+    QbrWelcome,
+    QbrCatering,
+    QbrFruit,
+    QbrCoffee,
+    QbrVisionary,
+    QbrLift,
+    QbrPrize,
+    QbrToDay,
+    QbrToLobby,
+    QbrToTheatre,
+    QbrToWar,
+    QbrToBoard,
+    QbrAgenda,
+    QbrLaser,
+    QbrClicker,
+    QbrSlides,
+    QbrPie,
+    QbrBuzz,
+    QbrDash,
+    QbrPrinter,
+    QbrTrust,
+    QbrBoard,
+    QbrReserved,
+    QbrSsot,
+    QbrSheetA,
+    QbrSheetB,
+    QbrSheetC,
+    QbrPod,
+    QbrCeo,
+    QbrHockey,
+    QbrSynergy,
+    QbrPreRead,
 }
 
 #[derive(Clone, Debug)]
@@ -1186,6 +1256,10 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
         Sign::OffsiteWelcome | Sign::OffsiteShuttle | Sign::FamilyBanner => (256, 96),
         Sign::ObNewStarters | Sign::ObWelcome | Sign::ObNameplate => (256, 96),
         Sign::MigDoor | Sign::MigCloud | Sign::MigClock => (256, 96),
+        Sign::QbrDoor | Sign::QbrWelcome | Sign::QbrSsot | Sign::QbrHockey | Sign::QbrPrize => {
+            (256, 96)
+        }
+        Sign::QbrAgenda | Sign::QbrBuzz | Sign::QbrSynergy => (256, 128),
         Sign::MigPlan | Sign::MigTickets | Sign::MigRates | Sign::MigCutover => (256, 128),
         Sign::OffsiteAgenda | Sign::KeynoteScreen | Sign::Calendar => (256, 128),
         Sign::TbPhoto | Sign::TbKaraoke | Sign::TbTrustFall => (256, 96),

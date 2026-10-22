@@ -652,6 +652,8 @@ solo first run       = K_trash * pct(trash level) + K_boss * pct(boss level) + Q
 | QBR | 20 x 25 = 500 x 3.35 = 1675 | 220/280/420 = 920 x 3.75 = 3450 | 800 x 3.35 = 2680 | ~7800 | 22200 (level 9) | 35% |
 | Hackathon (heroic) | 20 x 30 = 600 x 3.75 = 2250 | 300/380/520 = 1200 x 3.75 = 4500 | 700 x 3.75 = 2625 | ~9400 | cap: promotion XP | see note |
 
+Measured by the gate (QBR): a level-9 solo first run pays 7960 XP (35%); a four pays its best member 5435 (24%); a level-10 player gets the same run as 7449 promotion XP (24% of the 30000 first-rank bar).
+
 Group of four, the same runs: kill XP is 32.5% of the solo figure, quest XP is in full, so the member gets
 Onboarding 95 + 300 = ~395 (26%), Migration 503 + 825 = ~1330 (22%), QBR 1670 + 2680 = ~4350 (20%). Groups
 earn a smaller share per head because they clear faster and finish a quest set together; this is the

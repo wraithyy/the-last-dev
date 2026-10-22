@@ -147,6 +147,8 @@ fn parts(kind: &str) -> Vec<Part> {
         "overheated_rack" => overheated_rack(),
         "cooling_failure" => cooling_failure(),
         "cutover_rack" => cutover_rack(),
+        "slide_golem" => slide_golem(),
+        "kpi_dashboard" => kpi_dashboard(),
         "release_halo" => release_halo(),
         "agi_prototype" => agi_prototype(),
         "scooter" => scooter(),
@@ -408,6 +410,110 @@ fn cutover_rack() -> Vec<Part> {
         (0.0, -1.0, 80.0, [1.0, 0.8, 0.1]),
     ] {
         v.push(Part::cyl([x, 0.08, z], 0.16, 1.4, c).rot([90.0, yaw, 0.0]));
+    }
+    v
+}
+
+/// Boss of the QBR theatre: a golem of slides. Legs are stacks of printouts, the torso is one
+/// huge slide with a blue title bar and a bar chart whose last bar is the only one that matters,
+/// more slides fan out behind it, a projector for a head and two slide-board arms ending in
+/// bullet points. A red laser dot wobbles over its chest.
+fn slide_golem() -> Vec<Part> {
+    const PAPER: [f32; 3] = [0.95, 0.95, 0.92];
+    const BLUE: [f32; 3] = [0.15, 0.3, 0.72];
+    const ORANGE: [f32; 3] = [0.98, 0.5, 0.1];
+    const RED: [f32; 3] = [1.0, 0.1, 0.1];
+    let mut v = vec![
+        // Legs: two stacks of printouts, each sheet a little crooked.
+        Part::cube([-0.6, 0.55, 0.0], [0.95, 1.1, 0.75], PAPER),
+        Part::cube([0.6, 0.55, 0.0], [0.95, 1.1, 0.75], PAPER),
+        Part::cube([-0.62, 0.9, -0.02], [1.0, 0.05, 0.8], [0.8, 0.85, 0.95]).rot([0.0, 8.0, 0.0]),
+        Part::cube([0.62, 0.5, -0.02], [1.0, 0.05, 0.8], [0.95, 0.85, 0.8]).rot([0.0, -7.0, 0.0]),
+        // Slides fanned out behind the torso.
+        Part::cube([-0.25, 2.3, 0.4], [2.3, 2.1, 0.1], [0.78, 0.83, 0.95]).rot([0.0, 0.0, 5.0]),
+        Part::cube([0.25, 2.3, 0.3], [2.3, 2.1, 0.1], [0.95, 0.88, 0.8]).rot([0.0, 0.0, -4.0]),
+        // The torso: one very large slide with a title bar and a chart.
+        Part::cube([0.0, 2.25, 0.0], [2.4, 2.2, 0.3], PAPER),
+        Part::cube([0.0, 3.05, -0.17], [2.1, 0.4, 0.03], BLUE),
+        Part::cube([0.0, 1.45, -0.17], [2.1, 0.04, 0.03], DARK),
+        // Projector head: a dark box with a glowing lens and a vent of bars.
+        Part::cube([0.0, 3.8, 0.0], [1.0, 0.5, 0.7], DARK),
+        Part::cyl([0.0, 3.8, -0.42], 0.38, 0.2, [0.6, 0.9, 1.0])
+            .glow(3.5)
+            .rot([90.0, 0.0, 0.0]),
+        Part::cube([0.0, 4.1, 0.0], [0.7, 0.06, 0.5], STEEL),
+        // The laser dot that never leaves its chest.
+        Part::ball([0.5, 2.3, -0.2], 0.12, RED)
+            .glow(5.0)
+            .bob(0.25, 2.3),
+    ];
+    // Title lines: three grey bars of "text" and a bullet each.
+    for k in 0..3 {
+        let y = 2.7 - k as f32 * 0.22;
+        v.push(Part::ball([-0.95, y, -0.18], 0.1, DARK));
+        v.push(Part::cube(
+            [-0.15 - k as f32 * 0.1, y, -0.17],
+            [1.5 - k as f32 * 0.2, 0.06, 0.02],
+            [0.4, 0.42, 0.5],
+        ));
+    }
+    // The hockey stick: flat bars, then straight up.
+    for i in 0..6 {
+        let h = 0.1 + (i as f32 / 5.0).powi(3) * 0.8;
+        v.push(Part::cube(
+            [-0.8 + i as f32 * 0.32, 1.47 + h / 2.0, -0.18],
+            [0.22, h, 0.03],
+            if i == 5 { ORANGE } else { BLUE },
+        ));
+    }
+    // Arms: slide boards hanging from the shoulders, a big bullet point for a fist.
+    for side in [-1.0_f32, 1.0] {
+        v.push(
+            Part::cube([side * 1.6, 2.4, -0.1], [0.12, 1.7, 0.85], PAPER).rot([
+                0.0,
+                0.0,
+                side * 10.0,
+            ]),
+        );
+        v.push(
+            Part::cube([side * 1.6, 2.4, -0.16], [0.14, 1.5, 0.03], BLUE).rot([
+                0.0,
+                0.0,
+                side * 10.0,
+            ]),
+        );
+        v.push(Part::ball([side * 1.82, 1.3, -0.15], 0.5, DARK));
+    }
+    v
+}
+
+/// Trash: a KPI dashboard on a stand with wheels, a screen that is green all over, a chart of
+/// bars that only go up, and one tiny red light it hopes you have not noticed.
+fn kpi_dashboard() -> Vec<Part> {
+    const GREEN: [f32; 3] = [0.1, 1.0, 0.3];
+    let mut v = vec![
+        Part::cube([0.0, 0.08, 0.0], [0.9, 0.16, 0.6], DARK),
+        Part::cyl([0.0, 0.5, 0.0], 0.14, 0.8, STEEL),
+        Part::cube([0.0, 1.35, 0.0], [1.5, 0.95, 0.12], DARK),
+        Part::cube([0.0, 1.35, -0.07], [1.38, 0.82, 0.02], [0.03, 0.18, 0.08]).glow(1.2),
+        Part::ball([0.58, 1.68, -0.09], 0.07, [1.0, 0.1, 0.1])
+            .glow(4.0)
+            .bob(0.01, 9.0),
+        Part::cube([0.0, 0.2, -0.3], [0.8, 0.05, 0.02], GREEN).glow(2.0),
+    ];
+    for i in 0..7 {
+        let h = 0.12 + i as f32 * 0.09;
+        v.push(
+            Part::cube(
+                [-0.48 + i as f32 * 0.16, 0.98 + h / 2.0, -0.09],
+                [0.1, h, 0.02],
+                GREEN,
+            )
+            .glow(2.2),
+        );
+    }
+    for sx in [-0.4, 0.4] {
+        v.push(Part::cyl([sx, 0.06, 0.0], 0.14, 0.1, DARK).rot([0.0, 0.0, 90.0]));
     }
     v
 }
@@ -1144,6 +1250,8 @@ mod tests {
             "overheated_rack",
             "cooling_failure",
             "cutover_rack",
+            "slide_golem",
+            "kpi_dashboard",
             "release_halo",
             "agi_prototype",
             "scooter",

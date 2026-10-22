@@ -39,17 +39,17 @@ pub fn build(level: u8) -> FloorLayout {
 /// Corridor from the arrival, a hall, a corridor to the far pod, and one cell either side of the
 /// hall for packs. `hall` is (centre x, half x, half z), `cells` the two cell centres and `pod`
 /// the far pod's centre x with its half sizes.
-struct Shape {
-    arrival_x: f32,
-    hall: (f32, f32, f32),
-    cells: [(f32, f32); 2],
-    pod: (f32, f32, f32),
+pub(super) struct Shape {
+    pub(super) arrival_x: f32,
+    pub(super) hall: (f32, f32, f32),
+    pub(super) cells: [(f32, f32); 2],
+    pub(super) pod: (f32, f32, f32),
     /// Wall material of the far pod (the Consultants sit in a glass meeting pod).
-    pod_wall: Mat,
+    pub(super) pod_wall: Mat,
 }
 
 impl Shape {
-    fn pods(&self, p: &mut Plan) {
+    pub(super) fn pods(&self, p: &mut Plan) {
         let w = Mat::Wall;
         let (hx, hhx, hhz) = self.hall;
         let (bx, bhx, bhz) = self.pod;
@@ -79,7 +79,7 @@ impl Shape {
         ];
     }
 
-    fn cell_packs(&self) -> [(f32, f32); 2] {
+    pub(super) fn cell_packs(&self) -> [(f32, f32); 2] {
         [0, 1].map(|k| (self.cells[k].0, self.cells[k].1 - self.cells[k].1.signum()))
     }
 }
@@ -189,7 +189,7 @@ fn dock_bay(p: &mut Plan, x: f32, z: f32) {
 }
 
 /// A whiteboard on the nearest wall: aluminium frame, the sign as its content, a marker tray.
-fn whiteboard(p: &mut Plan, x: f32, z: f32, y: f32, width: f32, sign: Sign) {
+pub(super) fn whiteboard(p: &mut Plan, x: f32, z: f32, y: f32, width: f32, sign: Sign) {
     let Some(w) = WallSpot::at(p, x, z) else {
         return;
     };

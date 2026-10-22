@@ -1077,7 +1077,12 @@ const VIBECON: [&str; 5] = [
     "vibecon/5",
 ];
 /// Shields of linked bosses: the open member is the only one worth hitting.
-const LINK_SHIELDS: [&str; 3] = ["synergy_shield", "panel_muted", "billed_out"];
+const LINK_SHIELDS: [&str; 4] = [
+    "synergy_shield",
+    "panel_muted",
+    "billed_out",
+    "off_the_agenda",
+];
 
 impl Group {
     /// Every member in the best Legacy piece (ilvl 12) of each slot for its role.
@@ -1498,6 +1503,65 @@ fn the_migration_takes_a_group_and_async_attendance_takes_one() {
         let s = run_instance(&MIGRATION, &[Role::Dps], false, seed, 6, false);
         println!(
             "Migration seed {seed}: trio Normal {}/3 bosses in {} s (low {}%, most dead {}); solo Async {}/3 in {} s (low {}%, died {}); solo Normal {}/3 in {} s (low {}%, died {})",
+            g.bosses,
+            g.secs,
+            g.low,
+            g.deaths,
+            a.bosses,
+            a.secs,
+            a.low,
+            a.deaths,
+            s.bosses,
+            s.secs,
+            s.low,
+            s.deaths
+        );
+        if g.bosses < 3 {
+            failures.push(format!(
+                "seed {seed}: the trio stopped after {} bosses",
+                g.bosses
+            ));
+        }
+        if a.bosses < 3 {
+            failures.push(format!(
+                "seed {seed}: solo Async stopped after {} bosses",
+                a.bosses
+            ));
+        }
+        if a.low < 5 || a.deaths > 0 {
+            failures.push(format!(
+                "seed {seed}: solo Async scraped through ({}%, died {})",
+                a.low, a.deaths
+            ));
+        }
+        if s.bosses == 3 && s.low >= 25 {
+            failures.push(format!(
+                "seed {seed}: solo Normal cleared it at {}% lowest",
+                s.low
+            ));
+        }
+        if g.secs > 20 * 60 {
+            failures.push(format!("seed {seed}: the trio needed {} s", g.secs));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// The Quarterly Business Review balance gate (docs/DUNGEONS.md): three level-9 bots without gear
+/// clear all four rooms (three bosses, the Board as three linked heads) on Normal in under 20
+/// minutes, one bot clears Async Attendance without dying, and one bot on Normal either fails or
+/// only scrapes through.
+#[test]
+fn the_qbr_takes_a_group_and_async_attendance_takes_one() {
+    const QBR: [&str; 4] = ["qbr/1", "qbr/2", "qbr/3", "qbr/4"];
+    let mut failures = Vec::new();
+    let trio = [Role::Tank, Role::Dps, Role::Healer];
+    for seed in [7u64, 42, 1234] {
+        let g = run_instance(&QBR, &trio, false, seed, 9, false);
+        let a = run_instance(&QBR, &[Role::Dps], true, seed, 9, false);
+        let s = run_instance(&QBR, &[Role::Dps], false, seed, 9, false);
+        println!(
+            "QBR seed {seed}: trio Normal {}/3 bosses in {} s (low {}%, most dead {}); solo Async {}/3 in {} s (low {}%, died {}); solo Normal {}/3 in {} s (low {}%, died {})",
             g.bosses,
             g.secs,
             g.low,

@@ -502,6 +502,8 @@ fn music_file(track: Track, zone: &str, outdoor_night: bool) -> &'static str {
     match track {
         Track::Ambient => "audio/sfx/ambient_aircon.ogg",
         Track::Boss => match zone {
+            // Quarterly Business Review: the corporate lobby ambient all the way down (bosses use the generic boss loop).
+            "qbr/1" | "qbr/2" | "qbr/3" | "qbr/4" => "audio/music/office_muzak.ogg",
             "offsite/4" => "audio/music/raid_boss_offsite.ogg",
             "vibecon/5" => "audio/music/raid_boss_vibecon.ogg",
             _ => "audio/music/boss_battle.ogg",

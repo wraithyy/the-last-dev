@@ -238,6 +238,10 @@ impl WallSpot {
         p.slab(v(c.x, y, c.y), self.yaw, size, mat);
     }
 
+    pub fn yaw(&self) -> f32 {
+        self.yaw
+    }
+
     /// Ground point `l` along the wall and `d` out of it.
     pub fn world(&self, l: f32, d: f32) -> Vec2 {
         self.pt + self.n * d + self.lat * l

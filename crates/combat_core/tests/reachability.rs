@@ -46,19 +46,38 @@ fn zone_kills(c: &Content, zone: &str, unit: &str) -> u32 {
     let rares = c
         .zone(zone)
         .map_or(0, |z| z.rares.iter().filter(|r| r.unit == unit).count());
-    // A linked twin spawns beside its raid-zone boss without being a pack member.
+    // A linked twin (or panel member) spawns beside its raid-zone boss without being a pack member.
     let twin = c
         .raids
         .iter()
         .filter(|r| r.zones.iter().any(|z| z == zone))
         .filter_map(|r| r.twins.as_ref())
         .filter(|t| {
-            t.twin == unit
+            (t.twin == unit || t.extra.iter().any(|e| e == unit))
                 && c.zone(zone)
                     .is_some_and(|z| z.boss.as_ref().is_some_and(|b| b.unit == t.boss))
         })
         .count();
-    (c.zone_hostiles(zone).iter().filter(|k| **k == unit).count() + rares + twin) as u32
+    // A unit the zone's boss summons in its phases (the Golem's Bullet Points) comes as often as
+    // the fight lasts; the content check is that it is summoned at all.
+    let summoned = c
+        .zone(zone)
+        .and_then(|z| z.boss.as_ref())
+        .and_then(|b| c.unit_def(&b.unit))
+        .and_then(|d| d.ai.as_ref())
+        .map_or(0, |ai| {
+            let spells = ai
+                .abilities
+                .iter()
+                .map(|a| a.spell)
+                .chain(ai.phases.iter().filter_map(|p| p.spell));
+            spells
+                .filter_map(|id| c.spell(id))
+                .filter(|s| matches!(&s.effect, combat_core::Effect::Summon { unit: u, .. } if u == unit))
+                .count() as u32
+                * 8
+        });
+    (c.zone_hostiles(zone).iter().filter(|k| **k == unit).count() + rares + twin) as u32 + summoned
 }
 
 fn kill_supply(c: &Content, zone: &str, unit: &str) -> u32 {

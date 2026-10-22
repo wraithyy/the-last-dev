@@ -120,6 +120,7 @@ pub fn build() -> FloorLayout {
         ("door:vibecon/1", vibecon_entrance(&mut p)),
         ("door:onboarding/1", starters_door(&mut p)),
         ("door:basement/1", loading_dock_door(&mut p)),
+        ("door:qbr/1", executive_door(&mut p)),
     ];
     tower_shell(&mut p);
     data_center_shell(&mut p);
@@ -1069,6 +1070,55 @@ fn loading_dock_door(p: &mut Plan) -> (Vec3, f32) {
         p.sign(v(0.0, 4.5, 0.26), 0.0, 5.6, Sign::MigDoor);
     });
     (v(x + 1.8, 0.0, z), -FRAC_PI_2)
+}
+
+/// The Quarterly Business Review dungeon: an executive door on the west face of the tower, a
+/// brass-framed glass door under a canopy with a red carpet, velvet ropes and a lift panel whose
+/// only button says "5 1/2". Returns the door anchor in front of it, facing west.
+fn executive_door(p: &mut Plan) -> (Vec3, f32) {
+    let (c, s) = TOWER;
+    let (x, z) = (c.x - s.x / 2.0, -30.0);
+    p.framed(v(x, 0.0, z), Face::NegX.yaw(), |p| {
+        p.boxed(v(0.0, 1.6, 0.14), v(3.6, 3.2, 0.28), Mat::Dark, false);
+        for l in [-0.8, 0.8] {
+            p.boxed(v(l, 1.2, 0.28), v(1.4, 2.4, 0.08), Mat::Glass, false);
+        }
+        for sx in [-1.9, 1.9] {
+            p.boxed(v(sx, 1.65, 0.3), v(0.14, 3.3, 0.14), Mat::Gold, false);
+        }
+        p.boxed(v(0.0, 3.3, 0.3), v(4.0, 0.16, 0.2), Mat::Gold, false);
+        p.boxed(v(0.0, 3.55, 1.5), v(4.6, 0.2, 3.0), Mat::Gold, false);
+        for sx in [-2.1, 2.1] {
+            p.boxed(v(sx, 1.7, 2.8), v(0.14, 3.4, 0.14), Mat::Gold, false);
+        }
+        p.boxed(v(0.0, 0.03, 2.2), v(2.4, 0.05, 4.4), Mat::Red, false);
+        // Velvet ropes on brass stanchions along the carpet.
+        for sx in [-1.5, 1.5] {
+            for k in 0..3 {
+                let zz = 1.2 + k as f32 * 1.4;
+                p.prim(
+                    PrimKind::Cylinder,
+                    v(sx, 0.5, zz),
+                    v(0.1, 1.0, 0.1),
+                    Mat::Gold,
+                );
+                p.prim(
+                    PrimKind::Sphere,
+                    v(sx, 1.05, zz),
+                    v(0.18, 0.18, 0.18),
+                    Mat::Gold,
+                );
+                if k < 2 {
+                    p.boxed(v(sx, 0.85, zz + 0.7), v(0.04, 0.05, 1.3), Mat::Red, false);
+                }
+            }
+        }
+        p.sign(v(0.0, 4.4, 0.2), 0.0, 5.0, Sign::QbrDoor);
+        p.boxed(v(2.3, 1.4, 0.28), v(0.5, 0.9, 0.06), Mat::Dark, false);
+        p.boxed(v(2.3, 1.5, 0.33), v(0.12, 0.12, 0.04), Mat::LedRed, false);
+        p.sign(v(2.3, 2.05, 0.32), 0.0, 0.7, Sign::QbrLift);
+    });
+    (v(x - 1.8, 0.0, z), FRAC_PI_2)
 }
 
 /// The All-Hands Offsite shuttle: a shelter, a parked coach in offsite livery and a tall pylon

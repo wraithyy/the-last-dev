@@ -486,6 +486,16 @@ fn zone_tagline(id: &str) -> &'static str {
             "Every cable is labelled. Every label is wrong. The consultants have a rate card for that."
         }
         "basement/4" => "T minus ten. For eleven hours. There is no rollback plan, only forward.",
+        "qbr/1" => {
+            "Welcome, valued stakeholders. The pastries are for you. Nobody has touched them. Nobody will."
+        }
+        "qbr/2" => {
+            "Slide one: the agenda. Slide two: the agenda again. The clicker has no batteries."
+        }
+        "qbr/3" => "Every line goes up and to the right. Nobody can say what the axes are.",
+        "qbr/4" => {
+            "A table the length of a bowling lane. A glass of water per seat. One of them is a man."
+        }
         "vibecon/1" => "Two hundred booths, one product, forty names for it.",
         "vibecon/2" => "Today's workshop: replacing yourself with a prompt, hands-on.",
         "vibecon/3" => "Hour 47 of 48. The demo works if nobody breathes near it.",

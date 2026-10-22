@@ -24,6 +24,7 @@ mod office;
 mod offsite;
 mod onboarding;
 mod props;
+mod qbr;
 mod quest_spots;
 mod shape;
 mod teambuilding;

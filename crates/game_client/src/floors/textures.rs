@@ -1872,6 +1872,218 @@ fn sign_spec(s: Sign) -> SignSpec {
             [120, 255, 200],
             [255, 90, 90],
         ),
+        // Quarterly Business Review: a conference hotel in brass, cream and slide-deck blue.
+        Sign::QbrDoor => sp(
+            &["5 1/2: QBR", "BY INVITATION ONLY", "(YOU ARE INVITED)"],
+            [30, 24, 16],
+            [250, 235, 200],
+            [230, 180, 70],
+        ),
+        Sign::QbrWelcome => sp(
+            &["WELCOME,", "VALUED STAKEHOLDERS", "(PLEASE HOLD)"],
+            [12, 24, 52],
+            [235, 242, 255],
+            [250, 210, 60],
+        ),
+        Sign::QbrCatering => sp(
+            &["CATERING", "FOR STAKEHOLDERS ONLY", "(NONE ARRIVED)"],
+            [244, 240, 228],
+            [60, 40, 24],
+            [190, 60, 40],
+        ),
+        Sign::QbrFruit => sp(
+            &["FRESH FRUIT", "UNTOUCHED SINCE 07:00"],
+            [30, 90, 50],
+            [240, 250, 235],
+            [255, 210, 70],
+        ),
+        Sign::QbrCoffee => sp(
+            &["COFFEE STATION", "4 BRANDS", "0 COFFEE"],
+            [48, 30, 20],
+            [245, 225, 200],
+            [255, 190, 90],
+        ),
+        Sign::QbrVisionary => sp(
+            &["VISIONARY", "(DO NOT WAKE)", "(HE IS IDEATING)"],
+            [24, 30, 56],
+            [225, 235, 255],
+            [250, 210, 80],
+        ),
+        Sign::QbrLift => sp(
+            &["LIFT", "5 1/2: QBR", "(BY INVITATION)"],
+            [50, 40, 24],
+            [250, 230, 170],
+            [255, 190, 60],
+        ),
+        Sign::QbrPrize => sp(
+            &["WIN THIS CAR*", "*BY ADOPTING AI"],
+            [10, 20, 50],
+            [240, 245, 255],
+            [255, 200, 50],
+        ),
+        Sign::QbrToDay => sp(
+            &["BACK TO THE CAMPUS", "(AND REALITY)"],
+            [230, 200, 40],
+            [30, 30, 30],
+            [170, 30, 30],
+        ),
+        Sign::QbrToLobby => sp(
+            &["EXECUTIVE LOBBY", "(THE PASTRIES)"],
+            [244, 240, 228],
+            [60, 40, 24],
+            [190, 60, 40],
+        ),
+        Sign::QbrToTheatre => sp(
+            &["PRESENTATION THEATRE", "(SLIDE 1 OF 94)"],
+            [60, 14, 20],
+            [255, 225, 225],
+            [255, 90, 90],
+        ),
+        Sign::QbrToWar => sp(
+            &["ANALYTICS WAR ROOM", "(ALL LINES UP)"],
+            [14, 40, 70],
+            [200, 235, 255],
+            [90, 200, 255],
+        ),
+        Sign::QbrToBoard => sp(
+            &["THE BOARDROOM", "(QUORUM: 3)"],
+            [50, 34, 22],
+            [250, 230, 190],
+            [255, 190, 60],
+        ),
+        Sign::QbrAgenda => sp(
+            &["AGENDA", "AGENDA", "(CONTINUED)"],
+            [244, 246, 250],
+            [30, 50, 100],
+            [210, 50, 50],
+        ),
+        Sign::QbrLaser => sp(
+            &["LASER POINTER", "ON A STAND", "(IT IS ON)"],
+            [30, 30, 36],
+            [240, 240, 245],
+            [255, 60, 50],
+        ),
+        Sign::QbrClicker => sp(
+            &["CLICKER", "NO BATTERIES"],
+            [30, 30, 36],
+            [240, 240, 245],
+            [255, 190, 60],
+        ),
+        Sign::QbrSlides => sp(
+            &["SLIDES (PRINTED)", "DO NOT RECYCLE", "(THEY RECYCLE US)"],
+            [244, 246, 240],
+            [40, 50, 80],
+            [210, 50, 50],
+        ),
+        Sign::QbrPie => sp(
+            &[
+                "PIE CHART",
+                "STAND IN THE LIT SLICE",
+                "(IT IS THE SMALL ONE)",
+            ],
+            [20, 24, 44],
+            [240, 245, 255],
+            [255, 210, 60],
+        ),
+        Sign::QbrBuzz => sp(
+            &[
+                "LEVERAGE",
+                "PIVOT",
+                "SYNERGY",
+                "ALIGN",
+                "AI-FIRST",
+                "DISRUPT",
+                "BANDWIDTH",
+                "OFFLINE",
+            ],
+            [246, 247, 250],
+            [30, 60, 140],
+            [200, 50, 60],
+        ),
+        Sign::QbrDash => sp(
+            &["DASHBOARD", "ALL LINES GO UP", "(THE AXES ARE OPTIONAL)"],
+            [10, 40, 60],
+            [150, 235, 255],
+            [255, 230, 110],
+        ),
+        Sign::QbrPrinter => sp(
+            &["PRINTING: CHART 4,117", "NOBODY ASKED"],
+            [236, 236, 232],
+            [40, 40, 50],
+            [200, 50, 50],
+        ),
+        Sign::QbrTrust => sp(
+            &["SOURCE:", "TRUST ME", "(CONFIDENCE: HIGH)"],
+            [24, 24, 30],
+            [235, 235, 240],
+            [255, 200, 70],
+        ),
+        Sign::QbrBoard => sp(
+            &["THE BOARD", "MEETS QUARTERLY", "(IT IS NOW)"],
+            [40, 28, 18],
+            [250, 230, 190],
+            [255, 190, 60],
+        ),
+        Sign::QbrReserved => sp(
+            &["RESERVED", "FOR THE CHAIR", "(ALSO THE CHAIR)"],
+            [244, 240, 228],
+            [60, 40, 24],
+            [190, 60, 40],
+        ),
+        Sign::QbrSsot => sp(
+            &["SINGLE SOURCE", "OF TRUTH", "(THREE VERSIONS)"],
+            [12, 40, 80],
+            [235, 245, 255],
+            [255, 210, 70],
+        ),
+        Sign::QbrSheetA => sp(
+            &["Q3_FINAL.XLSX", "TOTAL: 4.2M"],
+            [236, 248, 238],
+            [20, 90, 50],
+            [20, 90, 50],
+        ),
+        Sign::QbrSheetB => sp(
+            &["Q3_FINAL_V2", "TOTAL: 3.9M"],
+            [236, 248, 238],
+            [20, 90, 50],
+            [190, 60, 40],
+        ),
+        Sign::QbrSheetC => sp(
+            &["Q3_REAL.XLSX", "TOTAL: 4.6M"],
+            [236, 248, 238],
+            [20, 90, 50],
+            [40, 60, 190],
+        ),
+        Sign::QbrPod => sp(
+            &["MEETING POD", "BOOKED UNTIL 2031"],
+            [20, 40, 64],
+            [220, 240, 255],
+            [255, 200, 60],
+        ),
+        Sign::QbrCeo => sp(
+            &["FORMER CEO", "WE LEARNED A LOT"],
+            [40, 30, 14],
+            [250, 230, 170],
+            [255, 190, 60],
+        ),
+        Sign::QbrHockey => sp(
+            &["UP AND TO", "THE RIGHT"],
+            [14, 20, 36],
+            [220, 235, 255],
+            [255, 230, 90],
+        ),
+        Sign::QbrSynergy => sp(
+            &["SYNERGY", "SYNERGY", "SYNERGY"],
+            [10, 70, 90],
+            [235, 250, 255],
+            [255, 220, 80],
+        ),
+        Sign::QbrPreRead => sp(
+            &["PRE-READ", "94 PAGES", "(READ BEFORE)"],
+            [244, 244, 240],
+            [40, 40, 50],
+            [200, 50, 50],
+        ),
         Sign::P3Shuttle => sp(
             &["P3 SHUTTLE", "SUSPENDED", "SINCE THE LAST REORG"],
             [20, 90, 130],
@@ -1922,7 +2134,10 @@ fn draw_sign(s: Sign) -> Canvas {
     let (w, h) = sign_canvas(s);
     let mut c = Canvas::new(w, h, spec.bg);
     let (wi, hi) = (w as i32, h as i32);
-    if matches!(s, Sign::WhiteboardA | Sign::WhiteboardB | Sign::WhiteboardC) {
+    if matches!(
+        s,
+        Sign::WhiteboardA | Sign::WhiteboardB | Sign::WhiteboardC | Sign::QbrBuzz
+    ) {
         c.frame(2, 2, wi - 4, hi - 4, 3, [150, 150, 158]);
         let seed = s as u32 * 31;
         for (i, word) in spec.lines.iter().enumerate() {

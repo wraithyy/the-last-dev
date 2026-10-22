@@ -3,7 +3,7 @@
 //! kill quest accepted after the work was done is ready at once (retro credit), like a cleared
 //! zone or carried items.
 
-use crate::content::{Content, Objective, QuestDef, QuestGiver, Role, ticks};
+use crate::content::{Content, Effect, Objective, QuestDef, QuestGiver, Role, ticks};
 use crate::effects::dist_xz;
 use crate::geom::{Vec3, in_range};
 use crate::sim::Sim;
@@ -1018,6 +1018,22 @@ impl Sim {
 }
 
 impl Content {
+    /// Whether the unit `boss` has a `Summon` of `add` among its abilities or phase spells.
+    fn boss_summons(&self, boss: &str, add: &str) -> bool {
+        let Some(ai) = self.unit_def(boss).and_then(|d| d.ai.as_ref()) else {
+            return false;
+        };
+        ai.abilities
+            .iter()
+            .map(|a| a.spell)
+            .chain(ai.phases.iter().filter_map(|p| p.spell))
+            .filter_map(|id| self.spell(id))
+            .any(|s| {
+                s.effects()
+                    .any(|e| matches!(e, Effect::Summon { unit, .. } if unit == add))
+            })
+    }
+
     /// "Choose one" gear for a quest and role (`gear_choices` of its tier; Epic only for group
     /// quests).
     pub fn quest_gear_choices(&self, def: &QuestDef, role: Option<Role>) -> Vec<String> {
@@ -1038,10 +1054,13 @@ impl Content {
                     z.packs.iter().any(|p| p.units.iter().any(|u| u == key))
                         || z.boss.as_ref().is_some_and(|b| b.unit == key)
                         || z.rares.iter().any(|r| r.unit == key)
-                        // A linked twin spawns beside its partner, the zone's boss.
+                        // A linked twin (or panel member) spawns beside its partner, the zone's boss.
                         || self.raids.iter().filter_map(|r| r.twins.as_ref()).any(|t| {
-                            t.twin == key && z.boss.as_ref().is_some_and(|b| b.unit == t.boss)
+                            (t.twin == key || t.extra.iter().any(|e| e == key))
+                                && z.boss.as_ref().is_some_and(|b| b.unit == t.boss)
                         })
+                        // So does an add the zone's boss summons in a phase or an ability.
+                        || z.boss.as_ref().is_some_and(|b| self.boss_summons(&b.unit, key))
                         // Fixed spawns can be hostile too (the campus training dummy).
                         || z.friendly.iter().any(|f| f.unit == key)
                 })
