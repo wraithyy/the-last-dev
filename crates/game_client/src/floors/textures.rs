@@ -174,6 +174,7 @@ pub fn material(mat: Mat, t: &Theme) -> StandardMaterial {
         Mat::NeonRed => glow(LinearRgba::rgb(4.0, 0.2, 0.3)),
         Mat::Hazard => matte(c(0.95, 0.72, 0.05)),
         Mat::Sand => matte(c(0.72, 0.64, 0.45)),
+        Mat::Bronze => shiny(c(0.62, 0.4, 0.2), 0.85, 0.32),
         Mat::Window => StandardMaterial {
             base_color: c(0.1, 0.15, 0.2),
             metallic: 0.5,

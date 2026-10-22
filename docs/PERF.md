@@ -54,6 +54,10 @@ Benchmark window ran at scale factor 1.0 (external monitor).
 Campus rework (520 x 360 m, Services Street, wayposts; same machine, window at 2x scale, median avg ms of
 3 runs): campus 5.43 -> 5.56, plaza 5.62 -> 5.63; entities 18,507 -> 19,215.
 
+Campus wave 1b (core spread: Lab, Data Center and annex moved out, two squares; same window at 2x, interleaved
+before/after runs on a noisy machine): campus p50 5.14 -> 5.07-5.26 ms (avg within the +-1 ms run noise), plaza p50
+5.4-5.8 -> 5.3-6.2; entities 19,215 -> 19,577, visible meshes +2 percent.
+
 Single run at `WOW_BENCH_SCALE=2` (1600x900 logical = 3200x1800 physical) on a loaded machine,
 for orientation only: avg ms lake 9.4, plaza 9.1, campus 7.8, carpark 5.9, raid 5.7, tower1 7.3.
 Re-measure on a quiet machine before drawing a retina conclusion.

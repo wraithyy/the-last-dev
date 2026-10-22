@@ -51,6 +51,25 @@ state; the picture does not change.
   elements of our own (a giant sign, a rooftop "AI-FIRST" beacon, an unfinished crane) so it
   reads as the game's tower, not a copy.
 
+- Spread the core (decided after wave 1): the Tower, the Data Center, the Innovation Lab and
+  VibeCon with the plaza between them sit within about 130 x 55 m. Spread them so the core
+  covers at least the footprint of Car Park P3 (120 x 170 m, about 20,000 m2), for example
+  around 220 x 130 m, with open squares, lawns and paths between the buildings instead of
+  walls of props. Grow the map again as needed (about 640 x 440 m) and keep the outer
+  districts' relative layout. Car Park P3 itself stays a separate zone; only its size is the
+  yardstick.
+  Done (wave 1b): no growth was needed. The Tower stays at (0, -36); the Lab moved to (-72, -80)
+  (Innovation Green), the Data Center to (98, -84) with the Migration dock on its east face, the
+  client annex to (62, -102) and the account manager to (70, -96) (Data Square); VibeCon stays at
+  about (132, -17). The core bounding box (Lab west edge to VibeCon east wall, Data Center and
+  Lab north edges to the graveyard) is about 220 x 145 m, 32,000 m2, against 130 x 55 m before.
+  The extra room came from the empty Old Campus band between the north avenue and the north
+  road, so the outer districts did not have to move. Two new districts name the squares.
+
+- Co-op: when the rework is done (after wave 2), bump `PROTOCOL_VERSION` in net_proto so old
+  clients and the old server (with the old campus geometry) refuse each other cleanly, then
+  check the Render server reports the new version after the deploy.
+
 ## 1. Measurements
 
 ### 1.1 The map is large; the crowding is one spot

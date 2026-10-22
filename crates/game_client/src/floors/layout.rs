@@ -1,7 +1,7 @@
 //! Pure, deterministic floor layouts: blockers, anchors, dressing pieces and
 //! the palette. `build_floor` has no ECS or asset dependencies.
 
-use super::kit::{Anchor, Piece, Plan, PrimKind};
+use super::kit::{Anchor, Part, Piece, Plan, PrimKind};
 use super::shape::Footprint;
 use super::themes;
 use crate::arena::DecorRect;
@@ -273,6 +273,26 @@ fn drape(plan: &mut Plan) {
                 let h = t.height((b.min.x + b.max.x) / 2.0, (b.min.z + b.max.z) / 2.0);
                 b.min.y += h;
                 b.max.y += h;
+            }
+            Piece::Merged { parts, .. } => {
+                for part in parts {
+                    match part {
+                        Part::Box { center, .. } => lift(center),
+                        Part::Strut { a, b, .. } => {
+                            let h = t.height((a.x + b.x) / 2.0, (a.z + b.z) / 2.0);
+                            a.y += h;
+                            b.y += h;
+                        }
+                        Part::Ring {
+                            outline, y0, y1, ..
+                        } => {
+                            let c = outline.iter().copied().sum::<Vec2>() / outline.len() as f32;
+                            let h = t.height(c.x, c.y);
+                            *y0 += h;
+                            *y1 += h;
+                        }
+                    }
+                }
             }
             Piece::Run { .. } | Piece::Cap { .. } => {}
         }

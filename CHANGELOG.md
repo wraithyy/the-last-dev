@@ -27,7 +27,7 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - QA Engineer: +5 spell power (25), it was the slowest role in most zones.
 - Unit frame portraits are bigger and show just the head, without the round backdrop behind it.
 - The Onboarding's rooms are packed with shelving, queue ropes, kiosks, cubicles and clutter, the Big Bang Cutover is now a rack monster with flashing status lights, and the Rollback Wraith carries a glowing "v1.0" tag.
-- The campus has room to breathe: it grew to 520 x 360 m with a quiet meadow on the west edge, the arrival lawn is clear (a spawn with the tower dead ahead, one scooter rack, no quest givers or fights within 60 m), and the menus, quest givers and the Company Calendar moved into a new Services Street east of the plaza.
+- The campus has room to breathe: it grew to 520 x 360 m with a quiet meadow on the west edge, the arrival lawn is clear (a spawn with the tower dead ahead, one scooter rack, no quest givers or fights within 60 m), the menus, quest givers and the Company Calendar moved into a new Services Street east of the plaza, and the Innovation Lab, the Data Center and the client annex moved out to their own green and square, so the headquarters core now spreads over about 220 x 145 m with long lawn walks between the buildings.
 - Entrances moved to their districts and got signposts: the Offsite coach leaves from the Wellness Park trailhead, VibeCon registers on Incubator Street, the Hybrid Row desks and givers sit between the ring road and the creek, the Board Meeting now convenes on the field by the gym, and wayposts at the junctions point to every dungeon and district.
 
 ### Fixed

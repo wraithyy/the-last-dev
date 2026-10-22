@@ -309,6 +309,8 @@ pub enum Mat {
     NeonRed,
     Hazard,
     Sand,
+    /// Warm bronze: the tower's fins.
+    Bronze,
     /// Office windows: dark glass by day, lit after dusk (`live::daynight` drives the glow).
     Window,
     /// Deep water (lake, river): darker and glossier than the plaza pond's `Water`.
@@ -738,6 +740,33 @@ pub enum Piece {
         yaw: f32,
         mat: Mat,
     },
+    /// Many shapes of one material drawn as a single mesh, visual only (the tower's fins, floor
+    /// bands and window ribbons: an entity per fin would cost a draw call each).
+    Merged { parts: Vec<Part>, mat: Mat },
+}
+
+/// One shape of a `Piece::Merged`, in world coordinates.
+#[derive(Clone, Debug)]
+pub enum Part {
+    Box {
+        center: Vec3,
+        size: Vec3,
+        yaw: f32,
+    },
+    /// A square-section bar of side `t` from `a` to `b` (slanted columns, crane lattice).
+    Strut {
+        a: Vec3,
+        b: Vec3,
+        t: f32,
+    },
+    /// Vertical wall around a closed convex outline (any winding) between `y0` and `y1`, with a
+    /// flat top and underside when `cap`: a drum, a floor band or a window ribbon.
+    Ring {
+        outline: Vec<Vec2>,
+        y0: f32,
+        y1: f32,
+        cap: bool,
+    },
 }
 
 /// Unit-sized shapes: a cylinder stands on Y with diameter `size.x` and height `size.y`.
@@ -1000,6 +1029,11 @@ impl Plan {
             Vec2::new(width, width * h as f32 / w as f32),
             Tex::Sign(sign),
         );
+    }
+
+    /// Visual-only merged mesh; `parts` are already in world coordinates (no frame).
+    pub fn merged(&mut self, parts: Vec<Part>, mat: Mat) {
+        self.pieces.push(Piece::Merged { parts, mat });
     }
 
     pub fn slab(&mut self, center: Vec3, yaw: f32, size: Vec3, mat: Mat) {

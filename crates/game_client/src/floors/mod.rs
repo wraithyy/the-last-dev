@@ -33,6 +33,7 @@ mod teambuilding;
 mod testgrid;
 mod textures;
 mod themes;
+mod tower;
 mod vibecon;
 mod water;
 mod zones;
@@ -629,6 +630,16 @@ fn load_floor(
                     NotShadowCaster,
                 ));
             }
+            Piece::Merged { parts, mat } => {
+                let mut e = commands.spawn((
+                    FloorEntity,
+                    Mesh3d(meshes.add(merged_mesh(parts))),
+                    MeshMaterial3d(get_mat(&mut mats, &mut materials, t, *mat)),
+                ));
+                if matches!(mat, Mat::Facade | Mat::Window | Mat::Glass) {
+                    e.insert(NotShadowCaster);
+                }
+            }
             Piece::Block(_) => {}
         }
     }
@@ -777,6 +788,98 @@ fn strip_mesh(segs: &[Seg], y0: f32, y1: f32, inset: f32) -> Mesh {
             uv.push([p.x, y]);
         }
         idx.extend([0, 1, 2, 0, 2, 3].map(|i| b0 + i));
+    }
+    mesh_from(pos, normals, uv, idx)
+}
+
+/// One mesh for a `Piece::Merged`: boxes and vertical rings with flat-shaded sides (smooth
+/// normals on a ring would round off the corners of a drum's flat run).
+fn merged_mesh(parts: &[kit::Part]) -> Mesh {
+    let (mut pos, mut normals, mut uv, mut idx) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    // A quad a-b-c-d (counter-clockwise seen from outside, so the material's back-face culling
+    // keeps it): the winding is fixed up against `n`.
+    let mut quad = |q: [Vec3; 4], n: Vec3| {
+        let b0 = pos.len() as u32;
+        for p in q {
+            pos.push(p.to_array());
+            normals.push(n.to_array());
+            uv.push([p.x + p.z, p.y]);
+        }
+        let flip = (q[1] - q[0]).cross(q[2] - q[0]).dot(n) < 0.0;
+        let order = if flip {
+            [0, 2, 1, 0, 3, 2]
+        } else {
+            [0, 1, 2, 0, 2, 3]
+        };
+        idx.extend(order.map(|i| b0 + i));
+    };
+    for part in parts {
+        match part {
+            kit::Part::Box { .. } | kit::Part::Strut { .. } => {
+                let (center, size, rot) = match part {
+                    kit::Part::Box { center, size, yaw } => {
+                        (*center, *size, Quat::from_rotation_y(*yaw))
+                    }
+                    kit::Part::Strut { a, b, t } => (
+                        (*a + *b) / 2.0,
+                        Vec3::new(*t, a.distance(*b), *t),
+                        Quat::from_rotation_arc(Vec3::Y, (*b - *a).normalize_or(Vec3::Y)),
+                    ),
+                    kit::Part::Ring { .. } => unreachable!(),
+                };
+                let h = size / 2.0;
+                let corner =
+                    |s: [f32; 3]| center + rot * Vec3::new(s[0] * h.x, s[1] * h.y, s[2] * h.z);
+                for axis in 0..3 {
+                    for s in [-1.0_f32, 1.0] {
+                        let mut u = [0.0; 3];
+                        u[axis] = s;
+                        let (a1, a2) = ((axis + 1) % 3, (axis + 2) % 3);
+                        let at = |p: f32, q: f32| {
+                            let mut c = u;
+                            c[a1] = p;
+                            c[a2] = q;
+                            corner(c)
+                        };
+                        quad(
+                            [at(-1.0, -1.0), at(1.0, -1.0), at(1.0, 1.0), at(-1.0, 1.0)],
+                            rot * Vec3::from(u),
+                        );
+                    }
+                }
+            }
+            kit::Part::Ring {
+                outline,
+                y0,
+                y1,
+                cap,
+            } => {
+                let c = outline.iter().copied().sum::<Vec2>() / outline.len() as f32;
+                for (i, a) in outline.iter().enumerate() {
+                    let b = outline[(i + 1) % outline.len()];
+                    let e = b - *a;
+                    let mut n = Vec2::new(e.y, -e.x).normalize_or_zero();
+                    if n.dot((*a + b) / 2.0 - c) < 0.0 {
+                        n = -n;
+                    }
+                    let n3 = Vec3::new(n.x, 0.0, n.y);
+                    quad(
+                        [
+                            Vec3::new(a.x, *y0, a.y),
+                            Vec3::new(b.x, *y0, b.y),
+                            Vec3::new(b.x, *y1, b.y),
+                            Vec3::new(a.x, *y1, a.y),
+                        ],
+                        n3,
+                    );
+                    if *cap {
+                        let at = |p: Vec2, y: f32| Vec3::new(p.x, y, p.y);
+                        quad([at(*a, *y1), at(b, *y1), at(c, *y1), at(c, *y1)], Vec3::Y);
+                        quad([at(*a, *y0), at(b, *y0), at(c, *y0), at(c, *y0)], -Vec3::Y);
+                    }
+                }
+            }
+        }
     }
     mesh_from(pos, normals, uv, idx)
 }

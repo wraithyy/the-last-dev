@@ -221,7 +221,7 @@ fn campus(p: &mut Plan) {
 /// Where the night shift (`live.night`, anchors `night_<n>`) waits on the campus: the edges of
 /// the lawn, 60 m or more from the arrival and 20 m from every door.
 pub const NIGHT_SPOTS: [(&str, f32, f32); 7] = [
-    ("night_1", -62.0, -60.0),
+    ("night_1", -45.0, -64.0),
     ("night_2", 74.0, 74.0),
     ("night_3", -66.0, -6.0),
     ("night_4", 48.0, -38.0),
@@ -308,57 +308,9 @@ fn company_calendar(p: &mut Plan) {
     }
 }
 
-/// Office windows on the tower's three visible faces (some offices lit, some not, the same
-/// pattern every night) and the lab's ribbon; `Mat::Window` glows after dusk.
+/// The lab's window ribbon (the tower lights its own windows, `tower.rs`); `Mat::Window` glows
+/// after dusk.
 fn lit_windows(p: &mut Plan) {
-    let (c, s) = super::campus::TOWER;
-    let floors = (s.y / 3.5) as i32;
-    // (face centre along the run, run direction x or z, columns, outward normal).
-    let faces = [
-        (
-            v(c.x, 0.0, c.y + s.z / 2.0 + 0.13),
-            true,
-            (s.x / 4.0) as i32,
-            0,
-        ),
-        (
-            v(c.x + s.x / 2.0 + 0.13, 0.0, c.y),
-            false,
-            (s.z / 4.0) as i32,
-            1,
-        ),
-        (
-            v(c.x - s.x / 2.0 - 0.13, 0.0, c.y),
-            false,
-            (s.z / 4.0) as i32,
-            2,
-        ),
-    ];
-    for (centre, along_x, cols, face) in faces {
-        for k in 1..floors {
-            let y = k as f32 * 3.5 + 1.75;
-            let lit = |j: i32| (k * 5 + j * 3 + face * 2) % 7 < 4;
-            let mut j = 0;
-            while j < cols {
-                if !lit(j) {
-                    j += 1;
-                    continue;
-                }
-                let start = j;
-                while j < cols && lit(j) {
-                    j += 1;
-                }
-                let n = (j - start) as f32;
-                let mid = (start as f32 + n / 2.0) * 4.0 - cols as f32 * 2.0;
-                let (pos, size) = if along_x {
-                    (v(centre.x + mid, y, centre.z), v(n * 4.0 - 0.5, 1.7, 0.06))
-                } else {
-                    (v(centre.x, y, centre.z + mid), v(0.06, 1.7, n * 4.0 - 0.5))
-                };
-                p.boxed(pos, size, Mat::Window, false);
-            }
-        }
-    }
     let (c, s) = super::campus::LAB;
     for sz in [-1.0, 1.0] {
         p.boxed(

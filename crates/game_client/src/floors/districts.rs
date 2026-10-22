@@ -30,12 +30,24 @@ pub struct District {
 }
 
 /// Most specific first; the HQ core comes last so the districts win where rectangles touch.
-pub const DISTRICTS: [District; 15] = [
+pub const DISTRICTS: [District; 17] = [
     // The ground the growth added on the west edge: nothing happens here on purpose.
     District {
         name: "Quiet Meadow",
         centre: (-246.0, 0.0),
         half: (14.0, 180.0),
+    },
+    // The core's two outlying squares (checked first: they lie inside the Old Campus and the
+    // Garage & Station rectangles).
+    District {
+        name: "Innovation Green",
+        centre: (-72.0, -70.0),
+        half: (26.0, 24.0),
+    },
+    District {
+        name: "Data Square",
+        centre: (82.0, -88.0),
+        half: (36.0, 24.0),
     },
     // Menus, quest givers and the calendar, east of the plaza arch.
     District {
@@ -234,7 +246,7 @@ pub(super) const PACKS: [(f32, f32); 38] = [
     (125.0, 106.0),
     (78.0, 104.0),
     // Garage & Station (4-5)
-    (120.0, -86.0),
+    (138.0, -92.0),
     (176.0, -80.0),
     (165.0, -132.0),
     (108.0, -134.0),
@@ -369,7 +381,7 @@ pub const TREES: [(f32, f32, bool); 54] = [
     (-9.0, 124.0, false),
     (9.0, 124.0, false),
     // Old Campus
-    (-84.0, -70.0, true),
+    (-50.0, -70.0, true),
     (-20.0, -70.0, false),
     (30.0, -70.0, true),
     (-92.0, -120.0, false),
@@ -378,7 +390,7 @@ pub const TREES: [(f32, f32, bool); 54] = [
     (-128.0, -70.0, false),
     (-224.0, -70.0, true),
     // Garage & Station
-    (92.0, -70.0, false),
+    (62.0, -66.0, false),
     (226.0, -70.0, true),
     (100.0, -110.0, true),
     // Incubator Street and Co-Living Commons
@@ -1466,10 +1478,10 @@ fn wayfinding(p: &mut Plan) {
     const STARTERS: (f32, f32) = (-22.0, 12.0);
     const TOWER: (f32, f32) = (0.0, -24.0);
     const SERVICES: (f32, f32) = (52.0, 18.0);
-    const DOCK: (f32, f32) = (68.0, -4.0);
+    const DOCK: (f32, f32) = (112.0, -80.0);
     const INCUBATOR: (f32, f32) = (117.0, 0.0);
     const HYBRID: (f32, f32) = (-86.0, -26.0);
-    const LAB: (f32, f32) = (-50.0, -23.0);
+    const LAB: (f32, f32) = (-72.0, -65.0);
     const PLAZA: (f32, f32) = (0.0, 5.0);
     let arm = |t: (f32, f32), s: Sign| (t.0, t.1, s);
     waypost(
@@ -1556,6 +1568,27 @@ fn wayfinding(p: &mut Plan) {
         -9.0,
         134.0,
         &[arm((0.0, 150.0), Sign::WayGate), arm(PLAZA, Sign::WayPlaza)],
+    );
+    // The two forks on the long walks out of the plaza.
+    waypost(
+        p,
+        -48.0,
+        -34.0,
+        &[
+            arm(LAB, Sign::WayLab),
+            arm(TOWER, Sign::WayTower),
+            arm(PLAZA, Sign::WayPlaza),
+        ],
+    );
+    waypost(
+        p,
+        50.0,
+        -24.0,
+        &[
+            arm(DOCK, Sign::WayDock),
+            arm(TOWER, Sign::WayTower),
+            arm(PLAZA, Sign::WayPlaza),
+        ],
     );
     waypost(
         p,

@@ -25,7 +25,7 @@ const PACKS: [(f32, f32); 8] = [
     (-72.0, 62.0),
     (-60.0, 82.0),
     (-30.0, -58.0),
-    (30.0, -39.0),
+    (22.0, -70.0),
     (85.0, 14.0),
     (80.0, 44.0),
     (60.0, -39.0),
@@ -44,11 +44,14 @@ const NPCS: [(f32, f32); 6] = [
 const PLAZA: (f32, f32) = (0.0, 2.0);
 
 pub(super) const TOWER: (Vec2, Vec3) = (Vec2::new(0.0, -36.0), Vec3::new(36.0, 26.0, 22.0));
-const DATA_CENTER: (Vec2, Vec3) = (Vec2::new(54.0, -8.0), Vec3::new(24.0, 11.0, 30.0));
-/// The client annex of the Body Leasing easter egg: a small grey block east of the plaza.
-const ANNEX: (Vec2, Vec3) = (Vec2::new(32.0, -12.0), Vec3::new(12.0, 6.0, 6.0));
-/// The vendor's account manager waits between the plaza and the annex.
-const ACCOUNT_MANAGER: (f32, f32) = (21.0, -3.0);
+/// The core is spread over about 220 x 145 m: the Tower stays at the centre, the Lab sits
+/// north-west on its own green, the Data Center and the annex north-east round a paved square,
+/// VibeCon east in Incubator Street, and the walks between them are 70 m or more of lawn.
+const DATA_CENTER: (Vec2, Vec3) = (Vec2::new(98.0, -84.0), Vec3::new(24.0, 11.0, 30.0));
+/// The client annex of the Body Leasing easter egg: a small grey block on the Data Square.
+const ANNEX: (Vec2, Vec3) = (Vec2::new(62.0, -102.0), Vec3::new(12.0, 6.0, 6.0));
+/// The vendor's account manager waits on the Data Square between the annex and the Data Center.
+const ACCOUNT_MANAGER: (f32, f32) = (70.0, -96.0);
 /// Company Calendar quest-chain givers, each where its story lives: Finance by the cafe,
 /// the leaver at the smoking corner, Security at the tower path, the RTO lead by the bike
 /// rack and Internal Comms on the plaza. Each looks at the point after it.
@@ -76,7 +79,7 @@ const OVERFLOW_DESKS: [(&str, Xz); 3] = [
     ("prop:rto_desk_2", (-86.0, -28.0)),
     ("prop:rto_desk_3", (-86.0, -20.0)),
 ];
-pub(super) const LAB: (Vec2, Vec3) = (Vec2::new(-50.0, -36.0), Vec3::new(26.0, 9.0, 22.0));
+pub(super) const LAB: (Vec2, Vec3) = (Vec2::new(-72.0, -80.0), Vec3::new(26.0, 9.0, 22.0));
 
 fn theme() -> Theme {
     let c = Color::srgb;
@@ -107,10 +110,7 @@ pub fn build() -> FloorLayout {
     perimeter(&mut p);
     quiet_meadow(&mut p);
     let doors = [
-        (
-            "door:tower/1",
-            facade_door(&mut p, TOWER, Face::PosZ, Sign::TowerName),
-        ),
+        ("door:tower/1", super::tower::entrance()),
         (
             "door:datacenter/1",
             facade_door(&mut p, DATA_CENTER, Face::NegX, Sign::DataCenterName),
@@ -130,7 +130,7 @@ pub fn build() -> FloorLayout {
         ("door:qbr/1", executive_door(&mut p)),
         ("door:hack24/1", hackathon_door(&mut p)),
     ];
-    tower_shell(&mut p);
+    super::tower::shell(&mut p);
     data_center_shell(&mut p);
     lab_shell(&mut p);
     annex_shell(&mut p);
@@ -141,6 +141,7 @@ pub fn build() -> FloorLayout {
     graveyard(&mut p);
     lawn(&mut p);
     services_street(&mut p);
+    core_squares(&mut p);
     ambient_props(&mut p);
     overflow_desks(&mut p);
     super::districts::build(&mut p);
@@ -218,6 +219,92 @@ fn services_street(p: &mut Plan) {
             v(1.0, 0.8, 1.0),
             Mat::White,
         );
+    }
+}
+
+/// The open ground the spread-out core buys: a paved square in front of the Lab and another
+/// round the Data Center, each with a fountain or planters, benches and lamps, so the walk
+/// from the plaza ends somewhere that reads as a place. Everything keeps 6 m or more from the
+/// door anchors and the stand spots (the density gate checks it).
+fn core_squares(p: &mut Plan) {
+    use super::models::{PLANTER, put};
+    let paved = |p: &mut Plan, c: Vec2, size: Vec2| {
+        p.boxed(
+            v(c.x, 0.025, c.y),
+            v(size.x, 0.05, size.y),
+            Mat::Concrete,
+            false,
+        );
+        // A white edge line so the square reads from a distance.
+        for (dx, dz, sx, sz) in [
+            (0.0, -size.y / 2.0, size.x, 0.2),
+            (0.0, size.y / 2.0, size.x, 0.2),
+            (-size.x / 2.0, 0.0, 0.2, size.y),
+            (size.x / 2.0, 0.0, 0.2, size.y),
+        ] {
+            p.boxed(
+                v(c.x + dx, 0.06, c.y + dz),
+                v(sx, 0.02, sz),
+                Mat::White,
+                false,
+            );
+        }
+    };
+    // Innovation Green: in front of the Lab, 30 x 14 m, a round planter bed in the middle.
+    let green = Vec2::new(LAB.0.x, -57.0);
+    paved(p, green, Vec2::new(30.0, 14.0));
+    p.prim(
+        PrimKind::Cylinder,
+        v(green.x, 0.2, green.y),
+        v(5.0, 0.4, 5.0),
+        Mat::Concrete,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(green.x, 0.42, green.y),
+        v(4.4, 0.06, 4.4),
+        Mat::Plant,
+    );
+    p.block(v(green.x, 0.3, green.y), v(5.0, 0.6, 5.0));
+    for sx in [-1.0, 1.0] {
+        super::districts::lamp(p, green.x + sx * 13.0, green.y - 5.0);
+        super::districts::lamp(p, green.x + sx * 13.0, green.y + 5.0);
+        bench(p, green.x + sx * 8.0, green.y + 3.5, 0.0);
+        put(
+            p,
+            &PLANTER,
+            v(green.x + sx * 11.0, 0.0, green.y),
+            0.0,
+            4.0,
+            true,
+        );
+    }
+    // Data Square: 28 x 28 m between the annex and the Data Center, a fountain in the middle.
+    let sq = Vec2::new(70.0, -86.0);
+    paved(p, sq, Vec2::new(28.0, 28.0));
+    for (r, h, m) in [(10.0, 0.5, Mat::Concrete), (8.8, 0.46, Mat::Water)] {
+        p.prim(PrimKind::Cylinder, v(sq.x, h / 2.0, sq.y), v(r, h, r), m);
+    }
+    p.prim(
+        PrimKind::Cylinder,
+        v(sq.x, 1.0, sq.y),
+        v(0.7, 2.0, 0.7),
+        Mat::Chrome,
+    );
+    p.block(v(sq.x, 0.3, sq.y), v(10.0, 0.6, 10.0));
+    for (dx, dz) in [(-13.0, -13.0), (13.0, -13.0), (-13.0, 13.0), (13.0, 13.0)] {
+        super::districts::lamp(p, sq.x + dx, sq.y + dz);
+    }
+    for (dx, dz, yaw) in [
+        (-8.0, 10.5, 0.0),
+        (8.0, 10.5, 0.0),
+        (-8.0, -10.5, PI),
+        (8.0, -10.5, PI),
+    ] {
+        bench(p, sq.x + dx, sq.y + dz, yaw);
+    }
+    for dz in [-6.0, 6.0] {
+        put(p, &PLANTER, v(sq.x - 12.0, 0.0, sq.y + dz), 0.0, 4.0, true);
     }
 }
 
@@ -323,61 +410,6 @@ fn neon_sign(p: &mut Plan) {
 
 fn building(p: &mut Plan, (c, size): (Vec2, Vec3), mat: Mat) {
     p.boxed(v(c.x, size.y / 2.0, c.y), size, mat, true);
-}
-
-/// Horizontal bands and vertical mullions so a blank block reads as a facade.
-fn bands(p: &mut Plan, (c, size): (Vec2, Vec3), step: f32, mat: Mat) {
-    let n = (size.y / step).floor() as i32;
-    for i in 1..=n {
-        let y = i as f32 * step;
-        p.boxed(
-            v(c.x, y, c.y),
-            v(size.x + 0.3, 0.25, size.z + 0.3),
-            mat,
-            false,
-        );
-    }
-    for k in 1..(size.x / 4.0) as i32 {
-        let x = c.x - size.x / 2.0 + k as f32 * 4.0;
-        for s in [-1.0, 1.0] {
-            p.boxed(
-                v(x, size.y / 2.0, c.y + s * (size.z / 2.0 + 0.1)),
-                v(0.25, size.y, 0.2),
-                mat,
-                false,
-            );
-        }
-    }
-}
-
-fn tower_shell(p: &mut Plan) {
-    building(p, TOWER, Mat::Facade);
-    bands(p, TOWER, 3.5, Mat::White);
-    let (c, s) = TOWER;
-    p.boxed(
-        v(c.x, s.y + 0.4, c.y),
-        v(s.x + 0.6, 0.8, s.z + 0.6),
-        Mat::Trim,
-        false,
-    );
-    p.boxed(
-        v(c.x + 8.0, s.y + 1.4, c.y),
-        v(5.0, 1.2, 5.0),
-        Mat::Metal,
-        false,
-    );
-    p.prim(
-        PrimKind::Cylinder,
-        v(c.x - 6.0, s.y + 3.0, c.y),
-        v(0.3, 5.0, 0.3),
-        Mat::Chrome,
-    );
-    p.prim(
-        PrimKind::Sphere,
-        v(c.x - 6.0, s.y + 5.6, c.y),
-        v(0.7, 0.7, 0.7),
-        Mat::LedRed,
-    );
 }
 
 fn data_center_shell(p: &mut Plan) {
@@ -738,8 +770,22 @@ fn plaza(p: &mut Plan) {
     );
     for ctrl in [
         vec![pt(0.0, -9.0), pt(0.0, -23.0)],
-        vec![pt(-14.0, -4.0), pt(-32.0, -14.0), pt(-50.0, -22.0)],
-        vec![pt(14.0, 0.0), pt(28.0, -6.0), pt(40.0, -8.0)],
+        // The long walks to the Innovation Green and the Data Square: wide lawns on both sides.
+        vec![
+            pt(-14.0, -4.0),
+            pt(-36.0, -22.0),
+            pt(-56.0, -42.0),
+            pt(-66.0, -56.0),
+            pt(-72.0, -66.0),
+        ],
+        vec![
+            pt(14.0, 0.0),
+            pt(36.0, -12.0),
+            pt(58.0, -30.0),
+            pt(70.0, -52.0),
+            pt(76.0, -72.0),
+            pt(82.0, -84.0),
+        ],
         // From the arrival lawn to the arch, to the Onboarding door and out east to Services Street.
         vec![pt(-12.0, 32.0), pt(-8.0, 22.0), pt(0.0, 12.0)],
         vec![pt(-9.0, 24.0), pt(-22.0, 17.0)],
