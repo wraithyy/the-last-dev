@@ -1639,7 +1639,9 @@ impl Sim {
         // Legacy floors drop the Legacy tier; their boss pieces are the weekly-locked bonus.
         // Raid trash drops the Legacy tier too; raid bosses drop raid pieces (`raid.rs`).
         let legacy_floor = self.legacy.fx.is_some();
-        let legacy = legacy_floor || self.in_raid();
+        // Dungeons are low-level: their trash drops the world tier, not Legacy pieces.
+        let dungeon = self.cur_raid_is_dungeon();
+        let legacy = legacy_floor || (self.in_raid() && !dungeon);
         let raid = self.raid_loot(mob);
         let raid_sets = self.raid_sets();
         let rolls = match (legacy_floor, boss) {
@@ -1697,11 +1699,16 @@ impl Sim {
                 eco.gear
                     .iter()
                     .filter(|g| {
-                        // Raid pieces come in one rarity: any rolled rarity takes them.
+                        // Raid pieces come in one rarity: any rolled rarity takes them. A dungeon
+                        // boss rolls its own pieces (source Boss) instead of the raid tier.
                         (if raid.is_some() {
-                            g.source == GearSource::Raid
-                                && (raid_sets.is_empty()
-                                    || g.set.as_ref().is_some_and(|k| raid_sets.contains(k)))
+                            if dungeon {
+                                matches!(&g.source, GearSource::Boss(k) if *k == d.key)
+                            } else {
+                                g.source == GearSource::Raid
+                                    && (raid_sets.is_empty()
+                                        || g.set.as_ref().is_some_and(|k| raid_sets.contains(k)))
+                            }
                         } else if legacy {
                             g.source == GearSource::Legacy && g.rarity == r
                         } else {
@@ -1737,7 +1744,8 @@ impl Sim {
         } else {
             eco.named_pct * scale / 100
         };
-        if !legacy_floor && !named.is_empty() && rng.chance_pct(named_pct) {
+        // A dungeon boss's pieces are its guaranteed pool above, not a second named roll.
+        if !legacy_floor && !dungeon && !named.is_empty() && rng.chance_pct(named_pct) {
             let own: Vec<&&GearDef> = named.iter().filter(|g| g.role == role).collect();
             let k = if own.is_empty() {
                 named[rng.below(named.len() as u32) as usize]

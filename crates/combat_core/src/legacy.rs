@@ -252,12 +252,16 @@ impl Sim {
     }
 
     pub(crate) fn everyone_capped(&self) -> bool {
-        let cap = self.content.max_level();
+        self.everyone_at(self.content.max_level())
+    }
+
+    /// Every player is at `level` or above (and there is at least one).
+    pub(crate) fn everyone_at(&self, level: u8) -> bool {
         !self.players.is_empty()
             && self
                 .players
                 .iter()
-                .all(|p| self.unit(*p).is_some_and(|u| u.level >= cap))
+                .all(|p| self.unit(*p).is_some_and(|u| u.level >= level))
     }
 
     /// `Command::SetLegacy`: the group lead picks Normal or Legacy for the next zone loads.

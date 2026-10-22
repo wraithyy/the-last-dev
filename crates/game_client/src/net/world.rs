@@ -1109,12 +1109,13 @@ impl NetWorld {
             .raid_of(from)
             .is_some_and(|r| r.name == into.name);
         (!inside).then(|| {
-            let cap = self.content.max_level();
+            // Raids need the level cap; a dungeon its first room's band.
+            let need = into.entry_level(&self.content);
             !self.players.is_empty()
                 && self
                     .players
                     .iter()
-                    .all(|p| self.units.get(p).is_some_and(|u| u.level >= cap))
+                    .all(|p| self.units.get(p).is_some_and(|u| u.level >= need))
         })
     }
 

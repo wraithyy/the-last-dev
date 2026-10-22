@@ -524,6 +524,17 @@ pub enum Sign {
     AgentsAd,
     FamilyAd,
     RtoAd,
+    // The Onboarding (dungeon).
+    ObNewStarters,
+    ObWelcome,
+    ObQueue,
+    ObCage,
+    ObWeek,
+    ObNameplate,
+    ObCulture,
+    ObToReception,
+    ObToCage,
+    ObToDesk,
 }
 
 #[derive(Clone, Debug)]
@@ -1148,6 +1159,7 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
         Sign::ClientName => (256, 96),
         Sign::Billboard | Sign::InnovationNeon => (256, 96),
         Sign::OffsiteWelcome | Sign::OffsiteShuttle | Sign::FamilyBanner => (256, 96),
+        Sign::ObNewStarters | Sign::ObWelcome | Sign::ObNameplate => (256, 96),
         Sign::OffsiteAgenda | Sign::KeynoteScreen | Sign::Calendar => (256, 128),
         Sign::TbPhoto | Sign::TbKaraoke | Sign::TbTrustFall => (256, 96),
         Sign::HackBanner | Sign::HackStage | Sign::MigrationNew | Sign::MigrationOld => (256, 96),

@@ -475,6 +475,11 @@ fn zone_tagline(id: &str) -> &'static str {
         "offsite/2" => "Today's breakout topic: aligning on what we are aligning on.",
         "offsite/3" => "A lake view, an open bar and a keynote about the open bar.",
         "offsite/4" => "We are a family. Families do not log off at six.",
+        "onboarding/1" => "Welcome aboard! Your first week has been scheduled. And rescheduled.",
+        "onboarding/2" => "One laptop per ten boxes. The other nine are for morale.",
+        "onboarding/3" => {
+            "Your desk is ready. Your desk has been ready since Tuesday. Which Tuesday is unclear."
+        }
         "vibecon/1" => "Two hundred booths, one product, forty names for it.",
         "vibecon/2" => "Today's workshop: replacing yourself with a prompt, hands-on.",
         "vibecon/3" => "Hour 47 of 48. The demo works if nobody breathes near it.",

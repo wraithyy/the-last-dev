@@ -10,6 +10,7 @@ use super::kit::{Plan, Sign};
 use super::lab;
 use super::layout::{FloorLayout, TOWER_ZONES, build_floor, yaw_towards};
 use super::offsite;
+use super::onboarding;
 use super::teambuilding;
 use super::themes::{pt, route_point_near, v};
 use super::vibecon;
@@ -19,7 +20,7 @@ use combat_core::Aabb;
 
 /// Every zone id of the contract, in a stable order.
 #[allow(dead_code)] // contract surface; the tests iterate it
-pub const ZONE_IDS: [&str; 20] = [
+pub const ZONE_IDS: [&str; 23] = [
     "campus",
     carpark::ZONE,
     "tower/1",
@@ -40,6 +41,9 @@ pub const ZONE_IDS: [&str; 20] = [
     "vibecon/3",
     "vibecon/4",
     "vibecon/5",
+    "onboarding/1",
+    "onboarding/2",
+    "onboarding/3",
 ];
 
 /// Pure and deterministic: the same id always yields the same layout. `None` for unknown ids.
@@ -60,6 +64,9 @@ pub fn build_zone(id: &str) -> Option<FloorLayout> {
         "vibecon/3" => Some(vibecon::build(3)),
         "vibecon/4" => Some(vibecon::build(4)),
         "vibecon/5" => Some(vibecon::build(5)),
+        "onboarding/1" => Some(onboarding::build(1)),
+        "onboarding/2" => Some(onboarding::build(2)),
+        "onboarding/3" => Some(onboarding::build(3)),
         client::ZONE => Some(client::build()),
         teambuilding::ZONE => Some(teambuilding::build()),
         id if corporate::ZONES.contains(&id) => corporate::build(id),
@@ -160,6 +167,7 @@ mod tests {
         let packs = match id {
             "campus" => 8,
             "datacenter/1" | "datacenter/2" | "lab/1" | "lab/2" => 5,
+            "onboarding/1" | "onboarding/2" | "onboarding/3" => 2,
             "offsite/1" | "offsite/2" | "vibecon/1" | "vibecon/2" => 4,
             "offsite/3" | "offsite/4" | "vibecon/3" | "vibecon/4" | "vibecon/5" => 3,
             _ => 6,
@@ -172,6 +180,9 @@ mod tests {
         let npcs = match id {
             "campus" => 6,
             "offsite/2" | "offsite/3" | "offsite/4" => 0,
+            // The Onboarding: the quest giver is `npc_2` beside the arrival (not required); only
+            // the exit hire of the last room is `npc_1`.
+            "onboarding/1" | "onboarding/2" => 0,
             "vibecon/2" | "vibecon/3" | "vibecon/4" | "vibecon/5" => 0,
             _ => 1,
         };
@@ -184,6 +195,7 @@ mod tests {
                 "door:lab/1",
                 "door:offsite/1",
                 "door:vibecon/1",
+                "door:onboarding/1",
             ],
             "tower/1" | "tower/2" | "tower/3" | "tower/4" => {
                 &["door:campus", "elevator", "elevator_exit"]
@@ -202,6 +214,9 @@ mod tests {
             "vibecon/3" => &["door:vibecon/2", "door:vibecon/4"],
             "vibecon/4" => &["door:vibecon/3", "door:vibecon/5"],
             "vibecon/5" => &["door:vibecon/4", "door:campus"],
+            "onboarding/1" => &["door:campus", "door:onboarding/2"],
+            "onboarding/2" => &["door:onboarding/1", "door:onboarding/3"],
+            "onboarding/3" => &["door:onboarding/2", "door:campus"],
             _ => &["elevator", "elevator_exit"],
         };
         r.extend(doors.iter().map(|d| (*d).to_string()));
@@ -385,6 +400,9 @@ mod tests {
             "vibecon/3",
             "vibecon/4",
             "vibecon/5",
+            "onboarding/1",
+            "onboarding/2",
+            "onboarding/3",
         ] {
             let l = zone(id);
             let g = Grid::from(&l, pos(&l, "player_spawn"));

@@ -2926,6 +2926,156 @@ static TABLE: &[(&str, UnitVisual)] = &[
             ],
         ),
     ),
+    // ---- The Onboarding (dungeon): pastel office staff, bots and the chatty buddy ----
+    (
+        "welcome_desk_clerk",
+        v(
+            CASUAL_F,
+            1.7,
+            "Welcome Desk Clerk",
+            "<Your Badge Is Being Printed>",
+            &[
+                paint("Shirt", 0.55, 0.85, 0.78),
+                paint("Pants", 0.3, 0.35, 0.45),
+                paint("Hair", 0.35, 0.22, 0.12),
+            ],
+        ),
+    ),
+    (
+        "tired_new_hire",
+        v(
+            CASUAL_M,
+            1.75,
+            "Very Tired New Hire",
+            "<Day 5>",
+            &[
+                paint("Shirt", 0.55, 0.57, 0.62),
+                paint("Pants", 0.25, 0.27, 0.32),
+            ],
+        ),
+    ),
+    (
+        "badge_scanner",
+        v(
+            "prim/delivery_robot",
+            1.5,
+            "Badge Scanner",
+            "<Beeps Wrong Every Time>",
+            &[],
+        ),
+    ),
+    (
+        "welcome_packet_dispenser",
+        v(
+            "prim/espresso_cart",
+            1.4,
+            "Welcome Packet Dispenser",
+            "<Dispatches Swag>",
+            &[],
+        ),
+    ),
+    (
+        "hr_generalist",
+        v(
+            CASUAL_F,
+            1.7,
+            "HR Generalist",
+            "<Circles Back>",
+            &[
+                paint("Shirt", 0.95, 0.6, 0.55),
+                paint("Pants", 0.25, 0.25, 0.35),
+                paint("Hair", 0.6, 0.35, 0.15),
+            ],
+        ),
+    ),
+    (
+        "probation_intern",
+        v(
+            CASUAL_M,
+            1.55,
+            "Forgotten Probation Intern",
+            "<Day 89 of 90>",
+            &[
+                paint("Shirt", 0.7, 0.85, 0.95),
+                paint("Pants", 0.35, 0.35, 0.4),
+            ],
+        ),
+    ),
+    (
+        "org_chart",
+        v(
+            "prim/cooling_fan",
+            1.7,
+            "Org Chart",
+            "<Forever Updating>",
+            &[],
+        ),
+    ),
+    (
+        "name_tag",
+        v("prim/drone", 0.55, "Name Tag", "<Hello, My Name Is>", &[]),
+    ),
+    (
+        "attendance_sheet",
+        v(
+            "prim/drone",
+            0.8,
+            "Attendance Sheet",
+            "<Please Sign Here>",
+            &[],
+        ),
+    ),
+    (
+        "courier_drone",
+        v(
+            "prim/drone",
+            1.2,
+            "Courier Drone",
+            "<Escalates to Tier 2>",
+            &[],
+        ),
+    ),
+    (
+        "compliance_trainer",
+        v(
+            SUIT_M,
+            1.95,
+            "Compliance Trainer",
+            "<Certified, Annually>",
+            &[
+                paint("Black", 0.18, 0.28, 0.4),
+                paint("Shirt", 0.95, 0.95, 0.98),
+                paint("Skin", 0.95, 0.8, 0.7),
+            ],
+        ),
+    ),
+    (
+        "laptop_provisioner",
+        v(
+            WORKER,
+            2.1,
+            "Laptop Provisioner",
+            "<INC-0042 (Awaiting Hardware)>",
+            &[
+                paint("Vest", 0.98, 0.55, 0.12),
+                paint("Shirt", 0.9, 0.9, 0.92),
+                paint("Hat", 0.95, 0.95, 0.95),
+            ],
+        ),
+    ),
+    (
+        "onboarding_buddy",
+        v(
+            CASUAL_M,
+            2.0,
+            "Onboarding Buddy",
+            "<Your Point of Contact>",
+            &[
+                paint("Shirt", 0.4, 0.8, 0.95),
+                paint("Pants", 0.85, 0.85, 0.9),
+            ],
+        ),
+    ),
 ];
 
 /// Primitive rig kind (see `rigs.rs`) of a unit key, `None` for character-model units.

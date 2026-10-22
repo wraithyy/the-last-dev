@@ -1162,8 +1162,10 @@ mod tests {
             panic!("embedded content invalid");
         };
         let c = sim.content();
-        assert_eq!(c.raids.len(), RAID_SCENES.len());
-        for (raid, r) in c.raids.iter().zip(&RAID_SCENES) {
+        // Dungeons are short and have no filmed scenes.
+        let raids: Vec<_> = c.raids.iter().filter(|r| !r.is_dungeon()).collect();
+        assert_eq!(raids.len(), RAID_SCENES.len());
+        for (raid, r) in raids.into_iter().zip(&RAID_SCENES) {
             let bosses = raid.bosses(c);
             assert_eq!(bosses.last().map(String::as_str), Some(r.final_boss));
             assert_eq!(raid.zones.first().map(String::as_str), Some(r.first_zone));

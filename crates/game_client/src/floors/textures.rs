@@ -1638,6 +1638,71 @@ fn sign_spec(s: Sign) -> SignSpec {
             [240, 245, 255],
             [255, 220, 90],
         ),
+        // The Onboarding: pastel and cheerful, the dread is in the small print.
+        Sign::ObNewStarters => sp(
+            &[
+                "NEW STARTERS - WEEK 1",
+                "(door may be locked, please",
+                "wait for someone to let you in)",
+            ],
+            [214, 232, 226],
+            [40, 70, 80],
+            [220, 110, 90],
+        ),
+        Sign::ObWelcome => sp(
+            &["WELCOME, DANIELA", "(THE PREVIOUS HIRE)"],
+            [226, 238, 250],
+            [40, 60, 100],
+            [230, 120, 100],
+        ),
+        Sign::ObQueue => sp(
+            &["PLEASE QUEUE HERE", "(THE QUEUE IS THE WALL)"],
+            [250, 236, 214],
+            [90, 60, 40],
+            [200, 90, 70],
+        ),
+        Sign::ObCage => sp(
+            &["EQUIPMENT CAGE", "1 LAPTOP PER 10 BOXES"],
+            [220, 226, 232],
+            [50, 60, 80],
+            [210, 110, 60],
+        ),
+        Sign::ObWeek => sp(
+            &["WEEK 1  WEEK 2", "WEEK 3  WEEK 4", "WEEK 5  WEEK 6"],
+            [250, 248, 240],
+            [60, 60, 80],
+            [210, 50, 50],
+        ),
+        Sign::ObNameplate => sp(
+            &["[NEW STARTER]", "(in marker)"],
+            [250, 246, 226],
+            [60, 60, 70],
+            [120, 150, 200],
+        ),
+        Sign::ObCulture => sp(
+            &["CULTURE DECK", "IGNORE PAGE 4"],
+            [255, 236, 130],
+            [70, 60, 40],
+            [210, 90, 60],
+        ),
+        Sign::ObToReception => sp(
+            &["BACK TO", "RECEPTION"],
+            [226, 238, 250],
+            [40, 60, 100],
+            [230, 120, 100],
+        ),
+        Sign::ObToCage => sp(
+            &["EQUIPMENT CAGE", "WEEK 2 (APPROX.)"],
+            [220, 226, 232],
+            [50, 60, 80],
+            [210, 110, 60],
+        ),
+        Sign::ObToDesk => sp(
+            &["YOUR DESK", "HOT DESK 14"],
+            [250, 246, 226],
+            [60, 60, 70],
+            [120, 150, 200],
+        ),
         Sign::P3Shuttle => sp(
             &["P3 SHUTTLE", "SUSPENDED", "SINCE THE LAST REORG"],
             [20, 90, 130],

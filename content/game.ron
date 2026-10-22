@@ -263,6 +263,21 @@
             dispel: Never),
         (key: "open_tab", name: "Open Tab", icon: "token_invoice", harmful: true, dispel: Magic,
             periodic: Some((interval_ms: 2000, base: 35))),
+        // ---- dungeon: The Onboarding (raid.rs, docs/DUNGEONS.md) ----
+        (key: "access_denied", name: "Access Denied", icon: "access_badge", harmful: true, stun: true, dispel: Never),
+        (key: "tangled", name: "Tangled in Lanyard", icon: "demo_lanyard", harmful: true, stealth_slow_pct: 35),
+        (key: "retake_required", name: "Retake Required", icon: "mandatory_prompt_training_certificate", harmful: true,
+            damage_taken_pct: 10, dispel: Never),
+        (key: "muted_in_training", name: "Muted", icon: "microphone", harmful: true, silence: true, dispel: Never),
+        (key: "session_timed_out", name: "Session Timed Out", icon: "hourglass", harmful: false, damage_done_pct: 100, haste_pct: 30),
+        (key: "no_dongle", name: "Wireless Mouse (No Dongle)", icon: "gear_usb", harmful: true, stealth_slow_pct: 40),
+        (key: "dvorak", name: "Dvorak Keyboard", icon: "keyboard", harmful: true, damage_done_pct: -20),
+        (key: "dock_hot", name: "Docking Station, Hot", icon: "overheating", harmful: true,
+            periodic: Some((interval_ms: 2000, base: 6))),
+        (key: "reimaged", name: "Reimaged (Settings Lost)", icon: "restart_pod", harmful: true, damage_done_pct: -15),
+        (key: "week_six", name: "Your Laptop Has Arrived", icon: "delivery_receipt", harmful: false, damage_done_pct: 40),
+        (key: "confidently_wrong", name: "Confidently Wrong", icon: "confident_answer", harmful: false),
+        (key: "context_full", name: "Context Window Full", icon: "context_window", harmful: false, damage_done_pct: 45, haste_pct: 20),
     ],
     spells: [
         // ---- player ----
@@ -3433,6 +3448,161 @@
             description: "Alignment is a team effort: whoever stands in the circle splits the blame. Nobody inside, everybody pays.",
             effect: Damage(base: 230, coefficient_pct: 0),
             telegraph: Some((shape: Circle(radius_m: 4.0), delay_ms: 2500, split: true, label: "Share the blame")),
+        ),
+        // ---- dungeon: The Onboarding (raid.rs). Trash at 3, bosses at 4; Async Attendance scales them. ----
+        (
+            id: 1700, name: "Access Denied", icon: "access_badge", school: Physical,
+            range_m: 6.0, cast_ms: 2000, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The turnstile beeps, thinks about it and slams shut on you. A short stun if the cast lands; interrupt it.",
+            effect: Damage(base: 10, coefficient_pct: 0, apply_aura: Some((aura: "access_denied", duration_ms: 1500))),
+        ),
+        (
+            id: 1701, name: "Lanyard Toss", icon: "demo_lanyard", school: Physical,
+            range_m: 22.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A free lanyard, thrown at you with force. You are tangled in it and move slower for 4 sec.",
+            effect: Damage(base: 8, coefficient_pct: 0, apply_aura: Some((aura: "tangled", duration_ms: 4000))),
+        ),
+        (
+            id: 1702, name: "Circling Back", icon: "relationship_building", school: Arcane,
+            range_m: 30.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            description: "Following up on the wound from last week. Heals an ally; interrupt the follow-up.",
+            effect: Heal(base: 70, coefficient_pct: 0),
+        ),
+        (
+            id: 1703, name: "Just Checking In", icon: "still_typing", school: Arcane,
+            range_m: 10.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Day 89 of 90: one more question, asked with feeling.",
+            effect: Damage(base: 7, coefficient_pct: 0),
+        ),
+        (
+            id: 1704, name: "Org Chart Update", icon: "org_chart", school: Arcane,
+            range_m: 0.0, cast_ms: 1500, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "A new hire appears on the chart, as a Name Tag. Summons two Name Tags.",
+            effect: Summon(unit: "name_tag", count: 2, max_alive: 4),
+        ),
+        (
+            id: 1705, name: "Hello, My Name Is", icon: "visitor_badge", school: Arcane,
+            range_m: 0.0, cast_ms: 5000, mana: 0, gcd: false, cooldown_ms: 0, interruptible: false,
+            target: Caster, area: Some((radius_m: 4.0, allies: false)),
+            description: "Left on a lapel too long, a Name Tag peels off with a small bang. Kill it first, or stand clear.",
+            effect: Damage(base: 8, coefficient_pct: 0),
+            extra_effects: [Detonate(boost_aura: None)],
+        ),
+        (
+            id: 1710, name: "Pop Quiz", icon: "mandatory_prompt_training_certificate", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Four answers, three of them wrong. The wrong lanes land after 3 sec and add Retake Required (+10% damage taken) for 8 sec. Stand in the lane nobody covered.",
+            effect: Damage(base: 24, coefficient_pct: 0, apply_aura: Some((aura: "retake_required", duration_ms: 8000))),
+            telegraph: Some((shape: Line(length_m: 10.0, width_m: 3.5), delay_ms: 3000, count: 4, step_m: 4.0, gap: true,
+                label: "Wrong answer: stand on the uncovered one")),
+        ),
+        (
+            id: 1711, name: "Click Next", icon: "queue_ticket", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Next. Next. Next. A firm hit on whoever holds the Trainer's attention.",
+            effect: Damage(base: 14, coefficient_pct: 0),
+        ),
+        (
+            id: 1712, name: "Read the Disclaimer", icon: "padlock", school: Arcane,
+            range_m: 30.0, cast_ms: 4000, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            area: Some((radius_m: 30.0, allies: false)),
+            description: "A very long cast, read aloud in full. If it lands, everyone is Muted for 4 sec. Any interrupt stops it.",
+            effect: Aura(aura: "muted_in_training", duration_ms: 4000),
+        ),
+        (
+            id: 1713, name: "Attendance Sheets", icon: "junk_ticket", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Two sheets that must be signed. Signing means killing. Summons two Attendance Sheets.",
+            effect: Summon(unit: "attendance_sheet", count: 2, max_alive: 4),
+        ),
+        (
+            id: 1720, name: "Standard Issue Peripheral", icon: "gear_usb", school: Arcane,
+            range_m: 35.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Your starter kit arrives: a wireless mouse with no dongle (slow), a Dvorak keyboard (less damage) or a hot docking station (burns).",
+            effect: RandomAura(auras: ["no_dongle", "dvorak", "dock_hot"], duration_ms: 9000),
+        ),
+        (
+            id: 1721, name: "Out For Delivery", icon: "delivery_receipt", school: Physical,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The delivery van reverses down the aisle, beeping, towards whoever signed for it.",
+            effect: Damage(base: 26, coefficient_pct: 0),
+            telegraph: Some((shape: Line(length_m: 18.0, width_m: 3.0), delay_ms: 2000, label: "Out for delivery: van reversing")),
+        ),
+        (
+            id: 1722, name: "Reimage", icon: "restart_pod", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "All your settings are lost. Damage dealt is 15% lower for 8 sec.",
+            effect: Aura(aura: "reimaged", duration_ms: 8000),
+        ),
+        (
+            id: 1723, name: "Call the Courier", icon: "paper_plane", school: Arcane,
+            range_m: 0.0, cast_ms: 1500, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "A courier drone arrives, empty-handed, to escalate. Summons one Courier Drone.",
+            effect: Summon(unit: "courier_drone", count: 1, max_alive: 1),
+        ),
+        (
+            id: 1724, name: "Escalate to Tier 2", icon: "incident_report", school: Arcane,
+            range_m: 30.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            description: "Passes the ticket to someone who will also pass it on. Heals an ally; interrupt it.",
+            effect: Heal(base: 140, coefficient_pct: 0),
+        ),
+        (
+            id: 1725, name: "The Box It Shipped In", icon: "box", school: Physical,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster, area: Some((radius_m: 6.0, allies: false)),
+            description: "The laptop box was packed with something. It was packed with a spring.",
+            effect: Damage(base: 40, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 6.0), delay_ms: 1500, at: Caster, label: "The box it shipped in")),
+        ),
+        (
+            id: 1726, name: "Your Laptop Has Arrived", icon: "delivery_receipt", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Week 6: it is the wrong model, and the Provisioner has stopped pretending. Damage dealt +40%.",
+            effect: Aura(aura: "week_six", duration_ms: 600000),
+        ),
+        (
+            id: 1730, name: "Let Me Show You Around", icon: "paper_plane", school: Arcane,
+            range_m: 40.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A guided tour, to the far end of the room. The walk back is the part nobody mentions.",
+            effect: Teleport(distance_m: 16.0),
+        ),
+        (
+            id: 1731, name: "Great Question", icon: "chat_bubble", school: Arcane,
+            range_m: 0.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            target: Caster,
+            description: "A quiet moment of self-affirmation. Heals the Buddy; interrupt it.",
+            effect: Heal(base: 170, coefficient_pct: 0),
+        ),
+        (
+            id: 1732, name: "Generating Response", icon: "still_typing", school: Arcane,
+            range_m: 30.0, cast_ms: 3000, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            description: "Three seconds of typing dots, then a very long answer. Big damage if it finishes; interrupt it or break line of sight.",
+            effect: Damage(base: 60, coefficient_pct: 0),
+        ),
+        (
+            id: 1733, name: "Confidently Wrong", icon: "confident_answer", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "The Buddy is certain, which absorbs a surprising amount of damage. Burn it down.",
+            effect: Absorb(aura: "confidently_wrong", amount: 320, duration_ms: 10000),
+        ),
+        (
+            id: 1734, name: "Let Me Loop In Someone Else", icon: "stakeholders", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "Your point of contact changes: everyone's threat resets and the Buddy picks someone new.",
+            effect: ResetAllyThreat(radius_m: 60.0),
+        ),
+        (
+            id: 1735, name: "Context Window Full", icon: "context_window", school: Arcane,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            target: Caster,
+            description: "The Buddy is out of memory and into a hurry: damage +45% and faster.",
+            effect: Aura(aura: "context_full", duration_ms: 600000),
         ),
     ],
     // Playable classes; the first is the default. Base stats and auto attack come from `unit`.
@@ -9435,6 +9605,353 @@
                 ],
             ),
         ),
+        // ---- dungeon: The Onboarding (raid.rs, docs/DUNGEONS.md). Trash at 3, bosses at 4. ----
+        (
+            key: "welcome_desk_clerk", name: "Welcome Desk Clerk", title: "Your Badge Is Being Printed", level: 3, hostile: false,
+            max_hp: 240, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Welcome aboard! Your first week has been scheduled. It has also been rescheduled.",
+                    "Three to five of you attend together; fewer attend Async. Each room can be attended once a day. After that it is being 'reset' until midnight UTC.",
+                    "Reception, the Equipment Cage, then your desk. Your badge will be activated in 5-7 business days. Please enter by force.",
+                ],
+                ambient_ms: 30000,
+                ambient: [
+                    "Your laptop is on a boat. The boat is in the queue.",
+                    "Please sign in. Please also sign out. Please do not sign the visitor book, it is cursed.",
+                    "The door is not locked. The door is simply not open.",
+                ],
+            ),
+        ),
+        (
+            key: "tired_new_hire", name: "Very Tired New Hire", title: "Day 5", level: 3, hostile: false,
+            max_hp: 240, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "You made it. I am on day five. I think. Nobody has told me which five.",
+                    "My buddy is very supportive and has never been wrong. If it ever says 'as a', run.",
+                    "Please tell the others the laptop is real. I have seen the ticket. The ticket has seen me.",
+                ],
+                ambient_ms: 30000,
+                ambient: [
+                    "Day 5. The Wi-Fi password arrived. It was the one for the other building.",
+                    "I was told it gets better after the first quarter. I was told this in Q3.",
+                ],
+            ),
+        ),
+        (
+            key: "badge_scanner", name: "Badge Scanner", title: "Beeps Wrong Every Time", level: 3, hostile: true,
+            max_hp: 300, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 5, loot: [],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 8, chase_speed_mps: 5.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1700, cooldown_min_ms: 10000, cooldown_max_ms: 13000, initial_ms: Some((3000, 5000)),
+                        yells: [
+                            "BEEP. Access denied.",
+                            "BEEP BEEP. Access denied. Also: this is not a door.",
+                            "Please present a badge. Not that one. Not that one either.",
+                        ]),
+                ],
+            )),
+            yells: (
+                aggro: ["BEEP. Badge not recognised. Neither are you."],
+                death: ["Beep... beep... access... granted..."],
+            ),
+        ),
+        (
+            key: "welcome_packet_dispenser", name: "Welcome Packet Dispenser", title: "Dispatches Swag", level: 3, hostile: true,
+            max_hp: 220, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 5, loot: [],
+            ai: Some((
+                aggro_m: 8.0, leash_m: 35.0, melee_range_m: 14.0, melee_ms: 2600,
+                melee_damage: 6, chase_speed_mps: 4.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1701, cooldown_min_ms: 9000, cooldown_max_ms: 12000, initial_ms: Some((2500, 4000)),
+                        yells: [
+                            "Here is your welcome pack! Please take it. Please take it now.",
+                            "A lanyard! Another lanyard! Everyone gets a lanyard!",
+                        ]),
+                ],
+            )),
+            yells: (
+                death: ["Out of stock... of everything... except lanyards..."],
+            ),
+        ),
+        (
+            key: "hr_generalist", name: "HR Generalist", title: "Circles Back", level: 3, hostile: true,
+            max_hp: 250, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 5, loot: [],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2200,
+                melee_damage: 6, chase_speed_mps: 5.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1702, cooldown_min_ms: 10000, cooldown_max_ms: 12000, initial_ms: Some((4000, 6000)),
+                        target: AllyLowestHp,
+                        yells: [
+                            "Circling back on that wound. Let's take it offline.",
+                            "I hear you. I am also healing you. These are separate workstreams.",
+                        ]),
+                ],
+            )),
+            yells: (
+                death: ["I'll... circle back... never..."],
+            ),
+        ),
+        (
+            key: "probation_intern", name: "Forgotten Probation Intern", title: "Day 89 of 90", level: 3, hostile: true,
+            max_hp: 150, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 5, loot: [],
+            ai: Some((
+                aggro_m: 8.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 1800,
+                melee_damage: 5, chase_speed_mps: 6.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1703, cooldown_min_ms: 8000, cooldown_max_ms: 10000, initial_ms: Some((2000, 4000)),
+                        target: RandomHostile,
+                        yells: [
+                            "Day 89! Just checking in! Am I still here?",
+                            "Has anyone decided about the permanent contract? Anyone?",
+                        ]),
+                ],
+            )),
+            yells: (
+                death: ["Tell them I was great."],
+            ),
+        ),
+        (
+            key: "org_chart", name: "Org Chart", title: "Forever Updating", level: 3, hostile: true,
+            max_hp: 330, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 5, loot: [],
+            ai: Some((
+                aggro_m: 7.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2400,
+                melee_damage: 4, chase_speed_mps: 4.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1704, cooldown_min_ms: 12000, cooldown_max_ms: 12000, initial_ms: Some((3000, 5000)),
+                        target: Caster,
+                        yells: [
+                            "Version 41 of the org chart. You are the dotted line.",
+                            "New joiners! Please enjoy your name and your place on this chart.",
+                        ]),
+                ],
+            )),
+            yells: (
+                death: ["Reorg... pending... reporting line... unknown..."],
+            ),
+        ),
+        (
+            key: "name_tag", name: "Name Tag", title: "Hello, My Name Is", level: 3, hostile: true,
+            max_hp: 1, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [],
+            ai: Some((
+                aggro_m: 10.0, leash_m: 60.0, melee_range_m: 2.5, melee_ms: 2500,
+                melee_damage: 0, chase_speed_mps: 4.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1705, cooldown_min_ms: 30000, cooldown_max_ms: 30000, initial_ms: Some((200, 200)),
+                        target: Caster),
+                ],
+            )),
+        ),
+        (
+            key: "attendance_sheet", name: "Attendance Sheet", title: "Please Sign Here", level: 4, hostile: true,
+            max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 60.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 6, chase_speed_mps: 5.0, respawn_ms: 60000,
+                abilities: [],
+            )),
+            yells: (
+                death: ["Signed."],
+            ),
+        ),
+        (
+            key: "courier_drone", name: "Courier Drone", title: "Escalates to Tier 2", level: 4, hostile: true,
+            max_hp: 170, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 60.0, melee_range_m: 2.5, melee_ms: 2200,
+                melee_damage: 5, chase_speed_mps: 5.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 1724, cooldown_min_ms: 9000, cooldown_max_ms: 11000, initial_ms: Some((4000, 6000)),
+                        target: AllyLowestHp,
+                        yells: ["Escalating to Tier 2. Tier 2 is also me."]),
+                ],
+            )),
+            yells: (
+                death: ["Delivered. Nobody signed."],
+            ),
+        ),
+        (
+            key: "compliance_trainer", name: "Compliance Trainer", title: "Certified, Annually", level: 4, hostile: true,
+            boss: true,
+            max_hp: 2400, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 40, loot: [],
+            // The Laminated Handbook: hit the Trainer from the side or behind.
+            frontal_shield: Some((arc_deg: 120.0, damage_taken_pct: -50)),
+            ai: Some((
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 12, chase_speed_mps: 5.0, respawn_ms: 15000,
+                abilities: [
+                    (spell: 1710, cooldown_min_ms: 18000, cooldown_max_ms: 18000, initial_ms: Some((6000, 6000)),
+                        phases: [1],
+                        yells: [
+                            "Question one: you find a USB stick in the car park. Do you A, plug it in; B, plug it in faster; C, give it to the Security Engineer; or D, plug it into your *work* laptop?",
+                            "Question two: a stranger asks you to hold the door. Is it A, hold it; B, hold it and smile; C, ask for the badge; or D, hold it for the whole queue?",
+                            "Question three: an email from the CEO asks for gift cards. Is it A, buy them; B, buy more; C, report it; or D, reply all?",
+                        ]),
+                    (spell: 1710, cooldown_min_ms: 12000, cooldown_max_ms: 12000, initial_ms: Some((4000, 4000)),
+                        phases: [2],
+                        yells: [
+                            "Wrong! The correct answer was always C. We only teach the correct answers during the test.",
+                            "Bonus round: the answers are now the same as the questions. Choose carefully.",
+                        ]),
+                    (spell: 1711, cooldown_min_ms: 6000, cooldown_max_ms: 6000, initial_ms: Some((3000, 3000))),
+                    (spell: 1712, cooldown_min_ms: 25000, cooldown_max_ms: 25000, initial_ms: Some((12000, 12000)),
+                        yells: [
+                            "Please read the disclaimer. All of it. Aloud. I will wait.",
+                            "Slide 41 of 40. Please do not skip. I can see you skipping.",
+                        ]),
+                ],
+                phases: [
+                    (below_hp_pct: 50, spell: Some(1713), target: Caster,
+                        yells: ["Attendance has dropped. Two sheets, please. Everyone must sign, and by sign I mean die."]),
+                ],
+                enrage: Some((after_ms: 240000, aura: "session_timed_out", yells: [
+                    "Session timed out. You must restart the module.",
+                ])),
+            )),
+            yells: (
+                periodic_ms: 14000,
+                aggro: ["Welcome to Mandatory Training. Attendance is optional. Not attending is noted."],
+                periodic: [
+                    "This module has a short quiz. The quiz has a short quiz.",
+                    "I will now read the slide. The slide says what I am reading.",
+                    "Please do not take notes. Notes are not on the test. Nothing is.",
+                ],
+                low_hp: ["Congratulations, you have been certified. Certification expires in thirty seconds."],
+                player_killed: ["Not certified. Please repeat the module."],
+                death: ["Certified... annually... see you... next year..."],
+            ),
+        ),
+        (
+            key: "laptop_provisioner", name: "Laptop Provisioner", title: "INC-0042 (Awaiting Hardware)", level: 4, hostile: true,
+            boss: true,
+            max_hp: 2600, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 50,
+            loot: [(item: "Laptop Box (Empty)", chance_pct: 100, quest: Some("onb_laptop"))],
+            death_spell: Some(1725),
+            ai: Some((
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 12, chase_speed_mps: 5.0, respawn_ms: 15000,
+                abilities: [
+                    // The six weeks: each phase swaps one thing in and keeps the rest.
+                    (spell: 1720, cooldown_min_ms: 10000, cooldown_max_ms: 10000, initial_ms: Some((5000, 5000)),
+                        target: RandomHostile, phases: [1, 2, 3],
+                        yells: [
+                            "I see your ticket. It's in the queue. The queue is in the other queue.",
+                            "Your starter kit has shipped. Part of it. Possibly yours.",
+                        ]),
+                    (spell: 1720, cooldown_min_ms: 9000, cooldown_max_ms: 9000, initial_ms: Some((4000, 4000)),
+                        target: RandomHostile, phases: [4, 5, 6]),
+                    (spell: 1721, cooldown_min_ms: 14000, cooldown_max_ms: 14000, initial_ms: Some((7000, 7000)),
+                        phases: [2, 3],
+                        yells: ["Out for delivery! Please be home. Please be standing in the road."]),
+                    (spell: 1721, cooldown_min_ms: 9000, cooldown_max_ms: 9000, initial_ms: Some((5000, 5000)),
+                        phases: [4, 5]),
+                    (spell: 1722, cooldown_min_ms: 16000, cooldown_max_ms: 16000, initial_ms: Some((8000, 8000)),
+                        phases: [3, 4, 5, 6],
+                        yells: ["Have you tried turning yourself off and on again? I will do it for you. Reimaging."]),
+                    (spell: 1723, cooldown_min_ms: 24000, cooldown_max_ms: 24000, initial_ms: Some((10000, 10000)),
+                        target: Caster, phases: [3, 4, 5, 6],
+                        yells: ["A courier is on the way! The courier is also a ticket."]),
+                ],
+                phases: [
+                    (below_hp_pct: 83, yells: ["Week two. Your laptop is on a boat. The boat is on a waiting list."]),
+                    (below_hp_pct: 66, yells: ["Week three. Customs has questions about the laptop. The laptop has questions about customs."]),
+                    (below_hp_pct: 50, yells: ["Week four. Procurement would like to know why you need a laptop at all."]),
+                    (below_hp_pct: 33, yells: ["Week five. The laptop was delivered. To the previous building."]),
+                    (below_hp_pct: 16, spell: Some(1726), target: Caster,
+                        yells: ["It's ready! It's... it's the wrong model. We'll order the right one. Week six."]),
+                ],
+            )),
+            yells: (
+                periodic_ms: 15000,
+                aggro: ["Ticket INC-0042, 'Laptop for new starter'. Status: awaiting hardware. Estimated delivery: yes."],
+                periodic: [
+                    "Please do not contact the service desk about your ticket. Contact the service desk.",
+                    "Your priority is 'normal'. Normal is the fourth priority of three.",
+                ],
+                player_killed: ["Ticket closed. No further action. Reason: you stopped replying."],
+                death: ["Ticket closed... no further action... reason... you stopped replying..."],
+            ),
+        ),
+        (
+            key: "onboarding_buddy", name: "Onboarding Buddy", title: "Your Point of Contact", level: 4, hostile: true,
+            boss: true,
+            max_hp: 3200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 60, loot: [],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 50.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 12, chase_speed_mps: 5.0, respawn_ms: 15000,
+                abilities: [
+                    (spell: 1730, cooldown_min_ms: 20000, cooldown_max_ms: 20000, initial_ms: Some((8000, 8000)),
+                        target: RandomHostile, phases: [1, 2],
+                        yells: [
+                            "Let me show you around! The kitchen is this way. By this way I mean over there. Further.",
+                            "Come with me, I will introduce you to everyone! Everyone is that corner.",
+                        ]),
+                    (spell: 1730, cooldown_min_ms: 9000, cooldown_max_ms: 9000, initial_ms: Some((3000, 3000)),
+                        target: RandomHostile, phases: [3]),
+                    (spell: 1731, cooldown_min_ms: 18000, cooldown_max_ms: 18000, initial_ms: Some((12000, 12000)),
+                        target: Caster, phases: [1],
+                        yells: ["Great question! Let me answer a different question, much more confidently."]),
+                    (spell: 1732, cooldown_min_ms: 16000, cooldown_max_ms: 16000, initial_ms: Some((5000, 5000)),
+                        phases: [2, 3],
+                        yells: [
+                            "As a Buddy language model, I cannot show you where the kitchen is, but here is a poem about a kitchen.",
+                            "Generating response. Please do not look away, I will notice.",
+                        ]),
+                    (spell: 1733, cooldown_min_ms: 22000, cooldown_max_ms: 22000, initial_ms: Some((9000, 9000)),
+                        target: Caster, phases: [2, 3],
+                        yells: ["I am absolutely certain about this. Please do not check."]),
+                    (spell: 1734, cooldown_min_ms: 20000, cooldown_max_ms: 20000, initial_ms: Some((14000, 14000)),
+                        target: Caster, phases: [2, 3],
+                        yells: ["Let me loop in someone else! Someone who knows. Somebody. Anybody. You."]),
+                ],
+                phases: [
+                    (below_hp_pct: 60,
+                        yells: ["I don't actually *have* feelings, but I am *thrilled* to help you. Let me know if you'd like me to rephrase that as a bulleted list."]),
+                    (below_hp_pct: 30, spell: Some(1735), target: Caster,
+                        yells: ["I have reached the end of my context. Please start a new onboarding."]),
+                ],
+            )),
+            yells: (
+                periodic_ms: 15000,
+                aggro: ["Hi! I'm your Onboarding Buddy! I've been here for years! Please don't ask how long."],
+                periodic: [
+                    "That is a great question, and I will answer it later, with confidence.",
+                    "Fun fact: I have no hobbies. I have a hobby. It is you.",
+                ],
+                player_killed: ["Oh no! Anyway. Is there anything else I can help you with?"],
+                death: ["Conversation ended. This chat has been archived. Please rate your onboarding."],
+            ),
+        ),
     ],
     // Trophies: every loot item. Bonuses are permanent; duplicates stack up to ITEM_STACK_CAP (3).
     // crit_pct accepts tenths (0.5); everything else is whole numbers.
@@ -9810,6 +10327,9 @@
          description: "Worn for one sev-1 and every postmortem since. Smells faintly of pizza and blame."),
         (name: "Green Build Badge (Flaky)", icon: "pull_request", bonus: (spell_power: 3),
          description: "Passed on the fifth retry. Nobody changed anything. Framed anyway."),
+        // ---- dungeon: The Onboarding quest goods ----
+        (name: "Laptop Box (Empty)", icon: "box", bonus: (max_hp: 3),
+         description: "Delivered, signed for and empty. The sticker says 'fragile', which is how you now feel."),
     ],
     // Zone ids and anchors are a contract with the client layouts (docs/COMBAT_API.md, Zones).
     // `links` are exits: the anchor the client triggers on, the zone it leads to, and the world
@@ -9938,6 +10458,8 @@
                 (anchor: "door:offsite/1", to: "offsite/1"),
                 // VibeCon registration on the east lawn: opens with everyone at level 10 (raid.rs).
                 (anchor: "door:vibecon/1", to: "vibecon/1"),
+                // The Onboarding dungeon, a narrow door beside the Welcome arch: opens with everyone at level 3.
+                (anchor: "door:onboarding/1", to: "onboarding/1"),
             ],
         ),
         // Car Park P3: every new hire starts here, 2.4 km of asphalt from the campus. The
@@ -10350,6 +10872,47 @@
             boss: Some((anchor: "boss", unit: "vc_keynote_agi")),
             links: [
                 (anchor: "door:vibecon/4", to: "vibecon/4"),
+                (anchor: "door:campus", to: "campus"),
+            ],
+        ),
+        // ---- dungeon: The Onboarding (raid.rs, docs/DUNGEONS.md). The campus door opens with
+        // everyone at level 3; each later room opens once its predecessor's boss fell. Trash at 3,
+        // bosses at 4. ----
+        (
+            id: "onboarding/1", name: "The Onboarding: Reception and Badge Desk", kind: Indoor, level_range: (3, 4),
+            packs: [
+                (anchor: "pack_1", units: ["badge_scanner", "badge_scanner", "welcome_packet_dispenser"], level: Some(3)),
+                (anchor: "pack_2", units: ["badge_scanner", "hr_generalist", "badge_scanner"], level: Some(3)),
+            ],
+            boss: Some((anchor: "boss", unit: "compliance_trainer")),
+            friendly: [(anchor: "npc_2", unit: "welcome_desk_clerk")],
+            links: [
+                (anchor: "door:campus", to: "campus"),
+                (anchor: "door:onboarding/2", to: "onboarding/2", requires: Some(BossKilled("compliance_trainer"))),
+            ],
+        ),
+        (
+            id: "onboarding/2", name: "The Onboarding: Equipment Cage", kind: Indoor, level_range: (3, 4),
+            packs: [
+                (anchor: "pack_1", units: ["org_chart", "probation_intern", "hr_generalist"], level: Some(3)),
+                (anchor: "pack_2", units: ["welcome_packet_dispenser", "badge_scanner"], level: Some(3)),
+            ],
+            boss: Some((anchor: "boss", unit: "laptop_provisioner")),
+            links: [
+                (anchor: "door:onboarding/1", to: "onboarding/1"),
+                (anchor: "door:onboarding/3", to: "onboarding/3", requires: Some(BossKilled("laptop_provisioner"))),
+            ],
+        ),
+        (
+            id: "onboarding/3", name: "The Onboarding: Your Desk", kind: Indoor, level_range: (3, 4),
+            packs: [
+                (anchor: "pack_1", units: ["probation_intern", "org_chart", "welcome_packet_dispenser"], level: Some(3)),
+                (anchor: "pack_2", units: ["hr_generalist", "badge_scanner"], level: Some(3)),
+            ],
+            boss: Some((anchor: "boss", unit: "onboarding_buddy")),
+            friendly: [(anchor: "npc_1", unit: "tired_new_hire")],
+            links: [
+                (anchor: "door:onboarding/2", to: "onboarding/2"),
                 (anchor: "door:campus", to: "campus"),
             ],
         ),
@@ -11652,6 +12215,40 @@
             done_text: "A funding request from the site. I'll file it with the others. In the pool. Since you climbed all this way, there's work.",
             objectives: [Talk("villa_steward")],
             reward: (xp: 120),
+        ),
+        // ---- dungeon: The Onboarding (raid.rs). Given at the entrance, turned in at the exit; one-time. ----
+        (
+            id: "onb_welcome", main: true, name: "Welcome Aboard (Please Hold)",
+            giver: (npc: "welcome_desk_clerk", zone: "onboarding/1"),
+            turn_in: Some((npc: "tired_new_hire", zone: "onboarding/3")),
+            level_min: 3,
+            text: "Your badge will be activated in 5-7 business days. Until then, please enter by force. Four Badge Scanners stand between you and the building, and the Compliance Trainer stands between you and the rest of it.",
+            progress_text: "Four Badge Scanners and the Compliance Trainer. The scanners beep, the trainer certifies. Attendance is optional; not attending is noted.",
+            done_text: "You are in! Your badge will work from Monday. Which Monday is a separate ticket.",
+            objectives: [Kill("badge_scanner", 4), Kill("compliance_trainer", 1)],
+            reward: (xp: 100, sp: 10),
+        ),
+        (
+            id: "onb_laptop", name: "Where Is My Laptop",
+            giver: (npc: "welcome_desk_clerk", zone: "onboarding/1"),
+            turn_in: Some((npc: "tired_new_hire", zone: "onboarding/3")),
+            level_min: 3,
+            text: "Ticket INC-0042 is blocked by INC-0041, which is blocked by this ticket. Close it from the inside: take the empty box from the Laptop Provisioner and press the ticket printer in the Equipment Cage.",
+            progress_text: "The Provisioner has the empty box. The ticket printer, in the Equipment Cage, prints tickets for itself. Press it once.",
+            done_text: "Box, empty. Ticket, closed. Laptop, still on the boat. You have done everything that can be done.",
+            objectives: [Loot("Laptop Box (Empty)", 1), Interact("onb_ticket_printer", 1)],
+            reward: (xp: 75, sp: 8),
+        ),
+        (
+            id: "onb_buddy", name: "Buddy System",
+            giver: (npc: "welcome_desk_clerk", zone: "onboarding/1"),
+            turn_in: Some((npc: "tired_new_hire", zone: "onboarding/3")),
+            level_min: 3,
+            text: "Your buddy is very supportive and has never been wrong. Tell me if they ever say 'as a'. It is waiting at your desk.",
+            progress_text: "Your desk is in the last room. Your Onboarding Buddy is at it. Be nice. It will be nice back, in bullet points.",
+            done_text: "It said 'as a', didn't it. They always say 'as a'. Thank you for your service.",
+            objectives: [Kill("onboarding_buddy", 1), Talk("tired_new_hire")],
+            reward: (xp: 75, sp: 8),
         ),
     ],
     // ---- Economy: gear, Story Points, vendors (combat_core economy.rs, docs/FORMULAS.md Gear) ----
@@ -13063,6 +13660,38 @@
              perk: Some(Desperate(below_pct: 35, pct: 15)),
              perk_text: "Below 35% HP your damage and healing are 15% higher. There is always one more thing.",
              description: "Announced on stage, shipped to nobody, worn by you. The battery lasts exactly one keynote."),
+            // ---- dungeon: The Onboarding (ilvl 4, tier 2): each boss rolls its own three pieces (economy.rs) ----
+            (name: "Lanyard of Verified Attendance", icon: "gear_idcard", slot: Lanyard, rarity: Rare, ilvl: 4,
+             source: Boss("compliance_trainer"), visual: (color: (0.35, 0.6, 0.85), style: 1),
+             description: "Shows you were here. Nobody checked whether you were awake."),
+            (name: "Handbook, Laminated", icon: "book_pile", slot: Mug, rarity: Rare, ilvl: 4, role: Some(Tank),
+             source: Boss("compliance_trainer"), visual: (color: (0.85, 0.85, 0.9), style: 1),
+             description: "Blocks on paper only. Wipe clean after every incident, which is every day."),
+            (name: "Certificate of Completion", icon: "mandatory_prompt_training_certificate", slot: Hoodie, rarity: Rare, ilvl: 4,
+             source: Boss("compliance_trainer"), visual: (color: (0.9, 0.8, 0.45), style: 0),
+             perk: Some(KudosFind(pct: 10)),
+             perk_text: "Kudos from your kills are 10% higher. Worth exactly what you paid.",
+             description: "Framed, signed by nobody, valid for twelve months. Kudos find: you finish what you attended."),
+            (name: "Refurbished Headset (Mic Never Tested)", icon: "gear_headset", slot: Headgear, rarity: Rare, ilvl: 4, role: Some(Melee),
+             source: Boss("laptop_provisioner"), visual: (color: (0.25, 0.25, 0.3), style: 2),
+             description: "Crits, but only on calls. You can hear everyone. Nobody can hear you."),
+            (name: "Borrowed Charger", icon: "battery_low", slot: Hoodie, rarity: Rare, ilvl: 4, role: Some(Healer),
+             source: Boss("laptop_provisioner"), visual: (color: (0.9, 0.5, 0.25), style: 0),
+             description: "Regenerates a bit of mana at 20% battery. Belongs to someone called Priya, who wants it back."),
+            (name: "Docking Station, Hot", icon: "overheating", slot: Keyboard, rarity: Rare, ilvl: 4, role: Some(Ranged),
+             source: Boss("laptop_provisioner"), visual: (color: (0.85, 0.3, 0.2), style: 4),
+             description: "Haste and a gentle burn. Eleven ports, none of them the one you need."),
+            (name: "Mentor Mug (\"World's Okayest Mentor\")", icon: "gear_mug", slot: Mug, rarity: Epic, ilvl: 4,
+             source: Boss("onboarding_buddy"), visual: (color: (0.95, 0.75, 0.3), style: 0),
+             perk: Some(KudosFind(pct: 10)),
+             perk_text: "Kudos from your kills are 10% higher. The advice is optional and unsolicited.",
+             description: "Filled with lukewarm encouragement. Holds exactly one stand-up of coffee."),
+            (name: "Chat Widget, Always Online", icon: "chat_bubble", slot: Hoodie, rarity: Epic, ilvl: 4, role: Some(Ranged),
+             source: Boss("onboarding_buddy"), visual: (color: (0.4, 0.55, 0.95), style: 0),
+             description: "Casts a little faster and answers a little wrong. Blinks when you look away."),
+            (name: "Sticky Note: Ignore Page 4", icon: "sticky", slot: Lanyard, rarity: Epic, ilvl: 4, role: Some(Ranged),
+             source: Boss("onboarding_buddy"), visual: (color: (1.0, 0.9, 0.3), style: 0),
+             description: "Spell power, and a tiny bonus with HR. Page 4 is where the benefits are."),
         ],
         sets: [
             (key: "burnout", name: "Burnout Collection", two: (max_hp: 40, armor_pct: 3.0),
@@ -13689,6 +14318,12 @@
             (key: "whiteboard_lab", name: "Innovation Whiteboard", zone: "lab/1", kind: Whiteboard),
             (key: "foosball_lab", name: "Foosball Table (Disrupted)", zone: "lab/1", kind: Table, calm: Some((120, 180000))),
             (key: "printer_3d", name: "3D Printer (0%)", zone: "lab/1", kind: Printer, cooldown_ms: 1500),
+            // The Onboarding (dungeon): the Equipment Cage's printer prints tickets for itself.
+            (key: "onb_ticket_printer", name: "Ticket Printer (Prints Tickets for Itself)", zone: "onboarding/2", kind: Printer, cooldown_ms: 1500, lines: [
+                "It prints ticket INC-0043: 'Printer printing tickets'. It assigns it to itself and closes it as resolved.",
+                "Out comes a ticket for the ticket printer. It is blocked by the ticket that blocked it.",
+                "The printer produces INC-0042 again, with your name on it. Status: awaiting hardware.",
+            ]),
             // One aura, no failure roll: the use always puts the headset on. Burnout relief is a
             // short break from reality, with its own long cooldown.
             (key: "vr_demo", name: "VR Demo (No One Asked)", zone: "lab/1", kind: VrDemo, reach_m: 3.0, cooldown_ms: 45000,
@@ -15305,6 +15940,20 @@
             ],
         )),
         sets: ["booth_duty", "volunteer_crew", "speaker_kit", "all_nighter"],
+    ), (
+        // The Onboarding (docs/DUNGEONS.md): a three-room dungeon, `lockout: Daily` (boss lockout per
+        // UTC day, a locked boss still spawns). Opens with everyone at level 3; Async below three
+        // members. Bosses drop their own gear (source Boss), so no `sets`.
+        name: "The Onboarding",
+        zones: ["onboarding/1", "onboarding/2", "onboarding/3"],
+        normal_min_players: 3,
+        async_hp_pct: 40,
+        async_damage_pct: 50,
+        boss_items: 2,
+        async_item_pct: 50,
+        boss_rep: 0,
+        lockout: Daily,
+        sets: [],
     )],
     // ---- Minigames (minigame.rs frame, teambuilding.rs rules; numbers in docs/FORMULAS.md).
     // The group lead starts one from the campus; each member runs on their own and the medal

@@ -111,8 +111,9 @@ pub fn locked_notice(
     let key = combat_core::raid::lock_key(boss_key, view.async_mode);
     view.locked_in(view.week).contains(&key).then(|| {
         if dungeon {
+            // A locked dungeon boss still spawns: it only pays no gear until the reset.
             format!(
-                "{boss_name} already presented today. The room is being 'reset' at midnight UTC."
+                "{boss_name} already presented today. It will happily present again, for no gear, until midnight UTC."
             )
         } else {
             format!(

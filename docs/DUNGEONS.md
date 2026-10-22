@@ -1,6 +1,7 @@
 # Dungeons: four runs for three to five, one for everybody
 
-Design document for the level 3-10 dungeons. Status: planned, nothing built yet.
+Design document for the level 3-10 dungeons. Status: the framework and dungeon 1, The Onboarding, are built
+(substitutions for mechanics the engine lacks are in `docs/KNOWN_LIMITATIONS.md`, "Dungeons"); 2-4 are planned.
 
 ## Context
 
@@ -711,7 +712,7 @@ door; the door for a boss room still uses `BossKilled` as in the raids.
 group         = 3 to 5; normal_min_players = 3
 difficulty    = Normal with >= 3 members at the zone load, else Async Attendance (same as the raids)
 group scaling = as usual (+55% HP, +30% damage per extra member, bosses +20% more); dungeons are tuned for 4
-async         = enemy HP x45%, damage x60% to start (the raid's 40/55 is the floor), tuned by bot clears
+async         = enemy HP x40%, damage x50% (tuned by bot clears: a solo level-3 bot clears all three bosses)
 heroic        = Hackathon only: HP x120%, damage x120% over Normal, one extra mechanic per boss (above),
                 its own lockout key, Normal-less (a group needs >= 3; below that it is Async Heroic)
 ```

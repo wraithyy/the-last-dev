@@ -1145,7 +1145,20 @@ struct RaidRun {
 /// `rooms` in order on the difficulty `async_mode`, packs one by one, boss last; the dead are
 /// released and everyone rests between rooms. Stops at the first wipe.
 fn raid_run(rooms: &[&str], keep: &[Role], async_mode: bool, seed: u64) -> RaidRun {
-    let mut g = Group::new(content(), "campus", 10, seed);
+    run_instance(rooms, keep, async_mode, seed, 10, true)
+}
+
+/// `raid_run` for any level; `legacy_gear` equips the best Legacy pieces (raids), dungeons play in
+/// whatever the level brings (nothing).
+fn run_instance(
+    rooms: &[&str],
+    keep: &[Role],
+    async_mode: bool,
+    seed: u64,
+    level: u8,
+    legacy_gear: bool,
+) -> RaidRun {
+    let mut g = Group::new(content(), "campus", level, seed);
     for k in (0..g.m.len()).rev() {
         if !keep.contains(&g.m[k].role) {
             let id = g.m[k].id;
@@ -1153,7 +1166,9 @@ fn raid_run(rooms: &[&str], keep: &[Role], async_mode: bool, seed: u64) -> RaidR
             g.m.remove(k);
         }
     }
-    g.gear_up_legacy();
+    if legacy_gear {
+        g.gear_up_legacy();
+    }
     g.sim.debug_force_raid_async(Some(async_mode));
     let start = g.sim.now().0;
     let mut bosses = 0;
@@ -1396,6 +1411,65 @@ fn vibecon_takes_a_group_and_async_attendance_takes_one() {
                 "seed {seed}: solo Normal cleared it at {}% lowest",
                 s.low
             ));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// The Onboarding balance gate (docs/DUNGEONS.md): three level-3 bots without gear clear all three
+/// encounters on Normal in under 20 minutes, one bot clears Async Attendance without dying, and one
+/// bot on Normal either fails or only scrapes through (below 25% HP), like the raids.
+#[test]
+fn the_onboarding_takes_a_group_and_async_attendance_takes_one() {
+    const ONBOARDING: [&str; 3] = ["onboarding/1", "onboarding/2", "onboarding/3"];
+    let mut failures = Vec::new();
+    let trio = [Role::Tank, Role::Dps, Role::Healer];
+    for seed in [7u64, 42, 1234] {
+        let g = run_instance(&ONBOARDING, &trio, false, seed, 3, false);
+        let a = run_instance(&ONBOARDING, &[Role::Dps], true, seed, 3, false);
+        let s = run_instance(&ONBOARDING, &[Role::Dps], false, seed, 3, false);
+        println!(
+            "Onboarding seed {seed}: trio Normal {}/3 bosses in {} s (low {}%, most dead {}); solo Async {}/3 in {} s (low {}%, died {}); solo Normal {}/3 in {} s (low {}%, died {})",
+            g.bosses,
+            g.secs,
+            g.low,
+            g.deaths,
+            a.bosses,
+            a.secs,
+            a.low,
+            a.deaths,
+            s.bosses,
+            s.secs,
+            s.low,
+            s.deaths
+        );
+        if g.bosses < 3 {
+            failures.push(format!(
+                "seed {seed}: the trio stopped after {} bosses",
+                g.bosses
+            ));
+        }
+        if a.bosses < 3 {
+            failures.push(format!(
+                "seed {seed}: solo Async stopped after {} bosses",
+                a.bosses
+            ));
+        }
+        if a.low < 5 || a.deaths > 0 {
+            failures.push(format!(
+                "seed {seed}: solo Async scraped through ({}%, died {})",
+                a.low, a.deaths
+            ));
+        }
+        if s.bosses == 3 && s.low >= 25 {
+            failures.push(format!(
+                "seed {seed}: solo Normal cleared it at {}% lowest",
+                s.low
+            ));
+        }
+        // 15-20 minutes per run, rests included: drop a pack, never a boss, if it drifts.
+        if g.secs > 20 * 60 {
+            failures.push(format!("seed {seed}: the trio needed {} s", g.secs));
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));

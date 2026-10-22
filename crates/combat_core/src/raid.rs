@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 
 /// Lockout and achievement key prefix of Async Attendance kills.
 pub const ASYNC_PREFIX: &str = "async:";
+/// Key prefix of a dungeon's daily clear counter, kept in the same daily lockout as its bosses.
+const CLEAR_PREFIX: &str = "clear:";
 /// Tethers check their range this often.
 const TETHER_TICK_MS: u32 = 1000;
 /// Long enough to outlast any fight; the twin swap moves the aura itself.
@@ -98,6 +100,19 @@ pub struct RaidDef {
 impl RaidDef {
     pub fn is_dungeon(&self) -> bool {
         self.lockout == LockoutPeriod::Daily
+    }
+
+    /// Level every member needs at the door from outside: a dungeon opens with its first room's
+    /// band, a raid with the level cap.
+    pub fn entry_level(&self, c: &Content) -> u8 {
+        if self.is_dungeon() {
+            self.zones
+                .first()
+                .and_then(|z| c.zone(z))
+                .map_or(1, |z| z.level_range.0)
+        } else {
+            c.max_level()
+        }
     }
 
     pub fn is_raid_zone(&self, zone: &str) -> bool {
@@ -197,6 +212,14 @@ pub fn lock_key(boss: &str, async_mode: bool) -> String {
     }
 }
 
+/// `clear:<first room>#`; the clear's number follows.
+fn clear_prefix(r: &RaidDef) -> String {
+    format!(
+        "{CLEAR_PREFIX}{}#",
+        r.zones.first().map_or("", String::as_str)
+    )
+}
+
 struct Tether {
     a: EntityId,
     b: EntityId,
@@ -245,6 +268,10 @@ impl Sim {
     /// The raid of the loaded zone.
     fn cur_raid(&self) -> Option<&RaidDef> {
         self.zone.as_deref().and_then(|z| self.content.raid_of(z))
+    }
+
+    pub(crate) fn cur_raid_is_dungeon(&self) -> bool {
+        self.cur_raid().is_some_and(RaidDef::is_dungeon)
     }
 
     /// The loaded zone is part of a raid.
@@ -300,15 +327,15 @@ impl Sim {
         }
     }
 
-    /// The door from outside into a raid opens only with everyone at the level cap; links
-    /// inside the raid follow their content `requires`.
+    /// The door from outside into a raid opens only with everyone at the level cap (a dungeon:
+    /// at its band's lower level); links inside follow their content `requires`.
     pub(crate) fn raid_link_open(&self, from: &str, to: &str) -> Option<bool> {
         let into = self.content.raid_of(to)?;
         let inside = self
             .content
             .raid_of(from)
             .is_some_and(|r| r.name == into.name);
-        (!inside).then(|| self.everyone_capped())
+        (!inside).then(|| self.everyone_at(into.entry_level(&self.content)))
     }
 
     /// Called by `load_zone` before anything spawns: picks the difficulty for a raid zone and
@@ -332,7 +359,8 @@ impl Sim {
     pub(crate) fn raid_boss_spawns(&self, zone: &str, boss: &str) -> Option<bool> {
         self.content
             .raid_of(zone)
-            .map(|_| !self.raid_locked(boss, self.raid.async_mode))
+            // Dungeons are meant to be rerun: a locked boss stays fightable, it only drops no gear.
+            .map(|r| r.is_dungeon() || !self.raid_locked(boss, self.raid.async_mode))
     }
 
     fn twins(&self) -> Option<TwinsDef> {
@@ -692,9 +720,15 @@ impl Sim {
         }
         let key = self.units[ti].state.key.clone();
         let async_mode = self.raid.async_mode;
-        if self.cur_raid().is_some_and(RaidDef::is_dungeon) {
+        if let Some(r) = self.cur_raid().filter(|r| r.is_dungeon()) {
             let day = self.raid_day();
+            let finale = r.bosses(&self.content).last() == Some(&key);
+            let clear =
+                finale.then(|| format!("{}{}", clear_prefix(r), self.dungeon_clears(r) + 1));
             self.raid.lock_daily.insert(day, lock_key(&key, async_mode));
+            if let Some(c) = clear {
+                self.raid.lock_daily.insert(day, c);
+            }
         } else {
             let week = self.raid_week();
             self.raid.lock.insert(week, lock_key(&key, async_mode));
@@ -711,6 +745,30 @@ impl Sim {
         self.raid_broadcast();
     }
 
+    /// Full clears of the loaded dungeon this UTC day (finale kills), whatever the difficulty.
+    fn dungeon_clears(&self, r: &RaidDef) -> usize {
+        let prefix = clear_prefix(r);
+        self.raid
+            .lock_daily
+            .list(self.raid_day())
+            .iter()
+            .filter(|k| k.starts_with(&prefix))
+            .count()
+    }
+
+    /// Kill XP percent of the loaded zone: a dungeon pays in full on the first clear of the UTC
+    /// day, a quarter on the second and nothing after (Kudos, reputation and loot rules aside).
+    pub(crate) fn raid_xp_pct(&self) -> u32 {
+        match self.cur_raid() {
+            Some(r) if r.is_dungeon() => match self.dungeon_clears(r) {
+                0 => 100,
+                1 => 25,
+                _ => 0,
+            },
+            _ => 100,
+        }
+    }
+
     /// Raid-piece rolls of a raid boss kill: `Some((rolls, chance %, legendary %))`; linked
     /// partners roll nothing. `None` for everything else (raid trash rolls the Legacy tier).
     pub(crate) fn raid_loot(&self, mob: usize) -> Option<(u32, u32, u32)> {
@@ -720,7 +778,10 @@ impl Sim {
             return None;
         }
         let legendary = self.content.economy.legendary_pct;
+        // A locked dungeon boss still fights and pays Kudos, but drops no gear.
+        let locked = r.is_dungeon() && self.raid_locked(&u.state.key, self.raid.async_mode);
         Some(match (u.floor_boss, self.raid.async_mode) {
+            _ if locked => (0, 0, 0),
             (true, false) => (r.boss_items.max(1), 100, legendary),
             (true, true) => (1, r.async_item_pct, legendary / 2),
             (false, _) => (0, 0, 0),
@@ -760,9 +821,10 @@ impl Sim {
             .collect();
         keys.iter()
             .filter(|k| {
-                bosses
-                    .iter()
-                    .any(|b| k.strip_prefix(ASYNC_PREFIX).unwrap_or(k) == b)
+                k.starts_with(CLEAR_PREFIX)
+                    || bosses
+                        .iter()
+                        .any(|b| k.strip_prefix(ASYNC_PREFIX).unwrap_or(k) == b)
             })
             .cloned()
             .collect()

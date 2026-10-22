@@ -29,7 +29,13 @@ fn hostile_levels(c: &Content) -> Vec<u8> {
 fn every_gear_piece_follows_the_stat_budget() {
     let c = content();
     let eco = &c.economy;
-    let raid_bosses: Vec<String> = c.raids.iter().flat_map(|r| r.bosses(&c)).collect();
+    // Dungeons are low-level and drop tier pieces of their own band (checked below), not the raid tier.
+    let raid_bosses: Vec<String> = c
+        .raids
+        .iter()
+        .filter(|r| !r.is_dungeon())
+        .flat_map(|r| r.bosses(&c))
+        .collect();
     assert_eq!(
         raid_bosses.len(),
         9,

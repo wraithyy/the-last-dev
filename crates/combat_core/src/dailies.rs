@@ -373,7 +373,13 @@ impl Sim {
         self.content
             .zones
             .iter()
-            .filter(|z| !z.packs.is_empty() && open(&z.id) && z.level_range.0 <= level)
+            // Dungeons and raids are instanced group content, never a daily's work zone.
+            .filter(|z| {
+                !z.packs.is_empty()
+                    && open(&z.id)
+                    && z.level_range.0 <= level
+                    && self.content.raid_of(&z.id).is_none()
+            })
             // In band first, then the highest band start; ties keep content order (home first).
             .min_by_key(|z| std::cmp::Reverse((level <= z.level_range.1 + 1, z.level_range.0)))
             .map_or_else(|| home.to_string(), |z| z.id.clone())

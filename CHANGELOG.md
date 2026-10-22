@@ -15,6 +15,7 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - Ill Marie, a colleague who came in sick (again), sits on the boulevard up from the South Gate, coughing through her day; she has a small errand for you. It's just a cold. Probably.
 - Somewhere in Wellness Park, on the quiet lawn by the lake, a family is having a picnic. Say hello.
 - A soundtrack: every tower floor, the datacenter halls, the lab, the car park, the campus, the home office and each raid wing have their own music (no more elevator muzak everywhere), a night track outdoors after dark, and the raid finales get their own boss themes. Tracks crossfade when you change zones and the web version only downloads the music of places you visit (offline, visited zones keep their music).
+- The Onboarding, a three-room dungeon for three to five players at levels 3 and 4 (alone, you attend the softer Async version): enter by the narrow starters' door beside the Welcome arch, get past the Compliance Trainer's pop quiz, the Laptop Provisioner's six weeks of "awaiting hardware" and your own Onboarding Buddy, and hand in three tickets to a very tired new hire at the exit. Each boss pays gear once a day (resets at midnight UTC); a boss you already beat today still shows up for the fight and the tickets, and repeat clears pay less XP.
 
 ### Changed
 

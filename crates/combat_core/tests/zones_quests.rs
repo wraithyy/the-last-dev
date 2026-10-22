@@ -277,6 +277,8 @@ fn load_zone_spawns_the_campus_and_reports_its_links() {
             ("client/1".to_string(), false),
             ("offsite/1".to_string(), false),
             ("vibecon/1".to_string(), false),
+            // Level 3 is the dungeon's door level.
+            ("onboarding/1".to_string(), true),
         ]
     );
     assert!(t.sim.zone_links("nowhere").is_empty());
@@ -882,7 +884,7 @@ fn area(zone: &str) -> &str {
 
 /// Campaign order of the zones (`playthrough.rs` WORLD_ORDER); 0 for zones off the path.
 fn campaign_rank(zone: &str) -> usize {
-    const ORDER: [&str; 11] = [
+    const ORDER: [&str; 14] = [
         "parking_p3",
         "campus",
         "tower/1",
@@ -894,6 +896,10 @@ fn campaign_rank(zone: &str) -> usize {
         "tower/5",
         "lab/1",
         "lab/2",
+        // The Onboarding dungeon: its quests end in its last room.
+        "onboarding/1",
+        "onboarding/2",
+        "onboarding/3",
     ];
     ORDER.iter().position(|z| *z == zone).map_or(0, |k| k + 1)
 }

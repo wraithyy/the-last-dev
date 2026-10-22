@@ -21,6 +21,7 @@ mod layout;
 mod models;
 mod office;
 mod offsite;
+mod onboarding;
 mod props;
 mod quest_spots;
 mod shape;

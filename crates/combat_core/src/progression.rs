@@ -259,10 +259,14 @@ impl Sim {
         let n = sharers.len();
         let bonus = GROUP_XP_BONUS_PCT[n.clamp(1, GROUP_XP_BONUS_PCT.len()) - 1];
         let (ml, reward) = (self.units[mob].state.level, self.units[mob].state.xp);
+        let repeat_pct = u64::from(self.raid_xp_pct());
         for p in sharers {
             let pl = self.units[p].state.level;
             let solo = u64::from(self.content.kill_xp(pl, ml, reward));
-            self.grant_xp(p, (solo * u64::from(bonus) / 100 / n as u64) as u32);
+            self.grant_xp(
+                p,
+                (solo * u64::from(bonus) / 100 / n as u64 * repeat_pct / 100) as u32,
+            );
         }
     }
 

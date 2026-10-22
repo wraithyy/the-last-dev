@@ -25,6 +25,7 @@ about 25 MB, 19 files in the folder.
 | lab/2 Rack Room | `lab_rack_room.ogg` | dark, moody, suspenseful | Crypto, Kevin MacLeod, CC BY 4.0 |
 | home/1 | `home.ogg` | soft evening calm | Evening, Kevin MacLeod, CC BY 4.0 |
 | offsite/1, offsite/2 | `offsite_lobby.ogg` | smooth lobby jazz | Lobby Time, Kevin MacLeod, CC BY 4.0 |
+| onboarding/1-3 | `office_muzak.ogg` (reuse) | elevator muzak; the dungeon's bosses use the generic `boss_battle.ogg` | see office muzak |
 | offsite/3 Terrace | `campus.ogg` (reuse) | calm outdoors | see campus |
 | offsite/4 Ballroom (boss) | `raid_boss_offsite.ogg` | static dark tension, violent drum hits | Perpetual Tension, Zander Noriega, CC BY 3.0 |
 | vibecon/1, 2, 3 | `vibecon_expo.ogg` | driving, grooving, conference energy | Brain Dance, Kevin MacLeod, CC BY 4.0 |

@@ -118,6 +118,7 @@ pub fn build() -> FloorLayout {
         ),
         ("door:offsite/1", shuttle_stop(&mut p)),
         ("door:vibecon/1", vibecon_entrance(&mut p)),
+        ("door:onboarding/1", starters_door(&mut p)),
     ];
     tower_shell(&mut p);
     data_center_shell(&mut p);
@@ -1001,6 +1002,26 @@ fn vibecon_entrance(p: &mut Plan) -> (Vec3, f32) {
         Sign::VibeConBanner,
     );
     (v(WALL_X - 2.0, 0.0, Z), FRAC_PI_2)
+}
+
+/// The Onboarding dungeon: a narrow door in a free-standing wall just south of the plaza, beside
+/// the Welcome arch, so a new starter walks past it on the way in. Returns the door anchor in
+/// front of it, facing the arrival lawn.
+fn starters_door(p: &mut Plan) -> (Vec3, f32) {
+    const X: f32 = 9.0;
+    const WALL_Z: f32 = 12.2;
+    p.framed(v(X, 0.0, WALL_Z), Face::PosZ.yaw(), |p| {
+        for x in [-1.9, 1.9] {
+            p.boxed(v(x, 2.3, 0.0), v(2.4, 4.6, 0.4), Mat::Wall, true);
+        }
+        p.boxed(v(0.0, 3.8, 0.0), v(1.4, 1.6, 0.4), Mat::Wall, true);
+        // The door itself stays shut for colliders: the way in is the trigger in front of it.
+        p.boxed(v(0.0, 1.5, 0.0), v(1.4, 3.0, 0.4), Mat::Door, true);
+        p.boxed(v(0.45, 1.1, 0.24), v(0.06, 0.06, 0.08), Mat::Gold, false);
+        p.boxed(v(0.0, 3.05, 0.22), v(1.3, 0.06, 0.06), Mat::LedRed, false);
+        p.sign(v(0.0, 3.8, 0.22), 0.0, 2.8, Sign::ObNewStarters);
+    });
+    (v(X, 0.0, WALL_Z + 2.0), PI)
 }
 
 /// The All-Hands Offsite shuttle: a shelter, a parked coach in offsite livery and a tall pylon
