@@ -1605,3 +1605,61 @@ fn the_qbr_takes_a_group_and_async_attendance_takes_one() {
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+/// The heroic Hackathon balance gate (docs/DUNGEONS.md): three level-10 bots without gear clear all
+/// four rooms (three bosses) on Normal in under 20 minutes, one bot clears Async Attendance
+/// without dying, and one bot on Normal either fails or only scrapes through.
+#[test]
+fn the_hackathon_takes_a_group_and_async_attendance_takes_one() {
+    const HACK: [&str; 4] = ["hack24/1", "hack24/2", "hack24/3", "hack24/4"];
+    let mut failures = Vec::new();
+    let trio = [Role::Tank, Role::Dps, Role::Healer];
+    for seed in [7u64, 42, 1234] {
+        let g = run_instance(&HACK, &trio, false, seed, 10, false);
+        let a = run_instance(&HACK, &[Role::Dps], true, seed, 10, false);
+        let s = run_instance(&HACK, &[Role::Dps], false, seed, 10, false);
+        println!(
+            "Hackathon seed {seed}: trio Normal {}/3 bosses in {} s (low {}%, most dead {}); solo Async {}/3 in {} s (low {}%, died {}); solo Normal {}/3 in {} s (low {}%, died {})",
+            g.bosses,
+            g.secs,
+            g.low,
+            g.deaths,
+            a.bosses,
+            a.secs,
+            a.low,
+            a.deaths,
+            s.bosses,
+            s.secs,
+            s.low,
+            s.deaths
+        );
+        if g.bosses < 3 {
+            failures.push(format!(
+                "seed {seed}: the trio stopped after {} bosses",
+                g.bosses
+            ));
+        }
+        if a.bosses < 3 {
+            failures.push(format!(
+                "seed {seed}: solo Async stopped after {} bosses",
+                a.bosses
+            ));
+        }
+        if a.low < 5 || a.deaths > 0 {
+            failures.push(format!(
+                "seed {seed}: solo Async scraped through ({}%, died {})",
+                a.low, a.deaths
+            ));
+        }
+        if s.bosses == 3 && s.low >= 25 {
+            failures.push(format!(
+                "seed {seed}: solo Normal cleared it at {}% lowest",
+                s.low
+            ));
+        }
+        if g.secs > 20 * 60 {
+            failures.push(format!("seed {seed}: the trio needed {} s", g.secs));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}

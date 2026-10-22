@@ -3415,6 +3415,170 @@ static TABLE: &[(&str, UnitVisual)] = &[
             ],
         ),
     ),
+    // ---- The Hackathon (heroic dungeon): organisers, trash, adds, the Pizza Overlord, the Gremlin and the Judge ----
+    (
+        "hackathon_organiser",
+        v(
+            CASUAL_F,
+            1.7,
+            "Hackathon Organiser",
+            "<Free Pizza, Unlimited>",
+            &[
+                paint("Shirt", 0.95, 0.3, 0.8),
+                paint("Pants", 0.12, 0.12, 0.2),
+                paint("Hair", 0.1, 0.8, 0.9),
+            ],
+        ),
+    ),
+    (
+        "clipboard_volunteer",
+        v(
+            WORKER,
+            1.75,
+            "Volunteer With Clipboard",
+            "<Has Been Here Since Friday>",
+            &[paint("Shirt", 0.95, 0.55, 0.15)],
+        ),
+    ),
+    (
+        "sleepy_dev",
+        v(
+            CASUAL_M,
+            1.7,
+            "Sleep-Deprived Developer",
+            "<Day 2>",
+            &[
+                paint("Shirt", 0.25, 0.2, 0.4),
+                paint("Pants", 0.2, 0.2, 0.25),
+                paint("Skin", 0.78, 0.68, 0.62),
+            ],
+        ),
+    ),
+    (
+        "prompt_engineer",
+        v(
+            CASUAL_F,
+            1.7,
+            "Prompt Engineer",
+            "<Types Words At A Chatbot>",
+            &[
+                paint("Shirt", 0.1, 0.55, 0.55),
+                paint("Pants", 0.15, 0.15, 0.2),
+                paint("Hair", 0.6, 0.15, 0.7),
+            ],
+        ),
+    ),
+    (
+        "hallucination",
+        v(
+            "prim/hallucination",
+            1.2,
+            "Hallucination",
+            "<Sounds Right>",
+            &[],
+        ),
+    ),
+    (
+        "energy_pyramid",
+        v(
+            "prim/energy_pyramid",
+            1.6,
+            "Energy Drink Pyramid",
+            "<47 Cans>",
+            &[],
+        ),
+    ),
+    (
+        "lead_mentor",
+        v(
+            SUIT_M,
+            1.9,
+            "Lead Mentor",
+            "<Giving Feedback>",
+            &[
+                paint("Black", 0.3, 0.3, 0.35),
+                paint("Shirt", 0.95, 0.85, 0.2),
+                paint("Skin", 0.7, 0.5, 0.4),
+            ],
+        ),
+    ),
+    (
+        "team_ai",
+        v(
+            CASUAL_M,
+            1.55,
+            "Team AI",
+            "<All Seventeen Of Them>",
+            &[
+                paint("Shirt", 0.2, 0.9, 1.0),
+                paint("Pants", 0.15, 0.15, 0.2),
+                paint("Hair", 0.1, 0.1, 0.1),
+            ],
+        ),
+    ),
+    (
+        "pizza_slice",
+        v("prim/pizza_slice", 0.9, "Slice", "<Cold Since 3 AM>", &[]),
+    ),
+    (
+        "heckler",
+        v(
+            CASUAL_F,
+            1.6,
+            "Heckler",
+            "<Back Row, Third Seat>",
+            &[paint("Shirt", 0.8, 0.2, 0.2), paint("Hair", 0.3, 0.2, 0.1)],
+        ),
+    ),
+    (
+        "associate",
+        v(
+            SUIT_F,
+            1.75,
+            "Associate",
+            "<Fleece Vest, Eager>",
+            &[
+                paint("Black", 0.2, 0.3, 0.5),
+                paint("Shirt", 0.9, 0.9, 0.95),
+                paint("Hair", 0.6, 0.4, 0.2),
+            ],
+        ),
+    ),
+    (
+        "pizza_overlord",
+        v(
+            "prim/pizza_overlord",
+            4.4,
+            "Pizza Overlord",
+            "<Free Pizza Is Never Free>",
+            &[],
+        ),
+    ),
+    (
+        "demo_gremlin",
+        v(
+            "prim/demo_gremlin",
+            2.6,
+            "Demo Day Gremlin",
+            "<It Worked On My Machine>",
+            &[],
+        ),
+    ),
+    (
+        "pitch_judge",
+        v(
+            SUIT_M,
+            2.5,
+            "Pitch Judge VC",
+            "<Only Funds AI>",
+            &[
+                paint("Black", 0.12, 0.2, 0.42),
+                paint("Shirt", 0.95, 0.95, 0.98),
+                paint("Skin", 0.82, 0.6, 0.48),
+                glow("Hair", 1.0, 0.85, 0.3),
+            ],
+        ),
+    ),
 ];
 
 /// Primitive rig kind (see `rigs.rs`) of a unit key, `None` for character-model units.

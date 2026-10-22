@@ -393,7 +393,14 @@ fn preread(p: &mut Plan, key: &'static str, x: f32, z: f32) {
 }
 
 /// A wall-mounted screen on a bezel at height `y`, with a lit backdrop.
-fn wall_screen(p: &mut Plan, x: f32, z: f32, y: f32, w: f32, h: f32) -> Option<WallSpot> {
+pub(super) fn wall_screen(
+    p: &mut Plan,
+    x: f32,
+    z: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+) -> Option<WallSpot> {
     let wl = WallSpot::at(p, x, z)?;
     wl.put(p, 0.0, y, 0.05, v(w + 0.4, h + 0.4, 0.08), Mat::Dark);
     wl.put(p, 0.0, y, 0.1, v(w, h, 0.03), Mat::ScreenGlow);
@@ -669,13 +676,13 @@ fn spreadsheet_trio(p: &mut Plan, x: f32, z: f32) {
     }
 }
 
-fn tags(p: &mut Plan, list: &[(&'static str, f32, f32)]) {
+pub(super) fn tags(p: &mut Plan, list: &[(&'static str, f32, f32)]) {
     for &(name, x, z) in list {
         p.interactable(name, v(x, 0.5, z - 0.4), v(x, 0.0, z));
     }
 }
 
-fn lamps(p: &mut Plan, color: Color, list: &[(f32, f32)], intensity: f32) {
+pub(super) fn lamps(p: &mut Plan, color: Color, list: &[(f32, f32)], intensity: f32) {
     point_lights(p, list, color, intensity);
 }
 
@@ -694,7 +701,7 @@ fn reception_desk(p: &mut Plan, x: f32, z: f32) {
 }
 
 /// Wall-hung flat banner on its own rail: width `w` along the wall.
-fn banner(p: &mut Plan, x: f32, z: f32, w: f32, y: f32, tex: Tex, aspect: f32) {
+pub(super) fn banner(p: &mut Plan, x: f32, z: f32, w: f32, y: f32, tex: Tex, aspect: f32) {
     let h = w / aspect;
     p.poster_near(x, z, y, Vec2::new(w, h), tex);
 }
@@ -728,7 +735,7 @@ fn rope_line(p: &mut Plan, x0: f32, x1: f32, z: f32, step: f32) {
 }
 
 /// Red stage curtains hung in folds against a wall at `l` along it.
-fn curtains(p: &mut Plan, x: f32, z: f32, folds: usize) {
+pub(super) fn curtains(p: &mut Plan, x: f32, z: f32, folds: usize) {
     let Some(wl) = WallSpot::at(p, x, z) else {
         return;
     };
@@ -753,7 +760,7 @@ fn curtains(p: &mut Plan, x: f32, z: f32, folds: usize) {
 }
 
 /// Pot plants either side of a point, big and well watered: this floor has a facilities budget.
-fn greenery(p: &mut Plan, x: f32, z: f32) {
+pub(super) fn greenery(p: &mut Plan, x: f32, z: f32) {
     plant_pair(p, x, z);
 }
 
@@ -1100,7 +1107,7 @@ fn pie_floor(p: &mut Plan, pads: &[(f32, f32)]) {
 }
 
 /// Painted ring of `n` slab segments around (cx, cz).
-fn floor_ring(p: &mut Plan, cx: f32, cz: f32, radius: f32, n: usize, mat: Mat, w: f32) {
+pub(super) fn floor_ring(p: &mut Plan, cx: f32, cz: f32, radius: f32, n: usize, mat: Mat, w: f32) {
     for k in 0..n {
         let (a, b) = (k as f32 * TAU / n as f32, (k as f32 + 1.0) * TAU / n as f32);
         floor_line(

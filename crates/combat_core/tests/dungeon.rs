@@ -2,7 +2,7 @@
 //! boss lockout with a locked boss that still spawns, the quest chain from the entrance clerk to
 //! the exit hire, and the XP ladder (full, a quarter, nothing) with its gate under half a level.
 //! The bot playthroughs (a trio on Normal, one player on Async) live in tests/coop.rs. The Migration's
-//! tests follow below, then the Quarterly Business Review's at the very end.
+//! tests follow below, then the Quarterly Business Review's and, at the very end, the heroic Hackathon's.
 
 mod common;
 
@@ -429,6 +429,7 @@ fn dungeon_xp_stays_under_half_a_level() {
     }
     migration_xp_stays_under_half_a_level();
     qbr_xp_stays_under_half_a_level();
+    hack_xp_stays_under_half_a_promotion();
 }
 
 #[test]
@@ -1032,4 +1033,267 @@ fn qbr_xp_stays_under_half_a_level() {
         rank_xp * 100 / bar.max(1)
     );
     assert!(rank_xp > 0 && rank_xp < bar / 2, "promotion XP: {rank_xp}");
+}
+
+// ---------------------------------------------------------------------------------------------
+// The Hackathon (heroic): four rooms, the second without a boss, level 10 plus one QBR clear, the
+// XP counted as promotion XP because level 10 is the cap.
+
+const H_ROOMS: [&str; 4] = ["hack24/1", "hack24/2", "hack24/3", "hack24/4"];
+const H_BOSSES: [&str; 3] = ["pizza_overlord", "demo_gremlin", "pitch_judge"];
+const H_QUESTS: [&str; 2] = ["hack_team_name", "hack_pivot"];
+const H_LEVEL: u8 = 10;
+
+/// The Board is dead once: the Hackathon's door wants a QBR clear on the books.
+fn clear_the_board(sim: &mut Sim) {
+    load(sim, "qbr/4");
+    kill(sim, "board_chair");
+    for head in ["board_activist", "board_independent"] {
+        if !alive(sim, head).is_empty() {
+            kill(sim, head);
+        }
+    }
+    load(sim, "campus");
+}
+
+#[test]
+fn the_hackathon_is_four_rooms_three_bosses_and_a_door_that_wants_a_qbr_clear() {
+    let c = content();
+    let r = c
+        .raids
+        .iter()
+        .find(|r| r.name == "The Hackathon")
+        .expect("dungeon");
+    assert!(r.is_dungeon());
+    assert_eq!(r.zones, H_ROOMS);
+    assert_eq!(r.bosses(&c), H_BOSSES, "room 2 is the boss-less hack floor");
+    assert!(c.zone("hack24/2").is_some_and(|z| z.boss.is_none()));
+    assert!(r.twins.is_none());
+    let mut trash = 0;
+    let mut boss_at = 0;
+    for (i, z) in H_ROOMS.iter().enumerate() {
+        let def = c.zone(z).expect("room");
+        assert_eq!(def.level_range, (10, 11));
+        for p in &def.packs {
+            trash += p.units.len();
+            for u in &p.units {
+                assert_eq!(c.unit_def(u).map(|d| d.level), Some(10), "{u}");
+            }
+        }
+        if let Some(b) = &def.boss {
+            let d = c.unit_def(&b.unit).expect("boss");
+            assert!(d.boss && d.level == 11, "{}", b.unit);
+            assert_eq!(b.unit, H_BOSSES[boss_at]);
+            boss_at += 1;
+        }
+        let forward = def
+            .links
+            .iter()
+            .find(|l| H_ROOMS.get(i + 1) == Some(&l.to.as_str()));
+        match (i, forward) {
+            (0, Some(l)) => {
+                assert!(matches!(&l.requires, Some(Unlock::BossKilled(k)) if k == "pizza_overlord"))
+            }
+            (1, Some(l)) => assert!(l.requires.is_none(), "the hack floor door is open"),
+            (2, Some(l)) => {
+                assert!(matches!(&l.requires, Some(Unlock::BossKilled(k)) if k == "demo_gremlin"))
+            }
+            (3, None) => {}
+            _ => panic!("{z}: unexpected forward link"),
+        }
+        let back = if i == 0 { "campus" } else { H_ROOMS[i - 1] };
+        assert!(
+            def.links
+                .iter()
+                .any(|l| l.to == back && l.requires.is_none()),
+            "{z}"
+        );
+    }
+    assert_eq!(trash, 20, "five types, twenty units");
+    let door = |sim: &Sim| {
+        sim.zone_links("campus")
+            .into_iter()
+            .find(|l| l.to == "hack24/1")
+            .is_some_and(|l| l.unlocked)
+    };
+    let (sim, _) = group(2, 9, |_| {});
+    assert!(!door(&sim), "level 9 stays outside");
+    let (mut sim, ids) = group(2, H_LEVEL, |_| {});
+    assert!(!door(&sim), "level 10 without a QBR clear stays outside");
+    clear_the_board(&mut sim);
+    assert!(door(&sim), "a QBR clear and level 10 open it");
+    sim.set_level_of(ids[1], 9);
+    assert!(!door(&sim), "everyone needs level 10");
+    let (mut solo, _) = group(1, H_LEVEL, |_| {});
+    load(&mut solo, "hack24/3");
+    assert!(solo.raid_view().async_mode);
+    let boss = alive(&solo, "demo_gremlin")[0];
+    assert_eq!(solo.unit(boss).map(|u| u.max_hp), Some(11_800 * 40 / 100));
+    let (mut trio, _) = group(3, H_LEVEL, |_| {});
+    load(&mut trio, "hack24/3");
+    assert!(!trio.raid_view().async_mode);
+}
+
+#[test]
+fn the_hackathon_bosses_add_their_heroic_mechanic_in_the_phase_they_promise() {
+    // The Overlord: the 50% phase hardens it and the Slices stay capped at four.
+    let (mut sim, _) = group(3, H_LEVEL, |_| {});
+    load(&mut sim, "hack24/1");
+    let boss = alive(&sim, "pizza_overlord")[0];
+    let max = sim.unit(boss).map_or(0, |u| u.max_hp);
+    pull(&mut sim);
+    assert!(sim.debug_set_hp(boss, max * 49 / 100));
+    run(&mut sim, 3);
+    assert!(
+        sim.unit(boss)
+            .is_some_and(|u| u.auras.iter().any(|a| a.key == "cold_pizza")),
+        "cold pizza at 3 AM"
+    );
+    run(&mut sim, 30 * 90);
+    assert!(alive(&sim, "pizza_slice").len() <= 4);
+    // The Gremlin: the audience files in at 40%.
+    let (mut sim, _) = group(3, H_LEVEL, |_| {});
+    load(&mut sim, "hack24/3");
+    let boss = alive(&sim, "demo_gremlin")[0];
+    let max = sim.unit(boss).map_or(0, |u| u.max_hp);
+    pull(&mut sim);
+    assert!(alive(&sim, "heckler").is_empty());
+    assert!(sim.debug_set_hp(boss, max * 39 / 100));
+    run(&mut sim, 3);
+    let n = alive(&sim, "heckler").len();
+    assert!((1..=4).contains(&n), "{n} hecklers");
+    // The Judge: Series A brings the Associates, the Unicorn round the billion.
+    let (mut sim, _) = group(3, H_LEVEL, |_| {});
+    load(&mut sim, "hack24/4");
+    let boss = alive(&sim, "pitch_judge")[0];
+    let max = sim.unit(boss).map_or(0, |u| u.max_hp);
+    pull(&mut sim);
+    assert!(sim.debug_set_hp(boss, max * 65 / 100));
+    run(&mut sim, 3);
+    assert!(!alive(&sim, "associate").is_empty(), "series A");
+    assert!(sim.debug_set_hp(boss, max * 32 / 100));
+    run(&mut sim, 3);
+    assert!(
+        sim.unit(boss)
+            .is_some_and(|u| u.auras.iter().any(|a| a.key == "billion")),
+        "the Unicorn round"
+    );
+}
+
+/// Whiteboard, Team AI and the three bosses: the whole run through the debug kill.
+fn clear_hackathon(sim: &mut Sim, players: &[EntityId], quests: bool) {
+    for (i, room) in H_ROOMS.iter().enumerate() {
+        load(sim, room);
+        if quests && i == 0 {
+            let org = alive(sim, "hackathon_organiser")[0];
+            for &p in players {
+                sim.apply_as(p, Command::Talk { unit: org });
+                for q in H_QUESTS {
+                    sim.apply_as(p, Command::AcceptQuest { quest: q.into() });
+                }
+            }
+            run(sim, 1);
+        }
+        if quests && i == 1 {
+            for &p in players {
+                sim.apply_as(
+                    p,
+                    Command::Interact {
+                        prop: "hack_whiteboard".into(),
+                    },
+                );
+            }
+        }
+        for _ in 0..40 {
+            let Some(k) = sim
+                .units()
+                .find(|u| u.hostile && u.alive && !u.boss)
+                .map(|u| u.key.clone())
+            else {
+                break;
+            };
+            kill(sim, &k);
+        }
+        let boss = [Some(0), None, Some(1), Some(2)][i];
+        if let Some(b) = boss {
+            kill(sim, H_BOSSES[b]);
+            // Adds the boss left behind (slices, hecklers, associates).
+            for _ in 0..20 {
+                let Some(k) = sim
+                    .units()
+                    .find(|u| u.hostile && u.alive && !u.boss)
+                    .map(|u| u.key.clone())
+                else {
+                    break;
+                };
+                kill(sim, &k);
+            }
+        }
+    }
+    if quests {
+        let vol = alive(sim, "clipboard_volunteer")[0];
+        for &p in players {
+            sim.apply_as(p, Command::Talk { unit: vol });
+            run(sim, 1);
+            for q in H_QUESTS {
+                sim.apply_as(
+                    p,
+                    Command::TurnInQuest {
+                        quest: q.into(),
+                        choice: 0,
+                    },
+                );
+            }
+        }
+        run(sim, 1);
+    }
+}
+
+#[test]
+fn the_hackathon_quest_set_runs_from_the_organiser_to_the_volunteer() {
+    let (mut sim, ids) = group(1, H_LEVEL, |_| {});
+    let p = ids[0];
+    let c = content();
+    for q in H_QUESTS {
+        let def = c.quest(q).expect("quest");
+        assert_eq!(def.giver.npc, "hackathon_organiser");
+        assert_eq!(def.giver.zone, "hack24/1");
+        let end = def.turn_in.as_ref().expect("turn-in at the exit");
+        assert_eq!(
+            (end.npc.as_str(), end.zone.as_str()),
+            ("clipboard_volunteer", "hack24/4")
+        );
+        assert!(def.requires.is_none(), "the set runs in parallel");
+    }
+    assert!(c.quest("hack_pivot").is_some_and(|q| q.main && q.group));
+    clear_hackathon(&mut sim, &[p], true);
+    let done = &sim.quests_of(p).completed;
+    for q in H_QUESTS {
+        assert!(done.iter().any(|d| d == q), "{q} not done: {done:?}");
+    }
+    assert!(sim.quests_of(p).active.is_empty());
+}
+
+/// Part of the `dungeon_xp_stays_under_half_a_level` gate: level 10 is the cap, so the whole run
+/// is promotion XP and has to stay under half of the first rank's bar.
+fn hack_xp_stays_under_half_a_promotion() {
+    let bar = content().endgame.rank_xp_to_next(0);
+    for n in [1usize, 4] {
+        let (mut sim, ids) = group(n, H_LEVEL, |_| {});
+        clear_hackathon(&mut sim, &ids, true);
+        for &p in &ids {
+            let rank_xp = sim.unit(p).map_or(0, |u| u.career.rank_xp);
+            let level = sim.unit(p).map_or(0, |u| u.level);
+            println!(
+                "Hackathon {} first run at level 10: {rank_xp} promotion XP of {bar} ({}%)",
+                if n == 1 { "solo" } else { "four, one member" },
+                rank_xp * 100 / bar.max(1)
+            );
+            assert_eq!(level, H_LEVEL);
+            assert!(rank_xp < bar / 2, "under half a promotion bar: {rank_xp}");
+            if n == 1 {
+                assert!(rank_xp > bar / 5, "worth doing: {rank_xp}");
+            }
+        }
+    }
 }

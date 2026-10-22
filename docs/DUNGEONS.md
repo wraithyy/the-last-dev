@@ -1,7 +1,7 @@
 # Dungeons: four runs for three to five, one for everybody
 
-Design document for the level 3-10 dungeons. Status: the framework and dungeon 1, The Onboarding, are built
-(substitutions for mechanics the engine lacks are in `docs/KNOWN_LIMITATIONS.md`, "Dungeons"); 2-4 are planned.
+Design document for the level 3-10 dungeons. Status: the framework and all four dungeons are built
+(substitutions for mechanics the engine lacks are in `docs/KNOWN_LIMITATIONS.md`, "Dungeons").
 
 ## Context
 
@@ -651,6 +651,8 @@ solo first run       = K_trash * pct(trash level) + K_boss * pct(boss level) + Q
 | Migration | 20 x 12 = 240 x 1.65 = 396 | 120/150/220 = 490 x 2.35 = 1152 | 500 x 1.65 = 825 | ~2370 | 6000 (level 6) | 40% |
 | QBR | 20 x 25 = 500 x 3.35 = 1675 | 220/280/420 = 920 x 3.75 = 3450 | 800 x 3.35 = 2680 | ~7800 | 22200 (level 9) | 35% |
 | Hackathon (heroic) | 20 x 30 = 600 x 3.75 = 2250 | 300/380/520 = 1200 x 3.75 = 4500 | 700 x 3.75 = 2625 | ~9400 | cap: promotion XP | see note |
+
+Measured by the gate (Hackathon, level 10): a solo first run pays 9588 promotion XP (31% of the 30000 first-rank bar); a four pays its best member 6297 (20%).
 
 Measured by the gate (QBR): a level-9 solo first run pays 7960 XP (35%); a four pays its best member 5435 (24%); a level-10 player gets the same run as 7449 promotion XP (24% of the 30000 first-rank bar).
 

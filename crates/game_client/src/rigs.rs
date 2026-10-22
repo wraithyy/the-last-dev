@@ -149,6 +149,11 @@ fn parts(kind: &str) -> Vec<Part> {
         "cutover_rack" => cutover_rack(),
         "slide_golem" => slide_golem(),
         "kpi_dashboard" => kpi_dashboard(),
+        "pizza_overlord" => pizza_overlord(),
+        "demo_gremlin" => demo_gremlin(),
+        "energy_pyramid" => energy_pyramid(),
+        "pizza_slice" => pizza_slice(),
+        "hallucination" => hallucination(),
         "release_halo" => release_halo(),
         "agi_prototype" => agi_prototype(),
         "scooter" => scooter(),
@@ -516,6 +521,181 @@ fn kpi_dashboard() -> Vec<Part> {
         v.push(Part::cyl([sx, 0.06, 0.0], 0.14, 0.1, DARK).rot([0.0, 0.0, 90.0]));
     }
     v
+}
+
+/// Boss of the Hackathon's registration room: a tower of pizza boxes in a delivery cap. The
+/// head is one huge pepperoni pizza with olive eyes and a dripping cheese grin, oven mitts hold a
+/// pizza cutter the size of a wheel, and the belly is an oven door with a fire in it.
+fn pizza_overlord() -> Vec<Part> {
+    const BOX: [f32; 3] = [0.8, 0.62, 0.4];
+    const CHEESE: [f32; 3] = [1.0, 0.8, 0.28];
+    const RED: [f32; 3] = [0.78, 0.1, 0.08];
+    const GREEN: [f32; 3] = [0.1, 0.3, 0.12];
+    let mut v = vec![
+        // Legs: two short stacks of boxes.
+        Part::cube([-0.6, 0.55, 0.0], [0.95, 1.1, 0.95], BOX),
+        Part::cube([0.6, 0.55, 0.0], [0.95, 1.1, 0.95], BOX),
+        // Torso: a leaning stack, every box a little off, with a red band round the middle.
+        Part::cube([0.0, 1.5, 0.0], [2.0, 0.5, 2.0], BOX),
+        Part::cube([0.05, 1.98, 0.02], [2.0, 0.5, 2.0], [0.74, 0.58, 0.36]).rot([0.0, 6.0, 0.0]),
+        Part::cube([-0.04, 2.46, 0.0], [2.0, 0.5, 2.0], BOX).rot([0.0, -5.0, 0.0]),
+        Part::cube([0.0, 2.2, -1.02], [2.04, 0.12, 0.04], RED),
+        // The belly oven: a black door and the fire behind its window.
+        Part::cube([0.0, 1.85, -1.03], [1.1, 0.8, 0.05], DARK),
+        Part::cube([0.0, 1.85, -1.07], [0.8, 0.5, 0.03], HOT).glow(3.5),
+        // Head: a huge pizza turned to face front, with olives and a cheese grin.
+        Part::cyl([0.0, 3.45, -0.15], 1.7, 0.22, CHEESE).rot([90.0, 0.0, 0.0]),
+        Part::cyl([0.0, 3.45, -0.27], 1.7, 0.04, RED).rot([90.0, 0.0, 0.0]),
+        Part::ball([-0.4, 3.7, -0.3], 0.34, GREEN),
+        Part::ball([0.4, 3.7, -0.3], 0.34, GREEN),
+        Part::ball([-0.4, 3.7, -0.43], 0.14, [1.0, 0.1, 0.1]).glow(4.0),
+        Part::ball([0.4, 3.7, -0.43], 0.14, [1.0, 0.1, 0.1]).glow(4.0),
+        Part::cube([0.0, 3.12, -0.3], [0.9, 0.2, 0.06], DARK),
+        // The delivery cap: red with a visor and a logo that is mostly a smile.
+        Part::cyl([0.0, 4.35, -0.1], 1.3, 0.3, RED),
+        Part::cube([0.0, 4.2, -0.65], [1.3, 0.06, 0.55], RED),
+        // Cheese drips from the chin and the arms.
+        Part::cube([-0.5, 2.85, -0.3], [0.12, 0.5, 0.04], CHEESE),
+        Part::cube([0.1, 2.9, -0.3], [0.12, 0.35, 0.04], CHEESE),
+        Part::cube([0.55, 2.8, -0.3], [0.12, 0.6, 0.04], CHEESE),
+    ];
+    // Pepperoni on the head.
+    for (x, y) in [(-0.1, 3.9), (0.6, 3.1), (-0.65, 3.2), (0.1, 3.3)] {
+        v.push(Part::cyl([x, y, -0.3], 0.26, 0.03, RED).rot([90.0, 0.0, 0.0]));
+    }
+    // Arms: sleeves and oven mitts, one holding the cutter.
+    for side in [-1.0_f32, 1.0] {
+        v.push(
+            Part::cyl([side * 1.35, 2.3, -0.1], 0.35, 1.3, [0.9, 0.9, 0.88]).rot([
+                0.0,
+                0.0,
+                side * 14.0,
+            ]),
+        );
+        v.push(Part::ball([side * 1.55, 1.5, -0.3], 0.62, [0.3, 0.3, 0.38]));
+    }
+    v.push(
+        Part::cyl([1.55, 1.5, -0.75], 1.2, 0.06, STEEL)
+            .rot([0.0, 0.0, 90.0])
+            .spin(Vec3::X, 2.0),
+    );
+    v.push(Part::cube([1.55, 1.5, -0.3], [0.1, 0.1, 0.9], DARK));
+    v
+}
+
+/// Boss of the Demo Stage: a gremlin in a lanyard, huge ears and a wide white grin, with a
+/// laptop on its back that is quite on fire and shows a blue screen.
+fn demo_gremlin() -> Vec<Part> {
+    const SKIN: [f32; 3] = [0.38, 0.62, 0.3];
+    const BSOD: [f32; 3] = [0.1, 0.25, 1.0];
+    let mut v = vec![
+        Part::ball([0.0, 1.1, 0.0], 1.5, SKIN),
+        Part::ball([0.0, 2.1, -0.15], 1.2, SKIN),
+        Part::cube([0.0, 1.0, -0.74], [0.3, 0.7, 0.04], [0.9, 0.9, 0.9]),
+        Part::cube([0.0, 0.7, -0.76], [0.45, 0.35, 0.03], [0.9, 0.2, 0.9]),
+        Part::cyl([-0.4, 0.3, 0.0], 0.4, 0.6, SKIN),
+        Part::cyl([0.4, 0.3, 0.0], 0.4, 0.6, SKIN),
+        Part::cube([-0.4, 0.04, -0.2], [0.5, 0.1, 0.7], DARK),
+        Part::cube([0.4, 0.04, -0.2], [0.5, 0.1, 0.7], DARK),
+        // Eyes and a mouth full of teeth.
+        Part::ball([-0.3, 2.25, -0.65], 0.34, [1.0, 1.0, 0.6]),
+        Part::ball([0.3, 2.25, -0.65], 0.34, [1.0, 1.0, 0.6]),
+        Part::ball([-0.3, 2.25, -0.8], 0.13, [1.0, 0.05, 0.05]).glow(4.0),
+        Part::ball([0.3, 2.25, -0.8], 0.13, [1.0, 0.05, 0.05]).glow(4.0),
+        Part::cube([0.0, 1.85, -0.72], [0.7, 0.18, 0.04], DARK),
+        // Ears: huge, flat and pointing out.
+        Part::cube([-0.95, 2.45, -0.1], [0.9, 0.7, 0.06], SKIN).rot([0.0, 0.0, 28.0]),
+        Part::cube([0.95, 2.45, -0.1], [0.9, 0.7, 0.06], SKIN).rot([0.0, 0.0, -28.0]),
+        // The laptop on fire, strapped to the back.
+        Part::cube([0.0, 1.5, 0.75], [1.4, 0.9, 0.08], DARK).rot([-12.0, 0.0, 0.0]),
+        Part::cube([0.0, 1.5, 0.7], [1.25, 0.75, 0.03], BSOD)
+            .glow(2.5)
+            .rot([-12.0, 0.0, 0.0]),
+        Part::ball([0.4, 2.15, 0.8], 0.35, HOT)
+            .glow(5.0)
+            .bob(0.1, 7.0),
+        Part::ball([-0.2, 2.3, 0.8], 0.26, [1.0, 0.8, 0.1])
+            .glow(5.0)
+            .bob(0.12, 9.0),
+    ];
+    // Arms: long, thin, with claws; one holds a clicker.
+    for side in [-1.0_f32, 1.0] {
+        v.push(Part::cyl([side * 0.95, 1.1, -0.3], 0.2, 1.3, SKIN).rot([55.0, 0.0, side * 15.0]));
+        v.push(Part::ball([side * 1.05, 0.65, -0.85], 0.3, SKIN));
+    }
+    v.push(Part::cube(
+        [1.05, 0.7, -1.1],
+        [0.1, 0.1, 0.4],
+        [0.85, 0.1, 0.1],
+    ));
+    v
+}
+
+/// Trash: the energy drink pyramid, 47 cans in rows with a crushed one on top.
+fn energy_pyramid() -> Vec<Part> {
+    let mut v = Vec::new();
+    for (k, n) in [5usize, 4, 2, 1].into_iter().enumerate() {
+        for i in 0..n {
+            for j in 0..n {
+                let o = (n as f32 - 1.0) / 2.0;
+                let shade = [
+                    [0.15, 0.9, 0.3],
+                    [0.2, 0.8, 1.0],
+                    [1.0, 0.8, 0.1],
+                    [1.0, 0.2, 0.7],
+                ][(i + j + k) % 4];
+                v.push(Part::cyl(
+                    [
+                        (i as f32 - o) * 0.27,
+                        0.16 + k as f32 * 0.32,
+                        (j as f32 - o) * 0.27,
+                    ],
+                    0.25,
+                    0.3,
+                    shade,
+                ));
+            }
+        }
+    }
+    v.push(Part::cyl([0.0, 1.45, 0.0], 0.25, 0.14, STEEL));
+    v.push(
+        Part::ball([0.0, 1.0, -0.6], 0.1, [1.0, 0.1, 0.1])
+            .glow(4.0)
+            .bob(0.02, 12.0),
+    );
+    v
+}
+
+/// Add: a slice of pizza on little legs, cold, with one pepperoni for an eye.
+fn pizza_slice() -> Vec<Part> {
+    vec![
+        Part::cube([0.0, 0.5, 0.0], [0.7, 0.1, 0.9], [1.0, 0.8, 0.3]).rot([0.0, 0.0, 0.0]),
+        Part::cube([0.0, 0.46, 0.5], [0.7, 0.14, 0.12], [0.8, 0.55, 0.25]),
+        Part::cube([0.0, 0.5, -0.5], [0.2, 0.1, 0.3], [1.0, 0.8, 0.3]),
+        Part::ball([0.12, 0.58, -0.2], 0.2, [0.8, 0.1, 0.08]),
+        Part::ball([-0.15, 0.58, 0.1], 0.18, [0.8, 0.1, 0.08]),
+        Part::ball([0.1, 0.6, -0.34], 0.07, [1.0, 1.0, 1.0]),
+        Part::cyl([-0.2, 0.2, 0.0], 0.12, 0.4, DARK),
+        Part::cyl([0.2, 0.2, 0.0], 0.12, 0.4, DARK),
+    ]
+}
+
+/// Add: a Hallucination, a glowing teal blob with a very sure expression and a question mark.
+fn hallucination() -> Vec<Part> {
+    vec![
+        Part::ball([0.0, 0.7, 0.0], 0.9, [0.3, 0.9, 0.85])
+            .glow(1.6)
+            .bob(0.12, 3.0),
+        Part::ball([-0.15, 0.8, -0.38], 0.16, [1.0, 1.0, 1.0]),
+        Part::ball([0.15, 0.8, -0.38], 0.16, [1.0, 1.0, 1.0]),
+        Part::cube([0.0, 0.55, -0.42], [0.3, 0.05, 0.03], DARK),
+        Part::cube([0.0, 1.35, 0.0], [0.08, 0.22, 0.08], MAGENTA)
+            .glow(3.0)
+            .bob(0.08, 4.0),
+        Part::ball([0.0, 1.1, 0.0], 0.09, MAGENTA)
+            .glow(3.0)
+            .bob(0.08, 4.0),
+    ]
 }
 
 /// Overlay for the Rollback Wraith: a spinning ring of light over its head, a glowing "v1.0"
@@ -1252,6 +1432,11 @@ mod tests {
             "cutover_rack",
             "slide_golem",
             "kpi_dashboard",
+            "pizza_overlord",
+            "demo_gremlin",
+            "energy_pyramid",
+            "pizza_slice",
+            "hallucination",
             "release_halo",
             "agi_prototype",
             "scooter",

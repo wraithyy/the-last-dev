@@ -69,6 +69,9 @@ fn spawn_ring(
             base_color: color,
             unlit: true,
             cull_mode: None,
+            // Pulls the ring in front of the floor it lies on, so rugs, painted pads and the
+            // ground plane cannot win the depth test as the target walks across them.
+            depth_bias: 100.0,
             ..default()
         })
     };
@@ -392,6 +395,11 @@ type RingUnits<'w, 's> = Query<
 fn update_ring(
     target: Res<Target>,
     units: RingUnits,
+    (colliders, ground, decor): (
+        Res<Colliders>,
+        Res<crate::arena::Ground>,
+        Res<crate::arena::FlatDecor>,
+    ),
     ring: Single<(
         &TargetRing,
         &mut Transform,
@@ -405,8 +413,14 @@ fn update_ring(
         return;
     };
     *vis = Visibility::Inherited;
-    // Intern is spawned with its centre at capsule height; the ring belongs on the floor.
-    tf.translation = Vec3::new(unit_tf.translation.x, RING_HEIGHT, unit_tf.translation.z);
+    // The ring lies on whatever the target stands on: terrain (hills, banks), a prop top or
+    // a rug. A fixed height sank it into slopes and made it fight floor decals. The Intern is
+    // spawned with its centre at capsule height, which `ground_height` tolerates (it only
+    // takes surfaces below the given point).
+    let at = unit_tf.translation;
+    let floor = crate::collision::ground_height(at, &colliders.0, &ground.0)
+        .max(decor.top_near(at, RING_OUTER));
+    tf.translation = Vec3::new(at.x, floor + RING_HEIGHT, at.z);
     mat.0 = if unit.is_some_and(|u| u.hostile) {
         data.hostile.clone()
     } else {

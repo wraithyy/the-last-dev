@@ -121,6 +121,7 @@ pub fn build() -> FloorLayout {
         ("door:onboarding/1", starters_door(&mut p)),
         ("door:basement/1", loading_dock_door(&mut p)),
         ("door:qbr/1", executive_door(&mut p)),
+        ("door:hack24/1", hackathon_door(&mut p)),
     ];
     tower_shell(&mut p);
     data_center_shell(&mut p);
@@ -1010,7 +1011,8 @@ fn vibecon_entrance(p: &mut Plan) -> (Vec3, f32) {
 /// the Welcome arch, so a new starter walks past it on the way in. Returns the door anchor in
 /// front of it, facing the arrival lawn.
 fn starters_door(p: &mut Plan) -> (Vec3, f32) {
-    const X: f32 = 9.0;
+    // West of the plaza's middle: at x 9 the door hid the scrum board (the dailies).
+    const X: f32 = -22.0;
     const WALL_Z: f32 = 12.2;
     p.framed(v(X, 0.0, WALL_Z), Face::PosZ.yaw(), |p| {
         for x in [-1.9, 1.9] {
@@ -1119,6 +1121,45 @@ fn executive_door(p: &mut Plan) -> (Vec3, f32) {
         p.sign(v(2.3, 2.05, 0.32), 0.0, 0.7, Sign::QbrLift);
     });
     (v(x - 1.8, 0.0, z), FRAC_PI_2)
+}
+
+/// The Hackathon dungeon: a door in the back wall of the Incubator Street coworking cafe, a
+/// shipping-container door under a neon frame, a stack of pizza boxes beside it and a sandwich
+/// board that promises the pizza is free. Returns the door anchor in front of it, facing east.
+fn hackathon_door(p: &mut Plan) -> (Vec3, f32) {
+    // The cafe's brick back wall stands at x 147 between its posts at z 30 and z 38.
+    let (x, z) = (147.1, 34.0);
+    p.framed(v(x, 0.0, z), Face::PosX.yaw(), |p| {
+        p.boxed(v(0.0, 1.6, 0.14), v(3.6, 3.2, 0.28), Mat::Dark, false);
+        for l in [-0.8, 0.8] {
+            p.boxed(v(l, 1.3, 0.3), v(1.5, 2.6, 0.08), Mat::Red, false);
+            for k in 0..8 {
+                p.boxed(
+                    v(l, 0.35 + k as f32 * 0.3, 0.36),
+                    v(1.4, 0.04, 0.03),
+                    Mat::Hazard,
+                    false,
+                );
+            }
+        }
+        for sx in [-1.9, 1.9] {
+            p.boxed(v(sx, 1.65, 0.3), v(0.14, 3.3, 0.14), Mat::NeonPink, false);
+        }
+        p.boxed(v(0.0, 3.3, 0.3), v(4.0, 0.16, 0.2), Mat::NeonPink, false);
+        p.sign(v(0.0, 4.45, 0.2), 0.0, 4.4, Sign::H24Door);
+        // Pizza boxes stacked by the door, and the sandwich board.
+        for k in 0..14 {
+            p.boxed(
+                v(-2.6 + 0.04 * (k % 3) as f32, 0.04 + k as f32 * 0.07, 1.0),
+                v(0.55, 0.06, 0.55),
+                Mat::Cardboard,
+                false,
+            );
+        }
+        p.boxed(v(2.6, 0.6, 1.2), v(0.9, 1.2, 0.06), Mat::Board, true);
+        p.sign(v(2.6, 0.7, 1.24), 0.0, 0.85, Sign::H24Pizza);
+    });
+    (v(x + 1.8, 0.0, z), -FRAC_PI_2)
 }
 
 /// The All-Hands Offsite shuttle: a shelter, a parked coach in offsite livery and a tall pylon

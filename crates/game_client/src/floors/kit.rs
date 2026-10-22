@@ -249,6 +249,10 @@ pub enum Mat {
     LedRed,
     LedBlue,
     LightPanel,
+    /// Street-lamp head: glows harder after dark (`live::daynight`).
+    StreetLamp,
+    /// The pool of lamp light on the ground: additive, black (invisible) by day.
+    LampPool,
     Glass,
     /// Milky translucent band on glass walls and low partitions.
     Frosted,
@@ -630,6 +634,38 @@ pub enum Sign {
     QbrHockey,
     QbrSynergy,
     QbrPreRead,
+    // The Hackathon (heroic dungeon).
+    H24Door,
+    H24Welcome,
+    H24Pizza,
+    H24Team,
+    H24Swag,
+    H24Fridge,
+    H24Clock,
+    H24ClockNote,
+    H24DemoDay,
+    H24Ideas,
+    H24PingPong,
+    H24Mentor,
+    H24Judges,
+    H24Series,
+    H24Ten,
+    H24ToReg,
+    H24ToFloor,
+    H24ToStage,
+    H24ToPitch,
+    H24ToDay,
+    H24Wifi,
+    H24Prize,
+    H24Quiet,
+    H24Mvp,
+    H24Ai,
+    H24Leader,
+    H24Recording,
+    H24Whiteboard,
+    H24Sticky,
+    H24Cans,
+    H24Caution,
 }
 
 #[derive(Clone, Debug)]
@@ -1260,6 +1296,17 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
             (256, 96)
         }
         Sign::QbrAgenda | Sign::QbrBuzz | Sign::QbrSynergy => (256, 128),
+        Sign::H24Door
+        | Sign::H24Welcome
+        | Sign::H24Team
+        | Sign::H24Clock
+        | Sign::H24ClockNote
+        | Sign::H24DemoDay
+        | Sign::H24Series
+        | Sign::H24Wifi
+        | Sign::H24Prize
+        | Sign::H24Quiet => (256, 96),
+        Sign::H24Ideas | Sign::H24Sticky => (256, 128),
         Sign::MigPlan | Sign::MigTickets | Sign::MigRates | Sign::MigCutover => (256, 128),
         Sign::OffsiteAgenda | Sign::KeynoteScreen | Sign::Calendar => (256, 128),
         Sign::TbPhoto | Sign::TbKaraoke | Sign::TbTrustFall => (256, 96),

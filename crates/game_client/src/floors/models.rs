@@ -401,8 +401,254 @@ pub static ROBOT_ARM_A: Model = Model::kit(
     [1.000, 3.200, 1.000],
 );
 
+// ---- Hackathon (dungeon): pizza, drinks, sleeping gear and a stage, from packs already credited plus three small ones ----
+pub static PIZZA_BOX: Model = Model::kit(
+    "food-kit",
+    "pizza-box",
+    [-0.471, -0.476],
+    [0.942, 0.882, 0.952],
+);
+pub static PIZZA: Model = Model::kit("food-kit", "pizza", [-0.421, -0.421], [0.842, 0.043, 0.842]);
+pub static PIZZA_CUTTER: Model = Model::kit(
+    "food-kit",
+    "pizza-cutter",
+    [-0.268, -0.127],
+    [0.536, 0.056, 0.255],
+);
+pub static CAN_CRUSHED: Model = Model::kit(
+    "food-kit",
+    "soda-can-crushed",
+    [-0.124, -0.124],
+    [0.247, 0.181, 0.247],
+);
+pub static ENERGY_CAN: Model =
+    Model::kit("food-kit", "can", [-0.150, -0.150], [0.300, 0.320, 0.300]);
+pub static SODA_BOTTLE: Model = Model::kit(
+    "food-kit",
+    "soda-bottle",
+    [-0.090, -0.078],
+    [0.180, 0.580, 0.156],
+);
+pub static DONUT_CHOC: Model = Model::kit(
+    "food-kit",
+    "donut-chocolate",
+    [-0.123, -0.141],
+    [0.245, 0.089, 0.283],
+);
+pub static COOKIE: Model = Model::kit(
+    "food-kit",
+    "cookie",
+    [-0.110, -0.095],
+    [0.220, 0.050, 0.190],
+);
+pub static FRIES: Model = Model::kit("food-kit", "fries", [-0.082, -0.133], [0.164, 0.236, 0.265]);
+pub static TACO: Model = Model::kit("food-kit", "taco", [-0.213, -0.057], [0.426, 0.262, 0.114]);
+pub static MUG: Model = Model::kit("food-kit", "mug", [-0.123, -0.143], [0.344, 0.273, 0.285]);
+pub static STYROFOAM: Model = Model::kit(
+    "food-kit",
+    "styrofoam-dinner",
+    [-0.902, -0.379],
+    [1.281, 0.822, 0.759],
+);
+pub static CANDY_BAR: Model = Model::kit(
+    "food-kit",
+    "candy-bar",
+    [-0.146, -0.037],
+    [0.292, 0.065, 0.075],
+);
+pub static FRAPPE: Model = Model::kit(
+    "food-kit",
+    "frappe",
+    [-0.127, -0.127],
+    [0.254, 0.499, 0.254],
+);
+pub static PILLOW_BLUE: Model = Model::kit(
+    "furniture",
+    "pillowBlue",
+    [0.000, -0.063],
+    [0.230, 0.129, 0.063],
+);
+pub static PILLOW_BLUE_LONG: Model = Model::kit(
+    "furniture",
+    "pillowBlueLong",
+    [-0.130, -0.088],
+    [0.517, 0.222, 0.088],
+);
+pub static PILLOW_LONG: Model = Model::kit(
+    "furniture",
+    "pillowLong",
+    [0.000, -0.088],
+    [0.387, 0.222, 0.088],
+);
+pub static BENCH: Model = Model::kit("furniture", "bench", [0.000, -0.200], [0.400, 0.470, 0.200]);
+pub static BENCH_CUSHION_LOW: Model = Model::kit(
+    "furniture",
+    "benchCushionLow",
+    [-0.010, -0.210],
+    [0.420, 0.200, 0.220],
+);
+pub static STOOL_SQUARE: Model = Model::kit(
+    "furniture",
+    "stoolBarSquare",
+    [0.056, -0.189],
+    [0.153, 0.405, 0.148],
+);
+pub static COFFEE_TABLE_GLASS_SQ: Model = Model::kit(
+    "furniture",
+    "tableCoffeeGlassSquare",
+    [-0.461, -0.300],
+    [0.400, 0.230, 0.400],
+);
+pub static RADIO: Model = Model::kit("furniture", "radio", [0.000, -0.098], [0.315, 0.228, 0.098]);
+pub static SPEAKER_SMALL: Model = Model::kit(
+    "furniture",
+    "speakerSmall",
+    [0.000, -0.133],
+    [0.148, 0.298, 0.133],
+);
+pub static FRIDGE_LARGE: Model = Model::kit(
+    "furniture",
+    "kitchenFridgeLarge",
+    [0.000, -0.342],
+    [0.520, 0.920, 0.406],
+);
+pub static FRIDGE_SMALL: Model = Model::kit(
+    "furniture",
+    "kitchenFridgeSmall",
+    [0.000, -0.282],
+    [0.430, 0.600, 0.292],
+);
+pub static MICROWAVE: Model = Model::kit(
+    "furniture",
+    "kitchenMicrowave",
+    [0.000, -0.220],
+    [0.290, 0.180, 0.230],
+);
+pub static BLENDER: Model = Model::kit(
+    "furniture",
+    "kitchenBlender",
+    [0.000, -0.109],
+    [0.136, 0.228, 0.109],
+);
+pub static RUG_SQUARE: Model = Model::kit(
+    "furniture",
+    "rugSquare",
+    [0.000, -0.920],
+    [0.904, 0.010, 0.920],
+);
+pub static RUG_ROUNDED: Model = Model::kit(
+    "furniture",
+    "rugRounded",
+    [0.000, -0.920],
+    [1.570, 0.010, 0.920],
+);
+pub static BOX_OPEN: Model = Model::kit(
+    "furniture",
+    "cardboardBoxOpen",
+    [-0.080, -0.212],
+    [0.372, 0.281, 0.212],
+);
+pub static TABLE_CROSS: Model = Model::kit(
+    "furniture",
+    "tableCross",
+    [0.000, -0.447],
+    [0.852, 0.347, 0.447],
+);
+pub static TV_ANTENNA: Model = Model::kit(
+    "furniture",
+    "televisionAntenna",
+    [-0.132, -0.080],
+    [0.265, 0.103, 0.080],
+);
+pub static CONVEYOR_LONG: Model = Model::kit(
+    "factory-kit",
+    "conveyor-long",
+    [-1.000, -0.500],
+    [2.000, 0.400, 1.000],
+);
+pub static MACHINE_WINDOW: Model = Model::kit(
+    "factory-kit",
+    "machine-window",
+    [-0.600, -0.750],
+    [1.200, 1.290, 1.500],
+);
+pub static HOPPER_SQUARE: Model = Model::kit(
+    "factory-kit",
+    "hopper-square",
+    [-0.559, -0.559],
+    [1.117, 1.000, 1.117],
+);
+pub static LEVER_SINGLE: Model = Model::kit(
+    "factory-kit",
+    "lever-single",
+    [-0.250, -0.170],
+    [0.500, 0.475, 0.340],
+);
+pub static BUTTON_FLOOR: Model = Model::kit(
+    "factory-kit",
+    "button-floor-round",
+    [-0.250, -0.250],
+    [0.500, 0.150, 0.500],
+);
+pub static BOX_SMALL: Model = Model::kit(
+    "factory-kit",
+    "box-small",
+    [-0.298, -0.250],
+    [0.595, 0.550, 0.500],
+);
+pub static GATE_FINISH: Model = Model::kit(
+    "toy-car-kit",
+    "gate-finish",
+    [-0.775, -0.150],
+    [1.550, 1.162, 0.300],
+);
+pub static ITEM_BOX: Model = Model::kit(
+    "toy-car-kit",
+    "item-box",
+    [-0.223, -0.223],
+    [0.445, 0.445, 0.445],
+);
+pub static COIN_GOLD: Model = Model::kit(
+    "toy-car-kit",
+    "item-coin-gold",
+    [-0.264, 0.000],
+    [0.264, 0.264, 0.100],
+);
+// A measured size, not the constant: 0.318 m just happens to be 1/pi.
+#[allow(clippy::approx_constant)]
+pub static BRICK_2X4: Model = Model::kit(
+    "brick-kit",
+    "bevel-hq-brick-2x4",
+    [-0.159, -0.079],
+    [0.318, 0.114, 0.158],
+);
+pub static BRICK_2X2: Model = Model::kit(
+    "brick-kit",
+    "bevel-hq-brick-2x2",
+    [-0.079, -0.079],
+    [0.159, 0.114, 0.158],
+);
+pub static CONE_ROAD: Model = Model::kit(
+    "city-kit-roads",
+    "construction-cone",
+    [-0.038, -0.038],
+    [0.075, 0.094, 0.075],
+);
+pub static BARRIER: Model = Model::kit(
+    "city-kit-roads",
+    "construction-barrier",
+    [-0.068, -0.112],
+    [0.135, 0.130, 0.225],
+);
+pub static SIGN_WARNING: Model = Model::kit(
+    "city-kit-roads",
+    "road-sign-warning",
+    [-0.051, -0.074],
+    [0.077, 0.499, 0.147],
+);
+
 #[cfg(test)]
-pub static ALL: [&Model; 78] = [
+pub static ALL: [&Model; 124] = [
     &BUILDING_A,
     &BUILDING_G,
     &BUILDING_J,
@@ -481,6 +727,52 @@ pub static ALL: [&Model; 78] = [
     &PIE,
     &LOAF,
     &SANDWICH,
+    &PIZZA_BOX,
+    &PIZZA,
+    &PIZZA_CUTTER,
+    &CAN_CRUSHED,
+    &ENERGY_CAN,
+    &SODA_BOTTLE,
+    &DONUT_CHOC,
+    &COOKIE,
+    &FRIES,
+    &TACO,
+    &MUG,
+    &STYROFOAM,
+    &CANDY_BAR,
+    &FRAPPE,
+    &PILLOW_BLUE,
+    &PILLOW_BLUE_LONG,
+    &PILLOW_LONG,
+    &BENCH,
+    &BENCH_CUSHION_LOW,
+    &STOOL_SQUARE,
+    &COFFEE_TABLE_GLASS_SQ,
+    &RADIO,
+    &SPEAKER_SMALL,
+    &FRIDGE_LARGE,
+    &FRIDGE_SMALL,
+    &MICROWAVE,
+    &BLENDER,
+    &RUG_SQUARE,
+    &RUG_ROUNDED,
+    &BOX_OPEN,
+    &TABLE_CROSS,
+    &TV_ANTENNA,
+    &CONVEYOR_LONG,
+    &MACHINE_WINDOW,
+    &HOPPER_SQUARE,
+    &LEVER_SINGLE,
+    &BUTTON_FLOOR,
+    &BOX_SMALL,
+    &GATE_FINISH,
+    &ITEM_BOX,
+    &COIN_GOLD,
+    &BRICK_2X4,
+    &BRICK_2X2,
+    &CONE_ROAD,
+    &BARRIER,
+    &SIGN_WARNING,
 ];
 
 /// One model with its footprint centred on `pos`, front (+Z) turned by `yaw`, `unit` metres

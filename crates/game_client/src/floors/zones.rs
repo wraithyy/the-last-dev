@@ -7,6 +7,7 @@ use super::carpark;
 use super::client;
 use super::corporate;
 use super::datacenter;
+use super::hack24;
 use super::kit::{Plan, Sign};
 use super::lab;
 use super::layout::{FloorLayout, TOWER_ZONES, build_floor, yaw_towards};
@@ -22,7 +23,7 @@ use combat_core::Aabb;
 
 /// Every zone id of the contract, in a stable order.
 #[allow(dead_code)] // contract surface; the tests iterate it
-pub const ZONE_IDS: [&str; 31] = [
+pub const ZONE_IDS: [&str; 35] = [
     "campus",
     carpark::ZONE,
     "tower/1",
@@ -54,6 +55,10 @@ pub const ZONE_IDS: [&str; 31] = [
     "qbr/2",
     "qbr/3",
     "qbr/4",
+    "hack24/1",
+    "hack24/2",
+    "hack24/3",
+    "hack24/4",
 ];
 
 /// Pure and deterministic: the same id always yields the same layout. `None` for unknown ids.
@@ -85,6 +90,10 @@ pub fn build_zone(id: &str) -> Option<FloorLayout> {
         "qbr/2" => Some(qbr::build(2)),
         "qbr/3" => Some(qbr::build(3)),
         "qbr/4" => Some(qbr::build(4)),
+        "hack24/1" => Some(hack24::build(1)),
+        "hack24/2" => Some(hack24::build(2)),
+        "hack24/3" => Some(hack24::build(3)),
+        "hack24/4" => Some(hack24::build(4)),
         client::ZONE => Some(client::build()),
         teambuilding::ZONE => Some(teambuilding::build()),
         id if corporate::ZONES.contains(&id) => corporate::build(id),
@@ -186,8 +195,9 @@ mod tests {
             "campus" => 8,
             "datacenter/1" | "datacenter/2" | "lab/1" | "lab/2" => 5,
             "onboarding/1" | "onboarding/2" | "onboarding/3" => 2,
-            "basement/1" | "qbr/1" => 3,
-            "basement/2" | "basement/3" | "basement/4" | "qbr/2" | "qbr/3" | "qbr/4" => 2,
+            "basement/1" | "qbr/1" | "hack24/2" => 3,
+            "basement/2" | "basement/3" | "basement/4" | "qbr/2" | "qbr/3" | "qbr/4"
+            | "hack24/1" | "hack24/3" | "hack24/4" => 2,
             "offsite/1" | "offsite/2" | "vibecon/1" | "vibecon/2" => 4,
             "offsite/3" | "offsite/4" | "vibecon/3" | "vibecon/4" | "vibecon/5" => 3,
             _ => 6,
@@ -205,7 +215,8 @@ mod tests {
             "onboarding/1" | "onboarding/2" => 0,
             // The Migration: the project manager is `npc_2` beside the arrival (not required); only
             // the on-call engineer of the last room is `npc_1`.
-            "basement/1" | "basement/2" | "basement/3" | "qbr/1" | "qbr/2" | "qbr/3" => 0,
+            "basement/1" | "basement/2" | "basement/3" | "qbr/1" | "qbr/2" | "qbr/3"
+            | "hack24/1" | "hack24/2" | "hack24/3" => 0,
             "vibecon/2" | "vibecon/3" | "vibecon/4" | "vibecon/5" => 0,
             _ => 1,
         };
@@ -221,6 +232,7 @@ mod tests {
                 "door:onboarding/1",
                 "door:basement/1",
                 "door:qbr/1",
+                "door:hack24/1",
             ],
             "tower/1" | "tower/2" | "tower/3" | "tower/4" => {
                 &["door:campus", "elevator", "elevator_exit"]
@@ -250,6 +262,10 @@ mod tests {
             "qbr/2" => &["door:qbr/1", "door:qbr/3"],
             "qbr/3" => &["door:qbr/2", "door:qbr/4"],
             "qbr/4" => &["door:qbr/3", "door:campus"],
+            "hack24/1" => &["door:campus", "door:hack24/2"],
+            "hack24/2" => &["door:hack24/1", "door:hack24/3"],
+            "hack24/3" => &["door:hack24/2", "door:hack24/4"],
+            "hack24/4" => &["door:hack24/3", "door:campus"],
             _ => &["elevator", "elevator_exit"],
         };
         r.extend(doors.iter().map(|d| (*d).to_string()));
@@ -444,6 +460,10 @@ mod tests {
             "qbr/2",
             "qbr/3",
             "qbr/4",
+            "hack24/1",
+            "hack24/2",
+            "hack24/3",
+            "hack24/4",
         ] {
             let l = zone(id);
             let g = Grid::from(&l, pos(&l, "player_spawn"));

@@ -18,9 +18,11 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - The Onboarding, a three-room dungeon for three to five players at levels 3 and 4 (alone, you attend the softer Async version): enter by the narrow starters' door beside the Welcome arch, get past the Compliance Trainer's pop quiz, the Laptop Provisioner's six weeks of "awaiting hardware" and your own Onboarding Buddy, and hand in three tickets to a very tired new hire at the exit. Each boss pays gear once a day (resets at midnight UTC); a boss you already beat today still shows up for the fight and the tickets, and repeat clears pay less XP.
 - The Migration, a four-room dungeon for three to five players at levels 6 and 7 (alone, you attend the softer Async version): enter by the loading dock on the back of the Data Center, push through the dock and its zombie processes, the Cold Aisle's Rollback Wraith, the Consultants (one is always billing, the other is always open) and the Big Bang Cutover, then hand in four tickets to an On-Call Engineer on Weekend 14. Same daily lockout for gear, same shrinking XP on repeat clears, and the Big Red Button is exactly where you were afraid it would be.
 - Quarterly Business Review, a four-room dungeon for three to five players at levels 9 and 10 (alone, you attend the softer Async version): take the brass executive door on the west side of the Tower, wade through the lobby's untouched pastries and fruit trolleys, the Presentation Theatre's Slide Deck Golem (stand in the lit wedge of its pie chart), Dana, who had Claude do the analysis, and finally the Board, three heads with one open at a time, then hand in four tickets to the Cleaner of the Boardroom. Same daily lockout for gear and the same shrinking XP on repeat clears; at level 10 the run pays promotion XP.
+- The Hackathon, a heroic four-room dungeon for three to five players at level 10 (alone, you attend the softer Async version), unlocked once you have cleared a Quarterly Business Review: take the shipping-container door in the back of the coworking cafe on Incubator Street, walk through registration and the Pizza Overlord (stand on the pineapple wedge), the sleeping-bag-strewn Hack Floor, Demo Day with the Gremlin who swears it worked on his machine, and the Pitch Judge VC, who only funds AI, then hand in two tickets to the Volunteer With Clipboard. Same daily lockout for gear; the XP is promotion XP.
 
 ### Changed
 
+- Nights outdoors are less pitch black: street lamps now throw a warm pool of light on the ground and light up the people and props around them.
 - Diminishing returns: your stuns and incapacitates on the same enemy within 18 s last half as long, then a quarter, then not at all, so trash can no longer be stun-locked. Enemy stuns on you are unchanged.
 - QA Engineer: +5 spell power (25), it was the slowest role in most zones.
 - Unit frame portraits are bigger and show just the head, without the round backdrop behind it.
@@ -28,6 +30,7 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ### Fixed
 
+- The ring under your target no longer flickers as it walks over rugs, floor markings or hills: it lies on whatever the target stands on.
 - The promotion pop-up no longer sits on top of the dungeon difficulty banner when you walk in.
 
 ## [0.7.0] - 2026-10-21

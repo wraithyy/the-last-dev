@@ -58,6 +58,9 @@ place are included (`crates/game_client/src/floors/models.rs`).
 | assets/models/train-kit/ | Kenney Train Kit | https://kenney.nl/assets/train-kit |
 | assets/models/food-kit/ | Kenney Food Kit | https://kenney.nl/assets/food-kit |
 | assets/models/factory-kit/ | Kenney Factory Kit 3.0 | https://kenney.nl/assets/factory-kit |
+| assets/models/toy-car-kit/ | Kenney Toy Car Kit | https://kenney.nl/assets/toy-car-kit |
+| assets/models/brick-kit/ | Kenney Brick Kit | https://kenney.nl/assets/brick-kit |
+| assets/models/city-kit-roads/ | Kenney City Kit (Roads) | https://kenney.nl/assets/city-kit-roads |
 
 Author: Kenney (https://www.kenney.nl).
 

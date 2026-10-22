@@ -496,6 +496,14 @@ fn zone_tagline(id: &str) -> &'static str {
         "qbr/4" => {
             "A table the length of a bowling lane. A glass of water per seat. One of them is a man."
         }
+        "hack24/1" => {
+            "HACK 24: free pizza, free t-shirts, free Wi-Fi. Only one of those is a lie, and it is the pizza."
+        }
+        "hack24/2" => "Forty laptops, nine sleeping bags and a diagram that is a box labelled AI.",
+        "hack24/3" => "Demo Day. Everything worked an hour ago. The projector is also an hour ago.",
+        "hack24/4" => {
+            "A glass room, a very large fish and a clock that only knows the number 10. Pitch."
+        }
         "vibecon/1" => "Two hundred booths, one product, forty names for it.",
         "vibecon/2" => "Today's workshop: replacing yourself with a prompt, hands-on.",
         "vibecon/3" => "Hour 47 of 48. The demo works if nobody breathes near it.",

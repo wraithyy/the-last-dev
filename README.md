@@ -117,6 +117,7 @@ the site, including the [changelog page](https://wraithyy.github.io/the-last-dev
 | Variable | Effect |
 |---|---|
 | `WOW_SCREENSHOT=path.png` (`WOW_SHOT_DELAY=s`) | Save an offscreen 1280x720 shot and exit |
+| `WOW_NIGHT=1` | Hold the scene at full night (street lamps, night look) |
 | `WOW_ZONE=<id>` | Start in that zone (campus, tower/1..5, datacenter/1..2, lab/1..2), sim-backed and playable, at its minimum level; `WOW_FLOOR=n` is `WOW_ZONE=tower/n` |
 | `WOW_QUESTS=id[:active\|ready\|done],..` | Force quest states at start |
 | `WOW_UNLOCK_ALL=1` | Open every door and elevator |

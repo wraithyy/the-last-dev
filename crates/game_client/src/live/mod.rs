@@ -129,7 +129,8 @@ impl Plugin for LivePlugin {
             )
             .add_systems(
                 Update,
-                daynight::light_the_world
+                (daynight::light_the_world, daynight::light_the_lamps)
+                    .chain()
                     .after(crate::game::FloorSwap)
                     .in_set(SimReady),
             );

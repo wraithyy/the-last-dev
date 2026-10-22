@@ -18,7 +18,7 @@ use combat_core::DEPARTMENTS;
 const GOLD: Color = Color::srgb(1.0, 0.82, 0.3);
 const OPEN: Color = Color::srgb(0.45, 0.95, 0.55);
 /// Lockout chips spawned up front: one per Legacy floor boss, then one per raid encounter.
-const LOCK_SLOTS: usize = 40;
+const LOCK_SLOTS: usize = 44;
 const REP_BLUE: Color = Color::srgb(0.35, 0.7, 0.95);
 const WIDTH: f32 = 600.0;
 const NAME_W: f32 = 96.0;

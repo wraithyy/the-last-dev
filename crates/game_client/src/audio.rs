@@ -504,6 +504,8 @@ fn music_file(track: Track, zone: &str, outdoor_night: bool) -> &'static str {
         Track::Boss => match zone {
             // Quarterly Business Review: the corporate lobby ambient all the way down (bosses use the generic boss loop).
             "qbr/1" | "qbr/2" | "qbr/3" | "qbr/4" => "audio/music/office_muzak.ogg",
+            // The Hackathon: the Pitch Judge gets the VibeCon finale track (the motivational arpeggio that never resolves).
+            "hack24/4" => "audio/music/raid_boss_vibecon.ogg",
             "offsite/4" => "audio/music/raid_boss_offsite.ogg",
             "vibecon/5" => "audio/music/raid_boss_vibecon.ogg",
             _ => "audio/music/boss_battle.ogg",
@@ -532,7 +534,10 @@ fn music_file(track: Track, zone: &str, outdoor_night: bool) -> &'static str {
             "vibecon/1" | "vibecon/2" | "vibecon/3" | "hackathon/1" => {
                 "audio/music/vibecon_expo.ogg"
             }
-            "vibecon/4" => "audio/music/vibecon_afterparty.ogg",
+            // The Hackathon: the afterparty synth, pulsing at 3 AM, all the way down.
+            "vibecon/4" | "hack24/1" | "hack24/2" | "hack24/3" | "hack24/4" => {
+                "audio/music/vibecon_afterparty.ogg"
+            }
             "vibecon/5" => "audio/music/raid_boss_vibecon.ogg",
             _ => "audio/music/office_muzak.ogg",
         },

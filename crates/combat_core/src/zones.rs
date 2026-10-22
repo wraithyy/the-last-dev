@@ -448,7 +448,12 @@ impl Sim {
                     to: l.to.clone(),
                     unlocked: self
                         .sprint_link_open(&l.to)
-                        .or_else(|| self.raid_link_open(id, &l.to))
+                        // A dungeon door also keeps its own `requires` (the Hackathon wants a QBR clear).
+                        .or_else(|| {
+                            self.raid_link_open(id, &l.to).map(|open| {
+                                open && l.requires.as_ref().is_none_or(|r| self.unlock_met(r))
+                            })
+                        })
                         .unwrap_or_else(|| l.requires.as_ref().is_none_or(|r| self.unlock_met(r))),
                 })
                 .collect()

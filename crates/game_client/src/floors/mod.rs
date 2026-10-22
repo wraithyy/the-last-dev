@@ -16,6 +16,7 @@ mod dressing;
 #[cfg(test)]
 mod export;
 mod frontier;
+mod hack24;
 mod kit;
 mod lab;
 mod layout;
@@ -39,7 +40,7 @@ mod zones;
 pub use districts::{DISTRICTS, district_at};
 use layout::build_floor;
 pub use layout::{FloorLayout, elevator_exit_trigger};
-pub use textures::{icon_image, z_image};
+pub use textures::{LAMP_DAY, icon_image, z_image};
 pub use zones::{build_zone, door_trigger};
 
 /// Piece types the map draws roads and water from.
@@ -200,6 +201,15 @@ struct Look<'w, 's> {
 /// The zone's shared office-window material, if its layout has windows.
 #[derive(Resource, Default)]
 pub struct WindowMats(pub Option<Handle<StandardMaterial>>);
+
+/// The zone's street lamps for the night: their shared head and ground-pool materials and
+/// the head positions, where `live::daynight` parks its few real lights.
+#[derive(Resource, Default)]
+pub struct StreetLamps {
+    pub head: Option<Handle<StandardMaterial>>,
+    pub pool: Option<Handle<StandardMaterial>>,
+    pub heads: Vec<Vec3>,
+}
 
 /// The shared materials of the blinking LEDs with their resting emissive colour and pattern.
 #[derive(Resource, Default)]
@@ -422,7 +432,13 @@ fn load_floor(
         if mat.is_some_and(|m| {
             matches!(
                 m,
-                Mat::Glass | Mat::Frosted | Mat::LightPanel | Mat::Facade | Mat::Window
+                Mat::Glass
+                    | Mat::Frosted
+                    | Mat::LightPanel
+                    | Mat::StreetLamp
+                    | Mat::LampPool
+                    | Mat::Facade
+                    | Mat::Window
             )
         }) || size.y < SHADOW_MIN_HEIGHT && layout.outdoor
         {
@@ -551,6 +567,19 @@ fn load_floor(
                 yaw,
                 mat,
             } => {
+                if *mat == Mat::LampPool {
+                    // A flat quad, so the radial gradient texture maps centre to edge.
+                    commands.spawn((
+                        FloorEntity,
+                        Mesh3d(quad.clone()),
+                        MeshMaterial3d(get_mat(&mut mats, &mut materials, t, *mat)),
+                        Transform::from_translation(*center)
+                            .with_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2))
+                            .with_scale(Vec3::new(size.x, size.z, 1.0)),
+                        NotShadowCaster,
+                    ));
+                    continue;
+                }
                 if *mat == Mat::Lake && matches!(kind, PrimKind::Cylinder) {
                     let m = water_mat
                         .get_or_insert_with(|| materials.add(water::material(&mut images)))
@@ -605,6 +634,29 @@ fn load_floor(
     }
     // Office windows light up at night (`live::daynight`); one shared material per zone.
     commands.insert_resource(WindowMats(mats.get(&Mat::Window).cloned()));
+    if let Some(mut m) = mats
+        .get(&Mat::LampPool)
+        .and_then(|h| materials.get_mut(h))
+        .filter(|m| m.base_color_texture.is_none())
+    {
+        m.base_color_texture = Some(images.add(textures::lamp_pool_image()));
+    }
+    commands.insert_resource(StreetLamps {
+        head: mats.get(&Mat::StreetLamp).cloned(),
+        pool: mats.get(&Mat::LampPool).cloned(),
+        heads: layout
+            .pieces
+            .iter()
+            .filter_map(|p| match p {
+                Piece::Prim {
+                    center,
+                    mat: Mat::StreetLamp,
+                    ..
+                } => Some(*center),
+                _ => None,
+            })
+            .collect(),
+    });
     blink.0 = mats
         .iter()
         .filter(|(m, _)| is_blink(**m))

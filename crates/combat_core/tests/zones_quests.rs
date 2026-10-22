@@ -283,6 +283,8 @@ fn load_zone_spawns_the_campus_and_reports_its_links() {
             ("basement/1".to_string(), false),
             // Level 9 is the QBR's door level.
             ("qbr/1".to_string(), false),
+            // Level 10 and a QBR clear open the Hackathon.
+            ("hack24/1".to_string(), false),
         ]
     );
     assert!(t.sim.zone_links("nowhere").is_empty());
@@ -888,7 +890,7 @@ fn area(zone: &str) -> &str {
 
 /// Campaign order of the zones (`playthrough.rs` WORLD_ORDER); 0 for zones off the path.
 fn campaign_rank(zone: &str) -> usize {
-    const ORDER: [&str; 22] = [
+    const ORDER: [&str; 26] = [
         "parking_p3",
         "campus",
         "tower/1",
@@ -914,6 +916,11 @@ fn campaign_rank(zone: &str) -> usize {
         "qbr/2",
         "qbr/3",
         "qbr/4",
+        // The Hackathon (heroic), the same way.
+        "hack24/1",
+        "hack24/2",
+        "hack24/3",
+        "hack24/4",
     ];
     ORDER.iter().position(|z| *z == zone).map_or(0, |k| k + 1)
 }

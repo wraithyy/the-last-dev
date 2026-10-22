@@ -21,6 +21,34 @@ pub fn matte(color: Color) -> StandardMaterial {
     }
 }
 
+/// Soft round falloff for the light pool under a street lamp: white in the middle fading to
+/// black at the rim (the pool material is additive, so black adds nothing).
+pub fn lamp_pool_image() -> Image {
+    const N: u32 = 64;
+    let data = (0..N * N)
+        .flat_map(|i| {
+            let (x, y) = ((i % N) as f32 + 0.5, (i / N) as f32 + 0.5);
+            let r = ((x - N as f32 / 2.0).hypot(y - N as f32 / 2.0) / (N as f32 / 2.0)).min(1.0);
+            let v = ((1.0 - r * r).powi(2) * 255.0) as u8;
+            [v, v, v, 255]
+        })
+        .collect();
+    Image::new(
+        Extent3d {
+            width: N,
+            height: N,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::RENDER_WORLD,
+    )
+}
+
+/// Street-lamp head by day; `live::daynight` brightens it after dark.
+pub const LAMP_DAY: LinearRgba = LinearRgba::rgb(1.2, 1.15, 1.0);
+
 pub fn glow(color: LinearRgba) -> StandardMaterial {
     StandardMaterial {
         base_color: Color::BLACK,
@@ -61,6 +89,16 @@ pub fn material(mat: Mat, t: &Theme) -> StandardMaterial {
         Mat::LedRed => glow(LinearRgba::rgb(4.0, 0.3, 0.2)),
         Mat::LedBlue => glow(LinearRgba::rgb(0.3, 1.0, 4.0)),
         Mat::LightPanel => glow(LinearRgba::rgb(2.4, 2.5, 2.2)),
+        Mat::StreetLamp => glow(LAMP_DAY),
+        Mat::LampPool => StandardMaterial {
+            // Additive black adds nothing: the pool only appears as night tints it.
+            base_color: Color::BLACK,
+            alpha_mode: AlphaMode::Add,
+            unlit: true,
+            // Lies a few mm over roads and lawn; the bias keeps it on top of them.
+            depth_bias: 100.0,
+            ..default()
+        },
         Mat::Glass => StandardMaterial {
             base_color: Color::srgba(0.6, 0.82, 0.92, 0.16),
             alpha_mode: AlphaMode::Blend,
@@ -2084,6 +2122,200 @@ fn sign_spec(s: Sign) -> SignSpec {
             [40, 40, 50],
             [200, 50, 50],
         ),
+        // The Hackathon: neon on black, a warehouse at 3 AM.
+        Sign::H24Door => sp(
+            &["HACK 24", "REGISTRATION", "(FREE PIZZA)"],
+            [30, 10, 50],
+            [255, 240, 255],
+            [255, 60, 200],
+        ),
+        Sign::H24Welcome => sp(
+            &["WELCOME HACKERS", "24 HOURS TO BUILD", "(AI)"],
+            [12, 12, 30],
+            [210, 255, 255],
+            [0, 240, 255],
+        ),
+        Sign::H24Pizza => sp(
+            &["FREE PIZZA", "PINEAPPLE ONLY", "(WAS ALWAYS)"],
+            [255, 200, 60],
+            [90, 20, 10],
+            [200, 30, 30],
+        ),
+        Sign::H24Team => sp(
+            &["TEAM NAME: ???", "17 x TEAM AI", "(PLEASE BE ORIGINAL)"],
+            [240, 240, 236],
+            [30, 30, 40],
+            [220, 40, 40],
+        ),
+        Sign::H24Swag => sp(
+            &["SWAG", "1 SHIRT LEFT", "(XXXL, SORT OF)"],
+            [20, 60, 110],
+            [240, 248, 255],
+            [255, 210, 60],
+        ),
+        Sign::H24Fridge => sp(
+            &["DRINKS", "COLD ONES: JUDGES", "(NOT COLD)"],
+            [10, 50, 70],
+            [210, 245, 255],
+            [255, 240, 90],
+        ),
+        Sign::H24Clock => sp(&["23:59:59"], [8, 8, 10], [255, 40, 40], [255, 120, 60]),
+        Sign::H24ClockNote => sp(
+            &["COUNTDOWN", "(IT HAS BEEN 23:59:59 SINCE FRIDAY)"],
+            [20, 20, 24],
+            [255, 90, 90],
+            [255, 200, 80],
+        ),
+        Sign::H24DemoDay => sp(
+            &["DEMO DAY", "(IT WORKED)"],
+            [120, 10, 40],
+            [255, 236, 245],
+            [255, 220, 60],
+        ),
+        Sign::H24Ideas => sp(
+            &[
+                "AI FOR X",
+                "AI FOR DOGS",
+                "AI FOR AI",
+                "AI FOR LUNCH",
+                "BLOCKCHAIN?",
+                "AI FOR AI FOR X",
+                "PIVOT!",
+                "AI+AI=AI",
+            ],
+            [246, 247, 250],
+            [40, 70, 160],
+            [210, 50, 60],
+        ),
+        Sign::H24PingPong => sp(
+            &["PING PONG", "TOURNAMENT DELAYED", "(NOBODY HAS A BALL)"],
+            [10, 90, 60],
+            [230, 255, 240],
+            [255, 230, 90],
+        ),
+        Sign::H24Mentor => sp(
+            &["ASK ME", "(I DO NOT KNOW)"],
+            [240, 240, 60],
+            [20, 20, 20],
+            [200, 30, 30],
+        ),
+        Sign::H24Judges => sp(
+            &["JUDGES", "DO NOT RING THE BELL", "(ONE BANANA)"],
+            [40, 28, 18],
+            [250, 230, 190],
+            [255, 190, 60],
+        ),
+        Sign::H24Series => sp(
+            &["SERIES Z", "VENTURES", "(WE ONLY FUND AI)"],
+            [10, 24, 50],
+            [230, 240, 255],
+            [100, 220, 255],
+        ),
+        Sign::H24Ten => sp(&["10"], [250, 250, 244], [20, 20, 20], [200, 30, 30]),
+        Sign::H24ToReg => sp(
+            &["REGISTRATION", "(PIZZA IS NOT FREE)"],
+            [30, 10, 50],
+            [255, 240, 255],
+            [255, 60, 200],
+        ),
+        Sign::H24ToFloor => sp(
+            &["THE HACK FLOOR", "(PLEASE STAY AWAKE)"],
+            [14, 40, 30],
+            [210, 255, 230],
+            [100, 255, 160],
+        ),
+        Sign::H24ToStage => sp(
+            &["DEMO STAGE", "(IT WILL BREAK)"],
+            [100, 10, 40],
+            [255, 225, 235],
+            [255, 100, 150],
+        ),
+        Sign::H24ToPitch => sp(
+            &["THE PITCH ROOM", "(EIGHT MINUTES)"],
+            [10, 24, 50],
+            [220, 235, 255],
+            [100, 220, 255],
+        ),
+        Sign::H24ToDay => sp(
+            &["BACK TO THE CAMPUS", "(AND SLEEP)"],
+            [230, 200, 40],
+            [30, 30, 30],
+            [170, 30, 30],
+        ),
+        Sign::H24Wifi => sp(
+            &[
+                "WI-FI: HACK24",
+                "PASSWORD: ASK A MENTOR",
+                "(MENTORS DO NOT KNOW)",
+            ],
+            [240, 240, 236],
+            [30, 30, 40],
+            [20, 100, 200],
+        ),
+        Sign::H24Prize => sp(
+            &["1ST PRIZE: A TROPHY*", "*ABSTRACT"],
+            [20, 10, 40],
+            [255, 240, 200],
+            [255, 210, 60],
+        ),
+        Sign::H24Quiet => sp(
+            &["QUIET HOURS", "24 HOURS A DAY", "(FOR THE SLEEPING BAGS)"],
+            [20, 24, 50],
+            [210, 220, 255],
+            [120, 160, 255],
+        ),
+        Sign::H24Mvp => sp(
+            &["MVP", "M = MAYBE", "V = VAGUE, P = PLAN"],
+            [240, 240, 236],
+            [30, 30, 40],
+            [220, 40, 40],
+        ),
+        Sign::H24Ai => sp(&["AI"], [8, 8, 20], [255, 255, 255], [0, 255, 255]),
+        Sign::H24Leader => sp(
+            &["LEADERBOARD", "1. TEAM AI", "2. TEAM AI", "3. TEAM AI"],
+            [10, 20, 40],
+            [190, 230, 255],
+            [255, 230, 90],
+        ),
+        Sign::H24Recording => sp(
+            &["RECORDING", "(THERE IS NO RECORDING)"],
+            [40, 6, 6],
+            [255, 210, 210],
+            [255, 60, 60],
+        ),
+        Sign::H24Whiteboard => sp(
+            &["ARCHITECTURE", "[ AI ]", "[ AI ] -> [ AI ]", "(TRUST ME)"],
+            [246, 247, 250],
+            [30, 60, 140],
+            [200, 50, 60],
+        ),
+        Sign::H24Sticky => sp(
+            &[
+                "SYNERGY? NO",
+                "PIVOT TO AI",
+                "AI FOR KIDS",
+                "AI FOR CATS",
+                "AI AI AI",
+                "WHY?",
+                "UBER FOR AI",
+                "SELL IT",
+            ],
+            [255, 236, 120],
+            [60, 50, 10],
+            [200, 60, 40],
+        ),
+        Sign::H24Cans => sp(
+            &["47 CANS", "SUGAR: YES", "SLEEP: NO"],
+            [20, 60, 20],
+            [220, 255, 200],
+            [255, 230, 60],
+        ),
+        Sign::H24Caution => sp(
+            &["CAUTION", "PIVOT AHEAD"],
+            [255, 200, 30],
+            [20, 20, 20],
+            [200, 30, 30],
+        ),
         Sign::P3Shuttle => sp(
             &["P3 SHUTTLE", "SUSPENDED", "SINCE THE LAST REORG"],
             [20, 90, 130],
@@ -2136,7 +2368,12 @@ fn draw_sign(s: Sign) -> Canvas {
     let (wi, hi) = (w as i32, h as i32);
     if matches!(
         s,
-        Sign::WhiteboardA | Sign::WhiteboardB | Sign::WhiteboardC | Sign::QbrBuzz
+        Sign::WhiteboardA
+            | Sign::WhiteboardB
+            | Sign::WhiteboardC
+            | Sign::QbrBuzz
+            | Sign::H24Ideas
+            | Sign::H24Sticky
     ) {
         c.frame(2, 2, wi - 4, hi - 4, 3, [150, 150, 158]);
         let seed = s as u32 * 31;

@@ -616,9 +616,19 @@ pub(super) fn lamp(p: &mut Plan, x: f32, z: f32) {
         PrimKind::Sphere,
         v(x, 4.1, z),
         v(0.45, 0.35, 0.45),
-        Mat::LightPanel,
+        Mat::StreetLamp,
+    );
+    // The pool of light it throws after dark: a flat disc, free compared to a real light.
+    p.prim(
+        PrimKind::Cylinder,
+        v(x, 0.04, z),
+        v(LAMP_POOL_M, 0.01, LAMP_POOL_M),
+        Mat::LampPool,
     );
 }
+
+/// Diameter of the light pool under a street lamp.
+const LAMP_POOL_M: f32 = 9.0;
 
 type Road = ((f32, f32), (f32, f32), f32);
 
