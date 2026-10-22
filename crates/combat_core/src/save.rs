@@ -86,6 +86,10 @@ pub struct SaveData {
     pub taken_props: Vec<String>,
     /// Ill Marie appearances talked to, one bit each (`quests::MARIE_BEATS`); optional key.
     pub marie_met: u16,
+    /// The player's clock at the post-credits unlock (`ilmari_at`), and whether the Opening
+    /// played (`ilmari_flags`); optional keys, old saves load as locked.
+    pub ilmari_stamp: Option<crate::ilmari::IlmariStamp>,
+    pub ilmari_revealed: bool,
 }
 
 fn list(v: &str) -> Vec<String> {
@@ -213,6 +217,17 @@ impl SaveData {
         if self.marie_met != 0 {
             out.push_str(&format!("marie_met={}\n", self.marie_met));
         }
+        if let Some(st) = &self.ilmari_stamp {
+            out.push_str(&format!(
+                "ilmari_at={},{},{}\n",
+                st.unix_secs, st.utc_offset_min, st.tz
+            ));
+            // revealed, phase, attunement bits: the last two belong to later Ilmari builds.
+            out.push_str(&format!(
+                "ilmari_flags={},0,0\n",
+                u8::from(self.ilmari_revealed)
+            ));
+        }
         if !self.minigames.is_empty() {
             let rows: Vec<String> = self
                 .minigames
@@ -311,6 +326,17 @@ impl SaveData {
                 "respecs" => s.respecs = v.parse().unwrap_or(0),
                 "taken_props" => s.taken_props = list(v),
                 "marie_met" => s.marie_met = v.parse().unwrap_or(0),
+                "ilmari_at" => {
+                    let mut f = v.splitn(3, ',');
+                    if let (Some(t), Some(o), Some(z)) = (f.next(), f.next(), f.next())
+                        && let (Ok(t), Ok(o)) = (t.parse(), o.parse())
+                    {
+                        s.ilmari_stamp = Some(crate::ilmari::IlmariStamp::new(t, o, z));
+                    }
+                }
+                "ilmari_flags" => {
+                    s.ilmari_revealed = v.split(',').next().is_some_and(|r| r.trim() == "1");
+                }
                 "minigames" => {
                     s.minigames = list(v)
                         .iter()
@@ -500,6 +526,8 @@ impl Sim {
             minigames: self.minigame_bests(player),
             taken_props: self.taken_props(player),
             marie_met: self.marie_met(player),
+            ilmari_stamp: self.ilmari.stamp.clone(),
+            ilmari_revealed: self.ilmari.revealed,
         })
     }
 
@@ -612,6 +640,7 @@ impl Sim {
         self.set_minigame_bests(player, &save.minigames);
         self.restore_taken_props(player, &save.taken_props);
         self.restore_marie_met(player, save.marie_met);
+        self.restore_ilmari(save.ilmari_stamp.clone(), save.ilmari_revealed);
         let class = self.class_at(i).map(|c| c.key.clone()).unwrap_or_default();
         self.units[i].state.talents = self.content.talents.sanitize(&class, &save.talents, level);
         let title = Some(&save.title)

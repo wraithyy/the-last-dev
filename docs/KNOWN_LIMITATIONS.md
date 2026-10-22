@@ -127,3 +127,15 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - A keycap tap casts on press, so a long press shows the tooltip while the spell has already fired.
 - Touch taps on HUD panels without a `Button`/`Interaction` (windows, dialogs) can still reach target picking, same as mouse clicks.
 - The service worker precaches everything; if the browser refuses the shell (low disk/quota) the install fails and the game keeps running online without offline support. Asset-only quota errors are logged and skipped.
+
+## The Opening after the credits (docs/ILMARI_09.md B.1)
+
+- The stamp shows on one full-screen overlay, not on every in-world screen (tower sign, LED wall,
+  scooter docks): world signs are baked textures with no runtime text. The chord and the sirens have no
+  sound, and Marie does not walk to the tower; the reveal retires her where she stands.
+- Offline only. The sim has no wall clock, so the client stamps it; online rooms never take
+  `StampIlmari`/`IlmariReveal`, so the Opening does not play in co-op until room progress exists (B.8).
+- Native reads the zone with `date +%z %Z`; Windows has no such `date` and stamps UTC. The web build
+  has the offset but no abbreviation, so it prints `UTC+hh:mm`. The date is always `D Month YYYY`, 24 h.
+- A player with the "Cough Drops" ticket still open when the Opening plays loses its giver (the queue
+  Marie retires with the desk and bench); abandon and re-take is not possible, the ticket just stays open.

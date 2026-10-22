@@ -746,7 +746,7 @@ management), synthetic androids, HR bots.
 | Sim | `combat_core/src/content.rs` | `AiAbility.requires_aura`, `AiAbility.story`, `UnitDef.death_burnout`, `UnitDef.death_spawn`, `AuraDef.no_death_spawn`, `Effect::{SummonMirror, Vote, Review}`, `GearSource::Ilmari`, `ItemKind::Token`, `ZoneSpawn.requires/until`, `Unlock::PlayerLevel` (Part A) |
 | Sim | `combat_core/src/{ilmari,companion,raid}.rs` | new `ilmari.rs` (flag, stamp, phase, attunement), `companion.rs` (B.7), `raid.rs` (Story difficulty, vote counter, review ring) |
 | Sim | `economy.rs`, `save.rs` | item-level sync in `gear_totals`, tokens, optional save keys `ilmari_at`, `ilmari_flags`, `marie_met`, `companions`; no `SAVE_VERSION` bump needed for optional keys (precedent: `legacy_locks`) |
-| Protocol | `net_proto/src/lib.rs` | `PROTOCOL_VERSION` 30 -> 31 with the first Ilmari wire change (Story difficulty, `Summoned.as_player`, vote and review events, the stamp command); expect a second bump (to 32) when the wing events settle. Always bump in the commit that changes a frame, never in a docs commit |
+| Protocol | `net_proto/src/lib.rs` | `PROTOCOL_VERSION` 30 -> 31 with the first Ilmari wire change (Story difficulty, `Summoned.as_player`, vote and review events, the stamp command); B1 shipped as 31 -> 32 (`StampIlmari`, `IlmariReveal`, both offline-only and refused from the wire); expect a further bump when the wing events settle. Always bump in the commit that changes a frame, never in a docs commit |
 | Server | `server/src/{rooms,world}.rs` | ignores `StampIlmari` for gameplay, applies the geometry delta of `campus_occupied`, spawns Ilmari zones like raid zones, no companions |
 | Client | `game_client/src/floors/{campus,carpark,zones}.rs` | `occupied` overlay, the P3 booth hatch, the six wing layouts, `resistance/1` |
 | Client | `cutscene.rs`, `hud/`, `copy.rs`, `catalog.rs`, `audio.rs`, `nameplates.rs` | the Opening, per-boss scenes, the mail window, changelog screens, glitch nameplates, tells on fakes, Marie rig, the stamp helper |
@@ -804,7 +804,7 @@ beside the one compiling agent. **Part A first.** After each task: `cargo test` 
 
 | # | Task | Depends | Acceptance |
 |---|---|---|---|
-| B1 | `ilmari.rs` state, `StampIlmari`, save keys, `ilmari_pending`, `copy::ilmari_stamp` | A6 | tests: gating, old save, stamp format; protocol bump 30 -> 31 |
+| B1 | `ilmari.rs` state, `StampIlmari`, save keys, `ilmari_pending`, `copy::ilmari_stamp` | A6 | tests: gating, old save, stamp format; protocol bump 31 -> 32 (built) |
 | B2 | The Opening cutscene and the mail window, `il_marie_awake`, `il_00_wake` | B1 | scripted playthrough reaches the quest; screenshot of the mail |
 | B3 | `campus_occupied`, `resistance/1`, geometry delta, P3 hatch | B2 | `ilmari_gating` passes; `WOW_BENCH=campus_occupied` within budget |
 | B4 | Resistance NPCs, tokens (`ItemKind::Token`), quartermaster, attunement chain, world quests, daily | B3 | quest-chain bot from `il_00_wake` to `il_06`; token cap test |

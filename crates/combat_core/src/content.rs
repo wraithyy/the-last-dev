@@ -1008,6 +1008,8 @@ pub enum Unlock {
     QuestStarted(String),
     /// The first player has reached this level; only spawn gates (`ZoneSpawn`) use it.
     PlayerLevel(u8),
+    /// Any one of these; only spawn gates use it (a beat that hands over to one of several).
+    AnyOf(Vec<Unlock>),
 }
 
 /// An exit of a zone: the client's trigger anchor (`door:<zone>`, `elevator_exit`) and where it leads.
@@ -1778,6 +1780,13 @@ impl Content {
                 .any(|z| z.boss.as_ref().is_some_and(|b| b.unit == *k)),
             Unlock::QuestDone(q) | Unlock::QuestStarted(q) => self.quest(q).is_some(),
             Unlock::PlayerLevel(n) => (1..=self.max_level()).contains(n),
+            Unlock::AnyOf(any) => {
+                return if any.is_empty() {
+                    Err(ContentError::Invalid("an empty AnyOf never opens".into()))
+                } else {
+                    any.iter().try_for_each(|u| self.validate_unlock(u))
+                };
+            }
         };
         if ok {
             Ok(())

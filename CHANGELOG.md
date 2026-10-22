@@ -11,6 +11,7 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 ### Added
 
 - Ill Marie turns up in more places, and she has two errands for you. Bring tissues.
+- Something happens after the credits.
 
 ### Fixed
 

@@ -558,7 +558,9 @@ mod tests {
             .iter()
             .filter(|a| {
                 !is_enemy(a.0)
-                    && !matches!(a.0, "player_spawn" | "graveyard")
+                    // The reveal Marie stands there for one scene after the credits, nobody to
+                    // click before or after it: she is not part of the arrival's crowd.
+                    && !matches!(a.0, "player_spawn" | "graveyard" | "npc_marie_reveal")
                     && !CALENDAR_DOORS.contains(&a.0)
             })
             .map(|a| (a.0, a.1))

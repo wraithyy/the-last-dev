@@ -2147,6 +2147,21 @@ static TABLE: &[(&str, UnitVisual)] = &[
             ],
         ),
     ),
+    // The Opening's reveal (docs/ILMARI_09.md B.1): the same Marie, all white, no cough.
+    (
+        "il_marie_awake",
+        v(
+            CASUAL_F,
+            1.7,
+            "ILMARI",
+            "<Autonomous Agent Pilot #1>",
+            &[
+                paint("Skin", 0.9, 0.88, 0.86),
+                paint("Shirt", 0.97, 0.97, 1.0),
+                paint("Pants", 0.9, 0.9, 0.95),
+            ],
+        ),
+    ),
     // ---- VibeCon (raid): lanyard neon on black, the founders in vests ----
     (
         "vc_registration",

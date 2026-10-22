@@ -1099,6 +1099,7 @@ impl NetWorld {
                 self.quests.completed.contains(q) || self.quests.active.iter().any(|a| a.id == *q)
             }
             Unlock::PlayerLevel(n) => self.units.get(&self.you).is_some_and(|u| u.level >= *n),
+            Unlock::AnyOf(any) => any.iter().any(|u| self.unlock_met(u)),
         }
     }
 

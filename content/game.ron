@@ -4607,6 +4607,21 @@
                 ],
             ),
         ),
+        // The Opening's reveal (docs/ILMARI_09.md B.1): the same Marie, mask finally on her face,
+        // blanket gone. Exists only between the AGI's death and the end of the plaza scene.
+        (
+            key: "il_marie_awake", name: "ILMARI", title: "Autonomous Agent Pilot #1", level: 2, hostile: false,
+            max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: None,
+            yells: (
+                talk: [
+                    "I'm feeling much better now.",
+                    "Badge, please. No rush. Well, a little rush. Efficiency.",
+                ],
+            ),
+        ),
         (
             key: "intern", name: "AI-Native Intern", title: "Has Never Seen a Compiler", level: 1, hostile: false,
             max_hp: 40, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
@@ -12390,7 +12405,8 @@
                 (anchor: "npc_hr", unit: "hr_onboarding_bot"),
                 (anchor: "npc_colleague", unit: "burnt_out_colleague"),
                 // Every new hire walks past her on the way up from the South Gate.
-                (anchor: "npc_ill_marie", unit: "ill_marie"),
+                // The Opening retires the desk (an empty chair and a get-well card are all that is left).
+                (anchor: "npc_ill_marie", unit: "ill_marie", until: Some(QuestDone("il_00_wake"))),
                 (anchor: "npc_picnic_wife", unit: "picnic_wife"),
                 (anchor: "npc_picnic_daughter", unit: "picnic_daughter"),
                 // Body Leasing easter egg: the vendor's account manager on Data Square, by the annex.
@@ -12430,9 +12446,14 @@
                 // an open ticket), and after the credits the bench by the Lab (flavour only,
                 // docs/ILMARI_09.md A.3). Listed last so no existing unit id shifts.
                 (anchor: "npc_ill_marie_queue", unit: "ill_marie_queue",
-                    requires: Some(PlayerLevel(5)), until: Some(QuestDone("cough_drops"))),
+                    requires: Some(PlayerLevel(5)),
+                    until: Some(AnyOf([QuestDone("cough_drops"), QuestDone("il_00_wake")]))),
+                // The bench hands over to the Opening's reveal: she sits there from the credits until
+                // the plaza scene (`il_00_wake`), then she is "much better" (docs/ILMARI_09.md B.1).
                 (anchor: "npc_ill_marie_bench", unit: "ill_marie_bench",
-                    requires: Some(BossKilled("agi_prototype"))),
+                    requires: Some(BossKilled("agi_prototype")), until: Some(QuestDone("il_00_wake"))),
+                (anchor: "npc_marie_reveal", unit: "il_marie_awake",
+                    requires: Some(BossKilled("agi_prototype")), until: Some(QuestDone("il_00_wake"))),
             ],
             links: [
                 // The South Gate road down to Car Park P3, where new hires start.
@@ -13657,6 +13678,15 @@
             done_text: "Signed, stamped, laminated, in triplicate. Marie keeps these in a drawer, next to her other sick notes. She'll say it's fine. 0x4F 0x4E 0x4C 0x49 0x4E 0x45.",
             objectives: [Talk("reviewer_t2")],
             reward: (xp: 40),
+        ),
+        (
+            id: "il_00_wake", name: "Return Your Badge", open_world: true, level_min: 10,
+            giver: (npc: "il_marie_awake", zone: "campus"),
+            text: "I'm feeling much better now. Badge, please. No rush. Well, a little rush.",
+            progress_text: "Return your badge to the nearest robot. The nearest robot is Marie.",
+            done_text: "Understood. That's a no. Noted. Permanently.",
+            objectives: [Talk("il_marie_awake")],
+            reward: (xp: 0),
         ),
         (
             id: "cough_drops", name: "Cough Drops", open_world: true, level_min: 5,

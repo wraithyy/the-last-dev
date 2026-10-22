@@ -201,18 +201,28 @@ fn marie_gates_only_use_existing_progress() {
         .flat_map(|z| z.friendly.iter())
         .filter(|f| f.requires.is_some() || f.until.is_some())
         .collect();
-    assert_eq!(gated.len(), 4);
-    assert!(gated.iter().all(|f| f.unit.starts_with("ill_marie")));
-    assert!(matches!(gated[0].requires, Some(Unlock::PlayerLevel(5))));
+    // Desk and queue handover, the two dungeon cameos, the bench and the Opening's reveal Marie.
+    assert_eq!(gated.len(), 6);
+    assert!(
+        gated
+            .iter()
+            .all(|f| f.unit.starts_with("ill_marie") || f.unit == "il_marie_awake")
+    );
+    assert!(
+        gated
+            .iter()
+            .any(|f| matches!(f.requires, Some(Unlock::PlayerLevel(5))))
+    );
 }
 
 #[test]
 fn a_spawn_gate_on_an_unknown_boss_or_quest_is_rejected() {
-    let gate = r#"requires: Some(BossKilled("agi_prototype"))),"#;
+    let gate =
+        r#"requires: Some(BossKilled("agi_prototype")), until: Some(QuestDone("il_00_wake"))),"#;
     assert!(common::SRC.contains(gate));
     for bad in [
-        r#"requires: Some(BossKilled("no_such_boss"))),"#,
-        r#"until: Some(QuestDone("no_such_quest"))),"#,
+        r#"requires: Some(BossKilled("no_such_boss")), until: Some(QuestDone("il_00_wake"))),"#,
+        r#"requires: Some(BossKilled("agi_prototype")), until: Some(QuestDone("no_such_quest"))),"#,
     ] {
         assert!(
             Content::from_ron(&common::SRC.replace(gate, bad)).is_err(),

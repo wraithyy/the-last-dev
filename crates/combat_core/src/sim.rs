@@ -231,6 +231,8 @@ pub struct Sim {
     pub(crate) minigame: crate::minigame::MinigameState,
     /// Defend waves and telegraph hits for `KillClean` (`quests.rs`).
     pub(crate) quest_rt: crate::quests::QuestRt,
+    /// The post-credits stamp and reveal flag (`ilmari.rs`).
+    pub(crate) ilmari: crate::ilmari::IlmariState,
     /// Ground of the loaded zone, and of every zone a loader registered (`terrain.rs`).
     pub(crate) terrain: crate::terrain::Terrain,
     pub(crate) zone_terrains: BTreeMap<String, crate::terrain::Terrain>,
@@ -273,6 +275,7 @@ impl Sim {
             raid: Default::default(),
             minigame: Default::default(),
             quest_rt: Default::default(),
+            ilmari: Default::default(),
             terrain: Default::default(),
             zone_terrains: BTreeMap::new(),
         }
@@ -596,6 +599,8 @@ impl Sim {
             | Command::DuelRespond { .. }
             | Command::StartMinigame { .. }
             | Command::LeaveMinigame
+            | Command::StampIlmari { .. }
+            | Command::IlmariReveal
             | Command::MinigamePick { .. } => {}
         }
         self.pending.push((Some(player), cmd));
@@ -814,6 +819,16 @@ impl Sim {
             Command::StartMinigame { key } => self.start_minigame(actor, &key),
             Command::LeaveMinigame => self.leave_minigame(actor),
             Command::MinigamePick { seq, option } => self.pick_minigame(actor, seq, option),
+            Command::StampIlmari {
+                unix_secs,
+                utc_offset_min,
+                tz,
+            } => {
+                self.stamp_ilmari(unix_secs, utc_offset_min, &tz);
+            }
+            Command::IlmariReveal => {
+                self.reveal_ilmari();
+            }
             other => self.apply_named(other),
         }
     }
@@ -873,6 +888,8 @@ impl Sim {
             | Command::DuelRespond { .. }
             | Command::StartMinigame { .. }
             | Command::LeaveMinigame
+            | Command::StampIlmari { .. }
+            | Command::IlmariReveal
             | Command::MinigamePick { .. } => {}
         }
     }

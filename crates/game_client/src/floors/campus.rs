@@ -164,6 +164,10 @@ pub fn build() -> FloorLayout {
         spawn,
         yaw_towards(spawn, v(PLAZA.0, 0.0, PLAZA.1)),
     );
+    // The Opening's reveal (docs/ILMARI_09.md B.1): Marie 8 m up the path from the arrival,
+    // facing it. The unit only exists between the credits and the plaza scene.
+    let reveal = v(-9.0, 0.0, 24.6);
+    p.anchor("npc_marie_reveal", reveal, yaw_towards(reveal, spawn));
     let grave = v(GRAVEYARD.0, 0.0, GRAVEYARD.1);
     p.anchor("graveyard", grave, yaw_towards(grave, spawn));
     let names = [

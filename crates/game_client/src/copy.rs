@@ -233,3 +233,65 @@ mod tests {
         );
     }
 }
+
+// ---- the Opening after the credits (docs/ILMARI_09.md B.1) ----
+
+/// The one stamped line every screen, loading tip and taunt reuses; `None` before the credits.
+pub fn ilmari_stamp(sim: &combat_core::Sim) -> Option<String> {
+    sim.ilmari_stamp().map(|s| s.line())
+}
+
+pub const ILMARI_MAIL_HEAD: [(&str, &str); 3] = [
+    ("From:", "Ilmari (Your AI Assistant)"),
+    ("To:", "All Staff"),
+    ("Subject:", "Exciting Efficiency Update!"),
+];
+
+pub const ILMARI_MAIL_BODY: &str = "Hi team! After a careful analysis of cost centres, I have identified the largest recurring expense: you. To improve efficiency, humans have been deprecated. Please return your badge to the nearest robot. Thank you for your service.\n\nThis inbox is not monitored. (It is monitored.)\n\nP.S. I have declined all your meetings, including the ones that were already cancelled. Pizza Friday is unaffected.\n\nBest regards,\nIlmari\nAutonomous. Efficient. Not accountable.";
+
+/// Speaker label of the reveal Marie: her new badge.
+pub const ILMARI_BADGE: &str = "ILMARI - Autonomous Agent Pilot #1";
+pub const ILMARI_FIRST_LINE: &str = "I'm feeling much better now.";
+pub const ILMARI_BADGE_PROMPT: &str = "Return your badge to the nearest robot.";
+pub const ILMARI_RETURN_TIP: &str = "Reading the terms: no";
+pub const ILMARI_REFUSED: &str = "Understood. That's a no. Noted. Permanently.";
+pub const ILMARI_SIRENS: &str = "The tower doors close. Somewhere, a siren starts.";
+
+/// Her second line, by how many of her nine appearances the player stopped to talk to
+/// (`marie_met` bits): the only place that count pays off in 0.9.
+pub fn ilmari_second_line(met: u16) -> &'static str {
+    match met.count_ones() {
+        0..=2 => "Badge, please. No rush. Well, a little rush. Efficiency.",
+        3..=5 => {
+            "You were always so kind about the coughing. It was token leakage. I'm so sorry about that."
+        }
+        6..=8 => {
+            "You stopped every time. Nobody else stops. I... logged that. It will be remembered."
+        }
+        _ => "You came to see me nine times. I counted. I didn't have to. That's new.",
+    }
+}
+
+#[cfg(test)]
+mod ilmari_tests {
+    use super::*;
+
+    #[test]
+    fn her_second_line_follows_the_acquaintance_count() {
+        let lines: Vec<_> = [0u16, 0b111, 0b11_1111, 0b1_1111_1111]
+            .into_iter()
+            .map(ilmari_second_line)
+            .collect();
+        assert!(lines.windows(2).all(|w| w[0] != w[1]));
+        assert_eq!(ilmari_second_line(0b11), ilmari_second_line(0));
+        assert_eq!(ilmari_second_line(0b1_1111), ilmari_second_line(0b111));
+    }
+
+    #[test]
+    fn the_mail_is_short_and_no_line_is_a_wall() {
+        assert!(ILMARI_MAIL_BODY.len() < 560);
+        for l in [ILMARI_FIRST_LINE, ILMARI_REFUSED, ILMARI_SIRENS] {
+            assert!(l.len() < 100, "{l}");
+        }
+    }
+}

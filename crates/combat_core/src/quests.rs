@@ -151,7 +151,8 @@ impl Sim {
         let chain = def
             .requires
             .as_ref()
-            .is_none_or(|r| log.completed.iter().any(|c| c == r));
+            .is_none_or(|r| log.completed.iter().any(|c| c == r))
+            && self.ilmari_quest_open(id);
         if chain && level >= def.level_min {
             QuestStatus::Available
         } else {

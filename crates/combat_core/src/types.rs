@@ -252,6 +252,17 @@ pub enum Command {
         seq: u16,
         option: u8,
     },
+    /// Offline only: the device clock when the post-credits chain unlocks, told once by the
+    /// client because the sim has no wall clock (`ilmari.rs`). Ignored before the AGI is down
+    /// and once a stamp exists; a server never accepts it from the wire.
+    StampIlmari {
+        unix_secs: u64,
+        utc_offset_min: i16,
+        tz: String,
+    },
+    /// Offline only: the Opening has played or was skipped (needs a stamp), which retires the
+    /// post-credits Marie beats and completes the opening quest.
+    IlmariReveal,
 }
 
 /// Why an item command did nothing; routed to the player.

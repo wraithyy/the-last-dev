@@ -103,6 +103,8 @@ pub struct GameFlow {
     tip: usize,
     victory_in: Option<f32>,
     pub victory: bool,
+    /// The post-credits Opening is playing (`ilmari_open.rs`).
+    pub opening: bool,
     pub unlock_all: bool,
     /// Run statistics for the victory screen.
     pub deaths: u32,
@@ -125,7 +127,7 @@ impl GameFlow {
 
     /// Movement and casting are frozen during a zone transition and on the victory screen.
     pub fn input_locked(&self) -> bool {
-        !matches!(self.fade, Fade::Idle) || self.victory
+        !matches!(self.fade, Fade::Idle) || self.victory || self.opening
     }
 
     /// The dressing's NPC (and pose) at a layout anchor of the current zone.
@@ -170,7 +172,7 @@ pub fn lock_reason(content: &Content, requires: Option<&Unlock>) -> String {
             content.quest(q).map_or(q.as_str(), |d| d.name.as_str())
         ),
         Some(Unlock::PlayerLevel(n)) => format!("Requires: level {n}"),
-        None => "The badge reader is thinking.".into(),
+        Some(Unlock::AnyOf(_)) | None => "The badge reader is thinking.".into(),
     }
 }
 
@@ -308,6 +310,10 @@ pub(crate) fn start_game(
         .flat_map(|v| v.split(','))
     {
         sim.0.debug_mark_boss(boss.trim());
+    }
+    // QA: `WOW_ILMARI=1` plays the Opening on the campus (`mail`, `reveal` or `badge` start there).
+    if std::env::var_os("WOW_ILMARI").is_some() {
+        sim.0.debug_ilmari_opening();
     }
     for (id, status, counts) in debug_quests() {
         if !sim.0.debug_set_quest(&id, status) {

@@ -483,6 +483,7 @@ impl Sim {
                 .quest_logs
                 .values()
                 .any(|l| l.completed.iter().any(|c| c == q) || l.active.iter().any(|a| a.id == *q)),
+            Unlock::AnyOf(any) => any.iter().any(|u| self.unlock_met(u)),
             // The group lead's level, like every other zone-load decision about the player.
             Unlock::PlayerLevel(n) => self
                 .first_player_index()

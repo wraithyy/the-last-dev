@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 31;
+pub const PROTOCOL_VERSION: u16 = 32;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -664,6 +664,8 @@ pub fn is_player_command(cmd: &Command) -> bool {
         Command::SetLegacy { .. } | Command::StartWeeklySprint => true,
         Command::StartMinigame { key } => key.len() <= combat_core::minigame::MINIGAME_KEY_MAX,
         Command::LeaveMinigame | Command::MinigamePick { .. } => true,
+        // Offline-only: the sim has no wall clock and the server never reads one for gameplay.
+        Command::StampIlmari { .. } | Command::IlmariReveal => false,
     }
 }
 
@@ -2049,6 +2051,20 @@ mod tests {
         ] {
             let c = ClientMsg::Cmd(cmd);
             assert_eq!(roundtrip(&c), Ok(c.clone()));
+        }
+        for cmd in [
+            Command::StampIlmari {
+                unix_secs: 1,
+                utc_offset_min: 0,
+                tz: "UTC".into(),
+            },
+            Command::IlmariReveal,
+        ] {
+            assert_eq!(
+                roundtrip(&ClientMsg::Cmd(cmd)),
+                Err(ProtoError::IllegalCommand),
+                "the Opening is offline-only"
+            );
         }
         let long_key = ClientMsg::Cmd(Command::StartMinigame {
             key: "k".repeat(combat_core::minigame::MINIGAME_KEY_MAX + 1),

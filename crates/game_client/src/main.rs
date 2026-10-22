@@ -19,6 +19,7 @@ mod game;
 mod gear;
 mod hair;
 mod hud;
+mod ilmari_open;
 mod input;
 mod keybinds;
 mod legacy;
@@ -151,7 +152,11 @@ fn main() {
         onboarding::OnboardingPlugin,
     ))
     // After TouchPlugin: the settings default to Low on phones.
-    .add_plugins((settings::SettingsPlugin, cutscene::CutscenePlugin))
+    .add_plugins((
+        settings::SettingsPlugin,
+        cutscene::CutscenePlugin,
+        ilmari_open::IlmariOpenPlugin,
+    ))
     .add_plugins(social::SocialPlugin)
     .add_plugins(roasts::RoastPlugin)
     .add_plugins(live::LivePlugin)

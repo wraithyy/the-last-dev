@@ -16,6 +16,7 @@ mod effects;
 pub mod endgame;
 mod floors;
 pub mod geom;
+pub mod ilmari;
 pub mod legacy;
 pub mod live;
 pub mod minigame;
