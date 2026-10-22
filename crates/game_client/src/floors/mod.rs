@@ -9,6 +9,7 @@ mod campus;
 pub mod carpark;
 mod class_spots;
 mod client;
+mod coplanar;
 pub mod corporate;
 mod datacenter;
 mod districts;
@@ -452,6 +453,7 @@ fn load_floor(
         }
     };
 
+    let backing = coplanar::Backing::new(&layout.pieces);
     for piece in &layout.pieces {
         if bare && !matches!(piece, Piece::Light { .. }) {
             continue;
@@ -517,17 +519,26 @@ fn load_floor(
                         materials.add(textures::tex_material(*tex, img))
                     })
                     .clone();
-                let mut e = commands.spawn((
-                    FloorEntity,
-                    Mesh3d(quad.clone()),
-                    MeshMaterial3d(handle),
-                    Transform::from_translation(*center)
-                        .with_rotation(Quat::from_rotation_y(*yaw))
-                        .with_scale(size.extend(1.0)),
-                    NotShadowCaster,
-                ));
-                if size.x.max(size.y) < DECOR_MAX_SIDE {
-                    e.insert(decor_range.clone());
+                // Panels cull their back face (so text never reads mirrored); a free-standing one
+                // gets a twin turned half a circle so it reads from both sides. Against a wall or
+                // board the twin would be hidden inside it, so it is skipped there.
+                let twin = *tex != Tex::Cobweb && !backing.covers_back(*center, *yaw, *size);
+                for turn in [0.0, std::f32::consts::PI]
+                    .into_iter()
+                    .take(1 + usize::from(twin))
+                {
+                    let mut e = commands.spawn((
+                        FloorEntity,
+                        Mesh3d(quad.clone()),
+                        MeshMaterial3d(handle.clone()),
+                        Transform::from_translation(*center)
+                            .with_rotation(Quat::from_rotation_y(*yaw + turn))
+                            .with_scale(size.extend(1.0)),
+                        NotShadowCaster,
+                    ));
+                    if size.x.max(size.y) < DECOR_MAX_SIDE {
+                        e.insert(decor_range.clone());
+                    }
                 }
             }
             Piece::Light {

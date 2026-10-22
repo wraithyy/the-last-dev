@@ -14,7 +14,7 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ### Fixed
 
-- Signs and posters no longer flicker against the board or wall behind them, especially from a distance.
+- Signs and posters no longer flicker against the board or wall behind them, and read the right way round from behind (the graveyard sign included); rugs, road markings, lamp light and other flat details no longer shimmer against the ground or each other from a distance.
 
 ## [0.8.0] - 2026-10-22
 

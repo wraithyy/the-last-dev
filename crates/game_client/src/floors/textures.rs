@@ -66,7 +66,23 @@ fn shiny(color: Color, metallic: f32, roughness: f32) -> StandardMaterial {
     }
 }
 
+/// Every material gets its own depth bias, so two different materials that still share a height
+/// after `coplanar::separate` hit its lift cap draw in a fixed order instead of flickering.
 pub fn material(mat: Mat, t: &Theme) -> StandardMaterial {
+    let mut m = base_material(mat, t);
+    if mat != Mat::LampPool {
+        m.depth_bias = mat_bias(mat);
+    }
+    m
+}
+
+/// Spaced wide enough that rasterisation noise cannot swap two neighbours; the whole range
+/// (about 0.6k) stays far below a sign's bias and a few millimetres at campus distances.
+fn mat_bias(mat: Mat) -> f32 {
+    (mat as i32 * 8) as f32
+}
+
+fn base_material(mat: Mat, t: &Theme) -> StandardMaterial {
     let c = Color::srgb;
     match mat {
         Mat::Wall => matte(t.wall),
@@ -96,7 +112,7 @@ pub fn material(mat: Mat, t: &Theme) -> StandardMaterial {
             alpha_mode: AlphaMode::Add,
             unlit: true,
             // Lies a few mm over roads and lawn; the bias keeps it on top of them.
-            depth_bias: 100.0,
+            depth_bias: 1000.0,
             ..default()
         },
         Mat::Glass => StandardMaterial {
@@ -254,12 +270,12 @@ pub fn tex_material(tex: Tex, image: Handle<Image>) -> StandardMaterial {
         } else {
             AlphaMode::Opaque
         },
+        // Single-sided: the back face is culled and `load_floor` spawns a twin facing the other
+        // way, so text reads right from both sides. Only cobwebs are see-through on both.
         double_sided: tex == Tex::Cobweb,
-        cull_mode: None,
-        // Signs and posters hang a couple of centimetres off a board or wall; at campus
-        // distances that gap is below depth precision and the two flicker. The bias keeps the
-        // panel in front of its backing.
-        depth_bias: 50.0,
+        // Panels hang a few centimetres off a board or wall; `coplanar::separate` keeps that gap
+        // above a centimetre, and this bias keeps the panel over any material bias (`mat_bias`).
+        depth_bias: 2000.0,
         ..default()
     }
 }

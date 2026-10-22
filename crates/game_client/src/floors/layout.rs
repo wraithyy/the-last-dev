@@ -224,7 +224,7 @@ pub fn assemble(
     drape(&mut plan);
     let ceiling = plan.top();
     let Plan {
-        pieces,
+        mut pieces,
         anchors,
         fp,
         route,
@@ -233,12 +233,15 @@ pub fn assemble(
         terrain,
         ..
     } = plan;
+    // Blockers first: separating coplanar faces is a visual nudge and must not move collision.
+    let blockers = blockers_of(&pieces);
+    super::coplanar::separate(&mut pieces, &terrain);
     FloorLayout {
         id,
         zone,
         name,
         outdoor,
-        blockers: blockers_of(&pieces),
+        blockers,
         anchors: anchors
             .into_iter()
             .map(|Anchor { name, pos, yaw }| (name, pos, yaw))
