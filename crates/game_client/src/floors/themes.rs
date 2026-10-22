@@ -564,10 +564,8 @@ fn plants(p: &mut Plan, list: &[(f32, f32)]) {
 
 fn decor1(p: &mut Plan) {
     // Cubicle islands, back to back, with a free lane beside each so packs have a clear pull.
-    for (i, x) in [-6.0, -2.5].into_iter().enumerate() {
-        cubicle(p, i, x, 18.5, 0.0);
-        cubicle(p, i + 1, x, 15.5, PI);
-    }
+    cubicle(p, 0, -4.0, 18.5, 0.0);
+    cubicle(p, 1, -4.0, 15.5, PI);
     cubicle(p, 0, -0.5, -9.0, 0.0);
     cubicle(p, 1, -0.5, -12.0, PI);
     lounge(p, 16.0, -12.0, FRAC_PI_2, true);
@@ -592,7 +590,7 @@ fn decor1(p: &mut Plan) {
     beanbag(p, -12.4, 7.2, Mat::BeanB);
     beanbag(p, -15.5, 7.4, Mat::BeanC);
     lounge(p, 7.5, 5.5, FRAC_PI_2, true);
-    plants(p, &[(24.0, -1.0), (1.0, -5.0), (-28.0, 5.0), (-4.0, 9.0)]);
+    plants(p, &[(24.0, -1.0), (-28.0, 5.0)]);
 
     // West pod: IT corner (npc_2 asleep, npc_3 chatting) and a kitchenette.
     p.framed(v(-39.0, 0.0, 9.0), PI, |p| {
@@ -641,11 +639,8 @@ fn decor1(p: &mut Plan) {
     p.poster_near(-46.0, -9.0, 2.4, v2(1.2, 1.5), Tex::Synergy);
     p.poster_near(-4.0, -24.0, 2.4, v2(1.2, 1.5), Tex::PosterBurn);
     p.poster_near(19.0, -12.0, 2.4, v2(1.2, 1.5), Tex::PosterHang);
-    p.poster_near(-20.0, 29.0, 2.4, v2(1.2, 1.5), Tex::PosterPie);
-    p.poster_near(37.0, 29.0, 2.4, v2(1.2, 1.5), Tex::PosterBars);
     p.panel_near(-9.0, -5.5, 3.6, v2(6.0, 1.1), Tex::MandatoryFun);
     p.poster_near(-20.0, -23.0, 2.2, v2(3.0, 1.5), Tex::Roadmap);
-    p.poster_near(-12.0, 4.0, 2.2, v2(3.0, 1.5), Tex::Flowchart);
     // Above the boss hall entrance, seen along the hub.
     p.panel_near(32.0, -1.0, 3.4, v2(2.4, 0.96), Tex::DaysCounter);
 
@@ -712,18 +707,7 @@ fn decor2(p: &mut Plan) {
         );
         p.light(v(x, 3.0, z), Color::srgb(0.7, 1.0, 0.9), 40_000.0);
     }
-    plants(
-        p,
-        &[
-            (-34.0, -14.0),
-            (-2.0, -16.0),
-            (12.0, 14.0),
-            (-12.0, 17.0),
-            (-44.0, 12.0),
-        ],
-    );
-    p.prop(&LAMP_ROUND_FLOOR, v(-14.0, 0.0, 2.0), 0.0, false);
-    p.prop(&LAMP_ROUND_FLOOR, v(1.0, 0.0, -4.0), 0.0, false);
+    plants(p, &[(-34.0, -14.0), (12.0, 14.0), (-44.0, 12.0)]);
     water_cooler(p, -30.0, -6.0);
 
     // Stand-up area in the arrival pod: yellow tape rectangle and a sign.
@@ -739,7 +723,6 @@ fn decor2(p: &mut Plan) {
     p.poster_near(-44.0, 13.0, 2.2, v2(3.0, 1.5), Tex::Roadmap);
     p.poster_near(-20.0, 22.0, 2.4, v2(2.0, 1.33), Tex::AiFirst);
     p.poster_near(2.0, 23.0, 2.4, v2(1.2, 1.5), Tex::Synergy);
-    p.poster_near(-20.0, -22.0, 2.4, v2(2.4, 1.2), Tex::Flowchart);
     p.poster_near(8.0, -22.0, 2.4, v2(2.4, 1.2), Tex::Stickies);
     p.panel_near(26.0, -1.0, 3.4, v2(2.4, 0.96), Tex::DaysCounter);
     runner(
@@ -799,11 +782,11 @@ fn decor2(p: &mut Plan) {
 
 fn decor3(p: &mut Plan) {
     // The demo stage drum: screens, neon and podiums all the way round.
-    for deg in [-60.0, -110.0, -160.0, 160.0, 110.0, 60.0] {
+    for deg in [-60.0, -160.0, 160.0, 60.0] {
         let c = polar(11.7, deg);
         p.panel_near(c.x, c.y, 2.3, v2(4.5, 2.5), Tex::DemoScreen);
     }
-    for deg in [-135.0, 135.0, 85.0, -85.0] {
+    for deg in [-110.0, 110.0] {
         let c = polar(11.7, deg);
         p.panel_near(c.x, c.y, 4.0, v2(4.8, 1.2), Tex::CloseDeals);
     }
@@ -816,27 +799,14 @@ fn decor3(p: &mut Plan) {
     demo_stand(p, 6.0, 16.5, Face::NegZ);
     // Showroom lounges between the pack positions, and the gong.
     lounge(p, -13.9, -12.9, 0.0, false);
-    lounge(p, -8.0, 17.2, PI, false);
-    p.prop(&LOUNGE_SOFA_LONG, v(-20.0, 0.0, 6.0), FRAC_PI_2, true);
     p.prop(&LOUNGE_DESIGN_SOFA, v(10.0, 0.0, 16.0), PI, true);
     p.prop(&COFFEE_TABLE_GLASS, v(10.0, 0.0, 14.0), 0.0, true);
     gong(p, 9.0, -18.0);
     trophy_shelf(p, 5.0, 11.0, Face::NegZ);
-    plants(
-        p,
-        &[
-            (-23.0, -2.0),
-            (-18.0, 12.0),
-            (14.0, -9.0),
-            (16.0, 14.0),
-            (-5.0, -18.0),
-        ],
-    );
-    p.poster_near(-24.0, -12.0, 2.4, v2(1.2, 1.5), Tex::PosterBars);
+    plants(p, &[(-23.0, -2.0), (16.0, 14.0)]);
     p.poster_near(-22.0, 14.0, 2.4, v2(2.4, 1.15), Tex::AiTransformation);
     p.poster_near(2.0, 25.0, 2.4, v2(2.0, 1.33), Tex::AiFirst);
     p.poster_near(8.0, -25.0, 2.4, v2(1.2, 1.5), Tex::Synergy);
-    p.poster_near(24.0, -28.0, 2.4, v2(1.2, 1.5), Tex::PosterPie);
 
     // Marketing pod (pack_6, the Head of Marketing).
     p.panel_near(-10.0, 39.0, 3.5, v2(3.9, 1.3), Tex::Brand);
@@ -911,13 +881,11 @@ fn decor4(p: &mut Plan) {
     long_table(p, 0.0, 0.0, 4, true);
     p.panel_near(0.0, 10.3, 2.4, v2(3.5, 1.75), Tex::Gantt);
     p.panel_near(0.0, -10.3, 2.4, v2(3.5, 1.75), Tex::Gantt);
-    p.panel_near(0.0, 11.7, 2.4, v2(3.5, 1.75), Tex::Gantt);
-    p.panel_near(0.0, -11.7, 2.4, v2(3.5, 1.75), Tex::Gantt);
     p.panel_near(-11.7, 6.0, 3.2, v2(2.8, 0.47), Tex::WarRoom);
     p.light(v(0.0, 3.4, 0.0), Color::srgb(1.0, 0.9, 0.6), 400_000.0);
 
     // Gantt walls: every bar red.
-    for deg in [75.0, 105.0, 140.0, 165.0, 15.0] {
+    for deg in [75.0, 140.0, 15.0] {
         let c = polar(27.7, deg);
         p.poster_near(c.x, c.y, 2.3, v2(4.5, 2.25), Tex::Gantt);
     }
@@ -932,8 +900,6 @@ fn decor4(p: &mut Plan) {
         }
     }
     lounge(p, 12.5, 18.0, PI, true);
-    p.prop(&RUG_ROUND, v(-2.0, 0.0, 19.0), 0.0, false);
-    p.prop(&LOUNGE_CHAIR_RELAX, v(-1.0, 0.0, 22.0), -FRAC_PI_2, true);
     water_cooler(p, -20.0, 12.5);
     p.prop(
         &COFFEE_MACHINE,
@@ -943,12 +909,12 @@ fn decor4(p: &mut Plan) {
     );
     p.prop(&SIDE_TABLE, v(-22.0, 0.0, 14.0), 0.0, true);
     doc_shelf(p, -22.0, 19.0, Face::NegZ);
-    plants(p, &[(-42.0, -7.0), (22.0, 8.0), (-24.0, -7.0), (5.0, 10.0)]);
+    plants(p, &[(-42.0, -7.0), (22.0, 8.0)]);
     p.poster_near(-49.0, -8.0, 2.4, v2(2.0, 1.33), Tex::AiFirst);
 
     // SOC offshoot (pack_6, the CISO): red "!" monitors, a password on a monitor, a shredder
     // next to unshredded paper, an open padlock, a fishing rod.
-    for x in [24.0, 27.0, 30.0, 33.0, 36.0] {
+    for x in [24.0, 30.0, 36.0] {
         p.poster_near(x, 35.8, 2.4, v2(1.45, 1.45), Tex::SocAlert);
     }
     p.panel_near(30.0, 35.8, 3.5, v2(2.4, 0.4), Tex::WarRoom);

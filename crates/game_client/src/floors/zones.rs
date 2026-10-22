@@ -511,6 +511,13 @@ mod tests {
         assert!(!l.pieces.iter().any(|p| matches!(p, Piece::Light { .. })));
     }
 
+    /// The Tower floors, the Data Center halls and the Innovation Lab floors.
+    fn is_landmark_interior(id: &str) -> bool {
+        ["tower/", "datacenter/", "lab/"]
+            .iter()
+            .any(|p| id.starts_with(p))
+    }
+
     /// Blocking: the campus passes, keep it that way (add an exception to the lists below with a reason).
     const GATE_ENFORCED: bool = true;
 
@@ -668,6 +675,76 @@ mod tests {
         );
     }
 
+    /// Pairs in the landmark interiors allowed closer than 2.5 m, each with the reason.
+    const LANDMARK_CLOSE_PAIRS: [(&str, &str, &str); 1] = [
+        // The sleeping IT admin and the colleague chatting at their elbow are one scene.
+        ("tower/1", "npc_2", "npc_3"),
+    ];
+
+    /// The indoor counterpart of `campus_density_gate`: the Tower floors, the Data Center halls
+    /// and the Innovation Lab keep their interactables apart and their model props in groups.
+    #[test]
+    fn landmark_density_gate() {
+        let mut bad: Vec<String> = Vec::new();
+        for id in ZONE_IDS.iter().filter(|i| is_landmark_interior(i)) {
+            let l = zone(id);
+            let things: Vec<(&str, Vec3)> = l
+                .anchors
+                .iter()
+                .filter(|a| {
+                    !is_enemy(a.0)
+                        // Arrival points, not things to walk up to.
+                        && !matches!(a.0, "player_spawn" | "graveyard" | "elevator" | "elevator_exit")
+                })
+                .map(|a| (a.0, a.1))
+                .collect();
+            let flat = |a: Vec3, b: Vec3| Vec2::new(a.x - b.x, a.z - b.z).length();
+            for (i, (a, pa)) in things.iter().enumerate() {
+                for (b, pb) in &things[i + 1..] {
+                    let allowed = LANDMARK_CLOSE_PAIRS
+                        .iter()
+                        .any(|(z, x, y)| z == id && ((a, b) == (x, y) || (a, b) == (y, x)));
+                    let d = flat(*pa, *pb);
+                    if d < 2.5 && !allowed {
+                        bad.push(format!("{id}: {a} and {b} are {d:.1} m apart"));
+                    }
+                }
+            }
+            let cell = |p: Vec3| ((p.x / 10.0).floor() as i32, (p.z / 10.0).floor() as i32);
+            let mut anchors_per_cell: std::collections::BTreeMap<(i32, i32), usize> =
+                Default::default();
+            for (_, p) in &things {
+                *anchors_per_cell.entry(cell(*p)).or_default() += 1;
+            }
+            for (c, n) in anchors_per_cell {
+                if n > 4 {
+                    bad.push(format!("{id}: {n} interactables in 10 m cell {c:?}"));
+                }
+            }
+            // Furniture and clutter models; walls, racks and signs are boxes and panels.
+            let mut props_per_cell: std::collections::BTreeMap<(i32, i32), usize> =
+                Default::default();
+            for pc in &l.pieces {
+                if let crate::floors::kit::Piece::Prop { pos, .. } = pc {
+                    *props_per_cell.entry(cell(*pos)).or_default() += 1;
+                }
+            }
+            for (c, n) in props_per_cell {
+                if n > 16 {
+                    bad.push(format!("{id}: {n} model props in 10 m cell {c:?}"));
+                }
+            }
+        }
+        for b in &bad {
+            eprintln!("landmark density gate: {b}");
+        }
+        eprintln!("landmark density gate: {} violations", bad.len());
+        assert!(
+            bad.is_empty(),
+            "landmark interiors are too crowded, see above"
+        );
+    }
+
     /// `cargo test -p game_client zone_anchors -- --ignored --nocapture`: QA coordinates for
     /// `WOW_PLAYER_AT`.
     #[test]
@@ -681,6 +758,32 @@ mod tests {
                     p.z,
                     yaw.to_degrees()
                 );
+            }
+        }
+    }
+
+    /// `cargo test -p game_client zone_props -- --ignored --nocapture`: every model piece of the
+    /// indoor landmark zones as `zone model x z solid`, input of `scripts/landmark_density.py`.
+    #[test]
+    #[ignore]
+    fn zone_props() {
+        for id in ZONE_IDS.iter().filter(|i| is_landmark_interior(i)) {
+            for pc in &zone(id).pieces {
+                match pc {
+                    crate::floors::kit::Piece::Prop {
+                        model, pos, solid, ..
+                    } => println!(
+                        "PROP {id} {}/{} {:.1} {:.1} {solid}",
+                        model.dir, model.file, pos.x, pos.z
+                    ),
+                    crate::floors::kit::Piece::Panel { center, tex, .. } => {
+                        println!(
+                            "PANEL {id} {tex:?} {:.1} {:.1} {:.1}",
+                            center.x, center.z, center.y
+                        )
+                    }
+                    _ => {}
+                }
             }
         }
     }

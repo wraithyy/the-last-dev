@@ -361,7 +361,10 @@ fn startup_desk(p: &mut Plan, i: usize, x: f32, z: f32, yaw: f32) {
             v(0.1, 0.12, 0.1),
             [Mat::White, Mat::Red, Mat::BeanB][i % 3],
         );
-        p.prop(&PLANTS_SMALL[i % 3], v(-0.68, top, -0.25), 0.0, false);
+        // One succulent per island corner, not one per desk.
+        if i.is_multiple_of(4) {
+            p.prop(&PLANTS_SMALL[i % 3], v(-0.68, top, -0.25), 0.0, false);
+        }
         p.prop(
             &CHAIR_DESK,
             v(0.1 + jit(i) * 0.3, 0.0, 0.95),
@@ -805,11 +808,10 @@ fn lab1_dressing(p: &mut Plan) {
     p.sign_near(-50.0, -10.0, 2.7, 4.0, Sign::InnovationNeon);
     p.poster_near(-45.0, 10.0, 2.4, Vec2::new(1.9, 0.95), Tex::TurnItOff);
 
-    // Open space: two desk islands, the pivot wall and the glass pod.
+    // Open space: three desk islands, the pivot wall and the glass pod.
     desk_island(p, 0, -31.0, -20.0);
     desk_island(p, 4, -6.0, 18.5);
     desk_island(p, 8, -32.0, 19.5);
-    desk_island(p, 12, 3.0, -19.5);
     lounge(p, -12.0, -8.5, 0.0, true);
     lounge(p, -12.0, 8.5, PI, false);
     // Standing-meeting tables nobody sits at.
@@ -829,43 +831,19 @@ fn lab1_dressing(p: &mut Plan) {
     graveyard(p, -39.0, 6.9);
 
     // Rugs under the beanbag islands, so they read as zones rather than lumps.
-    for (x, z) in [
-        (-29.5, -4.0),
-        (-28.0, 4.5),
-        (-19.5, 5.8),
-        (-5.5, -5.5),
-        (2.5, 6.5),
-        (-20.0, -5.5),
-    ] {
+    for (x, z) in [(-29.5, -4.0), (-5.5, -5.5), (2.5, 6.5)] {
         p.prop(&RUG_ROUND, v(x, 0.0, z), 0.0, false);
-    }
-    // Plants in the corners.
-    for (x, z) in [
-        (-36.5, -19.5),
-        (-36.5, 19.5),
-        (13.0, -19.5),
-        (13.0, 20.5),
-        (-17.5, -22.5),
-        (-17.5, 22.5),
-    ] {
-        p.prop(&POTTED_PLANT, v(x, 0.0, z), 0.0, true);
     }
     // Wall dressing: posters in the corridors, between the whiteboards and in the nooks.
     p.poster_near(-18.5, -24.0, 2.3, Vec2::new(1.2, 1.5), Tex::PosterBars);
-    p.poster_near(-6.0, -24.0, 2.3, Vec2::new(1.2, 1.5), Tex::PosterBurn);
-    p.poster_near(-19.0, 24.0, 2.3, Vec2::new(1.2, 1.5), Tex::PosterHang);
     p.poster_near(-6.5, 24.0, 2.3, Vec2::new(2.0, 1.33), Tex::AiFirst);
     p.poster_near(18.0, -4.0, 2.4, Vec2::new(3.0, 1.5), Tex::Roadmap);
     p.poster_near(24.0, 4.0, 2.4, Vec2::new(2.4, 1.15), Tex::AiTransformation);
     p.poster_near(-44.0, 4.0, 2.4, Vec2::new(1.2, 1.5), Tex::Synergy);
-    p.poster_near(-40.0, -4.0, 2.4, Vec2::new(1.2, 1.5), Tex::PosterPie);
     p.sign_near(-21.8, -34.0, 2.4, 2.4, Sign::WhiteboardB);
     p.sign_near(-2.2, -34.0, 2.4, 2.4, Sign::WhiteboardA);
     p.sign_near(-21.8, 34.0, 2.4, 2.4, Sign::WhiteboardC);
     p.sign_near(-2.2, 34.0, 2.4, 2.4, Sign::WhiteboardB);
-    for (x, z) in [(-20.0, -40.0), (-4.0, -40.0), (-20.0, 40.0), (-4.0, 40.0)] {
-        p.prop(&POTTED_PLANT, v(x, 0.0, z), 0.0, true);
-    }
 
     // Demo stage: neon edge, speaker stacks, a truss and the banner; chairs to the sides.
     let c = v(40.0, 0.0, 0.0);
@@ -912,7 +890,7 @@ fn lab1_dressing(p: &mut Plan) {
 /// and pendant lamps. Everything stays clear of the runner lane, the packs and the doors.
 fn lab1_zoning(p: &mut Plan) {
     // Desk islands: blue rugs; lounges: warm rugs; kombucha bar: a yellow strip.
-    for (x, z) in [(-31.0, -20.4), (-32.0, 19.3), (-6.0, 18.4), (3.0, -19.9)] {
+    for (x, z) in [(-31.0, -20.4), (-32.0, 19.3), (-6.0, 18.4)] {
         area_rug(p, x, z, 8.6, 5.2, Mat::Fabric1, Mat::White);
     }
     for z in [-9.75, 9.75] {
@@ -920,26 +898,17 @@ fn lab1_zoning(p: &mut Plan) {
     }
     area_rug(p, 2.9, 21.4, 6.4, 2.6, Mat::Fabric2, Mat::White);
     // Partitions on the hall side of each island, each capped by a planter.
-    for (x, z, len) in [
-        (-31.0, -17.9, 6.0),
-        (-32.0, 16.6, 6.0),
-        (-6.5, 15.7, 5.5),
-        (3.3, -16.9, 6.0),
-    ] {
+    for (x, z, len) in [(-31.0, -17.9, 6.0), (-32.0, 16.6, 6.0), (-6.5, 15.7, 5.5)] {
         partition(p, x, z, len, 0.0);
         for sx in [-1.0, 1.0] {
             planter(p, x + sx * (len / 2.0 + 0.8), z, 1.4, 0.0);
         }
-    }
-    for z in [-15.5, 15.5] {
-        planter(p, -12.0, z, 3.0, 0.0);
     }
     // Pendants over every zone.
     for (x, z) in [
         (-31.0, -20.4),
         (-32.0, 19.3),
         (-6.0, 18.4),
-        (3.0, -19.9),
         (-12.0, -9.75),
         (-12.0, 9.75),
         (2.9, 21.4),

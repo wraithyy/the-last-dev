@@ -260,18 +260,11 @@ fn dc1(p: &mut Plan) -> Theme {
         }
     }
     for z in [-10.5, 10.5] {
-        for x in [
-            -28.5, -25.5, -22.5, -19.5, -16.5, -13.5, -2.5, 0.5, 3.5, 6.5, 9.5, 12.5,
-        ] {
+        for x in [-28.5, -22.5, -16.5, -2.5, 3.5, 9.5] {
             vent_tile(p, x, z, Mat::Cold);
         }
     }
-    for (x, z, n) in [
-        (-22.5, -10.5, 3),
-        (6.5, 10.5, 3),
-        (-16.5, 10.5, 2),
-        (0.5, -10.5, 2),
-    ] {
+    for (x, z, n) in [(-22.5, -10.5, 3), (3.5, 10.5, 3)] {
         steam(p, x, z, n);
     }
     cable_bundle(
@@ -300,7 +293,6 @@ fn dc1(p: &mut Plan) -> Theme {
     }
     p.sign_near(0.0, -19.5, 2.8, 2.4, Sign::HotAisle);
     p.sign_near(0.0, 19.5, 2.8, 2.4, Sign::HotAisle);
-    p.sign_near(14.0, 20.0, 2.8, 2.6, Sign::Compute);
     cable_tray(p, pt(-30.0, 0.0), pt(14.0, 0.0), false);
     cable_tray(p, pt(-8.0, -18.0), pt(-8.0, 18.0), false);
     pipe_run(p, pt(-31.0, 3.2), pt(15.0, 3.2), 4.22, Mat::Scr1);
@@ -318,10 +310,8 @@ fn dc1(p: &mut Plan) -> Theme {
     // Lobby: reception, notices, vending, a sad plant.
     dc1_lobby(p);
     p.sign_near(-56.0, -6.0, 2.2, 2.0, Sign::DoNotUnplug);
-    p.sign_near(-56.0, 6.0, 2.2, 2.0, Sign::ThisIsFine);
     vending(p, -43.0, -9.8, Face::PosZ);
     sad_plant(p, -55.5, 9.0);
-    p.sign_near(-48.0, -11.0, 2.6, 3.0, Sign::Uptime);
 
     // GPU shrine room.
     gpu_shrine(p, -8.0, -39.5, Face::PosZ);
