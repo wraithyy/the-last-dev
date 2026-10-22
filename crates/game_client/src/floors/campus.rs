@@ -119,6 +119,7 @@ pub fn build() -> FloorLayout {
         ("door:offsite/1", shuttle_stop(&mut p)),
         ("door:vibecon/1", vibecon_entrance(&mut p)),
         ("door:onboarding/1", starters_door(&mut p)),
+        ("door:basement/1", loading_dock_door(&mut p)),
     ];
     tower_shell(&mut p);
     data_center_shell(&mut p);
@@ -1022,6 +1023,52 @@ fn starters_door(p: &mut Plan) -> (Vec3, f32) {
         p.sign(v(0.0, 3.8, 0.22), 0.0, 2.8, Sign::ObNewStarters);
     });
     (v(X, 0.0, WALL_Z + 2.0), PI)
+}
+
+/// The Migration dungeon: the loading dock on the back (east face) of the Data Center, a half-raised
+/// roller shutter with a hazard-striped frame, bumpers, bollards and the sign that lets everyone
+/// with a ticket in. Returns the door anchor in front of it, facing east.
+fn loading_dock_door(p: &mut Plan) -> (Vec3, f32) {
+    let (c, s) = DATA_CENTER;
+    let (x, z) = (c.x + s.x / 2.0, c.y + 4.0);
+    p.framed(v(x, 0.0, z), Face::PosX.yaw(), |p| {
+        // Dock recess, the shutter stuck at half height, and a dark gap under it that is the way in.
+        p.boxed(v(0.0, 1.7, 0.14), v(4.2, 3.4, 0.28), Mat::Dark, false);
+        for k in 0..6 {
+            p.boxed(
+                v(0.0, 3.2 - k as f32 * 0.14, 0.3),
+                v(3.9, 0.1, 0.06),
+                Mat::Metal,
+                false,
+            );
+        }
+        for sx in [-2.25, 2.25] {
+            for k in 0..8 {
+                let m = if k % 2 == 0 { Mat::Hazard } else { Mat::Dark };
+                p.boxed(
+                    v(sx, 0.25 + k as f32 * 0.45, 0.2),
+                    v(0.3, 0.45, 0.14),
+                    m,
+                    false,
+                );
+            }
+        }
+        p.boxed(v(0.0, 3.55, 0.3), v(4.8, 0.2, 0.2), Mat::Hazard, false);
+        // Dock leveller, rubber bumpers and two bollards.
+        p.boxed(v(0.0, 0.05, 1.3), v(3.6, 0.1, 2.4), Mat::Concrete, false);
+        for sx in [-1.7, 1.7] {
+            p.boxed(v(sx, 0.9, 0.4), v(0.3, 0.5, 0.2), Mat::Tire, false);
+            p.prim(
+                PrimKind::Cylinder,
+                v(sx * 1.5, 0.5, 3.2),
+                v(0.28, 1.0, 0.28),
+                Mat::Yellow,
+            );
+        }
+        p.boxed(v(0.0, 3.82, 0.3), v(0.3, 0.16, 0.12), Mat::LedRed, false);
+        p.sign(v(0.0, 4.5, 0.26), 0.0, 5.6, Sign::MigDoor);
+    });
+    (v(x + 1.8, 0.0, z), -FRAC_PI_2)
 }
 
 /// The All-Hands Offsite shuttle: a shelter, a parked coach in offsite livery and a tall pylon

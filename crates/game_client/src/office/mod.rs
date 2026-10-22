@@ -207,6 +207,7 @@ fn pickup_look(tag: &str) -> (&'static str, Color) {
         "dc1_fan_blade" => ("fan_blade", Color::srgb(0.75, 0.8, 0.9)),
         "dc2_tape" => ("rollback", Color::srgb(1.0, 0.55, 0.35)),
         "lab1_usb" => ("gear_usb", Color::srgb(1.0, 0.45, 0.8)),
+        "basement_tag" => ("junk_ticket", Color::srgb(0.35, 0.9, 1.0)),
         _ => ("box", Color::srgb(1.0, 0.8, 0.25)),
     }
 }

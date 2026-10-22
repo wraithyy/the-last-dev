@@ -1,7 +1,8 @@
-//! The dungeon "The Onboarding" (docs/DUNGEONS.md, content `raids`): its rooms and door, the daily
+//! The dungeons "The Onboarding" and "The Migration" (docs/DUNGEONS.md, content `raids`): rooms and doors, the daily
 //! boss lockout with a locked boss that still spawns, the quest chain from the entrance clerk to
 //! the exit hire, and the XP ladder (full, a quarter, nothing) with its gate under half a level.
-//! The bot playthroughs (a trio on Normal, one player on Async) live in tests/coop.rs.
+//! The bot playthroughs (a trio on Normal, one player on Async) live in tests/coop.rs. The Migration's
+//! tests are at the end of this file.
 
 mod common;
 
@@ -426,6 +427,7 @@ fn dungeon_xp_stays_under_half_a_level() {
         assert_eq!(lvl, LEVEL);
         assert!(xp < BAR / 2, "under half a level: {xp}");
     }
+    migration_xp_stays_under_half_a_level();
 }
 
 #[test]
@@ -474,4 +476,256 @@ fn the_box_the_laptop_shipped_in_goes_off_with_a_telegraph_when_the_provisioner_
         started && landed,
         "ring telegraph on death: {started} {landed}"
     );
+}
+
+// ---------------------------------------------------------------------------------------------
+// The Migration: four rooms (the first without a boss), the Consultants as linked twins, level 6.
+
+const M_ROOMS: [&str; 4] = ["basement/1", "basement/2", "basement/3", "basement/4"];
+const M_BOSSES: [&str; 3] = ["rollback_wraith", "consultant_jolene", "big_bang_cutover"];
+const M_QUESTS: [&str; 4] = [
+    "mig_inventory",
+    "mig_zombies",
+    "mig_consultants",
+    "mig_button",
+];
+/// Level-6 players: the dungeon's door level, and the level-6 XP bar of docs/FORMULAS.md.
+const M_LEVEL: u8 = 6;
+const M_BAR: u32 = 6000;
+
+#[test]
+fn the_migration_is_four_rooms_three_bosses_and_a_door_at_level_six() {
+    let c = content();
+    let r = c
+        .raids
+        .iter()
+        .find(|r| r.name == "The Migration")
+        .expect("dungeon");
+    assert!(r.is_dungeon());
+    assert_eq!(r.zones, M_ROOMS);
+    assert_eq!(r.bosses(&c), M_BOSSES, "room 1 is a boss-less gauntlet");
+    assert!(c.zone("basement/1").is_some_and(|z| z.boss.is_none()));
+    let twins = r.twins.as_ref().expect("the Consultants are linked");
+    assert_eq!(twins.members(), ["consultant_jolene", "consultant_jack"]);
+    let mut trash = 0;
+    for (i, z) in M_ROOMS.iter().enumerate() {
+        let def = c.zone(z).expect("room");
+        assert_eq!(def.level_range, (6, 7));
+        for p in &def.packs {
+            trash += p.units.len();
+            for u in &p.units {
+                assert_eq!(c.unit_def(u).map(|d| d.level), Some(6), "{u}");
+            }
+        }
+        if i > 0 {
+            let boss = c.unit_def(M_BOSSES[i - 1]).expect("boss");
+            assert!(boss.boss && boss.level == 7);
+        }
+        // Room 1 opens at once; every later room opens over the previous room's boss.
+        let forward = def
+            .links
+            .iter()
+            .find(|l| M_ROOMS.get(i + 1) == Some(&l.to.as_str()));
+        match (i, forward) {
+            (0, Some(l)) => assert!(l.requires.is_none(), "the gauntlet door is open"),
+            (1 | 2, Some(l)) => assert!(
+                matches!(&l.requires, Some(Unlock::BossKilled(k)) if k == M_BOSSES[i - 1]),
+                "{z}"
+            ),
+            (3, None) => {}
+            _ => panic!("{z}: unexpected forward link"),
+        }
+        let back = if i == 0 { "campus" } else { M_ROOMS[i - 1] };
+        assert!(
+            def.links
+                .iter()
+                .any(|l| l.to == back && l.requires.is_none()),
+            "{z}"
+        );
+    }
+    assert_eq!(trash, 20, "five types, twenty units");
+    let door = |sim: &Sim| {
+        sim.zone_links("campus")
+            .into_iter()
+            .find(|l| l.to == "basement/1")
+            .is_some_and(|l| l.unlocked)
+    };
+    let (sim, _) = group(2, 5, |_| {});
+    assert!(!door(&sim), "level 5 stays outside");
+    let (mut sim, ids) = group(2, M_LEVEL, |_| {});
+    assert!(door(&sim));
+    sim.set_level_of(ids[1], 5);
+    assert!(!door(&sim), "everyone needs the band's lower level");
+    let (mut solo, _) = group(1, M_LEVEL, |_| {});
+    load(&mut solo, "basement/2");
+    assert!(solo.raid_view().async_mode);
+    let boss = alive(&solo, "rollback_wraith")[0];
+    assert_eq!(solo.unit(boss).map(|u| u.max_hp), Some(5000 * 40 / 100));
+    let (mut trio, _) = group(3, M_LEVEL, |_| {});
+    load(&mut trio, "basement/2");
+    assert!(!trio.raid_view().async_mode);
+}
+
+#[test]
+fn an_orphaned_process_rises_once_as_a_zombie_and_the_zombie_stays_dead() {
+    let (mut sim, _) = group(1, M_LEVEL, |_| {});
+    load(&mut sim, "basement/1");
+    let before = alive(&sim, "orphaned_process").len();
+    assert!(before >= 2);
+    kill(&mut sim, "orphaned_process");
+    assert!(alive(&sim, "orphaned_process").is_empty());
+    assert_eq!(alive(&sim, "defunct_process").len(), before, "one each");
+    kill(&mut sim, "defunct_process");
+    run(&mut sim, 10);
+    assert!(alive(&sim, "defunct_process").is_empty());
+}
+
+#[test]
+fn the_consultants_spawn_as_a_linked_pair_with_exactly_one_open() {
+    let (mut sim, _) = group(3, M_LEVEL, |_| {});
+    load(&mut sim, "basement/3");
+    let shielded = |sim: &Sim, key: &str| {
+        let id = alive(sim, key)[0];
+        sim.unit(id)
+            .is_some_and(|u| u.auras.iter().any(|a| a.key == "billed_out"))
+    };
+    run(&mut sim, 2);
+    let (a, b) = (
+        shielded(&sim, "consultant_jolene"),
+        shielded(&sim, "consultant_jack"),
+    );
+    assert!(a != b, "exactly one of the pair is open: {a} {b}");
+}
+
+/// The whole run through the debug kill: every pack (zombies included) and boss of the four rooms.
+/// Quests are accepted at the project manager and handed in to the on-call engineer.
+fn clear_migration(sim: &mut Sim, players: &[EntityId], quests: bool) {
+    for (i, room) in M_ROOMS.iter().enumerate() {
+        load(sim, room);
+        if quests && i == 0 {
+            let pm = alive(sim, "migration_pm")[0];
+            for &p in players {
+                sim.apply_as(p, Command::Talk { unit: pm });
+                for q in M_QUESTS {
+                    sim.apply_as(p, Command::AcceptQuest { quest: q.into() });
+                }
+            }
+            run(sim, 1);
+        }
+        if quests && i < 2 {
+            // Three undocumented server tags in each of the first two rooms.
+            for &p in players {
+                for k in 0..3 {
+                    let n = i * 3 + k + 1;
+                    sim.apply_as(
+                        p,
+                        Command::Interact {
+                            prop: format!("basement_tag_{n}"),
+                        },
+                    );
+                }
+            }
+        }
+        // Zombies rise from the pack, so keep going until nothing but the boss is left.
+        for _ in 0..40 {
+            let Some(k) = sim
+                .units()
+                .find(|u| u.hostile && u.alive && !u.boss)
+                .map(|u| u.key.clone())
+            else {
+                break;
+            };
+            kill(sim, &k);
+        }
+        if let Some(boss) = i.checked_sub(1).map(|b| M_BOSSES[b]) {
+            kill(sim, boss);
+            // The linked twin dies with its partner; anything left is killed for the quest.
+            for twin in ["consultant_jack"] {
+                if !alive(sim, twin).is_empty() {
+                    kill(sim, twin);
+                }
+            }
+        }
+        if quests && i == 3 {
+            for &p in players {
+                sim.apply_as(
+                    p,
+                    Command::Interact {
+                        prop: "cutover_button".into(),
+                    },
+                );
+            }
+        }
+    }
+    if quests {
+        let engineer = alive(sim, "migration_oncall")[0];
+        for &p in players {
+            sim.apply_as(p, Command::Talk { unit: engineer });
+            run(sim, 1);
+            for q in M_QUESTS {
+                sim.apply_as(
+                    p,
+                    Command::TurnInQuest {
+                        quest: q.into(),
+                        choice: 0,
+                    },
+                );
+            }
+        }
+        run(sim, 1);
+    }
+}
+
+#[test]
+fn the_migration_quest_set_runs_from_the_project_manager_to_the_on_call_engineer() {
+    let (mut sim, ids) = group(1, M_LEVEL, |_| {});
+    let p = ids[0];
+    let c = content();
+    for q in M_QUESTS {
+        let def = c.quest(q).expect("quest");
+        assert_eq!(def.giver.npc, "migration_pm");
+        assert_eq!(def.giver.zone, "basement/1");
+        let end = def.turn_in.as_ref().expect("turn-in at the exit");
+        assert_eq!(
+            (end.npc.as_str(), end.zone.as_str()),
+            ("migration_oncall", "basement/4")
+        );
+        assert!(def.requires.is_none(), "the set runs in parallel");
+    }
+    assert!(c.quest("mig_button").is_some_and(|q| q.main));
+    assert!(c.quest("mig_consultants").is_some_and(|q| q.group));
+    clear_migration(&mut sim, &[p], true);
+    let done = &sim.quests_of(p).completed;
+    for q in M_QUESTS {
+        assert!(done.iter().any(|d| d == q), "{q} not done: {done:?}");
+    }
+    assert!(sim.quests_of(p).active.is_empty());
+}
+
+/// Part of the `dungeon_xp_stays_under_half_a_level` gate.
+fn migration_xp_stays_under_half_a_level() {
+    // Solo, Async: the full first run with every quest.
+    let (mut sim, ids) = group(1, M_LEVEL, |_| {});
+    clear_migration(&mut sim, &ids, true);
+    let gained = xp_of(&sim, ids[0]);
+    let level = sim.unit(ids[0]).map_or(0, |u| u.level);
+    println!(
+        "Migration solo first run: {gained} XP of {M_BAR} ({}%)",
+        gained * 100 / M_BAR
+    );
+    assert_eq!(level, M_LEVEL, "a fresh level-6 player must not reach 7");
+    assert!(gained > M_BAR * 3 / 10, "worth doing: {gained}");
+    assert!(gained < M_BAR / 2, "under half a level: {gained}");
+    // A four on Normal: kill XP is shared, quest XP is in full.
+    let (mut four, ids) = group(4, M_LEVEL, |_| {});
+    clear_migration(&mut four, &ids, true);
+    for &p in &ids {
+        let (xp, lvl) = (xp_of(&four, p), four.unit(p).map_or(0, |u| u.level));
+        println!(
+            "Migration four, one member: {xp} XP of {M_BAR} ({}%)",
+            xp * 100 / M_BAR
+        );
+        assert_eq!(lvl, M_LEVEL);
+        assert!(xp < M_BAR / 2, "under half a level: {xp}");
+    }
 }

@@ -1077,7 +1077,7 @@ const VIBECON: [&str; 5] = [
     "vibecon/5",
 ];
 /// Shields of linked bosses: the open member is the only one worth hitting.
-const LINK_SHIELDS: [&str; 2] = ["synergy_shield", "panel_muted"];
+const LINK_SHIELDS: [&str; 3] = ["synergy_shield", "panel_muted", "billed_out"];
 
 impl Group {
     /// Every member in the best Legacy piece (ilvl 12) of each slot for its role.
@@ -1198,7 +1198,7 @@ fn run_instance(
         if !cleared {
             break;
         }
-        bosses += 1;
+        bosses += u32::from(g.sim.content().zone(zone).is_some_and(|z| z.boss.is_some()));
         let dead: Vec<usize> = (0..g.m.len()).filter(|&k| !g.alive(k)).collect();
         for k in dead {
             let id = g.m[k].id;
@@ -1304,8 +1304,17 @@ impl Group {
                 self.rest();
             }
         }
-        if let Some((at, _)) = anchor("boss") {
+        let has_boss = self
+            .sim
+            .content()
+            .zone(zone)
+            .is_some_and(|z| z.boss.is_some());
+        if has_boss && let Some((at, _)) = anchor("boss") {
             self.raid_pull(at);
+        }
+        // A dungeon's boss-less gauntlet room is cleared once its packs are.
+        if !has_boss {
+            return (self.boss_min_pct, !self.wiped, self.deaths);
         }
         let boss = self
             .sim
@@ -1468,6 +1477,64 @@ fn the_onboarding_takes_a_group_and_async_attendance_takes_one() {
             ));
         }
         // 15-20 minutes per run, rests included: drop a pack, never a boss, if it drifts.
+        if g.secs > 20 * 60 {
+            failures.push(format!("seed {seed}: the trio needed {} s", g.secs));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// The Migration balance gate (docs/DUNGEONS.md): three level-6 bots without gear clear all four
+/// rooms (three bosses, the Consultants as linked twins) on Normal in under 20 minutes, one bot clears
+/// Async Attendance without dying, and one bot on Normal either fails or only scrapes through.
+#[test]
+fn the_migration_takes_a_group_and_async_attendance_takes_one() {
+    const MIGRATION: [&str; 4] = ["basement/1", "basement/2", "basement/3", "basement/4"];
+    let mut failures = Vec::new();
+    let trio = [Role::Tank, Role::Dps, Role::Healer];
+    for seed in [7u64, 42, 1234] {
+        let g = run_instance(&MIGRATION, &trio, false, seed, 6, false);
+        let a = run_instance(&MIGRATION, &[Role::Dps], true, seed, 6, false);
+        let s = run_instance(&MIGRATION, &[Role::Dps], false, seed, 6, false);
+        println!(
+            "Migration seed {seed}: trio Normal {}/3 bosses in {} s (low {}%, most dead {}); solo Async {}/3 in {} s (low {}%, died {}); solo Normal {}/3 in {} s (low {}%, died {})",
+            g.bosses,
+            g.secs,
+            g.low,
+            g.deaths,
+            a.bosses,
+            a.secs,
+            a.low,
+            a.deaths,
+            s.bosses,
+            s.secs,
+            s.low,
+            s.deaths
+        );
+        if g.bosses < 3 {
+            failures.push(format!(
+                "seed {seed}: the trio stopped after {} bosses",
+                g.bosses
+            ));
+        }
+        if a.bosses < 3 {
+            failures.push(format!(
+                "seed {seed}: solo Async stopped after {} bosses",
+                a.bosses
+            ));
+        }
+        if a.low < 5 || a.deaths > 0 {
+            failures.push(format!(
+                "seed {seed}: solo Async scraped through ({}%, died {})",
+                a.low, a.deaths
+            ));
+        }
+        if s.bosses == 3 && s.low >= 25 {
+            failures.push(format!(
+                "seed {seed}: solo Normal cleared it at {}% lowest",
+                s.low
+            ));
+        }
         if g.secs > 20 * 60 {
             failures.push(format!("seed {seed}: the trio needed {} s", g.secs));
         }

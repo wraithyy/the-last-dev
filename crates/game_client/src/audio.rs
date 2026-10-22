@@ -522,6 +522,10 @@ fn music_file(track: Track, zone: &str, outdoor_night: bool) -> &'static str {
             "offsite/1" | "offsite/2" => "audio/music/offsite_lobby.ogg",
             // The Onboarding: elevator muzak all the way down (its boss uses the generic boss loop).
             "onboarding/1" | "onboarding/2" | "onboarding/3" => "audio/music/office_muzak.ogg",
+            // The Migration: the Hall B drones all the way down (its bosses use the generic boss loop).
+            "basement/1" | "basement/2" | "basement/3" | "basement/4" => {
+                "audio/music/datacenter_hall_b.ogg"
+            }
             "offsite/4" => "audio/music/raid_boss_offsite.ogg",
             "vibecon/1" | "vibecon/2" | "vibecon/3" | "hackathon/1" => {
                 "audio/music/vibecon_expo.ogg"

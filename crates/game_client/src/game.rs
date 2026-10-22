@@ -480,6 +480,12 @@ fn zone_tagline(id: &str) -> &'static str {
         "onboarding/3" => {
             "Your desk is ready. Your desk has been ready since Tuesday. Which Tuesday is unclear."
         }
+        "basement/1" => "Cutover is scheduled for Friday at 18:00. Nobody asked which Friday.",
+        "basement/2" => "Racks as far as the mist goes. Every LED beats like a heart. A slow one.",
+        "basement/3" => {
+            "Every cable is labelled. Every label is wrong. The consultants have a rate card for that."
+        }
+        "basement/4" => "T minus ten. For eleven hours. There is no rollback plan, only forward.",
         "vibecon/1" => "Two hundred booths, one product, forty names for it.",
         "vibecon/2" => "Today's workshop: replacing yourself with a prompt, hands-on.",
         "vibecon/3" => "Hour 47 of 48. The demo works if nobody breathes near it.",

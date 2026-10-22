@@ -4,6 +4,7 @@
 //! (`game.rs`) decides which floor to load; `WOW_LINEUP=1|2` shows the whole
 //! cast side by side on a bare stage instead.
 
+mod basement;
 mod campus;
 pub mod carpark;
 mod class_spots;

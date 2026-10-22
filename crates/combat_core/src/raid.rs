@@ -136,7 +136,10 @@ impl RaidDef {
         for z in &self.zones {
             match c.zone(z) {
                 None => return bad(format!("unknown zone {z}")),
-                Some(d) if d.boss.is_none() => return bad(format!("zone {z} has no boss")),
+                // A dungeon may open with a trash gauntlet (The Migration's loading dock).
+                Some(d) if d.boss.is_none() && !self.is_dungeon() => {
+                    return bad(format!("zone {z} has no boss"));
+                }
                 _ => {}
             }
         }

@@ -65,12 +65,13 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - Loot objectives count pickups while active plus copies carried at accept time; turned-in quest items stay in the inventory (they are ordinary trophies with small bonuses).
 - `DrainMana` emits no event; the HUD sees the mana bar drop. Spell reflect (Alignment Training) also bounces DoT ticks of the player's spells.
 
-## Dungeons (The Onboarding)
+## Dungeons (The Onboarding, The Migration)
 
 - No new engine effects were added, so a few mechanics of docs/DUNGEONS.md use the closest existing one: the Laptop Provisioner's "Out For Delivery" is a Line telegraph (no boss teleport; `Teleport` moves the target), its "Reimage" is a damage-dealt debuff instead of stripping buffs (`Dispel` only removes harmful auras), and the Forgotten Probation Intern hits a random target (`AiTarget::Caster` is the unit itself, so it cannot fixate "the caster").
 - The Pop Quiz paints three of four answer lanes aimed at the target (no lettered floor tiles, which cannot follow a random aim); the Name Tags are a 5 s fuse (`Detonate`) rather than exploding on a hit.
 - The Fern pet, the dungeon's department reputation and the Company Calendar "Dungeon Finder" entry are not built yet (reputation is only paid at the level cap, and the dungeon is level 3-4).
 - Dungeon gear is rolled from the boss's own pieces (`source: Boss`), not as separate named drops at `legendary_pct`; the doc's named-piece roll and the tier-set `sets` field are unused here.
+- The Migration: no new engine effects either. The Data Sync tether pairs an odd player out with the boss itself (the doc's summoned Orphaned Record is not the second end), the Consultants' Gantt Chart and the Cutover's Traffic Switchover are Line telegraph waves, and the Orphaned Process's Zombie is a one-shot `Summon` on death, so killing the Zombie ends it. The DevOps snapshot rack, the COBOL label joke and the Hypercare Cape are not built.
 
 ## Debug bot
 

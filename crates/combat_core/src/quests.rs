@@ -1038,6 +1038,10 @@ impl Content {
                     z.packs.iter().any(|p| p.units.iter().any(|u| u == key))
                         || z.boss.as_ref().is_some_and(|b| b.unit == key)
                         || z.rares.iter().any(|r| r.unit == key)
+                        // A linked twin spawns beside its partner, the zone's boss.
+                        || self.raids.iter().filter_map(|r| r.twins.as_ref()).any(|t| {
+                            t.twin == key && z.boss.as_ref().is_some_and(|b| b.unit == t.boss)
+                        })
                         // Fixed spawns can be hostile too (the campus training dummy).
                         || z.friendly.iter().any(|f| f.unit == key)
                 })

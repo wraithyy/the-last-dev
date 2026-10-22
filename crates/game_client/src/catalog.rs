@@ -3076,6 +3076,168 @@ static TABLE: &[(&str, UnitVisual)] = &[
             ],
         ),
     ),
+    // ---- The Migration (dungeon): basement staff, legacy processes, the consultants and the cutover ----
+    (
+        "migration_pm",
+        v(
+            CASUAL_F,
+            1.7,
+            "Migration Project Manager",
+            "<Cutover Is Friday>",
+            &[
+                paint("Shirt", 0.55, 0.78, 0.4),
+                paint("Pants", 0.22, 0.25, 0.32),
+                paint("Hair", 0.15, 0.1, 0.08),
+            ],
+        ),
+    ),
+    (
+        "migration_oncall",
+        v(
+            CASUAL_M,
+            1.75,
+            "On-Call Engineer",
+            "<Weekend 14>",
+            &[
+                paint("Shirt", 0.3, 0.32, 0.38),
+                paint("Pants", 0.18, 0.2, 0.25),
+                paint("Hair", 0.25, 0.2, 0.15),
+            ],
+        ),
+    ),
+    (
+        "orphaned_process",
+        v(
+            "prim/drone",
+            1.1,
+            "Orphaned Process",
+            "<Still Running, Nobody Knows Why>",
+            &[],
+        ),
+    ),
+    (
+        "defunct_process",
+        v(
+            "prim/demo_bug",
+            0.9,
+            "Zombie",
+            "<Defunct, Technically>",
+            &[],
+        ),
+    ),
+    (
+        "cable_spaghetti",
+        v(
+            "prim/demo_bug",
+            1.5,
+            "Cable Spaghetti",
+            "<Do Not Touch>",
+            &[],
+        ),
+    ),
+    (
+        "legacy_admin",
+        v(COBOL, 1.8, "Legacy Admin", "<Last Person Who Knew>", &[]),
+    ),
+    (
+        "migration_script",
+        v(
+            "prim/drone",
+            1.0,
+            "Migration Script",
+            "<v0.1, Untested>",
+            &[],
+        ),
+    ),
+    (
+        "backup_tape_robot",
+        v(
+            "prim/overheated_rack",
+            1.5,
+            "Tape Robot",
+            "<Backup, Technically>",
+            &[],
+        ),
+    ),
+    (
+        "stale_process",
+        v("prim/drone", 0.9, "Stale Process", "<Holding a Lock>", &[]),
+    ),
+    (
+        "junior_analyst",
+        v(
+            CASUAL_M,
+            1.6,
+            "Junior Analyst",
+            "<Slides, by EOD>",
+            &[
+                paint("Shirt", 0.85, 0.88, 0.95),
+                paint("Pants", 0.2, 0.22, 0.3),
+            ],
+        ),
+    ),
+    (
+        "orphaned_record",
+        v(
+            "prim/drone",
+            0.8,
+            "Orphaned Record",
+            "<Foreign Key: Missing>",
+            &[],
+        ),
+    ),
+    (
+        "rollback_wraith",
+        v(
+            SUIT_M_BALD,
+            2.4,
+            "Rollback Wraith",
+            "<Ghost of the Previous Release>",
+            &[
+                paint("Black", 0.55, 0.7, 0.85),
+                paint("Shirt", 0.8, 0.9, 1.0),
+                glow("Skin", 0.35, 0.7, 1.0),
+            ],
+        ),
+    ),
+    (
+        "consultant_jolene",
+        v(
+            SUIT_F,
+            2.0,
+            "Jolene Utilization",
+            "<Senior Manager, Billable>",
+            &[
+                paint("Black", 0.1, 0.1, 0.14),
+                paint("Shirt", 0.9, 0.3, 0.45),
+                paint("Hair", 0.55, 0.25, 0.1),
+            ],
+        ),
+    ),
+    (
+        "consultant_jack",
+        v(
+            SUIT_M,
+            2.1,
+            "Jack Rate-Card",
+            "<Engagement Partner>",
+            &[
+                paint("Black", 0.12, 0.14, 0.2),
+                paint("Shirt", 0.9, 0.9, 0.95),
+                paint("Skin", 0.9, 0.72, 0.6),
+            ],
+        ),
+    ),
+    (
+        "big_bang_cutover",
+        v(
+            "prim/overheated_rack",
+            2.8,
+            "Big Bang Cutover",
+            "<Go-Live Weekend>",
+            &[],
+        ),
+    ),
 ];
 
 /// Primitive rig kind (see `rigs.rs`) of a unit key, `None` for character-model units.

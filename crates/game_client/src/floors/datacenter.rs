@@ -2,7 +2,7 @@
 //! shrine and a NOC; level 2 is the same building after the cooling failed (orange light,
 //! a round arena with pillars for the boss).
 
-mod dress;
+pub(super) mod dress;
 
 use super::kit::*;
 use super::layout::{FloorKind, FloorLayout, Theme, assemble};
@@ -103,7 +103,7 @@ fn noc_wall(p: &mut Plan) {
 }
 
 /// Beige mainframe cabinets against a wall, tape reels on top and a sign that says it all.
-fn mainframe(p: &mut Plan, x: f32, z: f32) {
+pub(super) fn mainframe(p: &mut Plan, x: f32, z: f32) {
     let Some(w) = WallSpot::at(p, x, z) else {
         return;
     };

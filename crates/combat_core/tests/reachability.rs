@@ -46,7 +46,19 @@ fn zone_kills(c: &Content, zone: &str, unit: &str) -> u32 {
     let rares = c
         .zone(zone)
         .map_or(0, |z| z.rares.iter().filter(|r| r.unit == unit).count());
-    (c.zone_hostiles(zone).iter().filter(|k| **k == unit).count() + rares) as u32
+    // A linked twin spawns beside its raid-zone boss without being a pack member.
+    let twin = c
+        .raids
+        .iter()
+        .filter(|r| r.zones.iter().any(|z| z == zone))
+        .filter_map(|r| r.twins.as_ref())
+        .filter(|t| {
+            t.twin == unit
+                && c.zone(zone)
+                    .is_some_and(|z| z.boss.as_ref().is_some_and(|b| b.unit == t.boss))
+        })
+        .count();
+    (c.zone_hostiles(zone).iter().filter(|k| **k == unit).count() + rares + twin) as u32
 }
 
 fn kill_supply(c: &Content, zone: &str, unit: &str) -> u32 {

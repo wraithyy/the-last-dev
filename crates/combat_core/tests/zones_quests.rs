@@ -279,6 +279,8 @@ fn load_zone_spawns_the_campus_and_reports_its_links() {
             ("vibecon/1".to_string(), false),
             // Level 3 is the dungeon's door level.
             ("onboarding/1".to_string(), true),
+            // Level 6 is The Migration's door level.
+            ("basement/1".to_string(), false),
         ]
     );
     assert!(t.sim.zone_links("nowhere").is_empty());
@@ -884,7 +886,7 @@ fn area(zone: &str) -> &str {
 
 /// Campaign order of the zones (`playthrough.rs` WORLD_ORDER); 0 for zones off the path.
 fn campaign_rank(zone: &str) -> usize {
-    const ORDER: [&str; 14] = [
+    const ORDER: [&str; 18] = [
         "parking_p3",
         "campus",
         "tower/1",
@@ -900,6 +902,11 @@ fn campaign_rank(zone: &str) -> usize {
         "onboarding/1",
         "onboarding/2",
         "onboarding/3",
+        // The Migration dungeon, the same way.
+        "basement/1",
+        "basement/2",
+        "basement/3",
+        "basement/4",
     ];
     ORDER.iter().position(|z| *z == zone).map_or(0, |k| k + 1)
 }
