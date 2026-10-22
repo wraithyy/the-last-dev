@@ -174,6 +174,11 @@ impl Sim {
         }
         for s in &z.friendly {
             let (at, yaw) = anchor(&s.anchor)?;
+            if s.requires.as_ref().is_some_and(|r| !self.unlock_met(r))
+                || s.until.as_ref().is_some_and(|u| self.unlock_met(u))
+            {
+                continue;
+            }
             let def = self.def_index(&s.unit)?;
             plan.push(Planned {
                 def,
@@ -478,6 +483,10 @@ impl Sim {
                 .quest_logs
                 .values()
                 .any(|l| l.completed.iter().any(|c| c == q) || l.active.iter().any(|a| a.id == *q)),
+            // The group lead's level, like every other zone-load decision about the player.
+            Unlock::PlayerLevel(n) => self
+                .first_player_index()
+                .is_some_and(|i| self.units[i].state.level >= *n),
         }
     }
 

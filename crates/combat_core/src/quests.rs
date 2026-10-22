@@ -65,6 +65,9 @@ pub(crate) struct QuestRt {
     /// Quest props each player has already used up (index into `world.props`): pickups taken,
     /// spots inspected, devices an item went on. Saved per player (`taken_props`).
     used_props: BTreeMap<EntityId, BTreeSet<usize>>,
+    /// Which Ill Marie appearances each player has talked to (`marie_beat` bits). Flavour
+    /// only: nothing in combat, XP or loot reads it. Saved as `marie_met`.
+    marie_met: BTreeMap<EntityId, u16>,
     /// Units each player already applied a `UseOn` item to.
     used_units: BTreeMap<EntityId, BTreeSet<EntityId>>,
     /// `Deliver` deadline tick per (player, quest).
@@ -74,6 +77,19 @@ pub(crate) struct QuestRt {
     /// `Inspect` props of the loaded zone: (index into `world.props`, stand spot, its yaw).
     inspect_spots: Vec<(usize, Vec3, f32)>,
 }
+
+/// The nine Ill Marie appearances, one acquaintance bit each. Order is part of the save format.
+pub const MARIE_BEATS: [&str; 9] = [
+    "ill_marie_p3",
+    "ill_marie",
+    "ill_marie_onboarding",
+    "ill_marie_call",
+    "ill_marie_queue",
+    "ill_marie_racks",
+    "ill_marie_oncall",
+    "ill_marie_home",
+    "ill_marie_bench",
+];
 
 static EMPTY_LOG: QuestLog = QuestLog {
     active: Vec::new(),
@@ -736,6 +752,24 @@ impl Sim {
             .used_props
             .get(&pid)
             .is_some_and(|s| s.contains(&k))
+    }
+
+    /// Bit of `mask` set for the Ill Marie appearance `key` (see `MARIE_BEATS`).
+    pub(crate) fn note_marie(&mut self, pid: EntityId, key: &str) {
+        if let Some(bit) = MARIE_BEATS.iter().position(|k| *k == key) {
+            *self.quest_rt.marie_met.entry(pid).or_default() |= 1 << bit;
+        }
+    }
+
+    /// Bitmask of the Ill Marie appearances `pid` talked to, bit per `MARIE_BEATS` entry.
+    pub fn marie_met(&self, pid: EntityId) -> u16 {
+        self.quest_rt.marie_met.get(&pid).copied().unwrap_or(0)
+    }
+
+    pub(crate) fn restore_marie_met(&mut self, pid: EntityId, mask: u16) {
+        // Bits past the table belong to a newer build; drop them.
+        let mask = mask & ((1u16 << MARIE_BEATS.len()) - 1);
+        self.quest_rt.marie_met.insert(pid, mask);
     }
 
     pub(crate) fn mark_prop_used(&mut self, pid: EntityId, k: usize) {

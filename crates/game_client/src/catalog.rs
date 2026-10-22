@@ -2032,6 +2032,121 @@ static TABLE: &[(&str, UnitVisual)] = &[
             ],
         ),
     ),
+    // Ill Marie's other appearances (docs/ILMARI_09.md A.3): one key each, the nameplate stays
+    // `Ill Marie`; the outfit tells which beat it is, the green pallor never changes.
+    (
+        "ill_marie_p3",
+        v(
+            CASUAL_F,
+            1.7,
+            "Ill Marie",
+            "<Working Through It>",
+            &[
+                paint("Skin", 0.74, 0.78, 0.6),
+                paint("Shirt", 0.8, 0.14, 0.16),
+                paint("Pants", 0.3, 0.28, 0.32),
+                paint("Hair", 0.3, 0.2, 0.14),
+            ],
+        ),
+    ),
+    (
+        "ill_marie_onboarding",
+        v(
+            CASUAL_F,
+            1.7,
+            "Ill Marie",
+            "<Working Through It>",
+            &[
+                paint("Skin", 0.74, 0.78, 0.6),
+                paint("Shirt", 0.95, 0.75, 0.3),
+                paint("Pants", 0.3, 0.28, 0.32),
+            ],
+        ),
+    ),
+    (
+        "ill_marie_call",
+        v(
+            CASUAL_F,
+            1.7,
+            "Ill Marie",
+            "<Working Through It>",
+            &[
+                paint("Skin", 0.74, 0.78, 0.6),
+                paint("Shirt", 0.55, 0.7, 0.9),
+                paint("Pants", 0.55, 0.7, 0.9),
+            ],
+        ),
+    ),
+    (
+        "ill_marie_queue",
+        v(
+            CASUAL_F,
+            1.7,
+            "Ill Marie",
+            "<Working Through It>",
+            &[
+                paint("Skin", 0.74, 0.78, 0.6),
+                paint("Shirt", 0.8, 0.14, 0.16),
+                paint("Pants", 0.25, 0.3, 0.4),
+            ],
+        ),
+    ),
+    (
+        "ill_marie_racks",
+        v(
+            CASUAL_F,
+            1.7,
+            "Ill Marie",
+            "<Working Through It>",
+            &[
+                paint("Skin", 0.74, 0.78, 0.6),
+                paint("Shirt", 0.9, 0.5, 0.15),
+                paint("Pants", 0.2, 0.2, 0.24),
+            ],
+        ),
+    ),
+    (
+        "ill_marie_oncall",
+        v(
+            CASUAL_F,
+            1.7,
+            "Ill Marie",
+            "<Working Through It>",
+            &[
+                paint("Skin", 0.74, 0.78, 0.6),
+                paint("Shirt", 0.35, 0.36, 0.4),
+                paint("Pants", 0.2, 0.2, 0.24),
+            ],
+        ),
+    ),
+    (
+        "ill_marie_home",
+        v(
+            CASUAL_F,
+            1.7,
+            "Ill Marie",
+            "<Working Through It>",
+            &[
+                paint("Skin", 0.74, 0.78, 0.6),
+                paint("Shirt", 0.9, 0.7, 0.8),
+                paint("Pants", 0.9, 0.7, 0.8),
+            ],
+        ),
+    ),
+    (
+        "ill_marie_bench",
+        v(
+            CASUAL_F,
+            1.7,
+            "Ill Marie",
+            "<Feeling Better>",
+            &[
+                paint("Skin", 0.86, 0.7, 0.6),
+                paint("Shirt", 0.92, 0.92, 0.94),
+                paint("Pants", 0.3, 0.28, 0.32),
+            ],
+        ),
+    ),
     // ---- VibeCon (raid): lanyard neon on black, the founders in vests ----
     (
         "vc_registration",

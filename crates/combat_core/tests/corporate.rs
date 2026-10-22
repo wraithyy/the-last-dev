@@ -1185,6 +1185,8 @@ fn home_venue() -> Anchors {
         "door" => at(DOOR.0, DOOR.1),
         "cat_bed" => at(3.0, 3.0),
         "cat_desk" => at(0.3, -0.3),
+        // Ill Marie's bed, well away from the laptop the chores are about.
+        "npc_ill_marie_call" => at(-3.0, 3.0),
         _ => None,
     })
 }

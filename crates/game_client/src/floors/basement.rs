@@ -1140,6 +1140,7 @@ fn war_room(p: &mut Plan) -> Theme {
         p.slab(v(x, 0.08, z), yaw, v(0.5, 0.14, 0.5), Mat::Cardboard);
         p.slab(v(x, 0.24, z), yaw + 0.2, v(0.5, 0.12, 0.5), Mat::Cardboard);
     }
+    super::marie::oncall(p);
     ticket_wall(p, 40.0, -12.9, 2.3);
     sad_plant(p, 52.4, -11.5);
     sad_plant(p, 52.4, 11.5);

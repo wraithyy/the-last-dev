@@ -8,6 +8,14 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ## [Unreleased]
 
+### Added
+
+- Ill Marie turns up in more places, and she has two errands for you. Bring tissues.
+
+### Fixed
+
+- Signs and posters no longer flicker against the board or wall behind them, especially from a distance.
+
 ## [0.8.0] - 2026-10-22
 
 ### Added

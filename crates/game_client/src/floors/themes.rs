@@ -353,6 +353,7 @@ fn floor2(p: &mut Plan) {
     ];
     p.build_walls();
     decor2(p);
+    super::marie::tower(p);
     cast(
         p,
         &Cast {

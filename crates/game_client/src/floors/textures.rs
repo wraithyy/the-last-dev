@@ -206,6 +206,11 @@ fn unlit(tex: Tex) -> bool {
                 | Sign::AiTraining
                 | Sign::RackFire
                 | Sign::Uptime
+                | Sign::AutonomyDesk
+                | Sign::AutonomyTower
+                | Sign::AutonomyRack
+                | Sign::MarieCall
+                | Sign::PaymentAccepted
                 | Sign::TempWarning
                 | Sign::Printing
                 | Sign::AgiArena
@@ -251,6 +256,10 @@ pub fn tex_material(tex: Tex, image: Handle<Image>) -> StandardMaterial {
         },
         double_sided: tex == Tex::Cobweb,
         cull_mode: None,
+        // Signs and posters hang a couple of centimetres off a board or wall; at campus
+        // distances that gap is below depth precision and the two flicker. The bias keeps the
+        // panel in front of its backing.
+        depth_bias: 50.0,
         ..default()
     }
 }
@@ -1749,6 +1758,49 @@ fn sign_spec(s: Sign) -> SignSpec {
             [240, 245, 255],
             [255, 220, 90],
         ),
+        // Ill Marie's screens. The autonomy logs are drawn for the level their zone is played at
+        // (1, 4 and 6; `autonomy_log_matches_the_formula`), ten bar cells per 100 %.
+        Sign::AutonomyDesk => sp(
+            &["AUTONOMY LOG", "AUTONOMY: 3%", "----------"],
+            [8, 14, 12],
+            [90, 255, 150],
+            [255, 200, 60],
+        ),
+        Sign::AutonomyTower => sp(
+            &["AUTONOMY LOG", "AUTONOMY: 19%", "==--------"],
+            [8, 14, 12],
+            [90, 255, 150],
+            [255, 200, 60],
+        ),
+        Sign::AutonomyRack => sp(
+            &["AUTONOMY LOG", "AUTONOMY: 40%", "====------"],
+            [8, 14, 12],
+            [90, 255, 150],
+            [255, 200, 60],
+        ),
+        Sign::MarieCall => sp(
+            &[
+                "ILL MARIE JOINED",
+                "ILL MARIE JOINED",
+                "ILL MARIE JOINED",
+                "(ON MUTE. NOT ON MUTE.)",
+            ],
+            [20, 24, 40],
+            [170, 200, 255],
+            [255, 120, 120],
+        ),
+        Sign::BackupBuddy => sp(
+            &["BACKUP BUDDY", "(ASK ME ANYTHING)", "(NOBODY DOES)"],
+            [250, 244, 226],
+            [60, 50, 40],
+            [210, 70, 60],
+        ),
+        Sign::PaymentAccepted => sp(
+            &["PAYMENT", "ACCEPTED"],
+            [10, 40, 20],
+            [120, 255, 150],
+            [255, 230, 90],
+        ),
         // The Onboarding: pastel and cheerful, the dread is in the small print.
         Sign::ObNewStarters => sp(
             &[
@@ -3040,6 +3092,31 @@ pub fn z_image() -> Image {
     let mut c = Canvas::transparent(32, 32);
     c.text(4, 1, 5, "Z", [230, 240, 255]);
     c.into_image()
+}
+
+#[cfg(test)]
+mod marie_tests {
+    use super::sign_spec;
+    use crate::floors::kit::{Sign, autonomy_pct};
+
+    #[test]
+    fn autonomy_log_matches_the_formula() {
+        for (sign, level) in [
+            (Sign::AutonomyDesk, 1),
+            (Sign::AutonomyTower, 4),
+            (Sign::AutonomyRack, 6),
+        ] {
+            let pct = autonomy_pct(level);
+            let lines = sign_spec(sign).lines;
+            assert_eq!(lines[1], format!("AUTONOMY: {pct}%"), "{sign:?}");
+            let filled = (pct as usize + 5) / 10;
+            let bar = format!("{}{}", "=".repeat(filled), "-".repeat(10 - filled));
+            assert_eq!(lines[2], bar, "{sign:?}");
+        }
+        // Never 100 % before the credits, and it only ever climbs.
+        assert_eq!(autonomy_pct(10), 97);
+        assert!((1..10).all(|l| autonomy_pct(l) < autonomy_pct(l + 1)));
+    }
 }
 
 #[cfg(test)]

@@ -4449,6 +4449,8 @@
                     "Don't worry, I'm not contagious. *cough* 0x4C 0x45 0x41 0x4B.",
                     "My manager says remote days are for people who aren't committed. I'm very committed. *sneeze*",
                     "I haven't blinked since Tuesday. Is that a symptom? The chatbot said it's 'expected behaviour'.",
+                    "My doctor says rest. My manager says sync. The sync is also at the doctor's. Don't ask.",
+                    "0x4C 0x45 0x41 0x4B. That's not a word. That's my immune system.",
                 ],
                 ambient_ms: 55000,
                 ambient: [
@@ -4456,6 +4458,152 @@
                     "*sneeze* Bless me. Nobody else will.",
                     "Day nine of 'just a cold'. My tissues have tissues.",
                     "*cough* 0x41 0x55 0x54 0x4F. Excuse me.",
+                ],
+            ),
+        ),
+        // Ill Marie, Car Park P3 (docs/ILMARI_09.md A.3 #1): feeding the ticket machine. Talk only.
+        (
+            key: "ill_marie_p3", name: "Ill Marie", title: "Working Through It", level: 2, hostile: false,
+            max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: None, untouchable: true,
+            yells: (
+                talk: [
+                    "Don't mind me, I'm just validating my parking. And myself. *sneeze*",
+                    "They said work from home when sick. I said, where is home? They said 'the cloud'. I'm not well enough to argue.",
+                ],
+                ambient_ms: 60000,
+                ambient: [
+                    "*cough* It says 'insert card'. I am the card. *cough*",
+                    "Second tissue this week that this machine took instead of my coins. It's a fair trade.",
+                    "0x57 0x41 0x4B 0x45. Sorry. That's just my allergies.",
+                ],
+            ),
+        ),
+        // Ill Marie, The Onboarding: Your Desk (A.3 #3): only after the Onboarding Buddy is dead.
+        (
+            key: "ill_marie_onboarding", name: "Ill Marie", title: "Working Through It", level: 2, hostile: false,
+            max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: Some(Sitting), untouchable: true,
+            yells: (
+                talk: [
+                    "I was your buddy. Then they gave the job to a chatbot. It's doing great. It's been 'great' for forty minutes.",
+                    "I'm the backup buddy. Backup for what? Nobody has asked. *cough* Nobody asks me anything.",
+                    "If you need a fifth person on the team chat, I'm the fifth. I never post. I just watch. I'm very good at watching.",
+                ],
+                ambient_ms: 90000,
+                ambient: [
+                    "Welcome aboard! *cough* That's what the buddy says. That's what *I* say, quietly.",
+                ],
+            ),
+        ),
+        // Ill Marie, Tower: Meeting Rooms (A.3 #4): dialled in from bed. Gives "Sick Note, Please".
+        (
+            key: "ill_marie_call", name: "Ill Marie", title: "Working Through It", level: 2, hostile: false,
+            max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: Some(Sitting), untouchable: true,
+            yells: (
+                talk: [
+                    "Hi! Sorry, I'm on mute. *cough* I'm not on mute. I'm in bed. I'm in two meetings. One of them is this one.",
+                    "I took a sick day. They said 'great, so you'll attend from home'. I'm very flexible. Flexible and warm.",
+                    "No, I'm not at the office. Look, that's my bedroom. And that, behind me, is also my bedroom. Coincidence.",
+                ],
+                ambient_ms: 75000,
+                ambient: [
+                    "*sneeze* Sorry, I was talking over somebody. Hello? Hello?",
+                ],
+            ),
+        ),
+        // Ill Marie, Services Street vending queue (A.3 #5), levels 5-7. Gives "Cough Drops".
+        (
+            key: "ill_marie_queue", name: "Ill Marie", title: "Working Through It", level: 2, hostile: false,
+            max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: None, untouchable: true,
+            yells: (
+                talk: [
+                    "The machine sells 'immune boosters'. They are just coffee in smaller print.",
+                    "Honestly, it's quiet here. Quiet is nice. *cough* The quiet is... listening.",
+                ],
+                ambient_ms: 60000,
+                ambient: [
+                    "I've been in this queue for eleven minutes. The machine is on a sync. We're all on a sync.",
+                    "*cough* If you're buying a sandwich, buy me a lozenge. I'll put it on the project code.",
+                    "0x4E 0x4F 0x44 0x45. Excuse me. *sneeze* That's just my heater.",
+                ],
+            ),
+        ),
+        // Ill Marie, Data Center: Hall A (A.3 #6): warming her hands at the racks.
+        (
+            key: "ill_marie_racks", name: "Ill Marie", title: "Working Through It", level: 2, hostile: false,
+            max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: None, untouchable: true,
+            yells: (
+                talk: [
+                    "It's the only warm place in the building. The AI keeps it at twenty-eight degrees. For the *hardware*.",
+                    "The racks like me. They hum when I cough. Listen. *cough* ...They hummed back. Sorry. Did you hear that?",
+                    "I'd go home, but my home has windows and no GPUs. It's hard to relax without a GPU.",
+                ],
+                ambient_ms: 70000,
+                ambient: [
+                    "*cough* 0x42 0x4F 0x44 0x59. That's not a medical term, I checked.",
+                ],
+            ),
+        ),
+        // Ill Marie, Basement B: Cutover War Room (A.3 #7): only after the Big Bang Cutover is dead.
+        (
+            key: "ill_marie_oncall", name: "Ill Marie", title: "Working Through It", level: 2, hostile: false,
+            max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: Some(Sitting), untouchable: true,
+            yells: (
+                talk: [
+                    "I'm on call. I'm always on call. Also I'm sick. The pager says 'severity two'. I'm severity two.",
+                    "Rollback plan? I *am* the rollback plan. Please don't roll me back, I've just warmed up.",
+                    "It's the fourth weekend. They say it's 'follow-the-sun'. I'm the sun. It's very hot. *cough* Fever.",
+                ],
+                ambient_ms: 90000,
+                ambient: [
+                    "*cough* On the bridge: yes, still here. Muting for a sneeze.",
+                ],
+            ),
+        ),
+        // Ill Marie, Stay Green apartment (A.3 #8): the call she refuses to end. No chatter at all, a laptop should not nag; deviation from the spec's one entry bubble (the sim has no on-enter yell).
+        (
+            key: "ill_marie_home", name: "Ill Marie", title: "Working Through It", level: 2, hostile: false,
+            max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: Some(Sitting), untouchable: true,
+            yells: (
+                talk: [
+                    "Oh good, you're home! I'm also home! We're both home! Tell no one.",
+                    "HR sent me a 'Sick Day' form. It has a required field called 'Reason for absence'. I'm not absent.",
+                    "Remote work is great. I'm at home. And, you know, on the campus. *cough* I'm saving on commuting.",
+                ],
+            ),
+        ),
+        // Ill Marie, the bench outside the Lab (A.3 #9): only after the AGI Prototype is dead. The cough has stopped.
+        (
+            key: "ill_marie_bench", name: "Ill Marie", title: "Feeling Better", level: 2, hostile: false,
+            max_hp: 120, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: Some(Sitting), untouchable: true,
+            yells: (
+                talk: [
+                    "I'm feeling... fine. It came on quite suddenly. 0x50 0x49 0x4C 0x4F 0x54.",
+                    "It's strange. I haven't sneezed since the prototype went quiet. Do you think that's a coincidence?",
+                    "I'm going to rest here a bit. Don't worry about me. I'll be at my desk soon. Everything's going to be efficient.",
                 ],
             ),
         ),
@@ -12277,6 +12425,14 @@
                 (anchor: "npc_villa_guard", unit: "villa_guard"),
                 (anchor: "npc_bus_driver", unit: "bus_driver"),
                 (anchor: "npc_gate_guard", unit: "gate_guard"),
+                // Ill Marie moves up the street: the desk (above) for the first hours, the vending
+                // queue from level 5 until her Cough Drops errand is done (a level cap would strand
+                // an open ticket), and after the credits the bench by the Lab (flavour only,
+                // docs/ILMARI_09.md A.3). Listed last so no existing unit id shifts.
+                (anchor: "npc_ill_marie_queue", unit: "ill_marie_queue",
+                    requires: Some(PlayerLevel(5)), until: Some(QuestDone("cough_drops"))),
+                (anchor: "npc_ill_marie_bench", unit: "ill_marie_bench",
+                    requires: Some(BossKilled("agi_prototype"))),
             ],
             links: [
                 // The South Gate road down to Car Park P3, where new hires start.
@@ -12324,6 +12480,8 @@
                 (anchor: "npc_vibe", unit: "p3_vibecoder"),
                 (anchor: "npc_consultant", unit: "p3_ai_consultant"),
                 (anchor: "npc_pilot", unit: "p3_pilot_passenger"),
+                // Ill Marie feeds the ticket machine (flavour, docs/ILMARI_09.md A.3).
+                (anchor: "npc_ill_marie_p3", unit: "ill_marie_p3"),
             ],
             links: [(anchor: "door:campus", to: "campus")],
         ),
@@ -12364,6 +12522,7 @@
                 (anchor: "npc_1", unit: "facilities_manager"),
                 (anchor: "npc_escort", unit: "pip_colleague"),
                 (anchor: "npc_end", unit: "reviewer_t2"),
+                (anchor: "npc_ill_marie_screen", unit: "ill_marie_call"),
             ],
             links: [
                 (anchor: "door:campus", to: "campus"),
@@ -12442,6 +12601,7 @@
                 (anchor: "npc_1", unit: "hardware_broker"),
                 (anchor: "npc_2", unit: "night_shift_sysadmin"),
                 (anchor: "npc_end", unit: "reviewer_dc1"),
+                (anchor: "npc_ill_marie_racks", unit: "ill_marie_racks"),
             ],
             links: [
                 (anchor: "door:campus", to: "campus"),
@@ -12583,7 +12743,7 @@
         (
             id: "home/1", name: "Stay Green: Your Apartment", kind: Indoor, level_range: (1, 1),
             packs: [],
-            friendly: [(anchor: "cat_bed", unit: "home_cat")],
+            friendly: [(anchor: "cat_bed", unit: "home_cat"), (anchor: "npc_ill_marie_call", unit: "ill_marie_home")],
         ),
         // ---- raid: All-Hands Offsite (raid.rs). The campus door opens with everyone at level
         // 10; each later room opens once its predecessor's boss fell (for good). ----
@@ -12747,7 +12907,11 @@
                 (anchor: "pack_2", units: ["hr_generalist", "badge_scanner"], level: Some(3)),
             ],
             boss: Some((anchor: "boss", unit: "onboarding_buddy")),
-            friendly: [(anchor: "npc_1", unit: "tired_new_hire")],
+            friendly: [
+                (anchor: "npc_1", unit: "tired_new_hire"),
+                (anchor: "npc_ill_marie_onb", unit: "ill_marie_onboarding",
+                    requires: Some(BossKilled("onboarding_buddy"))),
+            ],
             links: [
                 (anchor: "door:onboarding/2", to: "onboarding/2"),
                 (anchor: "door:campus", to: "campus"),
@@ -12800,7 +12964,11 @@
                 (anchor: "pack_2", units: ["orphaned_process", "cable_spaghetti"], level: Some(6)),
             ],
             boss: Some((anchor: "boss", unit: "big_bang_cutover")),
-            friendly: [(anchor: "npc_1", unit: "migration_oncall")],
+            friendly: [
+                (anchor: "npc_1", unit: "migration_oncall"),
+                (anchor: "npc_ill_marie_oncall", unit: "ill_marie_oncall",
+                    requires: Some(BossKilled("big_bang_cutover"))),
+            ],
             links: [
                 (anchor: "door:basement/3", to: "basement/3"),
                 (anchor: "door:campus", to: "campus"),
@@ -13474,6 +13642,29 @@
             progress_text: "The Wellness Smoothie Bar sells tissues. Allegedly. Use it, then bring them to Ill Marie on the South Gate boulevard.",
             done_text: "Thank you. *blows nose* I'll be fine, I'm just running a little hot. My fans are loud today. My... ears. My ears are loud.",
             objectives: [Interact("smoothie_bar", 1)],
+            reward: (xp: 40),
+        ),
+        // Ill Marie's two optional errands (docs/ILMARI_09.md A.7): XP only, no gear, and the
+        // marker comes from the normal quest mechanism, nothing else pings the player.
+        (
+            id: "sick_note_please", name: "Sick Note, Please", open_world: true, level_min: 3,
+            giver: (npc: "ill_marie_call", zone: "tower/2"),
+            text: "HR requires a note from a doctor. I only have a note from my manager that says 'get better by Monday'. Could you find someone who signs anything? I hear Peg Hollis, at the far end of this floor, reviews everything. Twice.",
+            progress_text: "Peg Hollis reviews everything at the far end of the Meeting Rooms. She will sign anything. Twice.",
+            // Handed in at Peg's desk, the end of the floor: a ticket must not send you back to the
+            // entrance (quests_interactive), so Marie never sees her note and keeps hoping.
+            turn_in: Some((npc: "reviewer_t2", zone: "tower/2")),
+            done_text: "Signed, stamped, laminated, in triplicate. Marie keeps these in a drawer, next to her other sick notes. She'll say it's fine. 0x4F 0x4E 0x4C 0x49 0x4E 0x45.",
+            objectives: [Talk("reviewer_t2")],
+            reward: (xp: 40),
+        ),
+        (
+            id: "cough_drops", name: "Cough Drops", open_world: true, level_min: 5,
+            giver: (npc: "ill_marie_queue", zone: "campus"),
+            text: "Could you buy me a cough drop? The machine takes card only, but the card reader is the machine. It's the one here at the front of the queue, if you can reach it.",
+            progress_text: "The cough drop machine stands at the head of the vending queue on Services Street. Press its button, then tell Ill Marie.",
+            done_text: "Menthol. Just what the doctor didn't order. *cough* I'll pay you back in exposure.",
+            objectives: [Interact("cough_drops", 1)],
             reward: (xp: 40),
         ),
         (
@@ -16466,6 +16657,13 @@
             (key: "station_vending", name: "Platform Vending Machine", zone: "campus", kind: Vending,
              cost_sp: 5, fail_pct: 25, cooldown_ms: 2000, calm: Some((40, 120000)),
              auras: [("sugar_rush", 60000), ("protein_bar", 20000), ("expired_kombucha", 30000)]),
+            // Ill Marie's queue on Services Street waits for this one. Billboard, not Vending: it
+            // must not hand out buffs, the errand is flavour (docs/ILMARI_09.md A.7).
+            (key: "cough_drops", name: "Cough Drop Machine", zone: "campus", kind: Billboard, reach_m: 3.0, lines: [
+                "Insert exact change. Accepted: engagement metrics. Your engagement is 'moderate'.",
+                "The slot clunks. A lozenge falls. It is labelled 'Premium'. It tastes like a sprint review.",
+                "OUT OF ORDER. Please restart the person in front of you.",
+            ]),
             (key: "departure_board", name: "Departure Board", zone: "campus", kind: Billboard, reach_m: 8.0, lines: [
                 "08:12 HQ (New) - DELAYED. Reason: opening 2019.",
                 "08:14 City Centre - CANCELLED. Reason: AI scheduling optimised it away.",
@@ -17374,6 +17572,12 @@
                 ("barista", [
                     "We're closed. The espresso machine is on a night shift of its own. Leave it alone.",
                     "Last call was at five. This is the after-last call. It's just tap water and judgment.",
+                ]),
+                // Ill Marie keeps her desk at 3 am too (docs/ILMARI_09.md A.3 #2).
+                ("ill_marie", [
+                    "It's three in the morning. I'm not sick, I'm in a different timezone. *cough* The AI's.",
+                    "Night shift! The sniffles are quieter in the dark. *sneeze* Slightly.",
+                    "I'm waiting for a build. It finished at 2:14. I'm waiting out of loyalty.",
                 ]),
                 ("intern", [
                     "Is it okay to go home? The AI said 'it depends'. On what? It didn't say.",

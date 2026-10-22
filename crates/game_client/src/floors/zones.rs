@@ -803,6 +803,156 @@ mod tests {
         }
     }
 
+    /// Ill Marie's spawns as content has them: (zone, anchor, unit, spawn gate).
+    fn marie_spawns() -> Vec<(String, String, String, Option<combat_core::Unlock>)> {
+        let c = combat_core::Content::from_ron(include_str!("../../../../content/game.ron"))
+            .expect("content");
+        c.zones
+            .iter()
+            .flat_map(|z| {
+                z.friendly
+                    .iter()
+                    .filter(|f| f.unit.starts_with("ill_marie"))
+                    .map(|f| {
+                        (
+                            z.id.clone(),
+                            f.anchor.clone(),
+                            f.unit.clone(),
+                            f.requires.clone(),
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+
+    fn marie_layout(id: &str) -> FloorLayout {
+        zone(id)
+    }
+
+    /// Every Marie spawn names an anchor the layout draws, and there are nine appearances.
+    #[test]
+    fn marie_has_an_anchor_per_appearance() {
+        let spawns = marie_spawns();
+        assert_eq!(spawns.len(), 9, "the desk and eight more");
+        for (z, a, u, _) in &spawns {
+            assert!(
+                marie_layout(z).anchor(a).is_some(),
+                "{z}: no anchor {a} for {u}"
+            );
+        }
+    }
+
+    /// One Marie on screen: on the campus the desk, the queue and the bench are 95 m or more
+    /// apart, past the decor cull range and the 40 m nameplate range.
+    #[test]
+    fn marie_never_stacks() {
+        let l = zone("campus");
+        let at: Vec<(&str, Vec3)> = marie_spawns()
+            .iter()
+            .filter(|s| s.0 == "campus")
+            .map(|s| {
+                let a = l
+                    .anchors
+                    .iter()
+                    .find(|a| a.0 == s.1)
+                    .expect("campus anchor");
+                (a.0, a.1)
+            })
+            .collect();
+        assert_eq!(at.len(), 3);
+        for (i, (a, pa)) in at.iter().enumerate() {
+            for (b, pb) in &at[i + 1..] {
+                let d = Vec2::new(pa.x - pb.x, pa.z - pb.z).length();
+                assert!(d >= 95.0, "{a} and {b} are only {d:.1} m apart");
+            }
+        }
+    }
+
+    /// Pairs of Marie and another interactable allowed closer than `MARIE_ROOM`, each with why.
+    const MARIE_CLOSE: [(&str, &str, &str); 4] = [
+        (
+            "npc_ill_marie_p3",
+            "prop:p3_ticket_machine",
+            "she feeds that machine, 1.8 m beside the spot where players use it",
+        ),
+        (
+            "npc_ill_marie_queue",
+            "prop:cough_drops",
+            "she queues for that machine, 3 m from the spot where players use it",
+        ),
+        (
+            "npc_ill_marie_call",
+            "cat_bed",
+            "the Stay Green flat is 18 x 12 m, her bed and the cat's basket are neighbours",
+        ),
+        (
+            "npc_ill_marie_call",
+            "desk",
+            "the same flat: the player's desk is in the next corner of the bedroom",
+        ),
+    ];
+    /// Room she keeps from everything clickable, in metres.
+    const MARIE_ROOM: f32 = 4.0;
+
+    /// She never sits in a walking line, a trigger, a pack's pull or a crowd: 2 m off the route,
+    /// `MARIE_ROOM` from other interactables, outside every pack's aggro and (except after the
+    /// boss, when it is dead) the boss's.
+    #[test]
+    fn marie_off_the_walking_line() {
+        let c = combat_core::Content::from_ron(include_str!("../../../../content/game.ron"))
+            .expect("content");
+        let flat = |a: Vec3, b: Vec3| Vec2::new(a.x - b.x, a.z - b.z).length();
+        for (zid, anchor, unit, gate) in marie_spawns() {
+            let l = zone(&zid);
+            let me = pos(&l, &anchor);
+            if !l.route.is_empty() {
+                let d = route_dist(&l, me);
+                assert!(d >= 2.0, "{zid}: {unit} is {d:.1} m from the route");
+            }
+            for (n, p, _) in &l.anchors {
+                let other = n.starts_with("npc_")
+                    || n.starts_with("prop:")
+                    || n.starts_with("secret:")
+                    || n.starts_with("door")
+                    || *n == "desk";
+                let allowed = MARIE_CLOSE.iter().any(|(a, b, _)| *a == anchor && b == n);
+                if other && *n != anchor && !allowed {
+                    let d = flat(*p, me);
+                    assert!(d >= MARIE_ROOM, "{zid}: {unit} is {d:.1} m from {n}");
+                }
+            }
+            let z = c.zone(&zid).expect("zone");
+            for pk in &z.packs {
+                let reach = pk
+                    .units
+                    .iter()
+                    .filter_map(|u| c.unit_def(u).and_then(|d| d.ai.as_ref()))
+                    .map(|ai| ai.aggro_m)
+                    .fold(0.0, f32::max);
+                let d = flat(pos(&l, &pk.anchor), me);
+                // A pack's members stand up to ~3 m around its anchor.
+                assert!(
+                    d >= reach + 3.0,
+                    "{zid}: {unit} is {d:.1} m from {}",
+                    pk.anchor
+                );
+            }
+            let boss_dead = match (&gate, &z.boss) {
+                (Some(combat_core::Unlock::BossKilled(k)), Some(b)) => *k == b.unit,
+                _ => false,
+            };
+            if let (Some(b), false) = (&z.boss, boss_dead) {
+                let reach = c
+                    .unit_def(&b.unit)
+                    .and_then(|d| d.ai.as_ref())
+                    .map_or(0.0, |ai| ai.aggro_m);
+                let d = flat(pos(&l, &b.anchor), me);
+                assert!(d >= reach + 3.0, "{zid}: {unit} is {d:.1} m from the boss");
+            }
+        }
+    }
+
     #[test]
     fn towers_gain_a_graveyard_and_floors_one_to_four_a_campus_door() {
         for i in 1..=5 {

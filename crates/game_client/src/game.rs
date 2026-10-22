@@ -169,6 +169,7 @@ pub fn lock_reason(content: &Content, requires: Option<&Unlock>) -> String {
             "Requires: accept the ticket \"{}\"",
             content.quest(q).map_or(q.as_str(), |d| d.name.as_str())
         ),
+        Some(Unlock::PlayerLevel(n)) => format!("Requires: level {n}"),
         None => "The badge reader is thinking.".into(),
     }
 }
@@ -300,6 +301,13 @@ pub(crate) fn start_game(
     let level = env_u8("WOW_LEVEL").unwrap_or(zone_min);
     if level > 1 {
         sim.0.set_player_level(level);
+    }
+    // QA: `WOW_BOSSES=onboarding_buddy,agi_prototype` for gated spawns (Ill Marie's cameos).
+    for boss in std::env::var("WOW_BOSSES")
+        .iter()
+        .flat_map(|v| v.split(','))
+    {
+        sim.0.debug_mark_boss(boss.trim());
     }
     for (id, status, counts) in debug_quests() {
         if !sim.0.debug_set_quest(&id, status) {

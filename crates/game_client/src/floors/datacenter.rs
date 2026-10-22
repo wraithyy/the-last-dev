@@ -368,6 +368,7 @@ fn dc1(p: &mut Plan) -> Theme {
         300_000.0,
     );
     strips(p, Mat::Cold, Mat::Candle, 2.0, 0.0);
+    super::marie::racks(p);
     cast_zone(
         p,
         &ZoneCast {

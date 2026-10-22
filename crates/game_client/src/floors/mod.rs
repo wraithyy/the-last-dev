@@ -21,6 +21,7 @@ mod hack24;
 mod kit;
 mod lab;
 mod layout;
+mod marie;
 mod models;
 mod office;
 mod offsite;

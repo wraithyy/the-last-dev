@@ -630,6 +630,7 @@ fn home() -> FloorLayout {
         false,
     );
     home_bedroom(&mut p);
+    super::marie::home(&mut p);
     home_living(&mut p);
     home_kitchen(&mut p);
     home_laundry(&mut p);

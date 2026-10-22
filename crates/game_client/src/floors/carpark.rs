@@ -92,6 +92,7 @@ pub fn build() -> FloorLayout {
     onboarding_corner(&mut p);
     badge_office(&mut p);
     attendant_booth(&mut p);
+    super::marie::p3(&mut p);
     vendor_kiosk(&mut p);
     jokes(&mut p);
     let door = exit(&mut p);

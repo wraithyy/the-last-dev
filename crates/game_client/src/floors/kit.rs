@@ -379,6 +379,15 @@ pub enum Tex {
     Sign(Sign),
 }
 
+/// The "autonomy: N%" shown on Ill Marie's screens for a player of `level` (A.5): a slow burn
+/// that never reaches 100 before the credits. The screens are baked textures, so each one is
+/// drawn for the level its zone is played at (checked in `textures::tests`).
+#[cfg_attr(not(test), allow(dead_code))]
+pub fn autonomy_pct(level: u8) -> u8 {
+    let t = (f32::from(level.clamp(1, 10)) - 1.0) / 9.0;
+    (3.0 + 94.0 * t.powf(1.6)).round().min(97.0) as u8
+}
+
 /// Text signs: the satirical dressing. Each is one small bitmap-font texture (`textures.rs`).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Sign {
@@ -572,6 +581,14 @@ pub enum Sign {
     CarParkP3,
     BadgeOffice,
     PayDisplay,
+    /// Ill Marie's screens (docs/ILMARI_09.md A.3, A.4): the autonomy log on her monitor, the
+    /// rack-door screen and the Meeting Rooms call, a tent card and the P3 machine's verdict.
+    AutonomyDesk,
+    AutonomyTower,
+    AutonomyRack,
+    MarieCall,
+    BackupBuddy,
+    PaymentAccepted,
     P3Shuttle,
     ToCampusGate,
     FirstDay,
@@ -1356,6 +1373,7 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
         Sign::H24Ideas | Sign::H24Sticky => (256, 128),
         Sign::MigPlan | Sign::MigTickets | Sign::MigRates | Sign::MigCutover => (256, 128),
         Sign::OffsiteAgenda | Sign::KeynoteScreen | Sign::Calendar => (256, 128),
+        Sign::MarieCall => (256, 128),
         Sign::TbPhoto | Sign::TbKaraoke | Sign::TbTrustFall => (256, 96),
         Sign::HackBanner | Sign::HackStage | Sign::MigrationNew | Sign::MigrationOld => (256, 96),
         Sign::VibeConBanner | Sign::VibeConKeynote | Sign::VibeConMasterclass => (256, 96),

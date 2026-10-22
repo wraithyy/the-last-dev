@@ -438,6 +438,8 @@ pub(super) fn build(p: &mut Plan) {
     shuttles(p);
     wayfinding(p);
     ill_marie(p);
+    super::marie::queue(p);
+    super::marie::campus_bench(p);
     picnic_dedication(p);
     for (k, (x, z)) in PACKS.into_iter().enumerate() {
         let at = v(x, 0.0, z);
@@ -515,6 +517,7 @@ fn ill_marie(p: &mut Plan) {
     p.prop(&DESK, v(x, 0.0, z), -FRAC_PI_2, true);
     p.prop(&CHAIR_DESK, v(x + 1.3, 0.0, z), FRAC_PI_2, false);
     p.occupy("npc_ill_marie", v(x + 1.3, 0.0, z));
+    super::marie::desk_monitor(p, x, z);
     // The tissue tower: boxes stacked higher than her monitor.
     for k in 0..4 {
         let y = 0.82 + k as f32 * 0.13;

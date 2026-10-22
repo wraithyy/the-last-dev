@@ -983,6 +983,12 @@ pub struct PackDef {
 pub struct ZoneSpawn {
     pub anchor: String,
     pub unit: String,
+    /// Friendly spawns only: the unit is there from this progress on (checked at zone load).
+    #[serde(default)]
+    pub requires: Option<Unlock>,
+    /// Friendly spawns only: the unit is gone once this is met, so appearances can hand over.
+    #[serde(default)]
+    pub until: Option<Unlock>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
@@ -1000,6 +1006,8 @@ pub enum Unlock {
     QuestDone(String),
     /// The quest is accepted or already done; opens a door the quest itself sends you through.
     QuestStarted(String),
+    /// The first player has reached this level; only spawn gates (`ZoneSpawn`) use it.
+    PlayerLevel(u8),
 }
 
 /// An exit of a zone: the client's trigger anchor (`door:<zone>`, `elevator_exit`) and where it leads.
@@ -1742,6 +1750,13 @@ impl Content {
                     z.id, r.unit
                 ));
             }
+            for g in z
+                .friendly
+                .iter()
+                .flat_map(|f| f.requires.iter().chain(&f.until))
+            {
+                self.validate_unlock(g)?;
+            }
             for l in &z.links {
                 if self.zone(&l.to).is_none() {
                     return bad(format!("zone {} links to unknown zone {}", z.id, l.to));
@@ -1762,6 +1777,7 @@ impl Content {
                 .iter()
                 .any(|z| z.boss.as_ref().is_some_and(|b| b.unit == *k)),
             Unlock::QuestDone(q) | Unlock::QuestStarted(q) => self.quest(q).is_some(),
+            Unlock::PlayerLevel(n) => (1..=self.max_level()).contains(n),
         };
         if ok {
             Ok(())

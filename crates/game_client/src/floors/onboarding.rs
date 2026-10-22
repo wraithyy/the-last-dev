@@ -802,6 +802,7 @@ fn desk_room(p: &mut Plan) -> Theme {
     // Side cells: a kitchen nobody can find in the north one, a meeting pod in the south.
     counter(p, -18.0, -36.0, 5.0);
     lounge(p, 10.0, 36.0, PI, true);
+    super::marie::onboarding(p);
     p.poster_near(-6.0, 17.9, 2.3, Vec2::new(1.6, 1.4), Tex::Standup);
     // The rest of the floor: kitchen things in the north cell, a fridge with somebody's name on
     // everything, kanban boards that disagree, and the far end of the open plan.

@@ -84,6 +84,8 @@ pub struct SaveData {
     pub minigames: Vec<(String, crate::minigame::Medal)>,
     /// Quest pickups and inspect spots already used up (`world.props` keys); optional key.
     pub taken_props: Vec<String>,
+    /// Ill Marie appearances talked to, one bit each (`quests::MARIE_BEATS`); optional key.
+    pub marie_met: u16,
 }
 
 fn list(v: &str) -> Vec<String> {
@@ -208,6 +210,9 @@ impl SaveData {
         if !self.taken_props.is_empty() {
             out.push_str(&format!("taken_props={}\n", self.taken_props.join("|")));
         }
+        if self.marie_met != 0 {
+            out.push_str(&format!("marie_met={}\n", self.marie_met));
+        }
         if !self.minigames.is_empty() {
             let rows: Vec<String> = self
                 .minigames
@@ -305,6 +310,7 @@ impl SaveData {
                 "duel_streak" => s.duel_streak = v.parse().unwrap_or(0),
                 "respecs" => s.respecs = v.parse().unwrap_or(0),
                 "taken_props" => s.taken_props = list(v),
+                "marie_met" => s.marie_met = v.parse().unwrap_or(0),
                 "minigames" => {
                     s.minigames = list(v)
                         .iter()
@@ -493,6 +499,7 @@ impl Sim {
             ladder: self.ladder_saved(),
             minigames: self.minigame_bests(player),
             taken_props: self.taken_props(player),
+            marie_met: self.marie_met(player),
         })
     }
 
@@ -604,6 +611,7 @@ impl Sim {
         self.set_ladder(save.ladder.week, save.ladder.entries.clone());
         self.set_minigame_bests(player, &save.minigames);
         self.restore_taken_props(player, &save.taken_props);
+        self.restore_marie_met(player, save.marie_met);
         let class = self.class_at(i).map(|c| c.key.clone()).unwrap_or_default();
         self.units[i].state.talents = self.content.talents.sanitize(&class, &save.talents, level);
         let title = Some(&save.title)

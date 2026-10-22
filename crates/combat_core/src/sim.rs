@@ -1025,6 +1025,12 @@ impl Sim {
         true
     }
 
+    /// Debug/test: the zone boss `key` counts as killed (spawn gates such as Ill Marie's
+    /// after-the-boss beats), without playing the fight. Takes effect at the next zone load.
+    pub fn debug_mark_boss(&mut self, key: &str) {
+        self.world.bosses_killed.insert(key.to_string());
+    }
+
     /// Debug/test: kills a living hostile unit as if the player landed the killing blow (XP,
     /// loot, zone clear, quest credit and unlocks all follow; events come out of the next tick).
     /// False for unknown, dead or friendly units.
@@ -1099,6 +1105,7 @@ impl Sim {
             let key = t.state.key.clone();
             self.request_yell(ti, YellKind::Talk);
             self.on_talk(player, &key);
+            self.note_marie(player, &key);
             self.quest_credit(player, |o| matches!(o, Objective::Talk(k) if *k == key));
             self.quest_talk(player, ti);
             self.offer_quests(player, ti);
