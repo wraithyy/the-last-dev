@@ -1626,6 +1626,78 @@ fn sign_spec(s: Sign) -> SignSpec {
             [240, 240, 255],
             [255, 120, 220],
         ),
+        Sign::WayServices => sp(
+            &["SERVICES STREET", "CALENDAR, QUESTS"],
+            [30, 70, 110],
+            [240, 245, 255],
+            [255, 210, 80],
+        ),
+        Sign::WayDock => sp(
+            &["DATA CENTER DOCK", "MIGRATION TICKETS"],
+            [60, 60, 64],
+            [255, 230, 120],
+            [255, 160, 40],
+        ),
+        Sign::WayIncubator => sp(
+            &["INCUBATOR STREET", "VIBECON, HACK24"],
+            [24, 16, 40],
+            [140, 240, 255],
+            [255, 110, 220],
+        ),
+        Sign::WayHybrid => sp(
+            &["HYBRID ROW", "DESKS AND BADGES"],
+            [70, 70, 76],
+            [235, 235, 240],
+            [120, 220, 160],
+        ),
+        Sign::WayStarters => sp(
+            &["NEW STARTERS", "ONBOARDING DOOR"],
+            [30, 90, 70],
+            [245, 250, 245],
+            [255, 230, 120],
+        ),
+        Sign::WayTower => sp(
+            &["THE TOWER", "QBR: WEST DOOR"],
+            [20, 20, 24],
+            [235, 215, 150],
+            [255, 90, 80],
+        ),
+        Sign::WayWellness => sp(
+            &["WELLNESS PARK", "OFFSITE COACH"],
+            [40, 110, 80],
+            [245, 250, 240],
+            [255, 230, 150],
+        ),
+        Sign::WayLab => sp(
+            &["INNOVATION LAB", "BADGE REQUIRED"],
+            [245, 245, 250],
+            [40, 40, 70],
+            [255, 60, 170],
+        ),
+        Sign::WayBoard => sp(
+            &["BOARD LAWN", "MEETINGS: ON TIME"],
+            [60, 20, 30],
+            [250, 235, 235],
+            [255, 200, 80],
+        ),
+        Sign::WayGate => sp(
+            &["SOUTH GATE", "CAR PARK P3"],
+            [200, 90, 30],
+            [255, 245, 225],
+            [255, 220, 90],
+        ),
+        Sign::WayPlaza => sp(
+            &["HQ PLAZA", "TOWER, HR, SCRUM"],
+            [40, 40, 70],
+            [240, 240, 255],
+            [255, 120, 220],
+        ),
+        Sign::WayOld => sp(
+            &["OLD CAMPUS", "LEGACY SYSTEMS"],
+            [90, 70, 50],
+            [245, 235, 215],
+            [240, 200, 120],
+        ),
         Sign::ExecParking => sp(
             &[
                 "EXECUTIVE PARKING",

@@ -18,8 +18,8 @@ const EMBEDDED_GEOMETRY: &str = include_str!("../../../content/zone_geometry.ron
 const STEP_HEIGHT: f32 = 0.3;
 const BODY_HEIGHT: f32 = 1.8;
 /// Every layout fits in this rectangle (game_client `FLOOR_HALF_X/Z`).
-const HALF_X: f32 = 234.0;
-const HALF_Z: f32 = 168.0;
+const HALF_X: f32 = 262.0;
+const HALF_Z: f32 = 182.0;
 const BOUNDS_MARGIN: f32 = 1.0;
 /// The server owns height: a claimed y is measured from the zone's ground (`Terrain`, flat
 /// y = 0 indoors) and only has to fit the jump arc (`JUMP_SPEED^2 / 2 GRAVITY` = 1.28 m in the

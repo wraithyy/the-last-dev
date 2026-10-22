@@ -1,4 +1,4 @@
-//! The outdoor hub: a corporate campus town, 464 x 332 m. The HQ core (140 x 100 m) has the
+//! The outdoor hub: a corporate campus town, 520 x 360 m. The HQ core (140 x 100 m) has the
 //! executive car park, a cafeteria pavilion, a smoking corner, the reception plaza and the
 //! building facades (tower, data center, innovation lab, client annex); the districts around
 //! it are in `districts.rs` and `frontier.rs`. Buildings are single large blockers; the
@@ -12,29 +12,34 @@ use super::themes::{pt, route_point_near, runner, v};
 use bevy::prelude::*;
 use std::f32::consts::{FRAC_PI_2, PI};
 
-pub const HALF_X: f32 = 232.0;
-pub const HALF_Z: f32 = 166.0;
+pub const HALF_X: f32 = 260.0;
+pub const HALF_Z: f32 = 180.0;
 
-const SPAWN: (f32, f32) = (-23.0, 22.0);
-const GRAVEYARD: (f32, f32) = (-15.0, 28.5);
+/// A lawn south-west of the plaza with the tower dead ahead and nothing within 20 m: the first
+/// screenshot has one clear subject. The Onboarding door is in view 22 m away, not on top of it.
+const SPAWN: (f32, f32) = (-12.0, 32.0);
+/// Out of the doors' way, behind the billboard's lawn.
+const GRAVEYARD: (f32, f32) = (10.0, 42.0);
+/// Every pack stays 60 m or more from the arrival and 20 m from any dungeon door (gate test).
 const PACKS: [(f32, f32); 8] = [
-    (-57.0, 8.0),
-    (-45.0, 41.0),
-    (-31.0, -37.0),
+    (-72.0, 62.0),
+    (-60.0, 82.0),
+    (-30.0, -58.0),
     (30.0, -39.0),
-    (24.0, 31.0),
-    (56.0, 28.0),
+    (85.0, 14.0),
+    (80.0, 44.0),
     (60.0, -39.0),
-    (-8.0, 43.0),
+    (64.0, 64.0),
 ];
 /// intern, facilities_guy, barista, smoking_corner_dev, two ambient.
+/// The intern, the facilities guy and the ambient pair stand in Services Street now.
 const NPCS: [(f32, f32); 6] = [
-    (-19.0, 19.0),
-    (36.5, -2.0),
+    (56.0, 24.0),
+    (44.0, 10.0),
     (-34.0, 6.85),
     (46.0, 22.5),
-    (8.0, 10.0),
-    (-9.0, 15.0),
+    (64.0, 34.0),
+    (56.0, 34.0),
 ];
 const PLAZA: (f32, f32) = (0.0, 2.0);
 
@@ -43,32 +48,33 @@ const DATA_CENTER: (Vec2, Vec3) = (Vec2::new(54.0, -8.0), Vec3::new(24.0, 11.0, 
 /// The client annex of the Body Leasing easter egg: a small grey block east of the plaza.
 const ANNEX: (Vec2, Vec3) = (Vec2::new(32.0, -12.0), Vec3::new(12.0, 6.0, 6.0));
 /// The vendor's account manager waits between the plaza and the annex.
-const ACCOUNT_MANAGER: (f32, f32) = (25.0, -5.5);
+const ACCOUNT_MANAGER: (f32, f32) = (21.0, -3.0);
 /// Company Calendar quest-chain givers, each where its story lives: Finance by the cafe,
 /// the leaver at the smoking corner, Security at the tower path, the RTO lead by the bike
 /// rack and Internal Comms on the plaza. Each looks at the point after it.
 type Xz = (f32, f32);
 const CHAIN_NPCS: [(&str, Xz, Xz); 10] = [
-    ("npc_expense", (-25.5, 8.0), (-12.0, 8.0)),
+    ("npc_expense", (-29.0, 5.0), (-12.0, 8.0)),
     ("npc_exit", (43.5, 23.0), (46.0, 26.0)),
-    ("npc_security", (-4.5, -18.5), (0.0, -10.0)),
-    ("npc_rto", (11.5, -12.0), (0.0, 2.0)),
+    ("npc_security", (-10.0, -14.0), (0.0, -10.0)),
+    ("npc_rto", (-92.0, -24.0), (-86.0, -26.0)),
     ("npc_comms", (4.5, -7.0), (0.0, 2.0)),
-    // Prod Incident: prod itself stands on the lawn west of the tower, its on-call beside it.
-    ("npc_prod", (-28.0, -9.0), (-20.0, -4.0)),
-    ("npc_oncall", (-24.0, -6.5), (-28.0, -9.0)),
+    // Prod Incident: prod itself stands in Hybrid Row with its on-call beside it.
+    ("npc_prod", (-90.0, -8.0), (-85.0, -5.5)),
+    ("npc_oncall", (-85.0, -5.5), (-90.0, -8.0)),
     // Flaky Tests: QA by the car park, where the delivery robots do their rounds.
     ("npc_qa", (-34.0, 27.0), (-45.0, 41.0)),
     // Hybrid work: the worker at the west end of the cafe counter, coffee first; the enforcer
     // beside the tower door, where the badges are.
-    ("npc_hybrid", (-39.6, 9.4), (-36.0, 7.8)),
+    ("npc_hybrid", (-43.0, 9.4), (-38.0, 7.8)),
     ("npc_enforcer", (9.0, -22.0), (2.0, -17.0)),
 ];
-/// Desk Census: overflow hot desks on the lawn west of the tower (desk centre; you stand south).
+/// Desk Census: overflow hot desks in Hybrid Row, the lawn between the ring road and the creek
+/// (desk centre; you stand south).
 const OVERFLOW_DESKS: [(&str, Xz); 3] = [
-    ("prop:rto_desk_1", (-24.0, -21.0)),
-    ("prop:rto_desk_2", (-29.0, -24.0)),
-    ("prop:rto_desk_3", (-33.0, -20.0)),
+    ("prop:rto_desk_1", (-86.0, -36.0)),
+    ("prop:rto_desk_2", (-86.0, -28.0)),
+    ("prop:rto_desk_3", (-86.0, -20.0)),
 ];
 pub(super) const LAB: (Vec2, Vec3) = (Vec2::new(-50.0, -36.0), Vec3::new(26.0, 9.0, 22.0));
 
@@ -99,6 +105,7 @@ pub fn build() -> FloorLayout {
     );
     ground(&mut p);
     perimeter(&mut p);
+    quiet_meadow(&mut p);
     let doors = [
         (
             "door:tower/1",
@@ -133,6 +140,7 @@ pub fn build() -> FloorLayout {
     plaza(&mut p);
     graveyard(&mut p);
     lawn(&mut p);
+    services_street(&mut p);
     ambient_props(&mut p);
     overflow_desks(&mut p);
     super::districts::build(&mut p);
@@ -188,6 +196,31 @@ pub fn build() -> FloorLayout {
     assemble("campus", 0, "Synergy Campus", true, p, theme())
 }
 
+/// Services Street dressing: lamps, planters, benches and two parasol tables along the path
+/// from the plaza, so the one busy street of the map reads as a place and not a lawn with menus.
+/// Everything sits 3 m or more from the stand spots.
+fn services_street(p: &mut Plan) {
+    use super::models::{PARASOL_A, PLANTER, put};
+    for x in [44.0, 52.0, 60.0, 68.0] {
+        super::districts::lamp(p, x, 20.0);
+    }
+    for x in [52.0, 60.0, 68.0] {
+        put(p, &PLANTER, v(x, 0.0, 11.0), 0.0, 4.0, true);
+    }
+    for (x, z) in [(52.0, 29.0), (60.0, 21.0)] {
+        bench(p, x, z, 0.0);
+    }
+    for (x, z) in [(52.0, 39.0), (66.0, 40.0)] {
+        put(p, &PARASOL_A, v(x, 0.0, z), x, 7.0, false);
+        p.prim(
+            PrimKind::Cylinder,
+            v(x, 0.4, z),
+            v(1.0, 0.8, 1.0),
+            Mat::White,
+        );
+    }
+}
+
 /// Far lawn under the fog, all round the campus: inside the hedge the terrain mesh is the
 /// ground (a slab there would cover the creek bed).
 fn ground(p: &mut Plan) {
@@ -212,8 +245,42 @@ fn perimeter(p: &mut Plan) {
     ] {
         p.boxed(v(x, 1.2, z), v(sx, 2.4, sz), Mat::LeafDark, true);
     }
+    // The old south edge stays a hedge except in front of the Overflow Lot and the creek, so the
+    // South Gate still ends at the road to Car Park P3 and the extra 14 m is the lot's.
+    for (x0, x1) in [(-HALF_X, -160.0), (-50.0, HALF_X)] {
+        p.boxed(
+            v((x0 + x1) / 2.0, 1.2, 166.5),
+            v(x1 - x0, 2.4, 1.0),
+            Mat::LeafDark,
+            true,
+        );
+    }
     // Executive parking really is at the door: everyone else parks in P3.
     super::districts::signpost(p, -60.0, 18.5, true, 4.0, Sign::ExecParking);
+}
+
+/// The ground the growth added: the Quiet Meadow on the west edge, past the Wellness Park
+/// hills, where nothing happens on purpose (no anchors, no packs). Clumps of trees and bushes
+/// with a few benches facing the sunset.
+fn quiet_meadow(p: &mut Plan) {
+    use super::models::{
+        BUSH_LARGE, FLOWER_RED, FLOWER_YELLOW, GRASS_LARGE, ROCK_SMALL, pick, put, tree,
+    };
+    for k in 0..16 {
+        let z = -150.0 + k as f32 * 19.0 + pick(k as f32, 3.0, 9) as f32;
+        let x = -246.0 + pick(z, 5.0, 7) as f32 * 2.0;
+        tree(p, x, z, k % 3 == 0, 1.7);
+        for j in 0..3 {
+            let (bx, bz) = (x + 3.0 + j as f32 * 1.6, z + 2.0 - j as f32 * 1.9);
+            let m = [&BUSH_LARGE, &GRASS_LARGE, &FLOWER_YELLOW][(k + j) % 3];
+            put(p, m, v(bx, 0.0, bz), j as f32 * 1.1, 2.0, false);
+        }
+        put(p, &FLOWER_RED, v(x - 2.5, 0.0, z + 1.5), 0.5, 1.4, false);
+    }
+    for (z, yaw) in [(-90.0, -FRAC_PI_2), (-10.0, -FRAC_PI_2), (70.0, -FRAC_PI_2)] {
+        bench(p, -240.0, z, yaw);
+        put(p, &ROCK_SMALL, v(-238.0, 0.0, z + 3.0), 1.0, 3.0, false);
+    }
 }
 
 /// Entrance anchor in front of the facade centre: 1.8 m out, facing away from the wall.
@@ -673,7 +740,10 @@ fn plaza(p: &mut Plan) {
         vec![pt(0.0, -9.0), pt(0.0, -23.0)],
         vec![pt(-14.0, -4.0), pt(-32.0, -14.0), pt(-50.0, -22.0)],
         vec![pt(14.0, 0.0), pt(28.0, -6.0), pt(40.0, -8.0)],
-        vec![pt(-23.0, 22.0), pt(-12.0, 11.0)],
+        // From the arrival lawn to the arch, to the Onboarding door and out east to Services Street.
+        vec![pt(-12.0, 32.0), pt(-8.0, 22.0), pt(0.0, 12.0)],
+        vec![pt(-9.0, 24.0), pt(-22.0, 17.0)],
+        vec![pt(12.0, 8.0), pt(28.0, 14.0), pt(46.0, 16.0)],
     ] {
         runner(p, &ctrl, 5.0, Mat::Concrete, Mat::White);
     }
@@ -760,13 +830,7 @@ fn lawn(p: &mut Plan) {
             Mat::Plant,
         );
     }
-    for (x, z) in [
-        (-14.0, 30.0),
-        (-4.0, 34.0),
-        (32.0, 34.0),
-        (60.0, 12.0),
-        (-58.0, -8.0),
-    ] {
+    for (x, z) in [(32.0, 34.0), (-58.0, -8.0)] {
         p.boxed(v(x, 0.75, z), v(2.0, 0.08, 0.9), Mat::Wood, true);
         for dz in [-0.8, 0.8] {
             p.boxed(v(x, 0.45, z + dz), v(2.0, 0.07, 0.35), Mat::Wood, false);
@@ -845,22 +909,12 @@ fn ambient_props(p: &mut Plan) {
     p.boxed(v(26.0, 1.5, -15.15), v(0.2, 3.0, 0.2), Mat::Metal, false);
     p.sign(v(-26.0, 3.0, -10.0), 0.0, 4.0, Sign::Compute);
     p.boxed(v(-26.0, 1.5, -10.15), v(0.2, 3.0, 0.2), Mat::Metal, false);
-    // Scooters littering the walkways; four more are borrowable (`office::CAMPUS_SCOOTERS`).
-    for (i, (x, z)) in [
-        (-4.0, -12.0),
-        (-17.0, -7.0),
-        (-28.0, -14.0),
-        (30.0, -7.5),
-        (-14.0, 13.0),
-        (35.0, -5.0),
-    ]
-    .into_iter()
-    .enumerate()
-    {
+    // Two scooters left lying about; the borrowable ones stand in two racks (`office::CAMPUS_SCOOTERS`).
+    for (i, (x, z)) in [(-28.0, -14.0), (35.0, -5.0)].into_iter().enumerate() {
         scooter(p, x, z, i as f32 * 1.7, i % 3 == 0);
     }
-    p.sign(v(-3.0, 1.2, -11.0), 0.0, 1.4, Sign::ScooterZone);
-    p.boxed(v(-3.0, 0.5, -10.85), v(0.1, 1.0, 0.1), Mat::Metal, false);
+    p.sign(v(-19.0, 1.2, 36.3), 0.0, 1.4, Sign::ScooterZone);
+    p.boxed(v(-19.0, 0.5, 36.45), v(0.1, 1.0, 0.1), Mat::Metal, false);
     // The lonely bike rack with its one bike.
     for k in 0..4 {
         p.boxed(
@@ -885,15 +939,24 @@ fn ambient_props(p: &mut Plan) {
     );
     p.sign(v(15.0, 1.4, -14.4), 0.0, 1.6, Sign::BikeRack);
     p.block(v(14.75, 0.5, -14.0), v(2.0, 1.0, 0.4));
-    // Old stop sign by the arrival spot; the shuttle itself is parked south of the plaza.
-    p.boxed(v(-16.0, 1.2, 21.0), v(0.15, 2.4, 0.15), Mat::Metal, false);
-    p.sign(v(-16.0, 2.7, 21.1), 0.0, 1.6, Sign::ShuttleBus);
+    // The plaza's shuttle stop sign, at the south edge of the arrival lawn beside the scooter rack.
+    p.boxed(v(-21.0, 1.2, 44.3), v(0.15, 2.4, 0.15), Mat::Metal, false);
+    p.sign(v(-21.0, 2.7, 44.4), 0.0, 1.6, Sign::ShuttleBus);
 }
 
 /// VibeCon on the east lawn: a pop-up backdrop wall with the entrance in it, a truss arch over
 /// the lanyard queue, the registration desk beside the queue and a poster easel facing the plaza.
 /// Returns the door anchor in front of the entrance (facing the plaza).
 fn vibecon_entrance(p: &mut Plan) -> (Vec3, f32) {
+    // Written around (33, 16) on the old east lawn; the whole venue now stands in Incubator
+    // Street, east of the road, between the booths (the frame shifts it, the code stays local).
+    const WALL_X: f32 = 33.0;
+    const Z: f32 = 16.0;
+    p.framed(v(101.0, 0.0, -33.0), 0.0, vibecon_venue);
+    (v(WALL_X - 2.0 + 101.0, 0.0, Z - 33.0), FRAC_PI_2)
+}
+
+fn vibecon_venue(p: &mut Plan) {
     const WALL_X: f32 = 33.0;
     const Z: f32 = 16.0;
     let neon = [Mat::NeonYellow, Mat::LedGreen, Mat::NeonCyan, Mat::NeonPink];
@@ -1004,7 +1067,6 @@ fn vibecon_entrance(p: &mut Plan) -> (Vec3, f32) {
         1.6,
         Sign::VibeConBanner,
     );
-    (v(WALL_X - 2.0, 0.0, Z), FRAC_PI_2)
 }
 
 /// The Onboarding dungeon: a narrow door in a free-standing wall just south of the plaza, beside
@@ -1165,6 +1227,13 @@ fn hackathon_door(p: &mut Plan) -> (Vec3, f32) {
 /// The All-Hands Offsite shuttle: a shelter, a parked coach in offsite livery and a tall pylon
 /// that reads from the arrival spot. Returns the door anchor in front of the coach's boarding door.
 fn shuttle_stop(p: &mut Plan) -> (Vec3, f32) {
+    // Written around (7, 34) on the old arrival lawn; the stop now stands at the Wellness Park
+    // trailhead (the frame shifts it, the code stays local).
+    p.framed(v(-131.0, 0.0, 40.1), 0.0, shuttle_pad);
+    (v(7.0 - 131.0, 0.0, 33.9 + 40.1), 0.0)
+}
+
+fn shuttle_pad(p: &mut Plan) {
     const COACH_Z: f32 = 37.0;
     let side = COACH_Z - 1.3;
     p.boxed(v(7.0, 0.03, 34.5), v(15.0, 0.06, 9.0), Mat::Concrete, false);
@@ -1241,7 +1310,6 @@ fn shuttle_stop(p: &mut Plan) -> (Vec3, f32) {
     p.block(v(13.8, 1.5, 33.5), v(0.5, 3.0, 0.5));
     p.sign(v(13.8, 5.4, 33.62), 0.0, 4.2, Sign::OffsiteShuttle);
     p.sign(v(13.8, 5.4, 33.38), PI, 4.2, Sign::OffsiteShuttle);
-    (v(7.0, 0.0, side - 1.8), 0.0)
 }
 
 /// Kick scooter: deck, stem, bars and two wheels; low enough to step over.
@@ -1284,21 +1352,21 @@ fn trees(p: &mut Plan, doors: &[(&'static str, (Vec3, f32))]) {
     };
     // A belt around the edge (sparse: it is mostly fog from the middle) plus clumps in the
     // lawns between buildings and in the districts.
-    for i in 0..40 {
-        let x = -226.0 + i as f32 * 11.6;
+    for i in 0..45 {
+        let x = -254.0 + i as f32 * 11.6;
         // The construction site and the railway own the north edge; the gate opens the south.
-        if !(-120.0..232.0).contains(&x) {
-            tree(p, x, -163.0, i % 2 == 0, 1.5 + (i % 3) as f32 * 0.2);
+        if !(-120.0..260.0).contains(&x) {
+            tree(p, x, -177.0, i % 2 == 0, 1.5 + (i % 3) as f32 * 0.2);
         }
-        if !(-20.0..20.0).contains(&(x + 4.0)) && !(176.0..232.0).contains(&(x + 4.0)) {
-            tree(p, x + 4.0, 163.0, i % 2 == 1, 1.6);
+        if !(-20.0..20.0).contains(&(x + 4.0)) && !(176.0..260.0).contains(&(x + 4.0)) {
+            tree(p, x + 4.0, 177.0, i % 2 == 1, 1.6);
         }
     }
-    for i in 0..29 {
-        let z = -158.0 + i as f32 * 11.2;
-        tree(p, -229.0, z, i % 2 == 0, 1.6);
+    for i in 0..32 {
+        let z = -172.0 + i as f32 * 11.2;
+        tree(p, -257.0, z, i % 2 == 0, 1.6);
         if !(118.0..166.0).contains(&z) {
-            tree(p, 229.0, z, i % 2 == 1, 1.7);
+            tree(p, 257.0, z, i % 2 == 1, 1.7);
         }
     }
     for (x, z, pine) in super::districts::TREES {
@@ -1311,8 +1379,6 @@ fn trees(p: &mut Plan, doors: &[(&'static str, (Vec3, f32))]) {
         (-8.0, 28.0, false),
         (8.0, 24.0, true),
         (40.0, 38.0, false),
-        (66.0, 8.0, true),
-        (36.0, 14.0, false),
         (-60.0, -8.0, true),
         (-58.0, 20.0, false),
         (-12.0, -22.0, false),

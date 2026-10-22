@@ -1,4 +1,4 @@
-//! The open-world campus around the HQ core (`campus.rs`), 464 x 332 m, laid out like a corporate
+//! The open-world campus around the HQ core (`campus.rs`), 520 x 360 m, laid out like a corporate
 //! town. Synergy Boulevard runs north from the South Gate (the road in from Car Park P3) past the
 //! Food Truck Plaza and the Lunch Lawn to the HQ plaza; the ring road around the core carries
 //! everything else. Food and leisure sit next to the offices (food trucks, the gym); parking and
@@ -30,11 +30,29 @@ pub struct District {
 }
 
 /// Most specific first; the HQ core comes last so the districts win where rectangles touch.
-pub const DISTRICTS: [District; 12] = [
+pub const DISTRICTS: [District; 15] = [
+    // The ground the growth added on the west edge: nothing happens here on purpose.
+    District {
+        name: "Quiet Meadow",
+        centre: (-246.0, 0.0),
+        half: (14.0, 180.0),
+    },
+    // Menus, quest givers and the calendar, east of the plaza arch.
+    District {
+        name: "Services Street",
+        centre: (55.0, 27.0),
+        half: (17.0, 19.0),
+    },
+    // The overflow desks and the hybrid-work givers, between the ring road and the creek.
+    District {
+        name: "Hybrid Row",
+        centre: (-86.0, -24.0),
+        half: (13.0, 26.0),
+    },
     District {
         name: "South Gate",
-        centre: (0.0, 150.0),
-        half: (22.0, 16.0),
+        centre: (0.0, 157.0),
+        half: (22.0, 23.0),
     },
     District {
         name: "Food Truck Plaza",
@@ -43,28 +61,28 @@ pub const DISTRICTS: [District; 12] = [
     },
     District {
         name: "Overflow Lot",
-        centre: (-96.0, 122.0),
-        half: (46.0, 44.0),
+        centre: (-96.0, 129.0),
+        half: (46.0, 51.0),
     },
     District {
         name: "Wellness Park",
-        centre: (-171.5, 54.0),
-        half: (60.5, 112.0),
+        centre: (-185.5, 61.0),
+        half: (74.5, 119.0),
     },
     District {
         name: "New HQ (Opening 2019)",
-        centre: (-171.5, -114.0),
-        half: (60.5, 52.0),
+        centre: (-185.5, -121.0),
+        half: (74.5, 59.0),
     },
     District {
         name: "Old Campus",
-        centre: (-12.5, -112.0),
-        half: (84.5, 54.0),
+        centre: (-12.5, -119.0),
+        half: (84.5, 61.0),
     },
     District {
         name: "Garage & Station",
-        centre: (155.0, -112.0),
-        half: (77.0, 54.0),
+        centre: (169.0, -119.0),
+        half: (91.0, 61.0),
     },
     District {
         name: "Incubator Street",
@@ -73,18 +91,18 @@ pub const DISTRICTS: [District; 12] = [
     },
     District {
         name: "Co-Living Commons",
-        centre: (196.0, 25.0),
-        half: (36.0, 81.0),
+        centre: (210.0, 25.0),
+        half: (50.0, 81.0),
     },
     District {
         name: "Executive Hill",
-        centre: (191.0, 136.0),
-        half: (41.0, 30.0),
+        centre: (205.0, 143.0),
+        half: (55.0, 37.0),
     },
     District {
         name: "Wellness Gym",
-        centre: (103.0, 112.0),
-        half: (47.0, 54.0),
+        centre: (103.0, 119.0),
+        half: (47.0, 61.0),
     },
     District {
         name: "HQ Plaza",
@@ -106,7 +124,7 @@ pub fn district_at(x: f32, z: f32) -> Option<&'static str> {
 pub const LAKE: (f32, f32) = (-150.0, -5.0);
 pub const LAKE_R: f32 = 16.0;
 /// Liquidity Creek: down from the north edge, west into the lake, out south past the lot.
-pub const CREEK: [(f32, f32); 4] = [(-104.0, -166.0), (-104.0, -5.0), LAKE, (-150.0, 166.0)];
+pub const CREEK: [(f32, f32); 4] = [(-104.0, -180.0), (-104.0, -5.0), LAKE, (-150.0, 180.0)];
 const CREEK_HALF_W: f32 = 3.5;
 const CREEK_BANK: f32 = 3.0;
 const CREEK_DEPTH: f32 = 1.3;
@@ -196,7 +214,7 @@ pub(super) fn abs(p: &Plan, x: f32, y: f32, z: f32) -> Vec3 {
 /// Trash packs `pack_9`.. in content order (`content/game.ron`, campus zone).
 pub(super) const PACKS: [(f32, f32); 38] = [
     // Food Truck Plaza and the Lunch Lawn (1-2)
-    (-20.0, 70.0),
+    (-48.0, 100.0),
     (-26.0, 94.0),
     (50.0, 106.0),
     (34.0, 104.0),
@@ -208,7 +226,7 @@ pub(super) const PACKS: [(f32, f32); 38] = [
     (-174.0, 132.0),
     // Incubator Street (3-4)
     (111.0, -30.0),
-    (124.0, -14.0),
+    (152.0, -2.0),
     (111.0, 12.0),
     (124.0, 36.0),
     // Wellness Gym (3-4)
@@ -280,9 +298,9 @@ pub(super) const SPOTS: [Spot; 29] = [
     ("night_10", (-96.0, 140.0), (-96.0, 120.0)),
     ("night_11", (-30.0, -150.0), (0.0, -112.0)),
     ("night_12", (170.0, 40.0), (196.0, 40.0)),
-    // The campus HR presence: the bot kiosk at reception, the colleague slumped on the plaza.
+    // The campus HR presence: the bot kiosk at reception, the colleague slumped in Services Street.
     ("npc_hr", (13.5, -6.0), (0.0, 2.0)),
-    ("npc_colleague", (-10.0, 9.5), (0.0, 2.0)),
+    ("npc_colleague", (64.0, 24.0), (56.0, 24.0)),
     // The Old Campus raised plaza and the gate guard of the villa (ambient regulars).
     ("npc_founder_guide", (-22.0, -90.0), (-8.0, -90.0)),
     ("npc_villa_guard", (202.0, 130.0), (196.0, 124.0)),
@@ -406,6 +424,7 @@ pub(super) fn build(p: &mut Plan) {
     super::frontier::build(p);
     super::dressing::build(p);
     shuttles(p);
+    wayfinding(p);
     ill_marie(p);
     picnic_dedication(p);
     for (k, (x, z)) in PACKS.into_iter().enumerate() {
@@ -552,6 +571,34 @@ pub(super) fn signpost(p: &mut Plan, x: f32, z: f32, along_x: bool, width: f32, 
         p.sign(v(0.0, 2.2, 0.06), 0.0, width, sign);
         p.sign(v(0.0, 2.2, -0.06), PI, width, sign);
     });
+}
+
+/// A waypost: one post with a pointed board per destination, each turned towards it, readable
+/// from both sides. `arms` are (target x, target z, sign), top board first.
+pub(super) fn waypost(p: &mut Plan, x: f32, z: f32, arms: &[(f32, f32, Sign)]) {
+    p.boxed(v(x, 2.0, z), v(0.2, 4.0, 0.2), Mat::Wall, true);
+    p.prim(
+        PrimKind::Sphere,
+        v(x, 4.05, z),
+        v(0.4, 0.4, 0.4),
+        Mat::Chrome,
+    );
+    for (k, (tx, tz, sign)) in arms.iter().enumerate() {
+        let dir = Vec2::new(tx - x, tz - z).normalize_or_zero();
+        let yaw = (-dir.y).atan2(dir.x);
+        let y = 3.45 - k as f32 * 1.15;
+        let centre = Vec2::new(x, z) + dir * 1.15;
+        p.sign(v(centre.x, y, centre.y), yaw, 2.0, *sign);
+        p.sign(v(centre.x, y, centre.y), yaw + PI, 2.0, *sign);
+        // The board's point: a square turned 45 degrees at its far end.
+        let tip = Vec2::new(x, z) + dir * 2.15;
+        p.slab(
+            v(tip.x, y, tip.y),
+            yaw + FRAC_PI_2 / 2.0,
+            v(0.7, 0.05, 0.7),
+            Mat::Trim,
+        );
+    }
 }
 
 /// Axis-aligned road with a dashed centre line: scooter-friendly, it says so on the tin.
@@ -1281,9 +1328,16 @@ fn incubator(p: &mut Plan) {
         bench(p, cx - 0.2, cz + dz, -FRAC_PI_2);
         spot(p, key, (cx + 1.5, 0.8, cz + dz), (cx - 2.0, cz + dz));
     }
-    p.boxed(v(cx + 3.8, 0.55, cz), v(1.0, 1.1, 3.0), Mat::Wood, true);
-    p.boxed(v(cx + 3.8, 1.3, cz), v(0.4, 0.5, 0.6), Mat::Chrome, false);
-    spot(p, "prop:cowork_coffee", (cx + 3.8, 1.3, cz), (cx + 2.2, cz));
+    // The tap counter at the north end: the Hack24 door in the back wall needs 8 m of its own.
+    let tap = cz - 6.5;
+    p.boxed(v(cx + 3.8, 0.55, tap), v(1.0, 1.1, 3.0), Mat::Wood, true);
+    p.boxed(v(cx + 3.8, 1.3, tap), v(0.4, 0.5, 0.6), Mat::Chrome, false);
+    spot(
+        p,
+        "prop:cowork_coffee",
+        (cx + 3.8, 1.3, tap),
+        (cx + 2.2, tap),
+    );
 }
 
 /// The Corporate Wellness gym next to the offices: an outdoor canopy over treadmill desks,
@@ -1405,6 +1459,115 @@ fn overflow_lot(p: &mut Plan) {
 
 /// Shuttle stop: a post with the shuttle sign, a small roof and a bench. The plaza stop reuses
 /// the old sign by the arrival spot (`campus.rs`).
+/// Waypost junctions: the arrival lawn, the plaza edge, the ring road and each hub, so a player
+/// sees where the dungeons, Services Street and the districts are before reading a quest.
+/// Each is 6 m or more from anything interactable.
+fn wayfinding(p: &mut Plan) {
+    const STARTERS: (f32, f32) = (-22.0, 12.0);
+    const TOWER: (f32, f32) = (0.0, -24.0);
+    const SERVICES: (f32, f32) = (52.0, 18.0);
+    const DOCK: (f32, f32) = (68.0, -4.0);
+    const INCUBATOR: (f32, f32) = (117.0, 0.0);
+    const HYBRID: (f32, f32) = (-86.0, -26.0);
+    const LAB: (f32, f32) = (-50.0, -23.0);
+    const PLAZA: (f32, f32) = (0.0, 5.0);
+    let arm = |t: (f32, f32), s: Sign| (t.0, t.1, s);
+    waypost(
+        p,
+        7.0,
+        26.0,
+        &[
+            arm(STARTERS, Sign::WayStarters),
+            arm(TOWER, Sign::WayTower),
+            arm(SERVICES, Sign::WayServices),
+        ],
+    );
+    waypost(
+        p,
+        22.0,
+        8.0,
+        &[
+            arm(SERVICES, Sign::WayServices),
+            arm(DOCK, Sign::WayDock),
+            arm(INCUBATOR, Sign::WayIncubator),
+        ],
+    );
+    waypost(
+        p,
+        -30.0,
+        -6.0,
+        &[
+            arm(LAB, Sign::WayLab),
+            arm((-20.0, -30.0), Sign::WayTower),
+            arm(HYBRID, Sign::WayHybrid),
+        ],
+    );
+    waypost(
+        p,
+        60.0,
+        29.0,
+        &[
+            arm(PLAZA, Sign::WayPlaza),
+            arm(INCUBATOR, Sign::WayIncubator),
+            arm((150.0, 82.0), Sign::WayBoard),
+        ],
+    );
+    waypost(
+        p,
+        76.0,
+        8.0,
+        &[
+            arm(DOCK, Sign::WayDock),
+            arm(SERVICES, Sign::WayServices),
+            arm(INCUBATOR, Sign::WayIncubator),
+        ],
+    );
+    waypost(
+        p,
+        -78.0,
+        -40.0,
+        &[
+            arm(HYBRID, Sign::WayHybrid),
+            arm((-12.0, -90.0), Sign::WayOld),
+            arm(LAB, Sign::WayLab),
+        ],
+    );
+    waypost(
+        p,
+        -114.0,
+        60.0,
+        &[
+            arm((-124.0, 74.0), Sign::WayWellness),
+            arm(PLAZA, Sign::WayPlaza),
+        ],
+    );
+    waypost(
+        p,
+        9.0,
+        50.0,
+        &[
+            arm(PLAZA, Sign::WayPlaza),
+            arm((-150.0, 10.0), Sign::WayWellness),
+            arm(INCUBATOR, Sign::WayIncubator),
+        ],
+    );
+    waypost(
+        p,
+        -9.0,
+        134.0,
+        &[arm((0.0, 150.0), Sign::WayGate), arm(PLAZA, Sign::WayPlaza)],
+    );
+    waypost(
+        p,
+        150.0,
+        66.0,
+        &[
+            arm((150.0, 82.0), Sign::WayBoard),
+            arm(INCUBATOR, Sign::WayIncubator),
+        ],
+    );
+}
+
 fn shuttles(p: &mut Plan) {
     for (anchor, (x, z), face) in SHUTTLES {
         let d = face.dir();
@@ -1419,11 +1582,11 @@ fn shuttles(p: &mut Plan) {
         bench(p, x + 2.0 * d.z, z - 2.0 * d.x - 0.6 * d.z, face.yaw());
         p.interactable(anchor, v(x, 1.6, z), v(x + 1.5 * d.x, 0.0, z + 1.5 * d.z));
     }
-    // The plaza stop: the old shuttle sign by the arrival spot.
+    // The plaza stop: the old shuttle sign, now at the south edge of the arrival lawn.
     p.interactable(
         "prop:shuttle_plaza",
-        v(-16.0, 1.6, 21.0),
-        v(-16.0, 0.0, 22.5),
+        v(-21.0, 1.6, 44.3),
+        v(-21.0, 0.0, 45.8),
     );
 }
 

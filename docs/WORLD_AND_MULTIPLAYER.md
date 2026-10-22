@@ -109,7 +109,9 @@ Determinism stays: quest progress is driven by sim events and needs no rng.
 - Online rooms still start on the campus (server `START_ZONE`) and joiners go to the group's zone:
   the tutorial is offline only, and P3 stays reachable on foot through the South Gate for anyone who
   wants the starter tickets.
-- The campus is 464 x 332 m in twelve districts. Ground height is analytic
+- The campus is 520 x 360 m (`campus::HALF_X/Z` 260 x 180; the clamp `FLOOR_HALF_X/Z` and the server's `HALF_X/Z` are 2 m larger) in
+  districts that include Services Street (menus, quest givers, the Company Calendar), Hybrid Row and the
+  Quiet Meadow. The arrival lawn is kept clear by the `campus_density_gate` test (`floors/zones.rs`). Ground height is analytic
   (`combat_core::terrain::Terrain`: hills, mesas with ramps, a creek with bridges), exported per zone in
   `content/zone_geometry.ron`; the sim, the server and the client all read the same `height(x, z)`, so
   units, corpses, telegraphs and the server's movement checks follow the slopes. The wire format did

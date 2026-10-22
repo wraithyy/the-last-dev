@@ -207,7 +207,8 @@ pub struct AuraDef {
     /// stuns. Player movement is client-owned, so players ignore it too.
     #[serde(default)]
     pub root: bool,
-    /// Enemy AI moves this much slower (the largest wins); bosses included.
+    /// Enemy AI moves this much slower (the largest wins); bosses included. Players ignore it:
+    /// an enemy slow aimed at players needs `stealth_slow_pct` as well.
     #[serde(default)]
     pub slow_pct: u32,
     /// Stealth (Tailgating): idle hostiles notice the bearer only within this percent of their

@@ -511,6 +511,163 @@ mod tests {
         assert!(!l.pieces.iter().any(|p| matches!(p, Piece::Light { .. })));
     }
 
+    /// Blocking: the campus passes, keep it that way (add an exception to the lists below with a reason).
+    const GATE_ENFORCED: bool = true;
+
+    /// Minigame return points of the Company Calendar: no door piece and no trigger, they share
+    /// the calendar's point on purpose, so the gate does not count them.
+    const CALENDAR_DOORS: [&str; 7] = [
+        "door:teambuilding/1",
+        "door:review/1",
+        "door:reorg/1",
+        "door:migration/1",
+        "door:hackathon/1",
+        "door:openspace/1",
+        "door:home/1",
+    ];
+
+    /// Pairs allowed closer than 2.5 m, each with the reason.
+    const CLOSE_PAIRS: [(&str, &str); 3] = [
+        // The corner's dev sits on the bench's second slot.
+        ("npc_4", "prop:smoking_bench"),
+        ("npc_exit", "prop:smoking_bench"),
+        // The bot idles at the board it reports on.
+        ("prop:scrum_board", "scrum_bot"),
+    ];
+
+    fn is_enemy(n: &str) -> bool {
+        ["pack_", "night_", "rare_", "boss", "world_boss"]
+            .iter()
+            .any(|p| n.starts_with(p))
+    }
+
+    /// The crowding rules of `docs/CAMPUS_REWORK.md` section 6, measured on the layout the
+    /// server will see. Reports every violation; fails on them once `GATE_ENFORCED`.
+    #[test]
+    fn campus_density_gate() {
+        let l = zone("campus");
+        let things: Vec<(&str, Vec3)> = l
+            .anchors
+            .iter()
+            .filter(|a| {
+                !is_enemy(a.0)
+                    && !matches!(a.0, "player_spawn" | "graveyard")
+                    && !CALENDAR_DOORS.contains(&a.0)
+            })
+            .map(|a| (a.0, a.1))
+            .collect();
+        let flat = |a: Vec3, b: Vec3| Vec2::new(a.x - b.x, a.z - b.z).length();
+        let mut bad: Vec<String> = Vec::new();
+
+        for (i, (a, pa)) in things.iter().enumerate() {
+            for (b, pb) in &things[i + 1..] {
+                let d = flat(*pa, *pb);
+                let allowed = CLOSE_PAIRS
+                    .iter()
+                    .any(|(x, y)| (a, b) == (x, y) || (a, b) == (y, x));
+                if d < 2.5 && !allowed {
+                    bad.push(format!("stacked: {a} and {b} are {d:.1} m apart"));
+                }
+            }
+        }
+
+        let mut cells: std::collections::BTreeMap<(i32, i32), Vec<&str>> = Default::default();
+        for (n, p) in &things {
+            let c = ((p.x / 20.0).floor() as i32, (p.z / 20.0).floor() as i32);
+            cells.entry(c).or_default().push(n);
+        }
+        for ((i, j), names) in &cells {
+            if names.len() > 8 {
+                bad.push(format!(
+                    "cell [{},{}) x [{},{}) holds {}: {names:?}",
+                    i * 20,
+                    i * 20 + 20,
+                    j * 20,
+                    j * 20 + 20,
+                    names.len()
+                ));
+            }
+        }
+        let spawn = pos(&l, "player_spawn");
+        for (label, c) in [
+            ("the spawn", spawn),
+            ("the plaza centre", Vec3::new(0.0, 0.0, 10.0)),
+        ] {
+            let near: Vec<&str> = things
+                .iter()
+                .filter(|t| flat(t.1, c) <= 40.0)
+                .map(|t| t.0)
+                .collect();
+            eprintln!(
+                "density: {} interactables within 40 m of {label}",
+                near.len()
+            );
+            // The plaza-centre disc also reaches the cafe and the car park lawn; it is reported
+            // for the before/after comparison, the arrival rule is the spawn's.
+            if near.len() > 15 && label == "the spawn" {
+                bad.push(format!(
+                    "{} interactables within 40 m of {label}: {near:?}",
+                    near.len()
+                ));
+            }
+        }
+
+        let enemies: Vec<(&str, Vec3)> = l
+            .anchors
+            .iter()
+            .filter(|a| is_enemy(a.0))
+            .map(|a| (a.0, a.1))
+            .collect();
+        for door in doors_of(&l)
+            .into_iter()
+            .filter(|d| !CALENDAR_DOORS.contains(d))
+        {
+            let dp = pos(&l, door);
+            for (n, p) in &things {
+                if *n != door && flat(*p, dp) < 8.0 {
+                    bad.push(format!(
+                        "door {door}: {n} is {:.1} m away (min 8)",
+                        flat(*p, dp)
+                    ));
+                }
+            }
+            for (n, p) in &enemies {
+                if flat(*p, dp) < 20.0 {
+                    bad.push(format!(
+                        "door {door}: enemy {n} is {:.1} m away (min 20)",
+                        flat(*p, dp)
+                    ));
+                }
+            }
+        }
+        for who in ["npc_picnic_wife", "npc_picnic_daughter"] {
+            for (n, p) in &enemies {
+                let d = flat(*p, pos(&l, who));
+                if d < 40.0 {
+                    bad.push(format!("picnic: enemy {n} is {d:.1} m from {who} (min 40)"));
+                }
+            }
+        }
+        for (n, p) in &enemies {
+            let d = flat(*p, spawn);
+            if d < 60.0 {
+                bad.push(format!("spawn: enemy {n} is {d:.1} m away (min 60)"));
+            }
+        }
+
+        for b in &bad {
+            eprintln!("density gate: {b}");
+        }
+        eprintln!(
+            "density gate: {} violations (enforced: {GATE_ENFORCED})",
+            bad.len()
+        );
+        assert!(
+            !GATE_ENFORCED || bad.is_empty(),
+            "campus is too crowded, see above"
+        );
+    }
+
     /// `cargo test -p game_client zone_anchors -- --ignored --nocapture`: QA coordinates for
     /// `WOW_PLAYER_AT`.
     #[test]

@@ -37,11 +37,13 @@ fn secret_seated(p: &mut Plan, anchor: &'static str, x: f32, z: f32, look: (f32,
 
 /// Parked e-scooters anyone can borrow; the office module draws them (they vanish when
 /// borrowed), so the campus builder leaves these four spots empty.
+/// Two racks instead of four drive-by scooters: one at the edge of the arrival lawn, one in
+/// Services Street.
 pub const CAMPUS_SCOOTERS: [(&str, f32, f32); 4] = [
-    ("prop:scooter_1", -20.0, 17.5),
-    ("prop:scooter_2", 4.0, 8.0),
-    ("prop:scooter_3", 18.0, -2.0),
-    ("prop:scooter_4", 3.5, -17.0),
+    ("prop:scooter_1", -19.0, 39.0),
+    ("prop:scooter_2", -19.0, 42.2),
+    ("prop:scooter_3", 50.0, 41.0),
+    ("prop:scooter_4", 53.2, 41.0),
 ];
 
 pub fn place(zone: &str, p: &mut Plan) {
@@ -190,9 +192,8 @@ fn campus(p: &mut Plan) {
     }
     // Behind the reception kiosk, back to the plaza, reading.
     secret_seated(p, "secret:docs_intern", 10.0, -5.8, (10.0, -10.0));
-    // Sprint mode: the planning board beside the walk from the car park, and a terminal at
-    // the tower entrance.
-    let (x, z) = (-14.0, 17.0);
+    // Sprint mode: the planning board and its terminal in Services Street, with the other menus.
+    let (x, z) = (56.0, 14.0);
     p.boxed(v(x, 1.6, z), v(2.6, 1.5, 0.06), Mat::Board, true);
     p.sign(v(x, 1.6, z + 0.05), 0.0, 2.5, Sign::SprintBoard);
     for dx in [-1.2, 1.2] {
@@ -204,7 +205,7 @@ fn campus(p: &mut Plan) {
         );
     }
     spot(p, "prop:sprint_board", (x, 1.6, z), (x, z + 2.0));
-    let (x, z) = (4.5, -20.5);
+    let (x, z) = (64.0, 14.0);
     p.boxed(v(x, 0.6, z), v(0.7, 1.2, 0.5), Mat::Dark, true);
     p.boxed(v(x, 1.45, z + 0.05), v(0.66, 0.5, 0.06), Mat::Dark, false);
     p.sign(v(x, 1.45, z + 0.09), 0.0, 0.62, Sign::SprintTerminal);
@@ -218,16 +219,16 @@ fn campus(p: &mut Plan) {
 }
 
 /// Where the night shift (`live.night`, anchors `night_<n>`) waits on the campus: the edges of
-/// the lawn, away from the arrival and the graveyard.
+/// the lawn, 60 m or more from the arrival and 20 m from every door.
 pub const NIGHT_SPOTS: [(&str, f32, f32); 7] = [
-    ("night_1", -30.0, -21.0),
-    ("night_2", 38.0, 32.0),
-    ("night_3", -55.0, -3.0),
-    ("night_4", 33.0, -25.0),
-    ("night_5", 6.0, 29.0),
+    ("night_1", -62.0, -60.0),
+    ("night_2", 74.0, 74.0),
+    ("night_3", -66.0, -6.0),
+    ("night_4", 48.0, -38.0),
+    ("night_5", -40.0, 118.0),
     ("night_6", 52.0, 13.0),
     // The Hard Deadline, the night's mini-elite, alone on the far west lawn by the car park.
-    ("night_7", -58.0, 31.0),
+    ("night_7", -80.0, 36.0),
 ];
 
 /// The live world on the campus: the Daily Standup board with its Scrum Master Bot on the
@@ -247,18 +248,19 @@ fn live_world(p: &mut Plan) {
     }
     spot(p, "prop:scrum_board", (x, 1.6, z), (x, z + 2.0));
     company_calendar(p);
-    let bot = v(x + 2.4, 0.0, z + 1.4);
+    let bot = v(x + 2.9, 0.0, z + 1.4);
     p.anchor(
         "scrum_bot",
         bot,
         super::layout::yaw_towards(bot, v(x, 0.0, z + 2.5)),
     );
-    // Off the paths between the doors, so nobody walks into a level-10 meeting by accident.
-    let boss = v(37.0, 0.0, 15.0);
+    // A level-10 meeting does not belong in the level-1 front yard: the open field between the
+    // gym and the Co-Living lane, a shuttle hop from anywhere.
+    let boss = v(150.0, 0.0, 82.0);
     p.anchor(
         "world_boss",
         boss,
-        super::layout::yaw_towards(boss, v(0.0, 0.0, 2.0)),
+        super::layout::yaw_towards(boss, v(100.0, 0.0, 44.0)),
     );
     for (name, x, z) in NIGHT_SPOTS {
         let at = v(x, 0.0, z);
@@ -267,12 +269,12 @@ fn live_world(p: &mut Plan) {
     lit_windows(p);
 }
 
-/// The Company Calendar beside the Welcome arch, on the walk from the parking lot and across
-/// the arch from the Daily Standup board: a wall calendar with a red header and binder rings.
+/// The Company Calendar at the head of Services Street, with the other menus: a wall calendar
+/// with a red header and binder rings.
 /// `door:<venue>` is where a minigame group comes back to (no door, no trigger: the minigame
 /// frame moves the group).
 fn company_calendar(p: &mut Plan) {
-    let (x, z) = (-6.5, 12.0);
+    let (x, z) = (48.0, 14.0);
     p.boxed(v(x, 1.55, z), v(2.6, 1.7, 0.06), Mat::Board, true);
     p.sign(v(x, 1.5, z + 0.05), 0.0, 2.5, Sign::Calendar);
     p.boxed(v(x, 2.55, z + 0.02), v(2.6, 0.32, 0.1), Mat::CarRed, false);

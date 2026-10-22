@@ -165,6 +165,20 @@ fn fake_server_round_trip_keeps_networld_in_step() {
     for tick in 0..=310u32 {
         let now = f64::from(tick) / 30.0;
         match tick {
+            // The intern waits in Services Street, away from the arrival lawn: walk up first.
+            1 => {
+                let at = sim.unit(intern).map(|u| u.pos).unwrap_or_default();
+                let stand = Vec3::new(at.x, at.y, at.z + 2.0);
+                sim.apply_as(
+                    you,
+                    Command::PlayerMoved {
+                        pos: stand,
+                        yaw: yaw_to(stand, at),
+                        moving: false,
+                        jumping: false,
+                    },
+                );
+            }
             3 => client_cmd(&mut sim, you, Command::Talk { unit: intern }),
             6 => client_cmd(
                 &mut sim,

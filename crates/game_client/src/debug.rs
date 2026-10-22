@@ -716,7 +716,7 @@ const BENCHES: [BenchSpec; 6] = [
         radius: 14.0,
         height: 5.0,
     },
-    // Whole campus (x -230..232, z -166..166) from above the middle.
+    // Whole campus (x -260..260, z -180..180) from above the middle.
     BenchSpec {
         name: "campus",
         zone: "campus",

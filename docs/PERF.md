@@ -51,6 +51,9 @@ Benchmark window ran at scale factor 1.0 (external monitor).
 | raid    | 4.69 | 4.29 | 6.98  | 9.50  | 13.4 | 213 | 4152  | 485/1397  | 4/9 |
 | tower1  | 4.28 | 4.17 | 5.17  | 5.80  | 11.0 | 234 | 4370  | 504/1202  | 3/10 |
 
+Campus rework (520 x 360 m, Services Street, wayposts; same machine, window at 2x scale, median avg ms of
+3 runs): campus 5.43 -> 5.56, plaza 5.62 -> 5.63; entities 18,507 -> 19,215.
+
 Single run at `WOW_BENCH_SCALE=2` (1600x900 logical = 3200x1800 physical) on a loaded machine,
 for orientation only: avg ms lake 9.4, plaza 9.1, campus 7.8, carpark 5.9, raid 5.7, tower1 7.3.
 Re-measure on a quiet machine before drawing a retina conclusion.
