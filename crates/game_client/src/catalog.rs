@@ -3231,8 +3231,8 @@ static TABLE: &[(&str, UnitVisual)] = &[
     (
         "big_bang_cutover",
         v(
-            "prim/overheated_rack",
-            2.8,
+            "prim/cutover_rack",
+            3.8,
             "Big Bang Cutover",
             "<Go-Live Weekend>",
             &[],

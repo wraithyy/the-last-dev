@@ -23,6 +23,11 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - Diminishing returns: your stuns and incapacitates on the same enemy within 18 s last half as long, then a quarter, then not at all, so trash can no longer be stun-locked. Enemy stuns on you are unchanged.
 - QA Engineer: +5 spell power (25), it was the slowest role in most zones.
 - Unit frame portraits are bigger and show just the head, without the round backdrop behind it.
+- The Onboarding's rooms are packed with shelving, queue ropes, kiosks, cubicles and clutter, the Big Bang Cutover is now a rack monster with flashing status lights, and the Rollback Wraith carries a glowing "v1.0" tag.
+
+### Fixed
+
+- The promotion pop-up no longer sits on top of the dungeon difficulty banner when you walk in.
 
 ## [0.7.0] - 2026-10-21
 

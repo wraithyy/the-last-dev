@@ -146,6 +146,8 @@ fn parts(kind: &str) -> Vec<Part> {
         "cooling_fan" => cooling_fan(),
         "overheated_rack" => overheated_rack(),
         "cooling_failure" => cooling_failure(),
+        "cutover_rack" => cutover_rack(),
+        "release_halo" => release_halo(),
         "agi_prototype" => agi_prototype(),
         "scooter" => scooter(),
         "unreviewed_pr" => unreviewed_pr(),
@@ -315,6 +317,143 @@ fn cooling_failure() -> Vec<Part> {
         v.push(Part::cyl([side * 0.6, 0.18, 0.0], 0.9, 0.36, DARK));
         v.push(Part::cyl([side * 0.6, 0.38, 0.0], 0.5, 0.04, HOT).glow(3.0));
     }
+    v
+}
+
+/// Boss of The Migration: the whole go-live weekend as one rack. A wall of red and green status
+/// LEDs (a green field with red alarms among it, never the same two nights running), a glowing
+/// "GO-LIVE" strip for a mouth, a siren on top and thick cables for arms, with more of them
+/// pooled on the floor. Reads as a different monster from the hot-orange Cooling Failure.
+fn cutover_rack() -> Vec<Part> {
+    const GREEN: [f32; 3] = [0.1, 1.0, 0.3];
+    const RED: [f32; 3] = [1.0, 0.08, 0.08];
+    let mut v = vec![
+        Part::cube([0.0, 1.85, 0.0], [2.2, 3.3, 1.3], [0.09, 0.1, 0.13]),
+        Part::cube([0.0, 1.8, -0.67], [2.0, 3.0, 0.04], [0.16, 0.17, 0.21]),
+        Part::cube([0.0, 0.12, 0.0], [2.4, 0.24, 1.5], DARK),
+        // Eyes: two red slits under a dark brow.
+        Part::cube([0.0, 3.3, -0.68], [1.8, 0.1, 0.05], DARK),
+        Part::cube([-0.5, 3.05, -0.7], [0.5, 0.18, 0.03], RED).glow(3.0),
+        Part::cube([0.5, 3.05, -0.7], [0.5, 0.18, 0.03], RED).glow(3.0),
+        // Mouth: the go-live strip, with dark gaps for teeth.
+        Part::cube([0.0, 0.62, -0.7], [1.6, 0.3, 0.03], RED).glow(2.5),
+        // Siren on the roof.
+        Part::cyl([0.0, 3.58, 0.0], 0.5, 0.18, DARK),
+        Part::cyl([0.0, 3.78, 0.0], 0.36, 0.24, RED).glow(3.0),
+        Part::cube([0.0, 3.78, 0.0], [0.0, 0.0, 0.0], RED)
+            .with(vec![
+                Part::cube([0.0, 0.0, -0.3], [0.1, 0.1, 0.6], [1.0, 0.7, 0.6]).glow(4.0),
+            ])
+            .spin(Vec3::Y, 5.0),
+    ];
+    for k in 0..4 {
+        v.push(Part::cube(
+            [-0.45 + k as f32 * 0.3, 0.62, -0.72],
+            [0.06, 0.34, 0.02],
+            DARK,
+        ));
+    }
+    // The LED wall: mostly green, red where something is wrong, a few dark ones for dead hosts.
+    for row in 0..8 {
+        for col in 0..5 {
+            let n = row * 5 + col;
+            let (c, g) = match (n * 7 + row * 3) % 9 {
+                0 | 4 => (RED, 2.2),
+                6 => (DARK, 0.0),
+                _ => (GREEN, 2.0),
+            };
+            let mut led = Part::cube(
+                [-0.72 + col as f32 * 0.36, 1.05 + row as f32 * 0.24, -0.7],
+                [0.2, 0.1, 0.02],
+                c,
+            )
+            .glow(g);
+            // Flicker: the red ones twitch, the way status lights do during a cutover.
+            if c == RED {
+                led = led.bob(0.015, 7.0 + n as f32);
+            }
+            v.push(led);
+        }
+    }
+    // Cable arms: a black hawser, a red and a yellow one wrapped round it, a plug for a fist.
+    for side in [-1.0_f32, 1.0] {
+        v.push(
+            Part::cyl([side * 1.4, 2.3, -0.2], 0.3, 1.9, [0.06, 0.06, 0.07]).rot([
+                0.0,
+                0.0,
+                side * 14.0,
+            ]),
+        );
+        v.push(
+            Part::cyl([side * 1.52, 2.3, -0.2], 0.1, 1.9, RED)
+                .glow(0.8)
+                .rot([0.0, 0.0, side * 14.0]),
+        );
+        v.push(
+            Part::cyl([side * 1.28, 2.3, -0.2], 0.08, 1.9, [1.0, 0.8, 0.1])
+                .glow(0.8)
+                .rot([0.0, 0.0, side * 14.0]),
+        );
+        v.push(Part::cube(
+            [side * 1.78, 1.2, -0.3],
+            [0.5, 0.45, 0.4],
+            STEEL,
+        ));
+        v.push(Part::cube([side * 1.78, 0.9, -0.3], [0.3, 0.22, 0.3], GREEN).glow(2.0));
+    }
+    // Cables pooled on the floor in front of it.
+    for (x, z, yaw, c) in [
+        (-0.8, -1.2, 20.0, [0.06, 0.06, 0.07]),
+        (0.5, -1.4, -30.0, RED),
+        (0.0, -1.0, 80.0, [1.0, 0.8, 0.1]),
+    ] {
+        v.push(Part::cyl([x, 0.08, z], 0.16, 1.4, c).rot([90.0, yaw, 0.0]));
+    }
+    v
+}
+
+/// Overlay for the Rollback Wraith: a spinning ring of light over its head, a glowing "v1.0"
+/// tag hovering above that (letters are bars; the unit faces -Z so the text runs towards -X)
+/// and a cold ring on the floor where its feet would be if it had been deployed properly.
+fn release_halo() -> Vec<Part> {
+    const ICE: [f32; 3] = [0.5, 0.85, 1.0];
+    let mut v = vec![
+        Part::cyl([0.0, 0.02, 0.0], 1.5, 0.02, ICE).glow(2.0),
+        Part::cyl([0.0, 0.025, 0.0], 1.1, 0.02, DARK),
+    ];
+    let ring = |x: f32, z: f32, deg: f32| {
+        Part::cube([x, 0.0, z], [0.28, 0.07, 0.07], ICE)
+            .glow(3.0)
+            .rot([0.0, deg, 0.0])
+    };
+    let mut halo = Vec::new();
+    for k in 0..8 {
+        let a = k as f32 * TAU / 8.0;
+        halo.push(ring(0.5 * a.cos(), 0.5 * a.sin(), -a.to_degrees()));
+    }
+    v.push(
+        Part::cube([0.0, 2.7, 0.0], [0.0, 0.0, 0.0], ICE)
+            .with(halo)
+            .spin(Vec3::Y, 1.2),
+    );
+    // "v1.0", read from the front: later glyphs sit at more negative x.
+    let bar = |x: f32, y: f32, w: f32, h: f32, deg: f32| {
+        Part::cube([x, y, -0.02], [w, h, 0.05], ICE)
+            .glow(2.5)
+            .rot([0.0, 0.0, deg])
+            .bob(0.05, 1.6)
+    };
+    let y = 3.15;
+    v.push(Part::cube([0.0, y, 0.03], [1.0, 0.5, 0.03], [0.1, 0.16, 0.24]).bob(0.05, 1.6));
+    v.push(bar(0.34, y - 0.02, 0.07, 0.3, -20.0));
+    v.push(bar(0.2, y - 0.02, 0.07, 0.3, 20.0));
+    v.push(bar(0.0, y, 0.07, 0.34, 0.0));
+    v.push(bar(0.07, y + 0.12, 0.07, 0.12, 40.0));
+    v.push(bar(-0.14, y - 0.15, 0.06, 0.06, 0.0));
+    v.push(bar(-0.3, y + 0.15, 0.22, 0.05, 0.0));
+    v.push(bar(-0.3, y - 0.15, 0.22, 0.05, 0.0));
+    v.push(bar(-0.2, y, 0.05, 0.3, 0.0));
+    v.push(bar(-0.4, y, 0.05, 0.3, 0.0));
     v
 }
 
@@ -1004,6 +1143,8 @@ mod tests {
             "cooling_fan",
             "overheated_rack",
             "cooling_failure",
+            "cutover_rack",
+            "release_halo",
             "agi_prototype",
             "scooter",
             "unreviewed_pr",

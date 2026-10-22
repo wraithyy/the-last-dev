@@ -204,10 +204,15 @@ fn spawn_ui(mut commands: Commands) {
             PromoToast,
             Node {
                 position_type: PositionType::Absolute,
-                top: px(212),
+                // Hangs under the 40 px zone banner (top 20 %, ~80 px tall) instead of on it.
+                top: percent(20),
                 left: percent(50),
                 width: px(420),
-                margin: UiRect::left(px(-210)),
+                margin: UiRect {
+                    left: px(-210),
+                    top: px(92),
+                    ..default()
+                },
                 padding: UiRect::axes(px(14), px(10)),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,

@@ -145,6 +145,14 @@ pub fn spawn_unit(
                 Halo,
             ));
         }
+        "rollback_wraith" => {
+            // The ring, the "v1.0" tag and the cold floor ring that make it read as a release.
+            commands.entity(e).with_child((
+                PrimRig("release_halo"),
+                Transform::default(),
+                Visibility::default(),
+            ));
+        }
         "it_support" if pose != IdlePose::Sleeping => {
             commands
                 .entity(e)
