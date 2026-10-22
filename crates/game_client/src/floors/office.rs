@@ -277,15 +277,7 @@ fn company_calendar(p: &mut Plan) {
     let (x, z) = (48.0, 14.0);
     p.boxed(v(x, 1.55, z), v(2.6, 1.7, 0.06), Mat::Board, true);
     p.sign(v(x, 1.5, z + 0.05), 0.0, 2.5, Sign::Calendar);
-    p.boxed(v(x, 2.55, z + 0.02), v(2.6, 0.32, 0.1), Mat::CarRed, false);
-    for dx in [-0.8, -0.27, 0.27, 0.8] {
-        p.prim(
-            PrimKind::Cylinder,
-            v(x + dx, 2.75, z + 0.04),
-            v(0.08, 0.22, 0.08),
-            Mat::Chrome,
-        );
-    }
+    super::entrances::calendar_pavilion(p, x, z);
     for dx in [-1.2, 1.2] {
         p.boxed(
             v(x + dx, 0.8, z - 0.06),

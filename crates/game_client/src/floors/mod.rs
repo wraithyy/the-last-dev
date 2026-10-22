@@ -13,6 +13,7 @@ pub mod corporate;
 mod datacenter;
 mod districts;
 mod dressing;
+mod entrances;
 #[cfg(test)]
 mod export;
 mod frontier;

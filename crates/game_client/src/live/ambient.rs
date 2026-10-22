@@ -358,13 +358,115 @@ struct ExtrasState {
     said_at: f32,
 }
 
+/// The one grey name tag, moved over whichever extra the mouse is on. Not a `Nameplate`: extras
+/// have no sim unit, so no health bar, no targeting and no clicks, just a name.
+#[derive(Component)]
+struct ExtraTag;
+
+const TAG_W: f32 = 180.0;
+/// Pick radius round an extra's chest (m): forgiving, they are small on screen.
+const HOVER_R: f32 = 0.9;
+
 pub(super) fn plugin(app: &mut App) {
-    app.init_resource::<ExtrasState>().add_systems(
-        Update,
-        drive_extras
-            .after(crate::game::FloorSwap)
-            .in_set(crate::combat::SimReady),
-    );
+    app.init_resource::<ExtrasState>()
+        .add_systems(Startup, spawn_tag)
+        .add_systems(
+            Update,
+            (drive_extras, hover_tag)
+                .chain()
+                .after(crate::game::FloorSwap)
+                .in_set(crate::combat::SimReady),
+        );
+}
+
+fn spawn_tag(mut commands: Commands) {
+    commands
+        .spawn((
+            ExtraTag,
+            Node {
+                position_type: PositionType::Absolute,
+                width: px(TAG_W),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            Visibility::Hidden,
+            GlobalZIndex(5),
+        ))
+        .with_child((
+            Node {
+                padding: UiRect::axes(px(5), px(1)),
+                border_radius: BorderRadius::all(px(3)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
+            children![(
+                crate::hud::label("", 12.0),
+                TextColor(Color::srgb(0.78, 0.78, 0.78)),
+            )],
+        ));
+}
+
+/// Show the name of the visible extra under the cursor (`WOW_HOVER_EXTRA=1` picks the nearest one
+/// to the player, for screenshots).
+fn hover_tag(
+    sim: SimView,
+    ui_scale: Res<UiScale>,
+    window: Single<&Window>,
+    camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
+    ui: Query<&Interaction>,
+    extras: Query<(&ExtraUnit, &GlobalTransform, &Visibility), Without<ExtraTag>>,
+    player: Query<&Transform, With<Player>>,
+    tag: Single<(&mut Node, &mut Visibility, &Children), (With<ExtraTag>, Without<ExtraUnit>)>,
+    pills: Query<&Children>,
+    mut texts: Query<&mut Text>,
+) {
+    let (mut node, mut vis, kids) = tag.into_inner();
+    let (cam, cam_tf) = *camera;
+    let forced = std::env::var_os("WOW_HOVER_EXTRA").is_some();
+    let ray = window
+        .cursor_position()
+        .filter(|_| !ui.iter().any(|i| *i != Interaction::None))
+        .and_then(|c| cam.viewport_to_world(cam_tf, c).ok());
+    let me = player.single().map(|t| t.translation).ok();
+    let hit = extras
+        .iter()
+        .filter(|(_, _, v)| **v != Visibility::Hidden)
+        .filter_map(|(x, gt, _)| {
+            let chest = gt.translation() + Vec3::Y * 0.9;
+            let t = if forced {
+                me?.distance(chest)
+            } else {
+                let r = ray?;
+                crate::targeting::ray_sphere(r.origin, *r.direction, chest, HOVER_R)?
+            };
+            Some((t, x.index, gt.translation()))
+        })
+        .min_by(|a, b| a.0.total_cmp(&b.0));
+    let Some((_, index, pos)) = hit else {
+        vis.set_if_neq(Visibility::Hidden);
+        return;
+    };
+    let key = EXTRAS[index].key;
+    let name = sim.content().unit_def(key).map_or(key, |d| d.name.as_str());
+    let head = pos + Vec3::Y * (crate::config::head_height(key) + 0.3);
+    let Ok(screen) = cam.world_to_viewport(cam_tf, head) else {
+        vis.set_if_neq(Visibility::Hidden);
+        return;
+    };
+    let view_h = cam.logical_viewport_size().map_or(window.height(), |v| v.y);
+    let scale = ui_scale.0.max(0.01);
+    node.left = px(screen.x / scale - TAG_W / 2.0);
+    node.bottom = px((view_h - screen.y) / scale);
+    for text in kids
+        .iter()
+        .filter_map(|k| pills.get(k).ok())
+        .flat_map(|c| c.iter())
+    {
+        if let Ok(mut t) = texts.get_mut(text) {
+            crate::hud::set_text(&mut t, name);
+        }
+    }
+    vis.set_if_neq(Visibility::Inherited);
 }
 
 fn drive_extras(

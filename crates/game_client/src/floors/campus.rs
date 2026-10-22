@@ -202,8 +202,9 @@ pub fn build() -> FloorLayout {
 /// Everything sits 3 m or more from the stand spots.
 fn services_street(p: &mut Plan) {
     use super::models::{PARASOL_A, PLANTER, put};
-    for x in [44.0, 52.0, 60.0, 68.0] {
-        super::districts::lamp(p, x, 20.0);
+    // The first two stand south of the calendar pavilion, which ends the path from the plaza.
+    for (x, z) in [(44.0, 23.0), (52.0, 23.0), (60.0, 20.0), (68.0, 20.0)] {
+        super::districts::lamp(p, x, z);
     }
     for x in [52.0, 60.0, 68.0] {
         put(p, &PLANTER, v(x, 0.0, 11.0), 0.0, 4.0, true);
@@ -1113,6 +1114,7 @@ fn vibecon_venue(p: &mut Plan) {
         1.6,
         Sign::VibeConBanner,
     );
+    super::entrances::vibecon_hall(p);
 }
 
 /// The Onboarding dungeon: a narrow door in a free-standing wall just south of the plaza, beside
@@ -1132,6 +1134,7 @@ fn starters_door(p: &mut Plan) -> (Vec3, f32) {
         p.boxed(v(0.45, 1.1, 0.24), v(0.06, 0.06, 0.08), Mat::Gold, false);
         p.boxed(v(0.0, 3.05, 0.22), v(1.3, 0.06, 0.06), Mat::LedRed, false);
         p.sign(v(0.0, 3.8, 0.22), 0.0, 2.8, Sign::ObNewStarters);
+        super::entrances::starters_queue(p);
     });
     (v(X, 0.0, WALL_Z + 2.0), PI)
 }
@@ -1178,6 +1181,7 @@ fn loading_dock_door(p: &mut Plan) -> (Vec3, f32) {
         }
         p.boxed(v(0.0, 3.82, 0.3), v(0.3, 0.16, 0.12), Mat::LedRed, false);
         p.sign(v(0.0, 4.5, 0.26), 0.0, 5.6, Sign::MigDoor);
+        super::entrances::dock_yard(p);
     });
     (v(x + 1.8, 0.0, z), -FRAC_PI_2)
 }
@@ -1227,6 +1231,7 @@ fn executive_door(p: &mut Plan) -> (Vec3, f32) {
         p.boxed(v(2.3, 1.4, 0.28), v(0.5, 0.9, 0.06), Mat::Dark, false);
         p.boxed(v(2.3, 1.5, 0.33), v(0.12, 0.12, 0.04), Mat::LedRed, false);
         p.sign(v(2.3, 2.05, 0.32), 0.0, 0.7, Sign::QbrLift);
+        super::entrances::executive_forecourt(p);
     });
     (v(x - 1.8, 0.0, z), FRAC_PI_2)
 }
@@ -1266,6 +1271,7 @@ fn hackathon_door(p: &mut Plan) -> (Vec3, f32) {
         }
         p.boxed(v(2.6, 0.6, 1.2), v(0.9, 1.2, 0.06), Mat::Board, true);
         p.sign(v(2.6, 0.7, 1.24), 0.0, 0.85, Sign::H24Pizza);
+        super::entrances::hacker_loft(p);
     });
     (v(x + 1.8, 0.0, z), -FRAC_PI_2)
 }
@@ -1356,6 +1362,7 @@ fn shuttle_pad(p: &mut Plan) {
     p.block(v(13.8, 1.5, 33.5), v(0.5, 3.0, 0.5));
     p.sign(v(13.8, 5.4, 33.62), 0.0, 4.2, Sign::OffsiteShuttle);
     p.sign(v(13.8, 5.4, 33.38), PI, 4.2, Sign::OffsiteShuttle);
+    super::entrances::coach_stop(p);
 }
 
 /// Kick scooter: deck, stem, bars and two wheels; low enough to step over.

@@ -22,6 +22,10 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ### Changed
 
+- Every campus entrance now reads from a distance as what it leads to: a conference hall with banners and a registration queue for VibeCon, a coach stop with a welcome gantry and luggage for the Offsite, a real loading dock with a truck and pallets for the Migration, a red-carpet executive entrance with a parked luxury car for the QBR, a hacker loft with bikes, pizza boxes and a neon pole sign for the Hackathon, a balloon-and-arrows queue for the Onboarding, and one covered Company Calendar pavilion on Services Street.
+- The Tower is rebuilt: three rounded drums of different heights in bronze fins over dark glass, one lifted on slanted columns over an open entrance, with a rooftop AI-first sign and beacon, green roofs, an unfinished crane and curved footpaths in front.
+- Fewer signs crowd the arrival lawn next to the Welcome board, and quest texts that pointed at the old spots (the Facilities Guy, the Intern, overflow desks, the annex, VibeCon, the Board meeting) now name where they really are.
+- The people strolling the campus now show a small grey name tag when you hover the mouse over them.
 - Nights outdoors are less pitch black: street lamps now throw a warm pool of light on the ground and light up the people and props around them.
 - Diminishing returns: your stuns and incapacitates on the same enemy within 18 s last half as long, then a quarter, then not at all, so trash can no longer be stun-locked. Enemy stuns on you are unchanged.
 - QA Engineer: +5 spell power (25), it was the slowest role in most zones.

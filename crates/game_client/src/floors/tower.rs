@@ -6,7 +6,9 @@
 //! drum and material (`Piece::Merged`): hundreds of fins would otherwise be hundreds of draws.
 
 use super::kit::*;
-use super::models::{TREE_DEFAULT, TREE_DETAILED, TREE_OAK, put};
+use super::models::{
+    BUSH_LARGE, FLOWER_RED, FLOWER_YELLOW, TREE_DEFAULT, TREE_DETAILED, TREE_OAK, put,
+};
 use bevy::prelude::*;
 use std::f32::consts::{FRAC_PI_2, PI};
 
@@ -484,6 +486,45 @@ fn landscaping(p: &mut Plan) {
     // Long low hedges flanking the entrance walk.
     for x in [-8.0, 8.5] {
         p.boxed(v(x, 0.35, -23.4), v(6.0, 0.7, 1.0), Mat::Leaf, false);
+    }
+    // Two curved footpaths fan out from the plaza to the lobby, each with a flower bed on its
+    // inside curve, so the way in is a stroll and not a ruler line.
+    for sx in [-1.0_f32, 1.0] {
+        super::themes::runner(
+            p,
+            &[
+                Vec2::new(sx * 17.0, -6.0),
+                Vec2::new(sx * 12.0, -15.0),
+                Vec2::new(sx * 5.0, -22.5),
+            ],
+            2.6,
+            Mat::Concrete,
+            Mat::White,
+        );
+        for (i, (dx, z)) in [(7.0, -12.0), (9.5, -9.5), (5.0, -16.0)]
+            .into_iter()
+            .enumerate()
+        {
+            let m = if i % 2 == 0 {
+                &FLOWER_RED
+            } else {
+                &FLOWER_YELLOW
+            };
+            put(p, m, v(sx * dx, 0.0, z), i as f32, 1.6, false);
+        }
+    }
+    // Shrubs round the feet of the drums and the wing so the glass does not start at bare grass.
+    for (x, z) in [
+        (-9.5, -50.0),
+        (-3.0, -48.5),
+        (3.0, -48.5),
+        (11.0, -48.0),
+        (17.0, -44.0),
+        (17.0, -37.0),
+        (-19.5, -46.0),
+        (-19.8, -22.2),
+    ] {
+        put(p, &BUSH_LARGE, v(x, 0.0, z), x, 2.2, false);
     }
 }
 

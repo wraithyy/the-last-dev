@@ -12245,7 +12245,7 @@
                 (anchor: "npc_ill_marie", unit: "ill_marie"),
                 (anchor: "npc_picnic_wife", unit: "picnic_wife"),
                 (anchor: "npc_picnic_daughter", unit: "picnic_daughter"),
-                // Body Leasing easter egg: the vendor's account manager between the plaza and the annex.
+                // Body Leasing easter egg: the vendor's account manager on Data Square, by the annex.
                 (anchor: "npc_am", unit: "bl_account_manager"),
                 // Company Calendar quest chains (E5): their givers around the campus.
                 (anchor: "npc_expense", unit: "expense_controller"),
@@ -12287,7 +12287,7 @@
                 (anchor: "door:client/1", to: "client/1", requires: Some(QuestStarted("bl_allocation"))),
                 // The All-Hands Offsite shuttle: opens with everyone at level 10 (raid.rs).
                 (anchor: "door:offsite/1", to: "offsite/1"),
-                // VibeCon registration on the east lawn: opens with everyone at level 10 (raid.rs).
+                // VibeCon registration at the conference hall on Incubator Street: opens with everyone at level 10 (raid.rs).
                 (anchor: "door:vibecon/1", to: "vibecon/1"),
                 // The Onboarding dungeon, a narrow door beside the Welcome arch: opens with everyone at level 3.
                 (anchor: "door:onboarding/1", to: "onboarding/1"),
@@ -12925,8 +12925,8 @@
             id: "onboarding", main: true, name: "Onboarding",
             giver: (npc: "intern", zone: "parking_p3"),
             turn_in: Some((npc: "intern", zone: "campus")),
-            text: "Hi! I'm your onboarding buddy. The AI assigned me to you, and you to me, and it thinks we're both interns. Step one: get to the actual campus. Up the ramp, through the gate, up the boulevard. Step two: introduce yourself to Facilities, he's by the badge reader. I'll meet you at the arrival spot. I'm taking the shuttle. Ha. Joke.",
-            progress_text: "Leave P3 by the gate at the top of the ramp, walk up Synergy Boulevard to HQ and talk to the Facilities Guy by the reception. The intern waits by the executive car park.",
+            text: "Hi! I'm your onboarding buddy. The AI assigned me to you, and you to me, and it thinks we're both interns. Step one: get to the actual campus. Up the ramp, through the gate, up the boulevard. Step two: introduce yourself to Facilities, he's on Services Street with the ladder. I'll meet you on Services Street, the lane east of the arrival lawn. I'm taking the shuttle. Ha. Joke.",
+            progress_text: "Leave P3 by the gate at the top of the ramp, walk up Synergy Boulevard to HQ and talk to the Facilities Guy on Services Street, east of the arrival lawn. The intern waits there too.",
             done_text: "You walked the whole way? And talked to a human, in person, on purpose? I'll log it as a 'synchronous alignment touchpoint'. Welcome to the campus!",
             objectives: [Talk("facilities_guy")],
             reward: (xp: 60),
@@ -13491,8 +13491,8 @@
             id: "bl_allocation", name: "Allocated to a Strategic Client",
             giver: (npc: "bl_account_manager", zone: "campus"),
             turn_in: Some((npc: "client_receptionist", zone: "client/1")),
-            text: "Good news: you are allocated to a strategic client. Very Large Insurance & Banking Group. Nine months, extendable, which is the polite word. Utilisation is our margin, so please be utilised. Their annex is the grey block east of the plaza. Reception has been told. Probably.",
-            progress_text: "The grey annex east of the plaza: Very Large Insurance & Banking Group. Ask at reception.",
+            text: "Good news: you are allocated to a strategic client. Very Large Insurance & Banking Group. Nine months, extendable, which is the polite word. Utilisation is our margin, so please be utilised. Their annex is the grey block on Data Square, north-east of the plaza. Reception has been told. Probably.",
+            progress_text: "The grey annex on Data Square, north-east of the plaza: Very Large Insurance & Banking Group. Ask at reception.",
             done_text: "Who are you? ... You are not on the list. Sit anywhere. Not that desk. Your access rights are not ready yet.",
             objectives: [Talk("client_receptionist")],
             reward: (xp: 20),
@@ -13610,7 +13610,7 @@
             id: "rto_commute", name: "Return to Office",
             giver: (npc: "rto_coordinator", zone: "campus"),
             text: "Great news: we're a hybrid company now, which means you come in five days a week. You commuted in, so let's get you a desk. Facilities assigns desks. Desks are unassigned, bookable and first come, first served. Those are three different systems and they disagree.",
-            progress_text: "Facilities is the guy with the ladder by the data center. Ask him for a desk.",
+            progress_text: "Facilities is the guy with the ladder on Services Street, east of the arrival lawn. Ask him for a desk.",
             done_text: "The booking app shows 400 free desks and zero chairs. He gave you a chair voucher. It's valid next quarter. The chair it's for was moved to a 'focus pod' that is also a broom cupboard.",
             objectives: [Talk("facilities_guy")],
             reward: (xp: 20),
@@ -13648,8 +13648,8 @@
         (
             id: "desk_census", name: "Desk Census",
             giver: (npc: "rto_enforcer", zone: "campus"),
-            text: "Leadership needs the desk count by ten. The official number is 400. The floor plan says 380. The booking app says 'unlimited'. Facilities put overflow desks on the lawn west of the tower. Stand at three of them and count each one. Count slowly. Counting is the job.",
-            progress_text: "Three overflow desks on the lawn west of the tower. Stand at each one, facing it, for a second.",
+            text: "Leadership needs the desk count by ten. The official number is 400. The floor plan says 380. The booking app says 'unlimited'. Facilities put overflow desks out in Hybrid Row, on the lawn west of the tower. Stand at three of them and count each one. Count slowly. Counting is the job.",
+            progress_text: "Three overflow desks in Hybrid Row, on the lawn out west of the tower. Stand at each one, facing it, for a second.",
             done_text: "Three desks. One laptop jiggling its own mouse, one cold flat white, one 'Reserved: Leadership (Wednesdays)'. That makes 403. Leadership will be thrilled, then confused, then they'll book a meeting room to discuss it. There are none.",
             objectives: [Inspect("rto_desk", 3)],
             reward: (xp: 60, sp: 10, rep: Some(("HR", 40))),
@@ -13658,7 +13658,7 @@
             id: "th_question", name: "Town Hall: Submit a Question",
             giver: (npc: "comms_lead", zone: "campus"),
             text: "Quarterly Town Hall in ten minutes! The CEO will announce a record quarter and cost optimisation in the same sentence, with the same smile. Questions go into the Q&A tool in advance. Bring me one from a colleague. The Intern has one. He's been practising it since onboarding.",
-            progress_text: "The Intern stands by the arrival spot. Collect his question.",
+            progress_text: "The Intern stands on Services Street, east of the arrival lawn. Collect his question.",
             done_text: "His question is 'Are layoffs planned?'. I've rephrased it as 'What are you most excited about this quarter?'. Same intent. Better energy. It's in the queue.",
             objectives: [Talk("intern")],
             reward: (xp: 20),
@@ -13847,7 +13847,7 @@
             id: "pi_runbook", name: "Prod Incident: Find the Runbook",
             giver: (npc: "oncall_engineer", zone: "campus"),
             text: "Sev-1. Prod is the server behind me: Facilities wheeled it outside because the data center was 'reserved for AI'. The runbook is with the Facilities Guy, who used it to level a table. Ask him what page one says.",
-            progress_text: "The Facilities Guy stands by the data center door. Ask him about the runbook.",
+            progress_text: "The Facilities Guy stands on Services Street, by his ladder. Ask him about the runbook.",
             done_text: "Page one: 'Step 1: don't panic. Step 2: page the on-call.' I am the on-call. I'm paging myself. It's ringing.",
             objectives: [Talk("facilities_guy")],
             reward: (xp: 20),
@@ -13897,7 +13897,7 @@
             giver: (npc: "qa_lead", zone: "campus"),
             requires: Some("ft_regression"),
             text: "Last step: sign-off. Release management needs a human to say 'looks good'. The intern counts as a human this quarter. Walk him through the results; he'll click approve without reading. That's the process.",
-            progress_text: "The Intern stands by the arrival spot. Show him the test results.",
+            progress_text: "The Intern stands on Services Street, east of the arrival lawn. Show him the test results.",
             done_text: "He approved it in four seconds and asked what QA stands for. I told him 'quietly aware'. Here, your green build badge. It flickers.",
             objectives: [Talk("intern")],
             reward: (xp: 50, sp: 10, rep: Some(("Engineering", 50)), trophy: Some("Green Build Badge (Flaky)")),
@@ -13977,7 +13977,7 @@
             id: "is_kill_the_pitch", name: "Kill the Pitch", open_world: true, level_min: 3,
             giver: (npc: "incubator_manager", zone: "campus"),
             text: "Pre-Seed Founders roam the street with forty-seven-slide decks. If one finishes the pitch, someone gets hurt and someone else invests. Interrupt them. Permanently. Four should send a message to the cohort.",
-            progress_text: "Pre-Seed Founders hang around the pop-up booths on Incubator Street, east of the data center. Interrupt the 47-Slide Pitch Deck.",
+            progress_text: "Pre-Seed Founders hang around the pop-up booths on Incubator Street, east of HQ. Interrupt the 47-Slide Pitch Deck.",
             done_text: "Four decks closed, zero term sheets signed. The cohort is pivoting to 'listening'. It won't last.",
             objectives: [Kill("preseed_founder", 4)],
             reward: (xp: 150, sp: 10),
@@ -14007,7 +14007,7 @@
             id: "cw_wifi_password", name: "What's the Wi-Fi Password?", open_world: true, level_min: 3,
             giver: (npc: "community_manager", zone: "campus"),
             text: "Nobody knows the cafe Wi-Fi password. It was set in 2009 by the Senior Dev, before the AI, before the cafe, possibly before Wi-Fi. He's at the smoking corner. Ask him nicely, he hates that.",
-            progress_text: "The Senior Dev sits on the sad bench at the smoking corner, east lawn.",
+            progress_text: "The Senior Dev sits on the sad bench at the smoking corner on Services Street.",
             done_text: "'password123'. Of course. He says he changed it once and the CEO's fridge went offline. We're keeping it.",
             objectives: [Talk("smoking_corner_dev")],
             reward: (xp: 120, sp: 8),
@@ -16495,7 +16495,7 @@
                 "The crane plays hold music. Even the crane is in a meeting.",
             ]),
             (key: "lake_bench", name: "Lakeside Bench", zone: "campus", kind: Bench, reach_m: 3.0, calm: Some((60, 120000))),
-            // Desk Census: overflow hot desks on the lawn west of the tower.
+            // Desk Census: overflow hot desks in Hybrid Row, on the lawn out west of the tower.
             (key: "rto_desk_1", name: "Overflow Hot Desk", zone: "campus", kind: Inspect, tag: "rto_desk", reach_m: 3.0,
              lines: ["A desk on the grass. The laptop on it moves its own mouse in perfect circles. Nobody is here. Status: green."]),
             (key: "rto_desk_2", name: "Overflow Hot Desk", zone: "campus", kind: Inspect, tag: "rto_desk", reach_m: 3.0,
@@ -16928,8 +16928,8 @@
         achievements: [
             // Live world (`Trigger::Event`): the world boss kill, clocking out on time, titled Sprint Goals.
             (key: "board_meeting", name: "Survived the Board Meeting", title: "Quarterly Visionary",
-             text: "Defeated The Board on the campus lawn. The minutes say you 'were not aligned'. Correct.",
-             hint: "Every half hour on campus, the Board meets on the east lawn. Bring friends; it brings Yes-Men.",
+             text: "Defeated The Board in its open field. The minutes say you 'were not aligned'. Correct.",
+             hint: "Every half hour on campus, the Board meets in the open field behind the gym, by the Co-Living lane. Bring friends; it brings Yes-Men.",
              trigger: Event("the_board"), sp: 60),
             // Campus districts: the world events (`live.events`), secrets, the shuttle and the two
             // level-10 spots (`quest:<id>` unlocks on that quest's turn-in).
@@ -17171,7 +17171,7 @@
              trigger: Event("raid:async:the_founder"), sp: 60),
             (key: "vibecon_vibe_coder", name: "Requested Changes", title: "Actually Read the Diff",
              text: "Beat the Vibe Coder before his PRs reached production. You left a comment. He did not read it.",
-             hint: "VibeCon starts at the registration desk on the east lawn. Someone in the expo hall is shipping unreviewed.",
+             hint: "VibeCon starts at the conference hall on Incubator Street. Someone in the expo hall is shipping unreviewed.",
              trigger: Event("raid:vc_vibe_coder"), sp: 40),
             (key: "vibecon_whisperer", name: "Followed Previous Instructions", title: "Prompt-Proof",
              text: "Defeated the Prompt Whisperer. You stepped out of the circle, which no prompt ever told you to.",

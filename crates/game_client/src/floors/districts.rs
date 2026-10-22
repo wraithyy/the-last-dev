@@ -1475,7 +1475,6 @@ fn overflow_lot(p: &mut Plan) {
 /// sees where the dungeons, Services Street and the districts are before reading a quest.
 /// Each is 6 m or more from anything interactable.
 fn wayfinding(p: &mut Plan) {
-    const STARTERS: (f32, f32) = (-22.0, 12.0);
     const TOWER: (f32, f32) = (0.0, -24.0);
     const SERVICES: (f32, f32) = (52.0, 18.0);
     const DOCK: (f32, f32) = (112.0, -80.0);
@@ -1484,16 +1483,8 @@ fn wayfinding(p: &mut Plan) {
     const LAB: (f32, f32) = (-72.0, -65.0);
     const PLAZA: (f32, f32) = (0.0, 5.0);
     let arm = |t: (f32, f32), s: Sign| (t.0, t.1, s);
-    waypost(
-        p,
-        7.0,
-        26.0,
-        &[
-            arm(STARTERS, Sign::WayStarters),
-            arm(TOWER, Sign::WayTower),
-            arm(SERVICES, Sign::WayServices),
-        ],
-    );
+    // No post on the arrival lawn: the Welcome arch is the orientation point there, and a post
+    // next to it only crowded the signs round it.
     waypost(
         p,
         22.0,
