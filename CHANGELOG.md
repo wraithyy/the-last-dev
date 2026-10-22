@@ -8,38 +8,39 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-22
+
 ### Added
 
-- Security Engineer stealth openers: while Tailgating, four bar keys turn into Supply Chain Attack (a big opener from behind), Rubber Ducky (a 4 s stun from a USB stick found in the car park), Phishing Call (keeps a regular enemy on the phone for up to 30 s until hit) and Keylogger (a damage-over-time with a 3 s silence).
-- DevOps SIGSTOP now also puts its target in Maintenance Mode for 4 s (any hit wakes it).
-- Ill Marie, a colleague who came in sick (again), sits on the boulevard up from the South Gate, coughing through her day; she has a small errand for you. It's just a cold. Probably.
+- Dungeons for three to five players, each three or four rooms and three bosses; alone or in pairs you attend the softer Async version. Each boss pays gear once a day (resets at midnight UTC) and repeat clears pay less XP, so dungeons never out-level the open world:
+  - The Onboarding (levels 3-4): the Compliance Trainer's pop quiz, the Laptop Provisioner's six weeks of "awaiting hardware" and your Onboarding Buddy, who is suspiciously eager to help.
+  - The Migration (levels 6-7), through the Data Center's loading dock: the Rollback Wraith, the Consultants (one is always billing) and the Big Bang Cutover.
+  - Quarterly Business Review (levels 9-10), through the Tower's executive door: the Slide Deck Golem, Dana, who had Claude do the analysis, and the three-headed Board.
+  - The Hackathon (level 10, heroic, opens after a QBR clear), behind the Incubator Street coworking cafe: the Pizza Overlord, the Demo Day Gremlin and the Pitch Judge VC, who only funds AI.
+- Security Engineer stealth openers: while Tailgating, four bar keys turn into Supply Chain Attack (a big opener from behind), Rubber Ducky (a 4 s stun), Phishing Call (keeps a regular enemy on the phone for up to 30 s until hit) and Keylogger (damage over time with a 3 s silence).
+- DevOps SIGSTOP also puts its target in Maintenance Mode for 4 s (any hit wakes it).
+- A soundtrack: every tower floor, data center hall, the lab, the car park, the campus, the home office and each raid wing have their own music, a night track plays outdoors after dark and raid finales get boss themes. The web version only downloads the music of places you visit.
+- Ill Marie, a colleague who came in sick (again), coughs through her day on the boulevard up from the South Gate and has a small errand for you. It's just a cold. Probably.
 - Somewhere in Wellness Park, on the quiet lawn by the lake, a family is having a picnic. Say hello.
-- A soundtrack: every tower floor, the datacenter halls, the lab, the car park, the campus, the home office and each raid wing have their own music (no more elevator muzak everywhere), a night track outdoors after dark, and the raid finales get their own boss themes. Tracks crossfade when you change zones and the web version only downloads the music of places you visit (offline, visited zones keep their music).
-- The Onboarding, a three-room dungeon for three to five players at levels 3 and 4 (alone, you attend the softer Async version): enter by the narrow starters' door beside the Welcome arch, get past the Compliance Trainer's pop quiz, the Laptop Provisioner's six weeks of "awaiting hardware" and your own Onboarding Buddy, and hand in three tickets to a very tired new hire at the exit. Each boss pays gear once a day (resets at midnight UTC); a boss you already beat today still shows up for the fight and the tickets, and repeat clears pay less XP.
-- The Migration, a four-room dungeon for three to five players at levels 6 and 7 (alone, you attend the softer Async version): enter by the loading dock on the back of the Data Center, push through the dock and its zombie processes, the Cold Aisle's Rollback Wraith, the Consultants (one is always billing, the other is always open) and the Big Bang Cutover, then hand in four tickets to an On-Call Engineer on Weekend 14. Same daily lockout for gear, same shrinking XP on repeat clears, and the Big Red Button is exactly where you were afraid it would be.
-- Quarterly Business Review, a four-room dungeon for three to five players at levels 9 and 10 (alone, you attend the softer Async version): take the brass executive door on the west side of the Tower, wade through the lobby's untouched pastries and fruit trolleys, the Presentation Theatre's Slide Deck Golem (stand in the lit wedge of its pie chart), Dana, who had Claude do the analysis, and finally the Board, three heads with one open at a time, then hand in four tickets to the Cleaner of the Boardroom. Same daily lockout for gear and the same shrinking XP on repeat clears; at level 10 the run pays promotion XP.
-- The Hackathon, a heroic four-room dungeon for three to five players at level 10 (alone, you attend the softer Async version), unlocked once you have cleared a Quarterly Business Review: take the shipping-container door in the back of the coworking cafe on Incubator Street, walk through registration and the Pizza Overlord (stand on the pineapple wedge), the sleeping-bag-strewn Hack Floor, Demo Day with the Gremlin who swears it worked on his machine, and the Pitch Judge VC, who only funds AI, then hand in two tickets to the Volunteer With Clipboard. Same daily lockout for gear; the XP is promotion XP.
 
 ### Changed
 
-- The Tower floors, the Data Center and the Innovation Lab are tidier: fewer duplicate posters, plants, rugs and desks, clear walking lines from the lift to the boss, and the same jokes in fewer, better-chosen spots.
-- Every campus entrance now reads from a distance as what it leads to: a conference hall with banners and a registration queue for VibeCon, a coach stop with a welcome gantry and luggage for the Offsite, a real loading dock with a truck and pallets for the Migration, a red-carpet executive entrance with a parked luxury car for the QBR, a hacker loft with bikes, pizza boxes and a neon pole sign for the Hackathon, a balloon-and-arrows queue for the Onboarding, and one covered Company Calendar pavilion on Services Street.
-- The Tower is rebuilt: three rounded drums of different heights in bronze fins over dark glass, one lifted on slanted columns over an open entrance, with a rooftop AI-first sign and beacon, green roofs, an unfinished crane and curved footpaths in front.
-- Fewer signs crowd the arrival lawn next to the Welcome board, and quest texts that pointed at the old spots (the Facilities Guy, the Intern, overflow desks, the annex, VibeCon, the Board meeting) now name where they really are.
-- The people strolling the campus now show a small grey name tag when you hover the mouse over them.
-- Nights outdoors are less pitch black: street lamps now throw a warm pool of light on the ground and light up the people and props around them.
-- Diminishing returns: your stuns and incapacitates on the same enemy within 18 s last half as long, then a quarter, then not at all, so trash can no longer be stun-locked. Enemy stuns on you are unchanged.
+- The campus has room to breathe: it grew to 520 x 360 m, the arrival lawn is clear, menus, quest givers and the Company Calendar moved into a new Services Street, the Innovation Lab and the Data Center stand on their own green and square, and signposts at the junctions point to every dungeon and district.
+- The Tower is rebuilt as three rounded drums in bronze fins, one lifted on slanted columns over the entrance, with green roofs, an AI-first beacon and an unfinished crane.
+- Every entrance reads from afar as what it leads to: a conference hall with a registration queue for VibeCon, a coach stop in Wellness Park for the Offsite, a loading dock for the Migration, a red-carpet executive entrance for the QBR, a hacker loft for the Hackathon, a balloon queue for the Onboarding and one Company Calendar pavilion.
+- The Tower floors, the Data Center and the Innovation Lab are tidier: fewer duplicate props, clear walking lines, the same jokes.
+- Nights outdoors are less pitch black: street lamps throw a warm pool of light and light up the people around them.
+- The people strolling the campus show a small grey name tag when you hover over them.
+- Diminishing returns: your stuns and incapacitates on the same enemy within 18 s last half as long, then a quarter, then not at all. Enemy stuns on you are unchanged.
 - QA Engineer: +5 spell power (25), it was the slowest role in most zones.
-- Unit frame portraits are bigger and show just the head, without the round backdrop behind it.
-- The Onboarding's rooms are packed with shelving, queue ropes, kiosks, cubicles and clutter, the Big Bang Cutover is now a rack monster with flashing status lights, and the Rollback Wraith carries a glowing "v1.0" tag.
-- The campus has room to breathe: it grew to 520 x 360 m with a quiet meadow on the west edge, the arrival lawn is clear (a spawn with the tower dead ahead, one scooter rack, no quest givers or fights within 60 m), the menus, quest givers and the Company Calendar moved into a new Services Street east of the plaza, and the Innovation Lab, the Data Center and the client annex moved out to their own green and square, so the headquarters core now spreads over about 220 x 145 m with long lawn walks between the buildings.
-- Entrances moved to their districts and got signposts: the Offsite coach leaves from the Wellness Park trailhead, VibeCon registers on Incubator Street, the Hybrid Row desks and givers sit between the ring road and the creek, the Board Meeting now convenes on the field by the gym, and wayposts at the junctions point to every dungeon and district.
+- Unit frame portraits are bigger and show just the head.
+- Co-op needs this version on both sides (protocol 30); older clients are turned away with a clear message.
 
 ### Fixed
 
-- In Quarterly Business Review, Dana's Outlier and the Board's Abstain now actually slow you down; before, they only slowed enemies.
-- The ring under your target no longer flickers as it walks over rugs, floor markings or hills: it lies on whatever the target stands on.
-- The promotion pop-up no longer sits on top of the dungeon difficulty banner when you walk in.
+- In Quarterly Business Review, Dana's Outlier and the Board's Abstain now actually slow you; before, they only slowed enemies.
+- The ring under your target no longer flickers over rugs, floor markings or hills.
+- The promotion pop-up no longer hides under the dungeon difficulty banner.
 
 ## [0.7.0] - 2026-10-21
 
@@ -169,7 +170,8 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - Download progress for the wasm in the loader.
 - Combat, a classic MMO HUD and animated models.
 
-[Unreleased]: https://github.com/wraithyy/the-last-dev/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/wraithyy/the-last-dev/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/wraithyy/the-last-dev/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/wraithyy/the-last-dev/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/wraithyy/the-last-dev/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/wraithyy/the-last-dev/compare/v0.5.0...v0.5.1
