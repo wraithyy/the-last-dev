@@ -101,6 +101,7 @@ impl Sim {
         self.sprint_on_load(id);
         self.legacy_on_load(id);
         self.raid_on_load(id);
+        self.companion_on_load();
         self.minigame_on_load(id);
         let state = self.world.zones.get(id);
         let recent = state
@@ -267,6 +268,7 @@ impl Sim {
         self.refill_quest_sources();
         self.sprint_after_load();
         self.raid_after_load();
+        self.companions_after_load();
         if let Some((pos, yaw)) = graveyard {
             self.set_respawn_point(pos, yaw);
         }

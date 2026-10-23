@@ -742,12 +742,49 @@ management), synthetic androids, HR bots.
     the nearest cable. **Damage** targets adds first, interrupts a `kick` cast when it is closest.
   - Rules: never target `il_candidate_human`; always interrupt `kick: true` if off cooldown; stand
     still on the "stack" part of a `split` telegraph.
-  - Offline-only. Online rooms never spawn companions; Story in a room scales like Async.
+  - Planned offline-only; as built, online rooms may bring up to two (see "As built" below).
   - Death: companions that die resurrect with the next dungeon checkpoint at no cost (no tokens or
     penalties).
 - **Solo-Story rule of thumb:** the player plus two companions should clear a boss with no deaths in
   bot-tuned numbers; and the same boss should be beatable with companions dismissed, since a companion is
   a convenience (guardrail 5), never required.
+
+**As built (B15).** Close to the plan, with these decisions and deviations:
+
+- **Not group members.** A companion is a friendly unit with `UnitDef::companion` (role plus spell ids)
+  and no `ai`, not a `bot: true` player. It never enters `Sim::players`, so the Recruiter's candidates,
+  the mirrors, the review's grades, managed out and the tethers ignore it with no special case, and the
+  wire needed no new type (protocol stays 36). Its kills are credited to its owner (`die` maps killer
+  to owner: XP, quest credit, lockout, tokens); it takes no loot.
+- **Loadout.** The "Sign-Up Sheet" (`il_roster`, a board in the hall of `resistance/1`) is the whole
+  interface: `Talk` cycles none, Dale and Priya, Dale and Rupert, Priya and Rupert. Pairs only. On Full
+  the sheet refuses ("Full is a real fight") and the loadout stays for Story. The pick is saved in the
+  optional `companions=` key (no `SAVE_VERSION` bump; unknown keys and a third entry are dropped).
+- **Where.** Wings only, and only on Story: the units step out beside their owner when a wing room
+  loads and are gone with the zone. The occupied campus keeps its single tuning and has no companions.
+  A player brings at most 2 (`MAX_PER_PLAYER`) and a room holds at most 2 (`MAX_PER_ROOM`), in join
+  order; a leaving owner takes theirs along. Online uses the same `Talk` path, so the server's sim is
+  the validator and there is no new command.
+- **Scaling.** Companions count as `config.companion_group_pct` (30) of a group member in the HP,
+  damage and boss-damage scalings (`FORMULAS.md`, Co-op group): two companions are 0.6 of a player, so
+  a Story boss has +33% HP and +18% damage, and company makes Story safer rather than faster. Their own
+  numbers are small on purpose (guardrail 6): Dale 26 per 2 s, Rupert 44 per 1.6 s cast, Priya 90 per
+  3.5 s heal.
+- **Brain** (`companion.rs`, no rng): follows at 4 m (6 m for the second), snaps beside the owner past
+  40 m (doors, bots), steps out of any pending hostile telegraph that is not a shared one (nearest safe
+  spot with a metre of margin, ring search, line of sight), and fights what is on the owner's threat
+  table or what the owner targeted, never a unit with `death_burnout` (the humans). Tank: whatever hits
+  the owner first, taunt when the target is not on him, absorb below 50%, strike. Damage: Hole Punch on a
+  `kick` cast always, adds before the owner's target, bolt from 10 m. Healer: the most hurt of the
+  owner's side below 70%.
+- **Death.** A dead companion is back at full HP 8 s after the owner leaves combat, free (a pull's end
+  stands in for "next checkpoint").
+- **Not built:** Priya's `Dispel` and `Resurrect` and Label Cable (the plan's extras), a deliberate
+  stand on the stack part of a `split` telegraph (they ignore split ones, which is safe), and party frames
+  for companions.
+- **Numbers** (`tests/playthrough.rs`, level 10 with Legacy gear, Story, seeds 7, 42, 1234): with
+  two companions backend, devops and fullstack clear both wings; clear times run 75-120% of the solo
+  time (no run under 50%) and the lowest HP of the run is higher with company.
 
 ## B.8 Systems and touch points
 
@@ -758,7 +795,7 @@ management), synthetic androids, HR bots.
 | Sim | `combat_core/src/{ilmari,companion,raid}.rs` | new `ilmari.rs` (flag, stamp, phase, attunement), `companion.rs` (B.7), `raid.rs` (Story difficulty, vote counter, review ring) |
 | Sim | `economy.rs`, `save.rs` | item-level sync in `gear_totals`, tokens, optional save keys `ilmari_at`, `ilmari_flags`, `marie_met`, `companions`; no `SAVE_VERSION` bump needed for optional keys (precedent: `legacy_locks`) |
 | Protocol | `net_proto/src/lib.rs` | `PROTOCOL_VERSION` 30 -> 31 with the first Ilmari wire change (Story difficulty, `Summoned.as_player`, vote and review events, the stamp command); B1 shipped as 31 -> 32 (`StampIlmari`, `IlmariReveal`, both offline-only and refused from the wire); B16 bumped 35 -> 36 (`ServerMsg::IlmariPending`; stamp and reveal opened to the wire). Always bump in the commit that changes a frame, never in a docs commit |
-| Server | `server/src/room_state.rs` | built: takes `StampIlmari` (clock-checked) and `IlmariReveal` from members while the room's Opening is due, announces it (`ServerMsg::IlmariPending`), loads Ilmari zones like any zone (the geometry is a full copy, so no delta loader), no companions; `Command::SetIlmariStory` stays lead-only in the sim |
+| Server | `server/src/room_state.rs` | built: takes `StampIlmari` (clock-checked) and `IlmariReveal` from members while the room's Opening is due, announces it (`ServerMsg::IlmariPending`), loads Ilmari zones like any zone (the geometry is a full copy, so no delta loader), companions only through `Talk` at the sheet (B15); `Command::SetIlmariStory` stays lead-only in the sim |
 | Client | `game_client/src/floors/{campus,carpark,zones}.rs` | `occupied` overlay, the P3 booth hatch, the six wing layouts, `resistance/1` |
 | Client | `cutscene.rs`, `hud/`, `copy.rs`, `catalog.rs`, `audio.rs`, `nameplates.rs` | the Opening, per-boss scenes, the mail window, changelog screens, glitch nameplates, tells on fakes, Marie rig, the stamp helper |
 | Docs | `docs/COMBAT_API.md`, `docs/FORMULAS.md`, `docs/KNOWN_LIMITATIONS.md` | the new effects and numbers; mechanics that could not be built exactly |
@@ -833,8 +870,8 @@ beside the one compiling agent. **Part A first.** After each task: `cargo test` 
 | B12 | The Culture Committee (`Vote`, ballot terminals, three-member `TwinsDef`) | B11 | vote tests; Story auto-vote; Full group clear (built as `TwinsDef.vote` and `PropKind::Ballot`, not an `Effect::Vote`: the swap is the vote) |
 | B13 | Performance Review (`Review`, scoring ring, HR portal, `managed_out`) | B12 | scoring tests; Story and Full clears (built: per-window counters instead of a ring, `PropKind::Portal`; grade formula in `FORMULAS.md`) |
 | B14 | Wing 2 cutscenes, loot, titles | B13 | cutscene triggers; loot tests (built; `il_w2_done` closes the wing) |
-| B15 | Companion AI (`companion.rs`, three companions, loadout, role behaviours) | B6 | per-role behaviour tests; determinism test; companion-assisted clears (can start as soon as B6 compiles, before B7) |
-| B16 | Server: geometry delta, room Ilmari option, no companions online | B14 | server tests; co-op smoke on a Full clear (built, protocol 35 -> 36: no delta and no room option were needed, see the B.8 "Co-op (as built)" note; tests in `server/src/room_state/ilmari_tests.rs`; the Full clear is covered by the sim's bot clears on the same code, not by a socket run) |
+| B15 | Companion AI (`companion.rs`, three companions, loadout, role behaviours) | B6 | per-role behaviour tests; determinism test; companion-assisted clears (built, see the B.7 "As built" note; protocol stays 36; tests in `tests/ilmari_companions.rs`, the clears in `tests/playthrough.rs`, the room cap in `server/src/room_state/ilmari_tests.rs`) |
+| B16 | Server: geometry delta, room Ilmari option (companions online came with B15) | B14 | server tests; co-op smoke on a Full clear (built, protocol 35 -> 36: no delta and no room option were needed, see the B.8 "Co-op (as built)" note; tests in `server/src/room_state/ilmari_tests.rs`; the Full clear is covered by the sim's bot clears on the same code, not by a socket run) |
 | B17 | Docs, `KNOWN_LIMITATIONS`, CHANGELOG, version note (0.9.0 only on the user's request) | all | docs match code; full golden replay pass; `WOW_BENCH` per wing; protocol bump check (docs and CHANGELOG done for B16; the 0.9.0 bump and the per-wing bench wait for the wings and the user) |
 
 ## B.11 Risks and open questions

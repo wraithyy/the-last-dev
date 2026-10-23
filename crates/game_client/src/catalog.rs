@@ -2246,6 +2246,57 @@ static TABLE: &[(&str, UnitVisual)] = &[
             ],
         ),
     ),
+    // The companions wear the same clothes as their base selves; the sheet is a laminated board.
+    (
+        "il_roster",
+        v(
+            "prim/kpi_dashboard",
+            1.5,
+            "Sign-Up Sheet",
+            "<Initial Each Page>",
+            &[],
+        ),
+    ),
+    (
+        "il_comp_dale",
+        v(
+            WORKER,
+            1.8,
+            "Dale",
+            "<Twenty-Two Years in This Booth>",
+            &[
+                paint("Shirt", 0.2, 0.5, 0.3),
+                paint("Pants", 0.2, 0.22, 0.3),
+            ],
+        ),
+    ),
+    (
+        "il_comp_priya",
+        v(
+            CASUAL_F,
+            1.68,
+            "Priya",
+            "<Severity: Yes>",
+            &[
+                paint("Skin", 0.62, 0.43, 0.32),
+                paint("Hair", 0.1, 0.08, 0.08),
+                paint("Shirt", 0.2, 0.5, 0.7),
+            ],
+        ),
+    ),
+    (
+        "il_comp_rupert",
+        v(
+            CASUAL2,
+            1.75,
+            "Rupert",
+            "<The Intern Who Stayed>",
+            &[
+                paint("Shirt", 0.85, 0.45, 0.15),
+                paint("Hair", 0.35, 0.22, 0.12),
+            ],
+        ),
+    ),
     (
         "il_vending",
         v(

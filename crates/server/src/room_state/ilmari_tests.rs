@@ -533,3 +533,33 @@ async fn an_afk_lead_hands_the_opening_to_the_room_after_the_grace() {
         "the room stayed stuck behind an idle lead"
     );
 }
+
+/// Companions in a room (docs/ILMARI_09.md B.7): the sheet is plain `Talk`, a wing on Story brings
+/// each member's pair, the room stops at two whoever asked, and Full gets none.
+#[tokio::test(start_paused = true)]
+async fn companions_belong_to_their_owner_and_a_room_stops_at_two() {
+    let mut s = room();
+    s.on_join(0, "Lead", "backend");
+    s.on_join(1, "Dps", "fullstack");
+    s.tick();
+    let (a, b) = (eid_of(&s, 0), eid_of(&s, 1));
+    s.sim.debug_force_raid_async(Some(true));
+    s.world.load(&mut s.sim, "resistance/1", None).unwrap();
+    let sheet = s.sim.units().find(|u| u.key == "il_roster").unwrap();
+    let (sheet, at) = (sheet.id, sheet.pos);
+    for (p, e) in [(0, a), (1, b)] {
+        move_sim(&mut s, e, Vec3::new(at.x, at.y, at.z + 1.0));
+        s.on_message(p, ClientMsg::Cmd(Command::Talk { unit: sheet }));
+        s.tick();
+    }
+    assert_eq!(s.sim.companion_picks(a).len(), 2);
+    assert_eq!(s.sim.companion_picks(b).len(), 2);
+
+    s.world.load(&mut s.sim, "ilmari1/1", None).unwrap();
+    let (mine, theirs) = (s.sim.companions_of(a), s.sim.companions_of(b));
+    assert_eq!((mine.len(), theirs.len()), (2, 0), "join order, cap two");
+
+    s.sim.debug_force_raid_async(Some(false));
+    s.world.load(&mut s.sim, "ilmari1/2", None).unwrap();
+    assert!(s.sim.companions_of(a).is_empty(), "Full has none");
+}

@@ -7,6 +7,7 @@ mod ai;
 mod auto_attack;
 pub mod burnout;
 pub mod calendar;
+pub mod companion;
 pub mod content;
 pub mod corporate;
 pub mod dailies;
@@ -47,13 +48,13 @@ pub use calendar::{
     CalendarChain, CalendarDef, CalendarGame, CalendarReward, ChainStatus, TICKET_BOARD_MULT,
 };
 pub use content::{
-    AiAbility, AiDef, AiTarget, ApplyAura, Area, AuraDef, AutoAttackDef, CcCat, ClassDef, Config,
-    ConsumeAura, Content, ContentError, DispelType, Effect, EnrageDef, Execute, FleeDef,
-    FrontalShield, ITEM_DESC_MAX, ITEM_STACK_CAP, IdlePose, ItemBonus, ItemDef, ItemKind,
-    ItemTotals, LevelDef, LootEntry, MAX_ACTION_BAR, MobScaling, Objective, OpenerDef, PackDef,
-    PeriodicDef, PhaseDef, QuestDef, QuestGiver, QuestReward, Role, School, SpellDef, SpellId,
-    SpellTarget, TOKEN_STACK_CAP, TelegraphAt, TelegraphDef, UnitDef, Unlock, XpRules, YellDef,
-    ZoneDef, ZoneKind, ZoneLink, ZoneSpawn,
+    AiAbility, AiDef, AiTarget, ApplyAura, Area, AuraDef, AutoAttackDef, CcCat, ClassDef,
+    CompanionDef, CompanionRole, Config, ConsumeAura, Content, ContentError, DispelType, Effect,
+    EnrageDef, Execute, FleeDef, FrontalShield, ITEM_DESC_MAX, ITEM_STACK_CAP, IdlePose, ItemBonus,
+    ItemDef, ItemKind, ItemTotals, LevelDef, LootEntry, MAX_ACTION_BAR, MobScaling, Objective,
+    OpenerDef, PackDef, PeriodicDef, PhaseDef, QuestDef, QuestGiver, QuestReward, Role, School,
+    SpellDef, SpellId, SpellTarget, TOKEN_STACK_CAP, TelegraphAt, TelegraphDef, UnitDef, Unlock,
+    XpRules, YellDef, ZoneDef, ZoneKind, ZoneLink, ZoneSpawn,
 };
 pub use dailies::{BoardView, GoalSpec, GoalView, SavedTask, TaskState, TaskView};
 pub use duel::{DuelError, DuelOutcome};

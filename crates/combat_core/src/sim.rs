@@ -233,6 +233,8 @@ pub struct Sim {
     pub(crate) quest_rt: crate::quests::QuestRt,
     /// The post-credits stamp and reveal flag (`ilmari.rs`).
     pub(crate) ilmari: crate::ilmari::IlmariState,
+    /// Resistance companions: each player's loadout and the units out in the zone (`companion.rs`).
+    pub(crate) companions: crate::companion::CompanionState,
     /// Ground of the loaded zone, and of every zone a loader registered (`terrain.rs`).
     pub(crate) terrain: crate::terrain::Terrain,
     pub(crate) zone_terrains: BTreeMap<String, crate::terrain::Terrain>,
@@ -276,6 +278,7 @@ impl Sim {
             minigame: Default::default(),
             quest_rt: Default::default(),
             ilmari: Default::default(),
+            companions: Default::default(),
             terrain: Default::default(),
             zone_terrains: BTreeMap::new(),
         }
@@ -340,6 +343,7 @@ impl Sim {
             return false;
         };
         self.duel_left(id);
+        self.companion_on_leave(id);
         self.despawn(i);
         self.players.retain(|p| *p != id);
         self.quest_logs.remove(&id);
@@ -723,6 +727,7 @@ impl Sim {
         self.run_queue();
         self.update_auto_attack();
         self.update_ai();
+        self.update_companions();
         self.update_telegraphs();
         self.update_wander();
         self.update_escorts();
@@ -1065,12 +1070,13 @@ impl Sim {
 
     /// Debug/test: kills a living hostile unit as if the player landed the killing blow (XP,
     /// loot, zone clear, quest credit and unlocks all follow; events come out of the next tick).
-    /// False for unknown, dead or friendly units.
+    /// False for unknown, dead or friendly units (a companion counts as hostile to this call, so
+    /// tests can drop one).
     pub fn debug_kill(&mut self, id: EntityId) -> bool {
-        let Some(ti) = self
-            .index(id)
-            .filter(|&i| self.units[i].state.alive && self.units[i].state.hostile)
-        else {
+        let Some(ti) = self.index(id).filter(|&i| {
+            self.units[i].state.alive
+                && (self.units[i].state.hostile || self.companion_owner(id).is_some())
+        }) else {
             return false;
         };
         self.die(ti, self.first_player());
@@ -1135,7 +1141,9 @@ impl Sim {
         let near = in_range(p.state.pos, t.state.pos, self.content.config.loot_range_m);
         if p.state.alive && t.state.alive && !t.despawned && !t.state.hostile && near {
             let key = t.state.key.clone();
-            self.request_yell(ti, YellKind::Talk);
+            if !self.companion_roster_talk(player, ti, &key) {
+                self.request_yell(ti, YellKind::Talk);
+            }
             self.on_talk(player, &key);
             self.note_marie(player, &key);
             self.quest_credit(player, |o| matches!(o, Objective::Talk(k) if *k == key));
@@ -1854,6 +1862,8 @@ impl Sim {
 
     pub(crate) fn die(&mut self, ti: usize, killer: Option<EntityId>) {
         let id = Self::id_of(ti);
+        // A companion's kill is its owner's: XP, quest credit and the lockout follow the player.
+        let killer = killer.map(|k| self.companion_owner(k).unwrap_or(k));
         self.duel_cancel_for(id);
         self.spread_auras(ti);
         // Read before the auras go: a labelled cable stays dead.
@@ -2068,6 +2078,10 @@ impl Sim {
                             .units
                             .iter()
                             .any(|o| o.state.alive && o.threat.contains_key(&id))
+                } else if let Some(owner) = self.companion_owner(id) {
+                    // A companion fights when its owner does (it never holds a threat table).
+                    self.index(owner)
+                        .is_some_and(|o| self.units[o].state.in_combat)
                 } else {
                     !u.threat.is_empty()
                 };

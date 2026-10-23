@@ -3035,3 +3035,60 @@ fn a_trio_clears_wing_two_on_full_and_a_lone_player_does_not() {
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+// ---- Resistance companions (docs/ILMARI_09.md B.7): company on Story, never a carry.
+
+/// One Story wing run for `class` with `picks` as the companion loadout (none: the solo baseline).
+/// Returns (bosses killed, seconds, lowest HP %, human candidates hit, died).
+fn companion_wing(
+    class: &'static str,
+    zones: &[&str],
+    seed: u64,
+    picks: &[&str],
+) -> (usize, u64, u32, u32, bool) {
+    let mut b = Bot::new_as(class, "campus", 10, seed);
+    b.wear_legacy_gear();
+    b.rest_alert = true;
+    let keys: Vec<String> = picks.iter().map(|k| k.to_string()).collect();
+    b.sim.set_companion_picks(b.player, &keys);
+    let (bosses, secs, low, humans) = b.wing(zones, true);
+    (bosses, secs, low, humans, b.report.died)
+}
+
+/// A tank, a healer and a damage dealer each bring the other two roles: the wing still falls on
+/// three seeds, the companions never hit a human candidate, and the clock says it did not get much
+/// easier (not under half the solo time), which is the "classes stay the stars" guardrail.
+#[test]
+fn story_with_two_companions_clears_each_wing_and_is_not_much_easier() {
+    use combat_core::companion::{DALE, PRIYA, RUPERT};
+    let mut failures = Vec::new();
+    for (class, picks) in [
+        ("backend", [PRIYA, RUPERT]),
+        ("devops", [DALE, RUPERT]),
+        ("fullstack", [DALE, PRIYA]),
+    ] {
+        for (name, zones) in [("Wing 1", &WING1), ("Wing 2", &WING2)] {
+            for seed in [7, 42, 1234] {
+                let solo = companion_wing(class, zones, seed, &[]);
+                let with = companion_wing(class, zones, seed, &picks);
+                println!(
+                    "{class:10} {name} Story seed {seed:4}: solo {}/3 in {} s (low {}%), with {picks:?} {}/3 in {} s (low {}%, humans hit {})",
+                    solo.0, solo.1, solo.2, with.0, with.1, with.2, with.3
+                );
+                if with.0 < 3 || with.4 || with.3 > 0 {
+                    failures.push(format!(
+                        "{class} {name} seed {seed}: {}/3 bosses, died {}, humans {}",
+                        with.0, with.4, with.3
+                    ));
+                }
+                if solo.0 == 3 && with.1 * 2 < solo.1 {
+                    failures.push(format!(
+                        "{class} {name} seed {seed}: {} s with company is under half of {} s solo",
+                        with.1, solo.1
+                    ));
+                }
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}

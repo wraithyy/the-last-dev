@@ -25,6 +25,9 @@
         group_damage_pct_per_player: 30,
         // Co-op: bosses add this much more per extra member (a trio faces 160% + 40%).
         group_boss_damage_pct_per_player: 20,
+        // Ilmari Story: each Resistance companion counts as half a group member for the three
+        // scalings above (docs/ILMARI_09.md B.7), so company never makes a boss easier on paper.
+        companion_group_pct: 30,
         // Co-op: every 2 members beyond the first, each trash pack spawns one more member.
         group_pack_growth_players: 2,
         // Pulling a pack also pulls idle trash of other packs within this radius.
@@ -4726,6 +4729,45 @@
             description: "'Do you have five minutes?' Interrupt it, or it lands on the room.",
             effect: Damage(base: 130, coefficient_pct: 0),
             area: Some((radius_m: 60.0, allies: false)),
+        ),
+        // ---- Ilmari: Resistance companions (docs/ILMARI_09.md B.7). Deliberately small numbers: a
+        // companion supports the player's class and never carries a fight (ILMARI_RAID.md guardrail 6). ----
+        (
+            id: 2490, name: "Laminated Slap", icon: "blocking_call", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 0, gcd: true, cooldown_ms: 2000,
+            description: "Dale hits it with something laminated. Small damage, a lot of extra threat.",
+            effect: Damage(base: 26, coefficient_pct: 0),
+            extra_effects: [Threat(amount: 40)],
+        ),
+        (
+            id: 2491, name: "Eyes On The Booth", icon: "who_touched_prod", school: Physical,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 9000,
+            description: "Dale reminds the enemy who has been watching the barrier for twenty-two years. It turns on him.",
+            effect: Taunt,
+        ),
+        (
+            id: 2492, name: "Raise the Barrier", icon: "rate_limiter", school: Physical,
+            range_m: 0.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 25000, target: Caster,
+            description: "Dale lowers the barrier arm, which in this building counts as armour. Absorbs damage for a few seconds.",
+            effect: Absorb(aura: "rate_limiter", amount: 160, duration_ms: 8000),
+        ),
+        (
+            id: 2493, name: "Severity: Yes", icon: "rollback", school: Arcane,
+            range_m: 30.0, cast_ms: 0, mana: 0, gcd: true, cooldown_ms: 3500, target: Ally,
+            description: "Priya escalates your wounds to the right team. They are the right team. Heals a little.",
+            effect: Heal(base: 90, coefficient_pct: 0),
+        ),
+        (
+            id: 2494, name: "Stapler", icon: "code_review", school: Physical,
+            range_m: 25.0, cast_ms: 1600, mana: 0, gcd: true, cooldown_ms: 0,
+            description: "Rupert throws the department stapler. It was never his stapler. It does small damage.",
+            effect: Damage(base: 44, coefficient_pct: 0),
+        ),
+        (
+            id: 2495, name: "Hole Punch", icon: "reject_pr", school: Physical,
+            range_m: 25.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 15000,
+            description: "Rupert interrupts a cast that must be interrupted. He read the sign. He is very proud.",
+            effect: Interrupt(lockout_ms: 4000),
         ),
     ],
     // Playable classes; the first is the default. Base stats and auto attack come from `unit`.
@@ -12580,6 +12622,88 @@
                 ],
             ),
         ),
+        // Resistance companions and their sign-up sheet (docs/ILMARI_09.md B.7). Friendly, no `ai`:
+        // `companion.rs` runs them. Barks are speech bubbles on long timers, never chat.
+        (
+            key: "il_roster", name: "Sign-Up Sheet", title: "<Initial Each Page>", level: 5, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                ambient_ms: 52000,
+                ambient: [
+                    "Volunteers for the Wings. Bring your own mug.",
+                    "Two per person. The third one is for morale and cannot be booked.",
+                ],
+            ),
+        ),
+        (
+            key: "il_comp_dale", name: "Dale", title: "<Twenty-Two Years in This Booth>", level: 12, hostile: false,
+            max_hp: 900, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None, healable: true,
+            companion: Some((role: Tank, main: 2490, utility: Some(2491), defense: Some(2492))),
+            yells: (
+                periodic_ms: 47000,
+                periodic: [
+                    "I have guarded a barrier for twenty-two years. This is a promotion.",
+                    "Stay behind me. I know what happens to people who walk in front of things.",
+                    "Nobody checks the ticket. Nobody ever checked the ticket.",
+                ],
+                low_hp: ["Fine. FINE. Barrier is going down."],
+                death: ["Told you... so... there is a queue..."],
+                talk: ["Behind me. Not in front. I have seen what is in front."],
+                ambient_ms: 71000,
+                ambient: [
+                    "Lanyard? Lanyard. Good.",
+                    "I miss the booth. The booth never tried to convert me.",
+                ],
+            ),
+        ),
+        (
+            key: "il_comp_priya", name: "Priya", title: "<Severity: Yes>", level: 12, hostile: false,
+            max_hp: 560, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None, healable: true,
+            companion: Some((role: Healer, main: 2493)),
+            yells: (
+                periodic_ms: 53000,
+                periodic: [
+                    "I'm not a doctor. I'm support. It's worse.",
+                    "Please hold. Your wound is important to us.",
+                    "I have escalated your injury. To myself. I am the escalation.",
+                ],
+                low_hp: ["Priority one. I am the ticket."],
+                death: ["Closing... as resolved..."],
+                talk: ["Have you tried not being hit?"],
+                ambient_ms: 77000,
+                ambient: [
+                    "Customer satisfaction is excellent. The customers are all behind us.",
+                ],
+            ),
+        ),
+        (
+            key: "il_comp_rupert", name: "Rupert", title: "<The Intern Who Stayed>", level: 12, hostile: false,
+            max_hp: 480, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None, healable: true,
+            companion: Some((role: Damage, main: 2494, utility: Some(2495))),
+            yells: (
+                periodic_ms: 49000,
+                periodic: [
+                    "I just wanted a reference letter.",
+                    "Is this on my objectives? It is not on my objectives.",
+                    "Do not tell my mentor. He is one of them now.",
+                ],
+                low_hp: ["This was not in the job description!"],
+                death: ["Tell HR... I wanted... the reference..."],
+                talk: ["I can throw things. That is the entire onboarding."],
+                ambient_ms: 69000,
+                ambient: [
+                    "I think it's Thursday. I think I have been awake since the credits.",
+                ],
+            ),
+        ),
         (
             key: "il_hunter_bot", name: "Repurposed Cleaning Robot", title: "<Hunting Dust. And You.>", level: 12, hostile: true,
             max_hp: 500, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
@@ -14524,6 +14648,7 @@
                 (anchor: "npc_brenda", unit: "il_brenda"),
                 (anchor: "npc_1", unit: "il_res_intern"),
                 (anchor: "npc_2", unit: "il_res_it"),
+                (anchor: "npc_roster", unit: "il_roster"),
             ],
             links: [
                 (anchor: "door:parking_p3", to: "parking_p3"),

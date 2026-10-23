@@ -209,6 +209,8 @@ max_hp    = level_scaled_max_hp * group_pct / 100      // hostile AI units only,
 
 Applied at spawn (zone load, `spawn_unit`, summons) and re-applied to every living enemy when a member joins or leaves, keeping its HP fraction (`hp = hp * new_max / old_max`, at least 1 while alive). Solo is 100% (no change); 3 players 210%, 5 players 320%.
 
+Companions (Ilmari Story, `config.companion_group_pct`, content 30, default 0) count as that share of a member in the three scalings of this section: the "players - 1" term is `(players - 1) + companions * companion_group_pct / 100`, so two companions beside one player scale like 1.6 players (HP +33%, damage +18%, boss damage +12% extra with the content numbers). They are friendly units, not members: kill sharing, loot, the group XP bonus and pack growth count players only.
+
 Enemy damage scaling (`config.group_damage_pct_per_player`, content 30, serde default 0):
 
 ```

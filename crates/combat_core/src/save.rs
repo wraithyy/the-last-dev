@@ -92,6 +92,8 @@ pub struct SaveData {
     pub ilmari_revealed: bool,
     /// Ilmari Tokens earned this ISO week (`ilmari_tok`: week, count); optional key.
     pub ilmari_tokens: (u32, u32),
+    /// The companion loadout (`companions`, unit keys); optional key, none by default.
+    pub companions: Vec<String>,
     /// UTC day of the last turn-in per daily quest (`quest_days`); optional key.
     pub quest_days: Vec<(String, u32)>,
 }
@@ -238,6 +240,9 @@ impl SaveData {
                 self.ilmari_tokens.0, self.ilmari_tokens.1
             ));
         }
+        if !self.companions.is_empty() {
+            out.push_str(&format!("companions={}\n", self.companions.join("|")));
+        }
         if !self.quest_days.is_empty() {
             let rows: Vec<String> = self
                 .quest_days
@@ -358,6 +363,7 @@ impl SaveData {
                         s.ilmari_tokens = (w, n);
                     }
                 }
+                "companions" => s.companions = list(v),
                 "quest_days" => {
                     s.quest_days = list(v)
                         .iter()
@@ -562,6 +568,7 @@ impl Sim {
             ilmari_stamp: self.ilmari.stamp.clone(),
             ilmari_revealed: self.ilmari.revealed,
             ilmari_tokens: self.ilmari.tokens.get(&player).copied().unwrap_or_default(),
+            companions: self.companion_picks(player),
             quest_days: self
                 .quests_of(player)
                 .days
@@ -689,6 +696,7 @@ impl Sim {
         self.restore_marie_met(player, save.marie_met);
         self.restore_ilmari(save.ilmari_stamp.clone(), save.ilmari_revealed);
         self.restore_ilmari_tokens(player, save.ilmari_tokens.0, save.ilmari_tokens.1);
+        self.set_companion_picks(player, &save.companions);
         let class = self.class_at(i).map(|c| c.key.clone()).unwrap_or_default();
         self.units[i].state.talents = self.content.talents.sanitize(&class, &save.talents, level);
         let title = Some(&save.title)

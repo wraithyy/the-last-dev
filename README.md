@@ -128,6 +128,7 @@ the site, including the [changelog page](https://wraithyy.github.io/the-last-dev
 | `WOW_FPS=1` | Log average frame time and drawn meshes every 3 s |
 | `WOW_MUTE=1` | Start with audio muted (on the web: `?mute=1` in the URL) |
 | `WOW_LEVEL=n` | Start level (overrides the floor minimum) |
+| `WOW_COMPANIONS=dale,priya` | Companion loadout (Dale, Priya, Rupert; two at most); they come into an Ilmari wing on Story (`WOW_RAID_ASYNC=1`) |
 | `WOW_PLAYER_AT=x,z,yaw_deg[,cam_deg]` | Start position after the first floor load; optional camera yaw offset (180 = front view) |
 | `WOW_CAM_DIST=m` | Start zoom |
 | `WOW_AUTOFIGHT=1` | Bot: walks to the nearest hostile (adds first), interrupts, heals/shields, runs the rotation, loots corpses, respawns, takes the elevator; logs every sim event |

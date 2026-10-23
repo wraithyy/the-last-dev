@@ -71,6 +71,8 @@ pub fn build() -> FloorLayout {
     at("npc_brenda", &mut p, 26.0, -5.0, (26.0, 0.0));
     at("npc_1", &mut p, 7.0, 6.0, (5.0, 2.0));
     at("npc_2", &mut p, -10.0, -6.0, (-6.0, 0.0));
+    // The sign-up sheet for the companions, on the wall side of the hall where the board hangs.
+    at("npc_roster", &mut p, 9.0, -6.5, (9.0, 0.0));
     assemble(ZONE, 1, "The Booth, Sub-Level", false, p, theme())
 }
 

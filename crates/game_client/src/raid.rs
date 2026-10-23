@@ -6,7 +6,8 @@
 //!
 //! QA: `WOW_RAID_ASYNC=0|1` forces the difficulty of offline raid loads; `WOW_RAID_LOCKS=a,b`
 //! sets this week's raid lockout (keys as in `RaidView::locked`); `WOW_LADDER_DEMO=1` puts three
-//! sample runs on this week's Weekly Sprint ladder.
+//! sample runs on this week's Weekly Sprint ladder; `WOW_COMPANIONS=dale,priya` sets the
+//! companion loadout (they step out beside you in an Ilmari wing on Story).
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity)]
 
@@ -45,6 +46,13 @@ fn qa_async(mut sim: ResMut<CombatSim>) {
         Ok("1") => sim.0.debug_force_raid_async(Some(true)),
         Ok("0") => sim.0.debug_force_raid_async(Some(false)),
         _ => {}
+    }
+    if let (Ok(v), Some(me)) = (std::env::var("WOW_COMPANIONS"), sim.0.player()) {
+        let keys: Vec<String> = v
+            .split(',')
+            .map(|k| format!("il_comp_{}", k.trim().trim_start_matches("il_comp_")))
+            .collect();
+        sim.0.set_companion_picks(me, &keys);
     }
 }
 

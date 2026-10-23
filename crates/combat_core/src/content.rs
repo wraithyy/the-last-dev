@@ -73,6 +73,10 @@ pub struct Config {
     /// Co-op: extra boss damage per group member beyond the first, on top of the group damage.
     #[serde(default)]
     pub group_boss_damage_pct_per_player: u32,
+    /// Ilmari Story: each companion counts as this percent of a group member in the three
+    /// group scalings above, so bringing company never makes a boss easier on paper.
+    #[serde(default)]
+    pub companion_group_pct: u32,
     /// Co-op: every this many players beyond the first, each trash pack spawns one more
     /// member (0 = off; FORMULAS.md, Co-op group).
     #[serde(default)]
@@ -1055,6 +1059,30 @@ pub struct UnitDef {
     pub death_burnout: u16,
     #[serde(default)]
     pub death_spawn: Option<DeathSpawn>,
+    /// A Resistance companion: friendly, no `ai`, driven by `companion.rs` instead.
+    #[serde(default)]
+    pub companion: Option<CompanionDef>,
+}
+
+/// What a companion does in a fight; the spells are ordinary `Content::spells` entries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+pub enum CompanionRole {
+    Tank,
+    Healer,
+    Damage,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct CompanionDef {
+    pub role: CompanionRole,
+    /// The bread-and-butter spell: the tank's strike, the healer's heal, the damage bolt.
+    pub main: SpellId,
+    /// Tank: the taunt. Damage: the kick (always used on a must-interrupt cast).
+    #[serde(default)]
+    pub utility: Option<SpellId>,
+    /// Tank: the self absorb, used when low.
+    #[serde(default)]
+    pub defense: Option<SpellId>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
@@ -1780,6 +1808,18 @@ impl Content {
                     "unit {} death spawn needs a known unit, a count and a cap",
                     u.key
                 ));
+            }
+            if let Some(c) = &u.companion {
+                let spells = [Some(c.main), c.utility, c.defense];
+                if u.hostile
+                    || u.ai.is_some()
+                    || spells.iter().flatten().any(|id| self.spell(*id).is_none())
+                {
+                    return bad(format!(
+                        "companion {} must be friendly, have no ai and use known spells",
+                        u.key
+                    ));
+                }
             }
             let Some(ai) = &u.ai else { continue };
             for ab in &ai.abilities {

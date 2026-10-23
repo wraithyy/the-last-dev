@@ -45,7 +45,7 @@ impl Sim {
         let is_player = self.is_player(Self::id_of(i));
         let group_pct = self.group_hp_pct();
         let group_dmg_pct = self.group_damage_pct();
-        let group_extra = self.players.len().saturating_sub(1) as u32;
+        let group_extra = self.group_extra_pct();
         let hp_level_pct = self.class_at(i).map_or(100, |c| c.level_hp_pct);
         let hp_aura_pct = self.max_hp_aura_pct(i);
         let (sprint_hp, sprint_dmg) = self.sprint_mob_pct(i);
@@ -107,7 +107,7 @@ impl Sim {
             };
             // Bosses are the group's real test: they get an extra slice per member on top.
             let group_dmg = if d.boss && d.hostile {
-                group_dmg + self.content.config.group_boss_damage_pct_per_player * group_extra
+                group_dmg + self.content.config.group_boss_damage_pct_per_player * group_extra / 100
             } else {
                 group_dmg
             };
@@ -127,14 +127,17 @@ impl Sim {
 
     /// Enemy HP percent for the current group size (100 solo); see FORMULAS.md.
     pub(crate) fn group_hp_pct(&self) -> u32 {
-        let extra = self.players.len().saturating_sub(1) as u32;
-        100 + self.content.config.group_hp_pct_per_player * extra
+        100 + self.content.config.group_hp_pct_per_player * self.group_extra_pct() / 100
     }
 
     /// Enemy damage percent for the current group size (100 solo); see FORMULAS.md.
     pub(crate) fn group_damage_pct(&self) -> u32 {
-        let extra = self.players.len().saturating_sub(1) as u32;
-        100 + self.content.config.group_damage_pct_per_player * extra
+        100 + self.content.config.group_damage_pct_per_player * self.group_extra_pct() / 100
+    }
+
+    /// Group members beyond the first, in percent of one: companions count as a share of one each.
+    fn group_extra_pct(&self) -> u32 {
+        self.players.len().saturating_sub(1) as u32 * 100 + self.companion_scaling_pct()
     }
 
     /// Re-applies the group HP scaling to every enemy after a join or leave, keeping each

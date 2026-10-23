@@ -270,7 +270,11 @@ the same rule as every other room unlock.
   Ballot terminals, HR Portals and label printers are `Interact` commands: the prop key is length-capped
   on the wire, the sim checks the sender's own position and cooldown, and the actor is always the
   sender.
-- **No companions online**: the companion AI is offline-only content (B15, not built yet).
+- **Companions online** (B15): the sign-up sheet is plain `Talk`, so the room's sim is the validator and
+  there is no new command or message. Companions belong to the player who picked them, a room holds at
+  most two (`MAX_PER_ROOM`, join order), they exist only in a wing on Story and a leaving owner takes
+  theirs along; Full gets none. They are friendly units, not members, so they never count as a player
+  for votes, mirrors, grades or tethers.
 
 ### Hosting and operations
 

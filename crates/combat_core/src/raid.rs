@@ -408,7 +408,7 @@ impl Sim {
 
     /// Whether the next Ilmari wing loads on Story: QA force, else the lead's pick, else by group
     /// size (the wings' `normal_min_players`).
-    fn wing_story(&self) -> bool {
+    pub(crate) fn wing_story(&self) -> bool {
         let min = self
             .content
             .raids
