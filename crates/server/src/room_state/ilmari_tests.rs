@@ -777,3 +777,137 @@ async fn wing_three_loot_stays_in_the_ilmari_band_of_the_wings_before_it() {
     };
     assert!(top("ilmari3/1") > 0 && top("ilmari3/1") <= top("ilmari2/1"));
 }
+
+// ---- Wing 4, The Cloud (docs/ILMARI_10.md C9-C14): split replicas, the bill, the platform tour.
+
+#[tokio::test(start_paused = true)]
+async fn the_autoscalers_replicas_and_bill_are_the_rooms_and_a_late_joiner_learns_the_bill() {
+    let mut s = room();
+    s.on_join(0, "Lead", "backend");
+    s.on_join(1, "Dps", "fullstack");
+    s.tick();
+    let boss = pull_wing3(&mut s, "ilmari4/2", "il_autoscaler");
+    let mut out = Vec::new();
+    for _ in 0..30 {
+        out.extend(s.tick());
+        keep_alive(&mut s, boss);
+    }
+    // One burst past the Story threshold (14% of max HP in the window) splits it once.
+    let (a, max) = (eid_of(&s, 0), s.sim.unit(boss).unwrap().max_hp);
+    s.sim.debug_hit(a, boss, max * 14 / 100 + 10);
+    for _ in 0..60 {
+        out.extend(s.tick());
+        s.sim.debug_set_hp(a, 10_000_000);
+    }
+    assert_eq!(s.sim.split_copies(), 2, "a replica in the room's sim");
+    for p in [0, 1] {
+        let last = events(&out, p)
+            .into_iter()
+            .filter_map(|e| match e {
+                Event::CloudBill { copies, .. } => Some(copies),
+                _ => None,
+            })
+            .next_back();
+        assert_eq!(last, Some(2), "member {p} sees both copies on the meter");
+    }
+    s.on_join(2, "Late", "devops");
+    let mut late = Vec::new();
+    for _ in 0..60 {
+        late.extend(s.tick());
+        s.sim.debug_set_hp(a, 10_000_000);
+    }
+    assert!(
+        events(&late, 2)
+            .iter()
+            .any(|e| matches!(e, Event::CloudBill { copies: 2, .. })),
+        "the joiner got the bill without waiting for a change"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_outage_tour_starts_at_us_east_1_for_everyone_and_a_joiner_gets_the_state() {
+    let mut s = room();
+    s.on_join(0, "Lead", "backend");
+    s.on_join(1, "Dps", "fullstack");
+    s.tick();
+    let boss = pull_wing3(&mut s, "ilmari4/3", "il_region_outage");
+    let mut out = Vec::new();
+    for _ in 0..30 * 30 {
+        out.extend(s.tick());
+        keep_alive(&mut s, boss);
+    }
+    assert_eq!(
+        s.sim.platform_order().first().map(String::as_str),
+        Some("us-east-1")
+    );
+    let ids: Vec<String> = s
+        .sim
+        .platform_phases()
+        .into_iter()
+        .map(|(id, _)| id)
+        .collect();
+    for p in [0, 1] {
+        let evs = events(&out, p);
+        let first_dark = evs.iter().find_map(|e| match e {
+            Event::PlatformState {
+                idx,
+                state: combat_core::PlatformPhase::Dark,
+                ..
+            } => Some(ids[usize::from(*idx)].clone()),
+            _ => None,
+        });
+        assert_eq!(first_dark.as_deref(), Some("us-east-1"), "member {p}");
+        assert!(
+            evs.iter()
+                .any(|e| matches!(e, Event::PlatformWarn { order, .. } if !order.is_empty())),
+            "member {p}: Story lists the rotation"
+        );
+    }
+    // Failover is a hit and a teleport, never a kill: both members are still up.
+    assert!(
+        [0, 1]
+            .iter()
+            .all(|p| s.sim.unit(eid_of(&s, *p)).is_some_and(|u| u.alive))
+    );
+    s.on_join(2, "Late", "devops");
+    let mut late = Vec::new();
+    for _ in 0..60 {
+        late.extend(s.tick());
+        keep_alive(&mut s, boss);
+    }
+    let seen = events(&late, 2)
+        .iter()
+        .filter(|e| matches!(e, Event::PlatformState { .. }))
+        .count();
+    assert!(seen >= ids.len(), "the joiner got every platform's state");
+}
+
+#[tokio::test(start_paused = true)]
+async fn wing_four_loot_stays_in_the_ilmari_band_and_below_the_reserved_level() {
+    let s = room();
+    let content = s.sim.content();
+    let top = |zone: &str| {
+        let bosses = content
+            .raid_of(zone)
+            .map(|r| r.bosses(content))
+            .unwrap_or_default();
+        content
+            .economy
+            .gear
+            .iter()
+            .filter(|g| {
+                g.source == combat_core::GearSource::Ilmari
+                    && g.drops_from
+                        .as_deref()
+                        .is_some_and(|b| bosses.iter().any(|k| k == b))
+            })
+            .map(|g| g.ilvl)
+            .max()
+            .unwrap_or(0)
+    };
+    assert!(top("ilmari4/2") > 0 && top("ilmari4/2") >= top("ilmari3/1"));
+    assert!(
+        top("ilmari4/2") < 20 && top("ilmari4/3") < 20,
+        "ilvl 20 is reserved for 1.0"
+    );
+}

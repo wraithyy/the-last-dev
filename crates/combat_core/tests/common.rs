@@ -546,6 +546,17 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             ..
         } => format!("echo of {} ({kind:?}) in {at_ms} ms", t(*as_player)),
         Event::Drafts { integrity, marked } => format!("drafts {integrity:?} marked {marked:?}"),
+        Event::CloudBill {
+            bill,
+            copies,
+            reserved,
+        } => format!("cloud bill {bill} with {copies} copies (reserved {reserved})"),
+        Event::PlatformState { idx, state, at_ms } => {
+            format!("platform {idx} is {state:?} since {at_ms} ms")
+        }
+        Event::PlatformWarn { idx, at_ms, order } => {
+            format!("platform {idx} warned for {at_ms} ms, order {order:?}")
+        }
     };
     format!("[{tick:05}] {body}")
 }

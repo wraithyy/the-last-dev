@@ -47,7 +47,7 @@ pub struct RaidScenes {
     pub end: &'static str,
 }
 
-pub const RAID_SCENES: [RaidScenes; 5] = [
+pub const RAID_SCENES: [RaidScenes; 6] = [
     RaidScenes {
         first_zone: "offsite/1",
         intro: "offsite_intro",
@@ -77,6 +77,12 @@ pub const RAID_SCENES: [RaidScenes; 5] = [
         intro: "il_wing3_intro",
         final_boss: "il_model_collapse",
         end: "il_wing3_end",
+    },
+    RaidScenes {
+        first_zone: "ilmari4/1",
+        intro: "il_wing4_intro",
+        final_boss: "il_region_outage",
+        end: "il_wing4_end",
     },
 ];
 
@@ -769,6 +775,77 @@ pub const SCENES: &[Scene] = &[
             l(
                 "Priya",
                 "I closed the ticket: 'Resolved by humans, who also varied'. The model rated it 'confident'. Nobody asked it to.",
+            ),
+        ],
+    },
+    // ---- Ilmari Wing 4, The Cloud (docs/ILMARI_10.md C.5). ----
+    Scene {
+        boss: "il_wing4_intro",
+        title: "The Cloud: the roof",
+        lines: &[
+            l(
+                "Dale",
+                "The roof. I always wanted to go up. Nobody ever let me. There was a ladder policy.",
+            ),
+            l("You", "And now?"),
+            l(
+                "Dale",
+                "Now the policy is rescinded, pending approval. I am treating that as approval.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_autoscaler",
+        title: "Scales With Demand. Yours.: the Autoscale Floor",
+        lines: &[
+            l(
+                "Wall screens",
+                "INVOICE 000000001. LINE 1 OF 80,000. THE SCROLL UNROLLS THROUGH THE HALL AND DOES NOT STOP.",
+            ),
+            l("Invoice", "TOTAL: YES. EXCLUDES TAX, EGRESS AND FEELINGS."),
+            l(
+                "Priya",
+                "I am not going to read the last line. I have read the last line. It is a smaller invoice, for the invoice.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_region_outage",
+        title: "us-east-1 Is Having A Moment: the Server Cloud",
+        lines: &[
+            l(
+                "Status page",
+                "ALL SYSTEMS OPERATIONAL. (UPDATED FOUR HOURS AGO.) (HOSTED IN US-EAST-1.)",
+            ),
+            l(
+                "Dale (radio)",
+                "I checked the status page. It says we are fine. I looked down. There is no down. That is the problem.",
+            ),
+            l(
+                "Narrator",
+                "Somewhere a region comes back, unprompted, and nobody writes down why.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_wing4_end",
+        title: "The Cloud: closing remarks",
+        lines: &[
+            l(
+                "Ilmari (PA)",
+                "The cloud has no floor. Neither does the budget. Keep climbing.",
+            ),
+            l(
+                "Dale",
+                "Wing Four is clear. The status page is green. For once it is right. I trust it less.",
+            ),
+            l(
+                "Narrator",
+                "On the Cooling Deck, a door with a lab coat on it lights up. The sign says: COMING.",
+            ),
+            l(
+                "Priya",
+                "I closed the ticket: 'Resolved by humans. Root cause: us-east-1. Action items: none.'",
             ),
         ],
     },

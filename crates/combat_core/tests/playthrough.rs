@@ -155,6 +155,10 @@ fn anchor(name: &str) -> Option<(Vec3, f32)> {
             0.0,
         ));
     }
+    // Wing 4: the Reserved Instance racks stand in the Autoscaler's pit.
+    if name.starts_with("prop:il_rack_") {
+        return Some((Vec3::new(5.0, 0.0, -PACK_SPACING * 7.0 + 10.0), 0.0));
+    }
     if name.starts_with("prop:il_truth_board_") {
         return Some((Vec3::new(10.0, 0.0, -PACK_SPACING * 7.0 + 10.0), 0.0));
     }
@@ -220,6 +224,8 @@ struct Bot {
     draft_next: u64,
     /// Model Collapse's repeater: casts only this spell (the test of "repeat yourself and lose").
     repeater: Option<SpellId>,
+    /// Wing 4's Server Cloud: the room is platforms over a void, so the bot stays on them.
+    on_platforms: bool,
 }
 
 fn yaw_to(from: Vec3, to: Vec3) -> f32 {
@@ -281,6 +287,7 @@ impl Bot {
             lobby_next: 0,
             draft_next: 0,
             repeater: None,
+            on_platforms: false,
         }
     }
 
@@ -552,6 +559,8 @@ impl Bot {
         let goal = candidates
             .into_iter()
             .filter(|p| !unsafe_at(*p))
+            // The Server Cloud: a safe spot over the void is no spot (the platforms are the floor).
+            .filter(|p| self.sim.on_platform_grid(*p) != Some(false))
             .min_by(|a, b| {
                 combat_core::distance(*a, self.pos).total_cmp(&combat_core::distance(*b, self.pos))
             });
@@ -1393,10 +1402,12 @@ impl Bot {
             self.report.boss_min_hp_pct = 100;
         }
         // Melee walks up into the pack's aggro radius; casters open from 20 m.
-        let gap = if matches!(self.class, "frontend" | "backend" | "security" | "cobol") {
-            4.0
-        } else {
-            20.0
+        let melee = matches!(self.class, "frontend" | "backend" | "security" | "cobol");
+        // On the Server Cloud's hub (9 m across) casters open from 7 m, not 20.
+        let gap = match (melee, boss && self.on_platforms) {
+            (true, _) => 4.0,
+            (false, true) => 7.0,
+            (false, false) => 20.0,
         };
         self.pos = Vec3::new(at.x, 0.0, at.z + gap);
         self.tick();
@@ -1617,6 +1628,7 @@ impl Bot {
     fn run(mut self, zone: &str) -> (Report, String) {
         let def = self.sim.content().zone(zone).cloned();
         let packs = def.as_ref().map_or(0, |z| z.packs.len());
+        self.on_platforms = def.as_ref().is_some_and(|z| !z.platforms.is_empty());
         let has_boss = def.is_some_and(|z| z.boss.is_some());
         for k in 1..=packs {
             if self.report.died {
@@ -2772,6 +2784,7 @@ fn every_class_clears_async_attendance_solo() {
 const WING1: [&str; 3] = ["ilmari1/1", "ilmari1/2", "ilmari1/3"];
 const WING2: [&str; 3] = ["ilmari2/1", "ilmari2/2", "ilmari2/3"];
 const WING3: [&str; 3] = ["ilmari3/1", "ilmari3/2", "ilmari3/3"];
+const WING4: [&str; 3] = ["ilmari4/1", "ilmari4/2", "ilmari4/3"];
 
 fn boss_of(sim: &Sim, zone: &str) -> String {
     sim.content()
@@ -2806,10 +2819,11 @@ impl Bot {
             self.rest(true);
             self.run_geared(zone);
             let boss = boss_of(&self.sim, zone);
-            if self.report.died || !self.sim.raid_locked(&boss, story) {
+            // A room without a boss (Wing 4's roof) is a gauntlet: surviving it is the clear.
+            if self.report.died || (!boss.is_empty() && !self.sim.raid_locked(&boss, story)) {
                 break;
             }
-            bosses += 1;
+            bosses += usize::from(!boss.is_empty());
         }
         let secs = (self.sim.now().0 - start) / 30;
         (bosses, secs, self.low_hp_pct, self.human_kills)
@@ -2922,8 +2936,14 @@ impl Group {
     fn pull(&mut self, at: Vec3, boss: bool) {
         for (k, b) in self.bots.iter_mut().enumerate() {
             let melee = matches!(b.class, "frontend" | "backend" | "security" | "cobol");
-            let gap = if melee { 4.0 } else { 20.0 };
-            b.pos = Vec3::new(at.x + (k as f32 - 1.0) * 2.5, 0.0, at.z + gap);
+            let gap = match (melee, boss && b.on_platforms) {
+                (true, _) => 4.0,
+                (false, true) => 7.0,
+                (false, false) => 20.0,
+            };
+            // Three on a 9 m hub stand closer than three in a pit.
+            let spread = if boss && b.on_platforms { 1.5 } else { 2.5 };
+            b.pos = Vec3::new(at.x + (k as f32 - 1.0) * spread, 0.0, at.z + gap);
             b.in_boss = boss;
             b.target = None;
         }
@@ -2982,6 +3002,14 @@ impl Group {
             }
             self.tick();
             self.rest();
+            let platforms = self
+                .sim()
+                .content()
+                .zone(zone)
+                .is_some_and(|z| !z.platforms.is_empty());
+            for b in &mut self.bots {
+                b.on_platforms = platforms;
+            }
             let packs = self.sim().content().zone(zone).map_or(0, |z| z.packs.len());
             for k in 1..=packs {
                 if self.died() {
@@ -3000,10 +3028,10 @@ impl Group {
                 self.boss_secs.push((self.sim().now().0 - t0) / 30);
             }
             let boss = boss_of(self.sim(), zone);
-            if self.died() || !self.sim().raid_locked(&boss, false) {
+            if self.died() || (!boss.is_empty() && !self.sim().raid_locked(&boss, false)) {
                 break;
             }
-            bosses += 1;
+            bosses += usize::from(!boss.is_empty());
         }
         let deaths = self.bots.iter().filter(|b| b.report.died).count();
         ((bosses), (self.sim().now().0 - start) / 30, deaths)
@@ -3175,21 +3203,27 @@ fn story_with_two_companions_clears_each_wing_and_is_not_much_easier() {
         ("devops", [DALE, RUPERT]),
         ("fullstack", [DALE, PRIYA]),
     ] {
-        for (name, zones) in [("Wing 1", &WING1), ("Wing 2", &WING2), ("Wing 3", &WING3)] {
+        for (name, zones) in [
+            ("Wing 1", &WING1),
+            ("Wing 2", &WING2),
+            ("Wing 3", &WING3),
+            ("Wing 4", &WING4),
+        ] {
+            let want = bosses_in(zones);
             for seed in [7, 42, 1234] {
                 let solo = companion_wing(class, zones, seed, &[]);
                 let with = companion_wing(class, zones, seed, &picks);
                 println!(
-                    "{class:10} {name} Story seed {seed:4}: solo {}/3 in {} s (low {}%), with {picks:?} {}/3 in {} s (low {}%, humans hit {})",
+                    "{class:10} {name} Story seed {seed:4}: solo {}/{want} in {} s (low {}%), with {picks:?} {}/{want} in {} s (low {}%, humans hit {})",
                     solo.0, solo.1, solo.2, with.0, with.1, with.2, with.3
                 );
-                if with.0 < 3 || with.4 || with.3 > 0 {
+                if with.0 < want || with.4 || with.3 > 0 {
                     failures.push(format!(
-                        "{class} {name} seed {seed}: {}/3 bosses, died {}, humans {}",
+                        "{class} {name} seed {seed}: {}/{want} bosses, died {}, humans {}",
                         with.0, with.4, with.3
                     ));
                 }
-                if solo.0 == 3 && with.1 * 2 < solo.1 {
+                if solo.0 == want && with.1 * 2 < solo.1 {
                     failures.push(format!(
                         "{class} {name} seed {seed}: {} s with company is under half of {} s solo",
                         with.1, solo.1
@@ -3343,5 +3377,130 @@ fn wing_three_probe() {
     );
     if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
         let _ = std::fs::write(PathBuf::from(dir).join("probe3.log"), &b.log);
+    }
+}
+
+// ---- Ilmari Wing 4, The Cloud (docs/ILMARI_10.md C.5): Story solo, Full as a group.
+
+/// The bosses a wing has (Wing 4's first room is a gauntlet without one).
+fn bosses_in(zones: &[&str]) -> usize {
+    let c = content();
+    zones
+        .iter()
+        .filter(|z| c.zone(z).is_some_and(|d| d.boss.is_some()))
+        .count()
+}
+
+/// Story is the solo difficulty: every class clears the roof, the Autoscaler (hit it in bursts
+/// and it replicates; the bill climbs) and the Region Outage (platforms that go dark, a hub that
+/// fails; the bot stays on the lit ones) on three seeds.
+#[test]
+fn every_class_clears_wing_four_on_story_solo() {
+    let want = bosses_in(&WING4);
+    let mut failures = Vec::new();
+    for class in CLASSES {
+        for seed in [7, 42, 1234] {
+            let mut b = Bot::new_as(class, "campus", 10, seed);
+            b.wear_legacy_gear();
+            b.rest_alert = true;
+            let (bosses, secs, low, _) = b.wing(&WING4, true);
+            println!(
+                "{class:14} Wing 4 Story seed {seed:4}: {bosses}/{want} bosses in {secs} s, low {low}%"
+            );
+            if bosses < want {
+                failures.push(format!("{class} seed {seed}: {bosses}/{want} bosses"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Full is the group difficulty: a tank and two damage dealers clear it on three seeds; the
+/// same wing alone is meant to fail.
+#[test]
+fn a_trio_clears_wing_four_on_full_and_a_lone_player_does_not() {
+    let want = bosses_in(&WING4);
+    let mut failures = Vec::new();
+    for seed in [7, 42, 1234] {
+        let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
+        let (bosses, secs, deaths) = g.wing(&WING4);
+        println!(
+            "trio Wing 4 Full seed {seed:4}: {bosses}/{want} bosses in {secs} s, {deaths} dead, boss fights {:?} s",
+            g.boss_secs
+        );
+        if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+            let _ = std::fs::write(
+                PathBuf::from(dir).join(format!("trio4_{seed}.log")),
+                &g.bots[0].log,
+            );
+        }
+        if bosses < want {
+            failures.push(format!("trio seed {seed}: {bosses}/{want} bosses"));
+        }
+    }
+    for class in CLASSES {
+        let mut b = Bot::new_as(class, "campus", 10, 7);
+        b.wear_legacy_gear();
+        b.rest_alert = true;
+        let (bosses, secs, low, _) = b.wing(&WING4, false);
+        println!("{class:14} Wing 4 Full alone: {bosses}/{want} bosses in {secs} s, low {low}%");
+        if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+            let _ = std::fs::write(
+                PathBuf::from(dir).join(format!("solo4_full_{class}.log")),
+                &b.log,
+            );
+        }
+        if bosses >= want {
+            failures.push(format!("{class} cleared Full alone"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// QA probe for balance work: `W4_CLASS`, `W4_SEED`, `W4_STORY`, `W4_ROOM` (1..3), `W4_TRIO` and a
+/// log dump in `WOW_BOT_DUMP`. Not part of the gates.
+#[test]
+#[ignore = "balance probe: W4_CLASS=<class> W4_SEED=<n> W4_STORY=1 W4_ROOM=2"]
+fn wing_four_probe() {
+    let class = std::env::var("W4_CLASS").unwrap_or_else(|_| "fullstack".into());
+    let class: &'static str = CLASSES
+        .iter()
+        .find(|c| **c == class)
+        .copied()
+        .unwrap_or("fullstack");
+    let seed = std::env::var("W4_SEED")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(7);
+    let story = std::env::var("W4_STORY").is_ok_and(|s| s == "1");
+    let room: usize = std::env::var("W4_ROOM")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(2);
+    let zones = &WING4[room - 1..room];
+    if std::env::var("W4_TRIO").is_ok() {
+        let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
+        let (bosses, secs, deaths) = g.wing(zones);
+        println!(
+            "probe trio room {room} Full seed {seed}: {bosses}/1 in {secs} s, {deaths} dead, fights {:?}",
+            g.boss_secs
+        );
+        if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+            let _ = std::fs::write(PathBuf::from(dir).join("probe4.log"), &g.bots[0].log);
+        }
+        return;
+    }
+    let mut b = Bot::new_as(class, "campus", 10, seed);
+    b.wear_legacy_gear();
+    b.rest_alert = true;
+    let (bosses, secs, low, _) = b.wing(zones, story);
+    println!(
+        "probe {class} room {room} {} seed {seed}: {bosses}/1 in {secs} s, low {low}%, died {}, boss fight {:?} s",
+        if story { "Story" } else { "Full" },
+        b.report.died,
+        b.report.after.last().map(|a| a.2)
+    );
+    if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+        let _ = std::fs::write(PathBuf::from(dir).join("probe4.log"), &b.log);
     }
 }

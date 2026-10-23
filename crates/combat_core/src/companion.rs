@@ -256,6 +256,13 @@ impl Sim {
             self.units[ci].nav.reset();
             return;
         }
+        // The Region Outage's room: never stranded on a platform that is going dark or left behind.
+        if self.companion_platform_snap(ci, oi) {
+            let (dx, dz) = pack_offsets(MAX_PER_ROOM + 1)[slot + 1];
+            self.units[ci].state.pos = Vec3::new(home.x + dx, home.y, home.z + dz);
+            self.units[ci].nav.reset();
+            return;
+        }
         if self.companion_dodge(ci) {
             return;
         }

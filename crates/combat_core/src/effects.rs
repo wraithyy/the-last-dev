@@ -457,6 +457,7 @@ impl Sim {
                 _,
             ) => self.confabulate(ci, *tile_m, *damage, *warn_ms),
             (Effect::Blink { spots }, _) => self.blink(ci, spots),
+            (Effect::AdvanceOutage { ms }, _) => self.outage_advance(*ms),
             (Effect::Footnotes { fake, real, count }, _) => {
                 self.footnotes(ci, fake, real, *count);
             }

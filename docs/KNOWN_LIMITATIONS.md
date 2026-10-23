@@ -197,6 +197,14 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 
 ## Wing 3: Training Data (docs/ILMARI_10.md C.4)
 
+## Wing 4: The Cloud (docs/ILMARI_10.md C9-C14)
+
+- The Region Outage has no Dark-platform damage over time and no phase-3 hub shrink: Failover covers Dark, and phase 3 only runs the cascade faster. It also gains Single Point Of Failure, which makes the hub itself dangerous.
+- The first room (the Cooling Deck) has no boss. The Reserved Instance racks work for every class; there are no class props, no forecast board and no vendor page.
+- Full solo is blocked by a 75 s enrage on a lone player rather than by a mechanic that needs a second body.
+- A split replica that nobody kills keeps its share of the pool: a group that ignores them fights one boss spread over several bodies until the last one falls.
+- The wing's teaser door on the Cooling Deck opens onto nothing yet; Wings 5-6 and the core belong to 1.0.
+
 - Bots read hazards off the sim where a player reads the boards, so the Hallucination is balanced for reading, not for guessing; a player who ignores the boards and the shimmer takes real damage.
 - Story keeps the engine's 3 x 3 grid and three circles; the spec's smaller Story grid is not built.
 - Ground Truth sits on the Comma key because every letter is bound; rebind it under Controls.

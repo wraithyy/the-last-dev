@@ -248,6 +248,20 @@ fn unlit(tex: Tex) -> bool {
                 | Sign::IlTruth
                 | Sign::IlTrainingLoss
                 | Sign::IlStatusGreen
+                | Sign::IlStatusDegraded
+                | Sign::IlStatusInvest
+                | Sign::IlStatusDark503
+                | Sign::IlRegionHub
+                | Sign::IlRegionUsEast
+                | Sign::IlRegionEuWest
+                | Sign::IlRegionApSouth
+                | Sign::IlRegionSaEast
+                | Sign::IlRegionAfSouth
+                | Sign::IlBillBoard
+                | Sign::IlInvoice
+                | Sign::IlDashboard
+                | Sign::IlTeaser
+                | Sign::IlScaleUp
                 | Sign::IlCitation
                 | Sign::IlScreenA
                 | Sign::IlScreenB
@@ -3049,6 +3063,246 @@ fn sign_spec(s: Sign) -> SignSpec {
             [10, 60, 30],
             [210, 255, 220],
             [255, 255, 120],
+        ),
+        Sign::IlW4Door => sp(
+            &[
+                "DATA CENTER ROOF",
+                "WING 4 - STORY OR FULL",
+                "LADDER POLICY APPLIES",
+            ],
+            [20, 26, 40],
+            [225, 235, 250],
+            [120, 200, 255],
+        ),
+        Sign::IlW4Back => sp(
+            &["BACK DOWN THE LADDER", "(THE POLICY STILL APPLIES)"],
+            [20, 26, 40],
+            [225, 235, 250],
+            [120, 200, 255],
+        ),
+        Sign::IlW4ToAutoscale => sp(
+            &[
+                "TO THE AUTOSCALE FLOOR",
+                "RACKS ADDED AUTOMATICALLY",
+                "(NOBODY ASKED)",
+            ],
+            [20, 26, 40],
+            [225, 235, 250],
+            [120, 200, 255],
+        ),
+        Sign::IlW4ToCloud => sp(
+            &[
+                "TO THE SERVER CLOUD",
+                "THERE IS NO FLOOR",
+                "THE BUDGET AGREES",
+            ],
+            [20, 26, 40],
+            [225, 235, 250],
+            [120, 200, 255],
+        ),
+        Sign::IlW4Out => sp(
+            &["EXIT TO THE LADDER", "EGRESS FEES APPLY", "(TO YOU)"],
+            [20, 26, 40],
+            [225, 235, 250],
+            [120, 200, 255],
+        ),
+        Sign::IlLadder => sp(
+            &[
+                "LADDER POLICY",
+                "FORM 27-B REQUIRED",
+                "FORM 27-B DOES NOT EXIST",
+                "(APPLY FOR IT ON FORM 27-B)",
+            ],
+            [250, 226, 120],
+            [40, 30, 10],
+            [190, 40, 40],
+        ),
+        Sign::IlRoofSla => sp(
+            &["UPTIME 99.99%", "(ROOF EXCLUDED)", "(WEATHER EXCLUDED)"],
+            [28, 34, 44],
+            [225, 240, 235],
+            [255, 200, 70],
+        ),
+        Sign::IlFan => sp(
+            &["FAN 14", "COOLING INTENT ONLY", "DO NOT FEED THE FAN"],
+            [236, 236, 240],
+            [40, 40, 60],
+            [200, 60, 60],
+        ),
+        Sign::IlRackGarden => sp(
+            &["RACK GARDEN", "DO NOT WATER", "(THEY ARE RACKS)"],
+            [214, 236, 214],
+            [24, 70, 40],
+            [200, 60, 60],
+        ),
+        Sign::IlCoolingNote => sp(
+            &["COOLING IS A FEELING", "TARGET 21 C", "ACTUAL: CHEERFUL"],
+            [226, 240, 250],
+            [20, 50, 90],
+            [200, 60, 60],
+        ),
+        Sign::IlBillBoard => sp(
+            &[
+                "THIS MONTH'S BILL",
+                "$ 4,096,000.00",
+                "PROJECTED: MORE",
+                "(EXCLUDES TAX AND FEELINGS)",
+            ],
+            [14, 18, 30],
+            [255, 220, 120],
+            [255, 90, 70],
+        ),
+        Sign::IlInvoice => sp(
+            &[
+                "INVOICE 000000001",
+                "LINE 1 OF 80,000",
+                "TOTAL: YES",
+                "(EXCLUDES EGRESS)",
+            ],
+            [244, 240, 226],
+            [40, 30, 20],
+            [200, 50, 50],
+        ),
+        Sign::IlReservedRack => sp(
+            &[
+                "RESERVED INSTANCE",
+                "HALF RATE FOR 30 SEC",
+                "COMMITMENT: ETERNAL",
+            ],
+            [220, 232, 250],
+            [20, 40, 90],
+            [200, 60, 60],
+        ),
+        Sign::IlScaleUp => sp(
+            &["SCALING UP...", "SCALING UP...", "SCALING UP..."],
+            [14, 30, 24],
+            [150, 255, 200],
+            [255, 220, 90],
+        ),
+        Sign::IlEgress => sp(
+            &["EGRESS: 9 CENTS PER GB", "TO LEAVE", "(IN IS FREE)"],
+            [30, 20, 14],
+            [255, 226, 196],
+            [255, 160, 60],
+        ),
+        Sign::IlFreeTier => sp(
+            &["FREE TIER", "12 MONTHS", "(EXPIRED IN 1 MONTH)"],
+            [226, 244, 226],
+            [20, 70, 40],
+            [200, 60, 60],
+        ),
+        Sign::IlSurprise => sp(
+            &["SURPRISE!", "THE BILL IS YOU", "(ALL OF YOU)"],
+            [250, 230, 120],
+            [60, 20, 20],
+            [200, 40, 40],
+        ),
+        Sign::IlDashboard => sp(
+            &[
+                "BILLING DASHBOARD",
+                "$ ###,###,###.##",
+                "NEXT 30 DAYS: UP",
+                "(THE GRAPH IS A WALL)",
+            ],
+            [14, 18, 30],
+            [160, 235, 255],
+            [255, 90, 70],
+        ),
+        Sign::IlRegionHub => sp(
+            &[
+                "GLOBAL CONTROL PLANE",
+                "SINGLE POINT OF FAILURE",
+                "(THIS ONE IS FINE)",
+            ],
+            [10, 30, 50],
+            [210, 240, 255],
+            [120, 220, 255],
+        ),
+        Sign::IlRegionUsEast => sp(
+            &["US-EAST-1", "FIRST TO GO", "(TRADITION)"],
+            [10, 34, 26],
+            [200, 255, 225],
+            [255, 200, 70],
+        ),
+        Sign::IlRegionEuWest => sp(
+            &["EU-WEST-1", "ALSO FINE", "(FOR NOW)"],
+            [10, 34, 26],
+            [200, 255, 225],
+            [255, 200, 70],
+        ),
+        Sign::IlRegionApSouth => sp(
+            &["AP-SOUTH-1", "PLEASE HOLD", "(YOUR CALL MATTERS)"],
+            [10, 34, 26],
+            [200, 255, 225],
+            [255, 200, 70],
+        ),
+        Sign::IlRegionSaEast => sp(
+            &["SA-EAST-1", "A DIFFERENT REGION", "(SAME PROBLEM)"],
+            [10, 34, 26],
+            [200, 255, 225],
+            [255, 200, 70],
+        ),
+        Sign::IlRegionAfSouth => sp(
+            &["AF-SOUTH-1", "ZERO REPLICAS", "(ONE SLIDE)"],
+            [10, 34, 26],
+            [200, 255, 225],
+            [255, 200, 70],
+        ),
+        Sign::IlStatusDegraded => sp(
+            &[
+                "DEGRADED PERFORMANCE",
+                "SOME OF YOU",
+                "(NOT THE STATUS PAGE)",
+            ],
+            [70, 40, 6],
+            [255, 230, 190],
+            [255, 170, 40],
+        ),
+        Sign::IlStatusInvest => sp(
+            &["INVESTIGATING", "STILL INVESTIGATING", "(THE ISSUE IS YOU)"],
+            [70, 12, 12],
+            [255, 210, 210],
+            [255, 110, 90],
+        ),
+        Sign::IlStatusDark503 => sp(
+            &["503", "SERVICE UNAVAILABLE", "(THIS REGION)"],
+            [6, 6, 10],
+            [255, 90, 80],
+            [255, 200, 70],
+        ),
+        Sign::IlSomeoneElse => sp(
+            &["THE CLOUD IS JUST", "SOMEONE ELSE'S COMPUTER", "(ON FIRE)"],
+            [236, 244, 252],
+            [20, 50, 100],
+            [200, 60, 60],
+        ),
+        Sign::IlMultiRegion => sp(
+            &[
+                "MULTI-REGION STRATEGY",
+                "SEE SLIDE 12",
+                "(SLIDE 12 IS BLANK)",
+            ],
+            [236, 236, 244],
+            [40, 30, 90],
+            [200, 60, 60],
+        ),
+        Sign::IlNotBug => sp(
+            &["IT'S NOT A BUG", "IT'S A REGION", "(PLEASE FILE A TICKET)"],
+            [30, 30, 40],
+            [240, 240, 250],
+            [255, 200, 70],
+        ),
+        Sign::IlSla => sp(
+            &["99.999% UPTIME", "(ROUGHLY)", "(ROUGHLY IS DOING A LOT)"],
+            [10, 40, 30],
+            [200, 255, 225],
+            [255, 255, 120],
+        ),
+        Sign::IlTeaser => sp(
+            &["THE LAB COAT DOOR", "COMING", "(ASK NOBODY)"],
+            [16, 12, 24],
+            [236, 226, 255],
+            [255, 200, 70],
         ),
         Sign::IlNineBox => sp(&["9-BOX"], [236, 232, 220], [40, 40, 70], [200, 60, 60]),
         Sign::IlFacePatch => sp(&["UPDATE"], [0, 70, 170], [255, 255, 255], [255, 220, 90]),

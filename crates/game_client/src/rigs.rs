@@ -158,6 +158,13 @@ fn parts(kind: &str) -> Vec<Part> {
         "perf_review" => perf_review(),
         "hr_bot" => hr_bot(),
         "scraper_queen" => scraper_queen(),
+        "fan_elemental" => fan_elemental(),
+        "generator_golem" => generator_golem(),
+        "reserved_bot" => reserved_bot(),
+        "rack_golem" => rack_golem(),
+        "pager" => pager(),
+        "autoscaler" => autoscaler(),
+        "region_outage" => region_outage(),
         "photocopier" => photocopier(),
         "footnote" => footnote(),
         "whiteboard" => whiteboard(),
@@ -473,6 +480,267 @@ fn scraper_queen() -> Vec<Part> {
         Part::cube([0.0, 2.2, 0.0], [0.0, 0.0, 0.0], SHELL)
             .with(orbit)
             .spin(Vec3::Y, 0.9),
+    );
+    v
+}
+
+/// A cooling fan that got up and followed you: a drum on its side with spinning blades, two
+/// hot eyes on the hub and a power cable it drags.
+fn fan_elemental() -> Vec<Part> {
+    const CASE: [f32; 3] = [0.28, 0.3, 0.34];
+    let mut v = vec![
+        Part::cyl([0.0, 1.2, 0.0], 1.7, 0.35, CASE).rot([90.0, 0.0, 0.0]),
+        Part::cyl([0.0, 1.2, -0.17], 1.35, 0.05, DARK).rot([90.0, 0.0, 0.0]),
+        Part::cyl([0.0, 1.2, -0.24], 0.4, 0.14, STEEL).rot([90.0, 0.0, 0.0]),
+        Part::ball([-0.1, 1.28, -0.34], 0.1, HOT).glow(4.0),
+        Part::ball([0.1, 1.28, -0.34], 0.1, HOT).glow(4.0),
+        Part::cube([0.0, 0.2, 0.2], [0.5, 0.4, 0.5], CASE),
+        Part::cube([0.0, 0.05, 0.9], [0.1, 0.08, 1.2], DARK).rot([0.0, 18.0, 0.0]),
+    ];
+    // Four blades on a hub that spins, the glow of a motor that is not rated for this.
+    let blades: Vec<Part> = (0..4)
+        .map(|k| {
+            Part::cube(
+                [0.0, 0.0, 0.0],
+                [1.5, 0.28, 0.04],
+                if k % 2 == 0 { STEEL } else { CYAN },
+            )
+            .rot([0.0, 0.0, k as f32 * 45.0])
+        })
+        .collect();
+    v.push(
+        Part::cube([0.0, 1.2, -0.27], [0.0, 0.0, 0.0], STEEL)
+            .with(blades)
+            .spin(Vec3::Z, 9.0),
+    );
+    v
+}
+
+/// A diesel generator that learned to walk: a boxy body with exhaust stacks, a fuel can for a
+/// backpack, a gauge face with the needle in the red and two tracks.
+fn generator_golem() -> Vec<Part> {
+    const BODY: [f32; 3] = [0.9, 0.62, 0.12];
+    const GREY: [f32; 3] = [0.3, 0.3, 0.32];
+    vec![
+        Part::cube([-0.65, 0.3, 0.0], [0.5, 0.6, 1.6], DARK),
+        Part::cube([0.65, 0.3, 0.0], [0.5, 0.6, 1.6], DARK),
+        Part::cube([0.0, 1.3, 0.0], [1.9, 1.4, 1.5], BODY),
+        Part::cube([0.0, 2.1, 0.0], [1.4, 0.4, 1.2], GREY),
+        Part::cyl([-0.5, 2.7, 0.3], 0.26, 1.0, GREY),
+        Part::cyl([0.5, 2.7, 0.3], 0.26, 1.0, GREY),
+        Part::ball([-0.5, 3.3, 0.3], 0.35, [0.2, 0.2, 0.22]).bob(0.12, 1.4),
+        Part::ball([0.5, 3.2, 0.3], 0.3, [0.25, 0.25, 0.27]).bob(0.14, 1.9),
+        // The face: a gauge in the red and two work lamps.
+        Part::cyl([0.0, 1.5, -0.78], 0.8, 0.06, [0.95, 0.95, 0.9]).rot([90.0, 0.0, 0.0]),
+        Part::cube([0.12, 1.6, -0.83], [0.04, 0.5, 0.02], [1.0, 0.1, 0.1]).rot([0.0, 0.0, 40.0]),
+        Part::ball([-0.55, 1.95, -0.78], 0.22, [1.0, 0.9, 0.4]).glow(3.5),
+        Part::ball([0.55, 1.95, -0.78], 0.22, [1.0, 0.9, 0.4]).glow(3.5),
+        // Hazard stripe, a fuel can and a cable for an arm.
+        Part::cube([0.0, 0.75, -0.77], [1.9, 0.14, 0.04], [0.15, 0.15, 0.15]),
+        Part::cube([0.0, 1.3, 0.95], [0.8, 1.0, 0.4], [0.75, 0.15, 0.1]),
+        Part::cyl([1.2, 1.2, 0.0], 0.2, 1.3, DARK).rot([0.0, 0.0, 12.0]),
+        Part::cyl([-1.2, 1.2, 0.0], 0.2, 1.3, DARK).rot([0.0, 0.0, -12.0]),
+    ]
+}
+
+/// A reserved instance: a tidy little kiosk with a clock for a face that never stops, a
+/// three-year calendar flag and a price tag on a string.
+fn reserved_bot() -> Vec<Part> {
+    const CASE: [f32; 3] = [0.82, 0.86, 0.95];
+    const BLUE: [f32; 3] = [0.15, 0.3, 0.72];
+    vec![
+        Part::cube([0.0, 0.85, 0.0], [0.9, 1.0, 0.7], CASE),
+        Part::cube([0.0, 0.2, 0.0], [0.8, 0.4, 0.6], BLUE),
+        Part::cyl([0.0, 1.1, -0.37], 0.6, 0.06, [0.97, 0.97, 0.94]).rot([90.0, 0.0, 0.0]),
+        Part::cube([0.0, 1.15, -0.42], [0.04, 0.24, 0.02], DARK),
+        Part::cube([0.07, 1.1, -0.42], [0.2, 0.04, 0.02], [1.0, 0.1, 0.1]),
+        Part::cube([0.0, 1.55, 0.0], [0.5, 0.3, 0.4], BLUE),
+        Part::ball([0.0, 1.55, -0.21], 0.12, CYAN).glow(3.0),
+        Part::cyl([0.0, 1.9, 0.0], 0.04, 0.6, STEEL),
+        Part::cube([0.17, 2.1, 0.0], [0.34, 0.22, 0.02], [1.0, 0.85, 0.2]).bob(0.05, 2.0),
+        Part::cube([0.5, 0.9, -0.05], [0.1, 0.1, 0.55], CASE),
+        Part::cube([-0.5, 0.9, -0.05], [0.1, 0.1, 0.55], CASE),
+        Part::cube([0.5, 0.78, -0.4], [0.3, 0.22, 0.02], [0.98, 0.98, 0.9]),
+    ]
+}
+
+/// An unmounted rack that walks: a tall cabinet with LED rows for a face, blade-server fists
+/// and a mess of cable ends where its feet should be.
+fn rack_golem() -> Vec<Part> {
+    const FRAME: [f32; 3] = [0.14, 0.15, 0.18];
+    let mut v = vec![
+        Part::cube([0.0, 1.5, 0.0], [1.1, 2.6, 0.9], FRAME),
+        Part::cube([0.0, 1.5, -0.46], [0.95, 2.4, 0.04], [0.2, 0.22, 0.26]),
+        Part::cube([-0.8, 1.4, 0.0], [0.35, 0.35, 1.0], STEEL),
+        Part::cube([0.8, 1.4, 0.0], [0.35, 0.35, 1.0], STEEL),
+        Part::cube([-0.8, 1.9, 0.0], [0.2, 1.0, 0.25], FRAME).rot([0.0, 0.0, 15.0]),
+        Part::cube([0.8, 1.9, 0.0], [0.2, 1.0, 0.25], FRAME).rot([0.0, 0.0, -15.0]),
+        Part::cube([0.0, 0.1, 0.1], [1.0, 0.2, 0.9], [0.05, 0.05, 0.06]),
+    ];
+    for k in 0..9 {
+        let y = 0.5 + k as f32 * 0.26;
+        let c = if k % 3 == 1 { HOT } else { [0.2, 1.0, 0.5] };
+        v.push(Part::cube([-0.25, y, -0.5], [0.12, 0.07, 0.02], c).glow(2.5));
+        v.push(Part::cube(
+            [0.15, y, -0.5],
+            [0.4, 0.05, 0.02],
+            [0.1, 0.1, 0.12],
+        ));
+    }
+    // Cables out of the bottom, bobbing a little.
+    for (x, r) in [(-0.35, 14.0), (0.0, -8.0), (0.35, 20.0)] {
+        v.push(
+            Part::cyl([x, 0.35, -0.5], 0.07, 0.8, DARK)
+                .rot([r, 0.0, 0.0])
+                .bob(0.03, 2.4),
+        );
+    }
+    v
+}
+
+/// A pager: a beige slab with a green screen reading BEEP, an antenna, a belt clip and a
+/// little halo of rings that go out whenever someone is on call.
+fn pager() -> Vec<Part> {
+    const CASE: [f32; 3] = [0.78, 0.74, 0.62];
+    vec![
+        Part::cube([0.0, 1.1, 0.0], [0.8, 1.0, 0.18], CASE).bob(0.06, 2.6),
+        Part::cube([0.0, 1.3, -0.1], [0.6, 0.35, 0.02], [0.25, 0.9, 0.4])
+            .glow(2.8)
+            .bob(0.06, 2.6),
+        Part::cube([-0.15, 0.85, -0.1], [0.12, 0.12, 0.03], [0.2, 0.2, 0.22]).bob(0.06, 2.6),
+        Part::cube([0.15, 0.85, -0.1], [0.12, 0.12, 0.03], [0.2, 0.2, 0.22]).bob(0.06, 2.6),
+        Part::cyl([0.3, 1.75, 0.0], 0.04, 0.5, STEEL).bob(0.06, 2.6),
+        Part::cube([0.0, 1.1, 0.14], [0.2, 0.7, 0.06], STEEL).bob(0.06, 2.6),
+        Part::cyl([0.0, 1.1, -0.2], 1.2, 0.02, [1.0, 0.3, 0.2])
+            .glow(1.5)
+            .rot([90.0, 0.0, 0.0])
+            .bob(0.06, 2.6),
+    ]
+}
+
+/// Boss of the Autoscale Floor: a tower of racks that keeps adding racks to itself. A tall
+/// central cabinet, smaller copies bolted on at angles, green "scale up" arrows on top, a
+/// gold ring of coins that spin round it (the bill) and a bank of LEDs that never goes red.
+fn autoscaler() -> Vec<Part> {
+    const FRAME: [f32; 3] = [0.12, 0.14, 0.2];
+    const GREEN: [f32; 3] = [0.2, 1.0, 0.5];
+    const GOLD: [f32; 3] = [1.0, 0.8, 0.2];
+    let mut v = vec![
+        Part::cube([0.0, 2.2, 0.0], [2.0, 4.4, 1.6], FRAME),
+        Part::cube([0.0, 2.2, -0.82], [1.8, 4.1, 0.05], [0.18, 0.2, 0.28]),
+        Part::cube([0.0, 4.6, 0.0], [1.6, 0.35, 1.3], [0.3, 0.34, 0.45]),
+        // The face: three console panels, the middle one an eye.
+        Part::cube([0.0, 3.4, -0.86], [1.5, 0.5, 0.03], [0.05, 0.08, 0.12]),
+        Part::ball([0.0, 3.4, -0.9], 0.34, GREEN).glow(4.5),
+        Part::cube([0.0, 2.7, -0.86], [1.5, 0.12, 0.03], GREEN).glow(2.5),
+    ];
+    // LED rows down the front.
+    for k in 0..10 {
+        let y = 0.4 + k as f32 * 0.22;
+        v.push(Part::cube([-0.55, y, -0.86], [0.12, 0.06, 0.02], GREEN).glow(2.5));
+        v.push(Part::cube([-0.25, y, -0.86], [0.12, 0.06, 0.02], [0.3, 0.7, 1.0]).glow(2.0));
+    }
+    // The replicas bolted on: smaller racks round the base, each a little less finished.
+    for (k, (x, z, s)) in [(-1.7, 0.2, 0.7), (1.75, -0.1, 0.62), (0.0, 1.45, 0.55)]
+        .into_iter()
+        .enumerate()
+    {
+        v.push(Part::cube(
+            [x, 1.6 * s, z],
+            [1.4 * s, 3.2 * s, 1.2 * s],
+            FRAME,
+        ));
+        v.push(Part::cube(
+            [x, 1.5 * s, z - 0.62 * s],
+            [1.2 * s, 2.8 * s, 0.03],
+            [0.18, 0.2, 0.28],
+        ));
+        v.push(
+            Part::ball([x, 2.4 * s, z - 0.66 * s], 0.2, GREEN)
+                .glow(3.5)
+                .bob(0.03, 2.0 + k as f32),
+        );
+    }
+    // Scale-up arrows on the roof, rising and fading in turns.
+    for (x, ph) in [(-0.5, 0.0), (0.0, 1.0), (0.5, 2.0)] {
+        v.push(
+            Part::cube([x, 5.1, 0.0], [0.12, 0.7, 0.12], GREEN)
+                .glow(3.0)
+                .bob(0.25, 2.0 + ph),
+        );
+        v.push(
+            Part::cube([x, 5.5, 0.0], [0.4, 0.14, 0.14], GREEN)
+                .rot([0.0, 0.0, 30.0])
+                .glow(3.0)
+                .bob(0.25, 2.0 + ph),
+        );
+    }
+    // The bill: gold discs that circle the tower, one for every month it has been running.
+    let mut coins = Vec::new();
+    for k in 0..8 {
+        let a = k as f32 * TAU / 8.0;
+        coins.push(
+            Part::cyl([a.cos() * 2.9, 0.0, a.sin() * 2.9], 0.55, 0.08, GOLD)
+                .rot([90.0, -a.to_degrees(), 0.0])
+                .glow(1.2)
+                .bob(0.1, 2.5 + k as f32 * 0.3),
+        );
+    }
+    v.push(
+        Part::cube([0.0, 2.0, 0.0], [0.0, 0.0, 0.0], GOLD)
+            .with(coins)
+            .spin(Vec3::Y, 0.7),
+    );
+    v
+}
+
+/// Boss of the Server Cloud: a thunderhead of white balls with a status light for an eye (red,
+/// whatever the status page says), a lightning bolt, and five small platforms orbiting it, all
+/// green but the one that is having a moment.
+fn region_outage() -> Vec<Part> {
+    const CLOUD: [f32; 3] = [0.93, 0.95, 0.99];
+    const GREY: [f32; 3] = [0.62, 0.66, 0.76];
+    const RED: [f32; 3] = [1.0, 0.12, 0.1];
+    let mut v = vec![
+        Part::ball([0.0, 3.0, 0.0], 4.2, CLOUD).bob(0.1, 1.2),
+        Part::ball([-2.0, 2.5, 0.2], 3.0, CLOUD).bob(0.12, 1.5),
+        Part::ball([2.1, 2.6, -0.2], 3.2, CLOUD).bob(0.1, 1.7),
+        Part::ball([0.4, 4.4, 0.1], 2.8, GREY).bob(0.14, 1.3),
+        Part::ball([-1.2, 1.4, 0.1], 2.4, GREY),
+        Part::ball([1.4, 1.4, 0.0], 2.2, GREY),
+        // The eye: a socket and a red status light, three bars of "503" below it.
+        Part::ball([0.0, 3.2, -1.95], 1.1, [0.1, 0.1, 0.14]),
+        Part::ball([0.0, 3.2, -2.45], 0.62, RED)
+            .glow(6.0)
+            .bob(0.05, 3.0),
+        Part::cube([-0.35, 2.4, -2.1], [0.25, 0.4, 0.04], RED).glow(2.5),
+        Part::cube([0.0, 2.4, -2.1], [0.25, 0.4, 0.04], RED).glow(2.5),
+        Part::cube([0.35, 2.4, -2.1], [0.25, 0.4, 0.04], RED).glow(2.5),
+        // A lightning bolt out of the bottom: two bars at an angle and a tip.
+        Part::cube([0.3, 0.7, 0.0], [0.28, 1.4, 0.2], [1.0, 0.95, 0.3])
+            .glow(4.0)
+            .rot([0.0, 0.0, 16.0]),
+        Part::cube([0.0, -0.2, 0.0], [0.28, 1.1, 0.2], [1.0, 0.95, 0.3])
+            .glow(4.0)
+            .rot([0.0, 0.0, -18.0]),
+    ];
+    // Five tiny regions on a ring: four green, one red (the one that went first).
+    let mut ring = Vec::new();
+    for k in 0..5 {
+        let a = k as f32 * TAU / 5.0;
+        let c = if k == 0 { RED } else { [0.2, 1.0, 0.5] };
+        ring.push(Part::cyl(
+            [a.cos() * 4.8, 0.0, a.sin() * 4.8],
+            0.9,
+            0.18,
+            GREY,
+        ));
+        ring.push(Part::ball([a.cos() * 4.8, 0.2, a.sin() * 4.8], 0.22, c).glow(3.5));
+    }
+    v.push(
+        Part::cube([0.0, 1.6, 0.0], [0.0, 0.0, 0.0], GREY)
+            .with(ring)
+            .spin(Vec3::Y, 0.6),
     );
     v
 }

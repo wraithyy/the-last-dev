@@ -20,7 +20,7 @@ const DRAFT_SYNC_TICKS: u64 = 30;
 #[derive(Default)]
 pub(crate) struct Wing3State {
     /// The boss whose encounter is armed.
-    boss: Option<EntityId>,
+    pub(crate) boss: Option<EntityId>,
     /// Prop keys of the drafts, in `EncounterDef::Drafts::props` order.
     draft_props: Vec<String>,
     lost: u8,
@@ -42,9 +42,21 @@ impl Sim {
         });
         let id = fighting.map(Self::id_of);
         if id != self.wing3.boss {
-            self.wing3_disarm();
-            if let Some(i) = fighting {
-                self.wing3_arm(i);
+            // A split boss whose original was decommissioned fights on in a replica: same fight.
+            let same_family = match (fighting, self.wing3.boss.and_then(|b| self.index(b))) {
+                (Some(f), Some(b)) => {
+                    self.units[f].def == self.units[b].def
+                        && self.content.units[self.units[f].def].split.is_some()
+                }
+                _ => false,
+            };
+            if same_family {
+                self.wing3.boss = id;
+            } else {
+                self.wing3_disarm();
+                if let Some(i) = fighting {
+                    self.wing3_arm(i);
+                }
             }
         }
         if let Some(i) = fighting {
@@ -74,6 +86,7 @@ impl Sim {
                 self.wing3.next_sync = self.now;
             }
             EncounterDef::Illusion => {}
+            e @ (EncounterDef::Cloud(_) | EncounterDef::Outage(_)) => self.wing4_arm(bi, &e),
             EncounterDef::Echo {
                 add_unit,
                 strike_pct,
@@ -102,6 +115,7 @@ impl Sim {
         self.wing3.sent.clear();
         self.echo_stop();
         self.illusion_end();
+        self.wing4_disarm();
         for i in 0..self.units.len() {
             let u = &self.units[i];
             if !u.despawned && self.content.units[u.def].swarm.is_some() {

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 39;
+pub const PROTOCOL_VERSION: u16 = 40;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -978,6 +978,8 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
             list(integrity.len())?;
             list(marked.len())
         }
+        Event::PlatformWarn { order, .. } => list(order.len()),
+        Event::CloudBill { bill, .. } if *bill > 1000 => Err(ProtoError::BadNumber),
         Event::Ladder { view } => {
             list(view.entries.len())?;
             for e in &view.entries {
@@ -1906,6 +1908,41 @@ mod tests {
     }
 
     #[test]
+    fn wing_four_events_cross_the_wire() {
+        use combat_core::PlatformPhase;
+        let msg = ServerMsg::Events {
+            tick: 50,
+            events: vec![
+                Event::CloudBill {
+                    bill: 640,
+                    copies: 3,
+                    reserved: true,
+                },
+                Event::PlatformState {
+                    idx: 2,
+                    state: PlatformPhase::Dark,
+                    at_ms: 90_000,
+                },
+                Event::PlatformWarn {
+                    idx: 4,
+                    at_ms: 120_000,
+                    order: vec![4, 1, 3],
+                },
+            ],
+        };
+        assert_eq!(roundtrip(&msg), Ok(msg.clone()));
+        let bad = ServerMsg::Events {
+            tick: 50,
+            events: vec![Event::CloudBill {
+                bill: 1001,
+                copies: 1,
+                reserved: false,
+            }],
+        };
+        assert_eq!(roundtrip(&bad), Err(ProtoError::BadNumber));
+    }
+
+    #[test]
     fn calendar_events_cross_the_wire() {
         let msg = ServerMsg::Events {
             tick: 30,
@@ -1994,6 +2031,11 @@ mod tests {
             Event::Drafts {
                 integrity: vec![1000; MAX_LIST_LEN + 1],
                 marked: Vec::new(),
+            },
+            Event::PlatformWarn {
+                idx: 1,
+                at_ms: 0,
+                order: vec![0; MAX_LIST_LEN + 1],
             },
             Event::Ladder { view: crowd },
             Event::Ladder { view: long_name },

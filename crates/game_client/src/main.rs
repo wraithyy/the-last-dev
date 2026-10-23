@@ -50,6 +50,7 @@ mod touch;
 mod units;
 mod vfx;
 mod wing3_fx;
+mod wing4_fx;
 mod yell;
 
 use bevy::asset::AssetMetaCheck;
@@ -164,6 +165,7 @@ fn main() {
         ilmari_wing::IlmariWingPlugin,
         swarm_fx::SwarmFxPlugin,
         wing3_fx::Wing3FxPlugin,
+        wing4_fx::Wing4FxPlugin,
     ))
     .add_plugins(social::SocialPlugin)
     .add_plugins(roasts::RoastPlugin)

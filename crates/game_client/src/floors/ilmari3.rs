@@ -98,7 +98,7 @@ fn theme(level: u8) -> Theme {
 }
 
 /// The plan of Wings 1-2 with a pod of this room's size.
-fn pods3(p: &mut Plan, pod: (f32, f32, f32)) {
+pub(super) fn pods3(p: &mut Plan, pod: (f32, f32, f32)) {
     let w = Mat::Wall;
     let ((hx, hhx, hhz), (bx, bhx, bhz), a) = (HALL, pod, ARRIVAL_X);
     p.fp.pod(rounded_rect(pt(a, 0.0), 6.0, 6.0, 3.0, 0.0), w);
@@ -126,14 +126,14 @@ fn pods3(p: &mut Plan, pod: (f32, f32, f32)) {
     ];
 }
 
-fn casing(p: &mut Plan, pod: (f32, f32, f32), glow: Mat) {
+pub(super) fn casing(p: &mut Plan, pod: (f32, f32, f32), glow: Mat) {
     pods3(p, pod);
     p.build_walls();
     wall_dress(p, Mat::Beige, Mat::Trim, Mat::Dark);
     cove(p, glow);
 }
 
-fn cast(p: &mut Plan, pod: (f32, f32, f32), doors: [(&'static str, Sign); 2]) {
+pub(super) fn cast(p: &mut Plan, pod: (f32, f32, f32), doors: [(&'static str, Sign); 2]) {
     let packs = CELLS.map(|(x, z)| (x, z - z.signum()));
     cast_zone(
         p,
@@ -200,19 +200,19 @@ fn scraped_shelf(p: &mut Plan, x: f32, z: f32, face: Face) {
 }
 
 /// A stack of cartons with a sheet stuck to the top: somebody's life's work, pending ingestion.
-fn ingest_stack(p: &mut Plan, x: f32, z: f32, yaw: f32) {
+pub(super) fn ingest_stack(p: &mut Plan, x: f32, z: f32, yaw: f32) {
     models::put(p, &BOX_LARGE, v(x, 0.0, z), yaw, 1.2, true);
     models::put(p, &BOX_OPEN, v(x + 0.1, 0.62, z), yaw + 0.4, 1.0, false);
     p.boxed(v(x, 1.3, z), v(0.5, 0.02, 0.4), Mat::Paper, false);
 }
 
 /// A caution sign on a barrier: the room's only honest piece of signage.
-fn caution(p: &mut Plan, x: f32, z: f32, yaw: f32) {
+pub(super) fn caution(p: &mut Plan, x: f32, z: f32, yaw: f32) {
     models::put(p, &BARRIER, v(x, 0.0, z), yaw, 2.4, true);
     models::put(p, &SIGN_WARNING, v(x, 0.0, z + 0.3), yaw, 1.3, false);
 }
 
-fn arrival_kit(p: &mut Plan, back: Sign) {
+pub(super) fn arrival_kit(p: &mut Plan, back: Sign) {
     arrival(p);
     // A sign-in tablet that has been "improved" mid-sentence.
     p.boxed(v(-46.2, 0.55, 5.6), v(0.1, 1.1, 0.1), Mat::Metal, false);

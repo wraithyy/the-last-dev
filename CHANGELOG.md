@@ -12,6 +12,7 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 - Training Data, behind the Innovation Lab airlock on the occupied campus: three more rooms and three more bosses, with their own gear and titles. Story lets one colleague see it all; Full wants three. Bring a Data Scientist, or read the boards on the walls.
 - The Data Scientist can fact-check the room with Ground Truth (default key: comma) when the wing's hazards stop agreeing with each other.
+- The Cloud, up the Data Center's new roof ladder on the occupied campus: three more rooms and two more bosses, with their own gear and titles. Story lets one colleague see it all; Full wants three.
 
 ## [0.9.0] - 2026-10-23
 

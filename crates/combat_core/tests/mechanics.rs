@@ -63,6 +63,7 @@ fn only(c: &mut Content, key: &str, spell: SpellId, initial_ms: u32, target: AiT
         yells: vec![],
         requires_aura: None,
         mode: Default::default(),
+        original_only: false,
     }];
     ai.melee_damage = 0;
     ai.enrage = None;

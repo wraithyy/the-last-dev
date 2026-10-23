@@ -53,6 +53,7 @@ pub fn overlay(p: &mut Plan) {
     gate(p);
     lobby(p);
     airlock(p);
+    roof_ladder(p);
 }
 
 /// "ILMARI" on the Tower, the Data Center and the Lab, and a closed sign at each door. Signs
@@ -114,6 +115,82 @@ fn airlock(p: &mut Plan) {
     }
     signpost(p, -62.0, -62.0, true, 2.4, Sign::IlW3Door);
     signpost(p, -82.0, -62.0, true, 2.4, Sign::IlLabRevolve);
+}
+
+/// The roof ladder (docs/ILMARI_10.md C.2): a caged steel ladder up the Data Center's east face,
+/// north of the Migration dock's three bays, with the ladder policy beside it. The campus's own
+/// building is untouched; this phase adds the ladder and its door anchor, which the Roof
+/// Warden's quest (`il_10`) opens.
+fn roof_ladder(p: &mut Plan) {
+    const Z: f32 = -94.5;
+    const WALL_X: f32 = 110.0;
+    let top = 11.0;
+    p.framed(v(WALL_X, 0.0, Z), Face::PosX.yaw(), |p| {
+        for l in [-0.4_f32, 0.4] {
+            p.boxed(v(l, top / 2.0, 0.3), v(0.08, top, 0.08), Mat::Metal, false);
+        }
+        for k in 0..30 {
+            p.boxed(
+                v(0.0, 0.5 + k as f32 * 0.34, 0.3),
+                v(0.8, 0.05, 0.05),
+                Mat::Metal,
+                false,
+            );
+        }
+        // Safety cage: a hoop every metre from head height, tied by two straps.
+        for k in 0..8 {
+            let y = 2.4 + k as f32;
+            p.boxed(v(0.0, y, 0.62), v(1.0, 0.05, 0.05), Mat::Hazard, false);
+            for l in [-0.5_f32, 0.5] {
+                p.boxed(v(l, y, 0.46), v(0.05, 0.05, 0.34), Mat::Hazard, false);
+            }
+        }
+        for l in [-0.5_f32, 0.5] {
+            p.boxed(
+                v(l, (top + 2.4) / 2.0, 0.62),
+                v(0.04, top - 2.4, 0.04),
+                Mat::Metal,
+                false,
+            );
+        }
+        // The roof edge's hatch, a closed gate with a chain across the first rungs, a hazard
+        // base and the policy.
+        p.boxed(
+            v(0.0, top + 0.1, 0.25),
+            v(1.4, 0.2, 1.0),
+            Mat::Hazard,
+            false,
+        );
+        p.boxed(v(0.0, 0.5, 0.9), v(1.2, 0.9, 0.04), Mat::Hazard, false);
+        p.boxed(v(0.0, 0.1, 0.5), v(2.4, 0.2, 1.6), Mat::Concrete, false);
+        p.sign(v(0.0, 4.3, 0.1), 0.0, 3.4, Sign::IlW4Door);
+        p.sign(v(2.4, 1.9, 0.12), 0.0, 2.2, Sign::IlLadder);
+        p.boxed(v(2.4, 1.0, 0.06), v(0.12, 2.0, 0.12), Mat::Metal, false);
+    });
+    let at = v(WALL_X + 1.8, 0.0, Z);
+    p.anchor("door:ilmari4/1", at, -FRAC_PI_2);
+}
+
+/// A roof antenna on the east dock: a mast with a dish and a lit receiver, a prop (stand spot
+/// 1.8 m toward the road).
+fn antenna(p: &mut Plan, x: f32, z: f32, key: &'static str) {
+    p.boxed(v(x, 2.5, z), v(0.14, 5.0, 0.14), Mat::Metal, false);
+    p.prim(
+        PrimKind::Sphere,
+        v(x, 4.6, z),
+        v(1.5, 0.7, 1.5),
+        Mat::Chrome,
+    );
+    p.boxed(v(x, 5.2, z), v(0.05, 0.6, 0.05), Mat::Metal, false);
+    p.boxed(
+        v(x, 1.2, z - 0.1),
+        v(0.5, 0.4, 0.16),
+        Mat::ScreenGlow,
+        false,
+    );
+    p.boxed(v(x, 0.1, z), v(1.2, 0.2, 1.2), Mat::Concrete, false);
+    p.block(v(x, 1.0, z), v(0.6, 2.0, 0.6));
+    p.interactable(key, v(x, 1.2, z), v(x - 1.8, 0.0, z));
 }
 
 /// Dale's folding table, a laminated sign, crates and a sandbag wall: the Resistance's forward
@@ -237,9 +314,33 @@ fn quest_spots(p: &mut Plan) {
     screen(p, 20.0, 30.0, PI, Sign::IlScreenA, None);
     screen(p, 100.0, 30.0, FRAC_PI_2, Sign::IlScreenB, None);
     // The Data Center's east dock: three status monitors, all green (`il_wq_status`).
-    for (k, z) in [-64.0, -96.0, -104.0].into_iter().enumerate() {
+    // The two northern ones moved off the roof ladder's door (Wing 4 put it at the north end of the
+    // east face; the density gate keeps 8 m round a door).
+    for (k, (x, z)) in [(116.0, -64.0), (118.0, -102.0), (122.0, -108.0)]
+        .into_iter()
+        .enumerate()
+    {
         let key = ["prop:il_status_1", "prop:il_status_2", "prop:il_status_3"][k];
-        screen(p, 116.0, z, FRAC_PI_2, Sign::IlStatusGreen, Some(key));
+        screen(p, x, z, FRAC_PI_2, Sign::IlStatusGreen, Some(key));
+    }
+    // The roof warden of il_10 stands off the ladder (20 m from every door), and three antennas
+    // east of the dock listen to something expensive (il_09).
+    let warden = v(136.0, 0.0, -104.0);
+    p.anchor("rare_roof", warden, yaw_towards(warden, spawn));
+    for (k, (x, z)) in [(130.0, -72.0), (132.0, -84.0), (130.0, -96.0)]
+        .into_iter()
+        .enumerate()
+    {
+        antenna(
+            p,
+            x,
+            z,
+            [
+                "prop:il_antenna_1",
+                "prop:il_antenna_2",
+                "prop:il_antenna_3",
+            ][k],
+        );
     }
     // HR passes and mug photos: glowing pickups (the office module draws them).
     for (key, x, z) in [

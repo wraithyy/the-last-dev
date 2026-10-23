@@ -276,6 +276,7 @@ the same rule as every other room unlock.
   ballots (sim-side position, cooldown and sender checks). The Hallucination's fakes never travel: every
   client derives its own from the public salt and its own id, and the sim only ever holds the real set.
   The recorder logs players, never companions, and replays in the sim, so a room sees one set of echoes.
+- **Wing 4 (protocol 40).** `Event::CloudBill { bill, copies, reserved }`, `Event::PlatformState { idx, state, at_ms }` and `Event::PlatformWarn { idx, at_ms, order }` are the new wire types; `check_event` bounds the bill (at most 1000) and the rotation list. The room's sim owns the replicas, the bill, the platform states and Failover; a joiner gets the current bill and every platform's state through `raid_on_join`, and clients only draw them. Companions never count for the split window and snap beside their owner when a platform goes Dark.
 - **Companions online** (B15): the sign-up sheet is plain `Talk`, so the room's sim is the validator and
   there is no new command or message. Companions belong to the player who picked them, a room holds at
   most two (`MAX_PER_ROOM`, join order), they exist only in a wing on Story and a leaving owner takes

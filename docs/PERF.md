@@ -5,7 +5,7 @@ to the tables below; always re-run with the same commands.
 
 ## Method
 
-Hook: `WOW_BENCH=<lake|plaza|campus|campus_occupied|carpark|raid|swarm|ilmari3_halluc|ilmari3_collapse|tower1>` (`crates/game_client/src/debug.rs`).
+Hook: `WOW_BENCH=<lake|plaza|campus|campus_occupied|carpark|raid|swarm|ilmari3_halluc|ilmari3_collapse|ilmari4_autoscaler|ilmari4_outage|tower1>` (`crates/game_client/src/debug.rs`).
 It starts in the scenario's zone and spot, orbits the camera around a fixed centre (one turn per
 40 s), waits `WOW_BENCH_WARMUP` s (default 5), records `WOW_BENCH_FRAMES` frames (default 600) of
 `Time::delta`, logs one `BENCH ...` line and exits. Native runs use `PresentMode::Immediate`, a
@@ -130,3 +130,14 @@ only 2,400 are claimed. The web (WebGPU) number is not measured yet.
 
 `WOW_BENCH=ilmari3_halluc` (a hazard cycle every 9 s) and `ilmari3_collapse` (echo ghosts every
 3 s), High: avg 4.38 ms / p99 6.26 ms / 3,324 entities and avg 4.06 ms / p99 4.76 ms / 3,508 entities.
+
+## Ilmari Wing 4 (2026-10-23, docs/ILMARI_10.md C.14)
+
+`WOW_BENCH=ilmari4_autoscaler` (the Autoscale Floor with the bill HUD live at 620 points and the boss's replica out; `wing4_fx::stage_qa`) and `ilmari4_outage` (the Server Cloud: hub, five regions, bridges and the platform decals mid-tour). Native release, M2 Pro, High, one run each, 1600x900 @1x, 600 frames.
+
+| scenario | avg ms | p95 | p99 | max | entities | meshes visible |
+|---|---|---|---|---|---|---|
+| ilmari4_autoscaler | 4.46 | 5.04 | 5.99 | 11.24 | 3,934 | 718 |
+| ilmari4_outage | 4.28 | 4.72 | 5.06 | 5.85 | 4,231 | 751 |
+
+Both sit within 1 ms of the Ilmari Wing 3 scenarios above (4.06-4.38 ms avg) and well inside the budgets (avg <= 8 ms, p99 <= 16.7 ms, entities <= 8,000). The web (WebGPU) number is not measured yet.

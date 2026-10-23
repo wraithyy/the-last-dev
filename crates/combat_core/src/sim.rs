@@ -243,6 +243,8 @@ pub struct Sim {
     pub(crate) echo: crate::echo::EchoState,
     /// Wing 3's armed encounter and its draft bookkeeping (`wing3.rs`).
     pub(crate) wing3: crate::wing3::Wing3State,
+    /// The Autoscaler's split family and cloud bill, the Region Outage's platforms (`wing4.rs`).
+    pub(crate) wing4: crate::wing4::Wing4State,
     /// True while an area spell resolves its effects: swarm clusters take a bigger share.
     pub(crate) area_hit: bool,
     /// Ground of the loaded zone, and of every zone a loader registered (`terrain.rs`).
@@ -291,6 +293,7 @@ impl Sim {
             companions: Default::default(),
             swarm: Default::default(),
             wing3: Default::default(),
+            wing4: Default::default(),
             illusion: Default::default(),
             echo: Default::default(),
             area_hit: false,
@@ -1791,6 +1794,7 @@ impl Sim {
             self.duel_hit(ti);
         }
         self.hr_damage(source, target, dealt);
+        self.split_note(ti, source, dealt);
         self.events.push(Event::Damage {
             source,
             target,
@@ -1888,6 +1892,10 @@ impl Sim {
     }
 
     pub(crate) fn die(&mut self, ti: usize, killer: Option<EntityId>) {
+        // A replica of a split boss with company leaves without paying out; the last one pays.
+        if self.split_decommission(ti) {
+            return;
+        }
         let id = Self::id_of(ti);
         // A companion's kill is its owner's: XP, quest credit and the lockout follow the player.
         let killer = killer.map(|k| self.companion_owner(k).unwrap_or(k));

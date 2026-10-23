@@ -2668,6 +2668,88 @@ static TABLE: &[(&str, UnitVisual)] = &[
             &[glow("Skin", 0.85, 0.78, 0.6)],
         ),
     ),
+    // ---- Ilmari Wing 4: The Cloud (docs/ILMARI_10.md C.5). Roof gear that came to life, a rack that walks,
+    // a pager, and two bosses: a tower of racks that keeps adding racks and a thundercloud with a status
+    // light for an eye. The roof warden is a man in a hard hat with a clipboard and no mercy. ----
+    (
+        "il_fan_elemental",
+        v(
+            "prim/fan_elemental",
+            2.4,
+            "Cooling Fan Elemental",
+            "<Spinning Up, Sadly>",
+            &[],
+        ),
+    ),
+    (
+        "il_generator_golem",
+        v(
+            "prim/generator_golem",
+            3.4,
+            "Generator Golem",
+            "<Rated For Less Than This>",
+            &[],
+        ),
+    ),
+    (
+        "il_reserved_bot",
+        v(
+            "prim/reserved_bot",
+            2.0,
+            "Reserved Instance",
+            "<Committed For Three Years>",
+            &[],
+        ),
+    ),
+    (
+        "il_roof_warden",
+        v(
+            SUIT_M,
+            2.5,
+            "Roof Warden",
+            "<Change Advisory Board of One>",
+            &[
+                paint("Skin", 0.8, 0.66, 0.55),
+                paint("Black", 0.9, 0.7, 0.1),
+                paint("Shirt", 0.95, 0.95, 0.9),
+                glow("Hair", 1.0, 0.7, 0.1),
+            ],
+        ),
+    ),
+    (
+        "il_rack_golem",
+        v(
+            "prim/rack_golem",
+            3.0,
+            "Rack Golem",
+            "<Unmounted, Unsupported>",
+            &[],
+        ),
+    ),
+    (
+        "il_pager",
+        v("prim/pager", 1.9, "Pager", "<On Call. Always.>", &[]),
+    ),
+    (
+        "il_autoscaler",
+        v(
+            "prim/autoscaler",
+            5.8,
+            "The Autoscaler",
+            "<Scales With Demand. Yours.>",
+            &[],
+        ),
+    ),
+    (
+        "il_region_outage",
+        v(
+            "prim/region_outage",
+            8.0,
+            "The Region Outage",
+            "<us-east-1 Is Having A Moment>",
+            &[],
+        ),
+    ),
     (
         "il_scraper_swarm",
         v(

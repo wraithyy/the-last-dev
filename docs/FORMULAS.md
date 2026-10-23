@@ -627,6 +627,14 @@ Recorder (`echo.rs`): entropy `H = 1000 * (n ln n - sum c ln c) / (n ln K)` per 
 - Hallucination: `Confabulate` every 20 s (Full, warning 5 s) or 24 s (Story, 7 s), 3 x 3 grid of 8 m tiles, damage 320 power. Ground Truth: 8 s aura, 25 s board cooldown (starts only on a real answer), Data Scientist spell 20 m radius, 20 s cooldown. Footnotes: 3 per Source Needed, exactly one real (Verified gives the boss Cited, +20% damage taken, 3 stacks); a fake retracts for 150 in 5 m.
 - Model Collapse: echo delay 60 s Full / 45 s Story with a 3 s / 5 s ghost warning; Strike echo damage = recorded power x entropy x `strike_pct` (30%). Synthetic Double: 650 HP, melee 12, 22 s.
 
+## Ilmari Wing 4: The Cloud
+
+- Split (`UnitDef.split`): only players' damage counts, in a rolling window of 5 s. A burst of 8% of max HP (Story 14%) inside it spawns a replica holding 40% of the parent's current HP (the pool is conserved), at most 4 copies on Full and 2 on Story, 6 s between splits. Replicas copy the threat table, run staggered ability timers and skip `original_only` abilities. A non-last death is a `kill_add` (no loot, XP or lockout) and takes `relief` points off the bill; only the last member's death pays.
+- Cloud bill (0..=1000 points, kept in 1/300-point units; one unit per tick is 0.1 point per second): rate by copies out [2.0, 5.7, 10.4, 16.0] points per second, halved on Story, halved again while a Reserved Instance rack is on (30 s, per-player cooldown). 250, 500 and 750 apply a stack of Overage (damage taken up); 1000 makes the boss cast Invoice on Full. `Event::CloudBill` goes out when a tenth of the meter, the copy count or the reserved flag changes.
+- Platforms (`ZoneDef.platforms`, offsets from the boss): a region goes Degraded 4 s, Dark 30 s, Restoring 3 s, Live. First outage 14 s after the pull, us-east-1 first, then a seeded shuffle drawn once at the pull. Period Full 37 s (two at a time below 66% boss HP), Story 44 s and always one at a time. Warning 8 s ahead on Full, 20 s with the whole order on Story. An uninterrupted Health Check (Outage) brings the next outage 10 s early.
+- Failover: off every non-Dark platform (1.5 m margin) for the 1 s grace costs 10% of max HP (Story 5%), clamped to leave 1 HP, and teleports the player to the nearest Live non-bridge platform. Players far from the hub (the corridor and the lobby) are exempt; Restoring counts as safe.
+- Enrage (`EnrageDef`): Full group 150 s, a lone player on Full 75 s (`solo_after_ms`), Story 540 s (`story_after_ms`). The aura `il_rate_limited` doubles the boss's damage and takes 92% off damage dealt to it.
+
 ## Weekly Sprint ladder
 
 ```

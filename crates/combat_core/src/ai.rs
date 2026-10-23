@@ -437,7 +437,13 @@ impl Sim {
     fn check_enrage(&mut self, i: usize, ai: &AiDef) {
         let Some(en) = &ai.enrage else { return };
         let u = &self.units[i];
-        let due = u.combat_since > 0 && self.now >= u.combat_since + ticks(en.after_ms);
+        let after = if self.raid.story {
+            en.story_after_ms
+        } else {
+            en.solo_after_ms.filter(|_| self.players.len() <= 1)
+        }
+        .unwrap_or(en.after_ms);
+        let due = u.combat_since > 0 && self.now >= u.combat_since + ticks(after);
         if !due || u.auras.iter().any(|a| a.key == en.aura) {
             return;
         }
@@ -507,6 +513,7 @@ impl Sim {
                 continue;
             }
             if !ab.mode.active(self.raid.story)
+                || (ab.original_only && self.split_is_copy(i))
                 || ab
                     .requires_aura
                     .as_ref()

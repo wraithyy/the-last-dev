@@ -94,6 +94,9 @@ pub enum PropKind {
     /// A Ground Truth board in the Validation Wing: a use shows the user which hazards are real
     /// for a few seconds (`PropDef::auras`, the `il_grounded` aura the client reads).
     Truth,
+    /// A Reserved Instance rack in the Autoscale Floor (`EncounterDef::Cloud`): a use halves the
+    /// cloud bill's rate for a while (any class, a cooldown per player).
+    Rack,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -584,6 +587,9 @@ impl Sim {
         }
         if def.kind == PropKind::Truth {
             return self.use_truth_prop(pi, k);
+        }
+        if def.kind == PropKind::Rack {
+            return self.use_rack_prop(pi, k);
         }
         // Mirrored controls in a fight would be a griefing tool, not a joke; a shuttle would be
         // a free escape.

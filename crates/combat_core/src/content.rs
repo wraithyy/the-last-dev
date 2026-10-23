@@ -493,6 +493,11 @@ pub enum Effect {
     Blink {
         spots: Vec<(f32, f32)>,
     },
+    /// Caster-centric (the Region Outage's Health Check, `wing4.rs`): the next region goes
+    /// `ms` earlier. Only an uninterrupted cast gets here, which is the point of the kick.
+    AdvanceOutage {
+        ms: u32,
+    },
     /// Caster-centric: `count` footnotes beside the caster, exactly one of them the real citation
     /// (`real`), picked by the rng; the rest are `fake`.
     Footnotes {
@@ -518,6 +523,7 @@ impl Effect {
                 | Effect::Confabulate { .. }
                 | Effect::Blink { .. }
                 | Effect::Footnotes { .. }
+                | Effect::AdvanceOutage { .. }
         )
     }
 
@@ -877,6 +883,9 @@ pub struct AiAbility {
     /// Which Ilmari difficulty uses it; every other fight runs the `Both` and `FullOnly` rules.
     #[serde(default)]
     pub mode: AbilityMode,
+    /// Skipped by a split replica (`UnitDef::split`): the Autoscaler's copies keep a trimmed list.
+    #[serde(default)]
+    pub original_only: bool,
 }
 
 /// The Ilmari wings tune a boss twice: Story drops or softens mechanics (docs/ILMARI_09.md B.3).
@@ -914,6 +923,14 @@ pub struct DeathSpawn {
 #[derive(Clone, Debug, Deserialize)]
 pub struct EnrageDef {
     pub after_ms: u32,
+    /// Story-mode override of `after_ms`: Story fights run on 40% HP but with slower bots and
+    /// a forgiving pace, so the Full timer that keeps a lone player out would punish it.
+    #[serde(default)]
+    pub story_after_ms: Option<u32>,
+    /// Full-mode override when a single player holds the instance: the group fights are tuned to
+    /// a group's DPS and healing, so a lone player gets the timer that keeps them out.
+    #[serde(default)]
+    pub solo_after_ms: Option<u32>,
     pub aura: String,
     #[serde(default)]
     pub yells: Vec<String>,
@@ -1111,6 +1128,86 @@ pub struct UnitDef {
     /// A Wing 3 boss's encounter machinery, armed while it fights (`wing3.rs`).
     #[serde(default)]
     pub encounter: Option<EncounterDef>,
+    /// A boss that replicates when hit hard (`wing4.rs`, docs/ILMARI_10.md C.3.4).
+    #[serde(default)]
+    pub split: Option<SplitDef>,
+}
+
+/// Rolling-window splitting: more than `threshold_pct` of the unit's max HP in player damage inside
+/// `window_ms` spawns one replica of the same unit that takes `hp_share_pct` of the parent's
+/// current HP, so the total pool is conserved. Replicas share one threat table; the fight ends
+/// when the last of them dies.
+#[derive(Clone, Debug, Deserialize)]
+pub struct SplitDef {
+    pub window_ms: u32,
+    pub threshold_pct: u32,
+    pub story_threshold_pct: u32,
+    pub hp_share_pct: u32,
+    /// Living units of the family at most, the original included.
+    pub max_copies: u8,
+    pub story_max_copies: u8,
+    /// Between two splits of one family.
+    pub cooldown_ms: u32,
+    /// A replica's abilities are late by this much per replica already out (they do not cast in
+    /// unison).
+    pub offset_ms: u32,
+    #[serde(default)]
+    pub yells: Vec<String>,
+    #[serde(default)]
+    pub decommission_yells: Vec<String>,
+}
+
+/// Platform of an Ilmari floating room. Coordinates are offsets from the boss's spawn point (the
+/// hub is where the boss hovers), so a layout and a synthetic test zone place them alike.
+#[derive(Clone, Debug, Deserialize)]
+pub struct PlatformDef {
+    pub id: String,
+    /// Written on the platform ("us-east-1").
+    pub label: String,
+    pub x: f32,
+    pub z: f32,
+    pub shape: PlatformShape,
+    pub kind: PlatformKind,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
+pub enum PlatformShape {
+    Disc {
+        r: f32,
+    },
+    /// Half extents along and across the direction `yaw_deg` (degrees from +x toward +z).
+    Rect {
+        hx: f32,
+        hz: f32,
+        #[serde(default)]
+        yaw_deg: f32,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+pub enum PlatformKind {
+    /// Takes its turn going dark.
+    Region,
+    /// Never goes dark: the boss hovers over it.
+    Hub,
+    /// A permanent walkway between platforms.
+    Bridge,
+}
+
+impl PlatformDef {
+    /// Distance outside the shape (0 inside) of the point `(x, z)` given relative to the origin.
+    pub fn dist_outside(&self, x: f32, z: f32) -> f32 {
+        let (dx, dz) = (x - self.x, z - self.z);
+        match self.shape {
+            PlatformShape::Disc { r } => ((dx * dx + dz * dz).sqrt() - r).max(0.0),
+            PlatformShape::Rect { hx, hz, yaw_deg } => {
+                let (s, c) = yaw_deg.to_radians().sin_cos();
+                let (lx, lz) = (dx * c + dz * s, -dx * s + dz * c);
+                let (ox, oz) = ((lx.abs() - hx).max(0.0), (lz.abs() - hz).max(0.0));
+                (ox * ox + oz * oz).sqrt()
+            }
+        }
+    }
 }
 
 /// What an Ilmari Wing 3 boss arms when it is pulled (and disarms when it resets or dies). The
@@ -1146,6 +1243,69 @@ pub enum EncounterDef {
         /// Percent of a recorded cast's power a `Strike` echo deals (see `EchoCfg::strike_pct`).
         strike_pct: u32,
     },
+    /// The Autoscaler: the cloud bill climbs with the replicas (docs/ILMARI_10.md C.3.4).
+    Cloud(BillDef),
+    /// The Region Outage: the zone's platforms go dark in turn (docs/ILMARI_10.md C.3.5).
+    Outage(OutageDef),
+}
+
+/// The cloud bill: a meter of 0..=1000 points that grows with the living replicas.
+#[derive(Clone, Debug, Deserialize)]
+pub struct BillDef {
+    /// Tenths of a point per second by replica count (index `copies - 1`, the last entry for
+    /// more): the integer table of `2 * copies^1.5`.
+    pub rate_tenths: Vec<u32>,
+    /// Story pays this percent of the rate.
+    pub story_rate_pct: u32,
+    /// Points at which `Overage` stacks I, II and III land.
+    pub steps: [u32; 3],
+    /// Stack of this aura on every replica per step (damage and cast speed).
+    pub overage_aura: String,
+    pub story_overage_aura: String,
+    /// On every replica from 1000 points: it enables the `Invoice` ability (`requires_aura`).
+    pub budget_aura: String,
+    /// A decommissioned replica takes this many points off.
+    pub relief: u32,
+    /// What a Reserved Instance rack does: the rate is halved for this long.
+    pub reserve_ms: u32,
+    #[serde(default)]
+    pub step_yells: Vec<String>,
+    #[serde(default)]
+    pub budget_yells: Vec<String>,
+}
+
+/// The region sequence.
+#[derive(Clone, Debug, Deserialize)]
+pub struct OutageDef {
+    /// The region that always goes first.
+    pub first: String,
+    /// From the pull to the first region degrading.
+    pub first_ms: u32,
+    pub degraded_ms: u32,
+    pub dark_ms: u32,
+    pub restoring_ms: u32,
+    /// From one region degrading to the next one doing so (one at a time), per difficulty.
+    pub period_ms: u32,
+    pub story_period_ms: u32,
+    /// Full below this boss HP percent: the period halves (two regions at a time).
+    pub cascade_below_pct: u32,
+    /// How far ahead the next region is announced, per difficulty (Story also names the whole order).
+    pub warn_ms: u32,
+    pub story_warn_ms: u32,
+    /// Off-grid for `grace_ms` costs this percent of max HP, never the last point, and a teleport.
+    pub failover_pct: u32,
+    pub story_failover_pct: u32,
+    pub grace_ms: u32,
+    /// Tolerance round every platform, for latency.
+    pub margin_m: f32,
+    #[serde(default)]
+    pub first_dark_yells: Vec<String>,
+    #[serde(default)]
+    pub dark_yells: Vec<String>,
+    #[serde(default)]
+    pub restored_yells: Vec<String>,
+    #[serde(default)]
+    pub failover_yells: Vec<String>,
 }
 
 /// A cluster of drones simulated as one unit (docs/ILMARI_10.md C.3.1). The HP pool is
@@ -1287,6 +1447,9 @@ pub struct ZoneDef {
     /// anchor (skipped otherwise), never respawn, and do not count towards a clear.
     #[serde(default)]
     pub rares: Vec<ZoneSpawn>,
+    /// Floating platforms (Ilmari Wing 4's Server Cloud); offsets from the boss's spawn point.
+    #[serde(default)]
+    pub platforms: Vec<PlatformDef>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -1981,7 +2144,53 @@ impl Content {
                 }) if self.unit_def(a).is_none() => {
                     return bad(format!("unit {} echo add {a} unknown", u.key));
                 }
+                Some(EncounterDef::Cloud(b))
+                    if b.rate_tenths.is_empty()
+                        || b.steps.windows(2).any(|w| w[0] >= w[1])
+                        || b.steps[2] >= 1000
+                        || b.story_rate_pct == 0
+                        || b.reserve_ms == 0
+                        || [&b.overage_aura, &b.story_overage_aura, &b.budget_aura]
+                            .iter()
+                            .any(|a| self.aura(a).is_none())
+                        || u.split.is_none() =>
+                {
+                    return bad(format!(
+                        "unit {} cloud encounter needs a rate table, ordered steps, known auras and a split",
+                        u.key
+                    ));
+                }
+                Some(EncounterDef::Outage(o))
+                    if o.period_ms == 0
+                        || o.story_period_ms == 0
+                        || o.degraded_ms == 0
+                        || o.dark_ms == 0
+                        || o.grace_ms == 0
+                        || !(o.margin_m.is_finite() && o.margin_m >= 0.0)
+                        || o.failover_pct == 0
+                        || o.failover_pct >= 100
+                        || o.story_failover_pct >= 100 =>
+                {
+                    return bad(format!(
+                        "unit {} outage encounter has a zero or absurd number",
+                        u.key
+                    ));
+                }
                 _ => {}
+            }
+            if let Some(sp) = &u.split
+                && (sp.window_ms == 0
+                    || sp.threshold_pct == 0
+                    || sp.story_threshold_pct == 0
+                    || !(1..100).contains(&sp.hp_share_pct)
+                    || sp.max_copies < 2
+                    || sp.story_max_copies < 2
+                    || u.ai.is_none())
+            {
+                return bad(format!(
+                    "unit {} split needs a window, a share and 2+ copies",
+                    u.key
+                ));
             }
             if let Some(d) = &u.death_spawn
                 && (self.unit_def(&d.unit).is_none() || d.count == 0 || d.max_alive == 0)
@@ -2141,6 +2350,57 @@ impl Content {
                 .flat_map(|f| f.requires.iter().chain(&f.until))
             {
                 self.validate_unlock(g)?;
+            }
+            for (k, pl) in z.platforms.iter().enumerate() {
+                let size_ok = match pl.shape {
+                    PlatformShape::Disc { r } => r.is_finite() && r > 0.0,
+                    PlatformShape::Rect { hx, hz, yaw_deg } => {
+                        hx.is_finite()
+                            && hz.is_finite()
+                            && yaw_deg.is_finite()
+                            && hx > 0.0
+                            && hz > 0.0
+                    }
+                };
+                if !(pl.x.is_finite() && pl.z.is_finite() && size_ok)
+                    || pl.id.is_empty()
+                    || z.platforms[..k].iter().any(|o| o.id == pl.id)
+                {
+                    return bad(format!(
+                        "zone {} has a bad or duplicate platform {}",
+                        z.id, pl.id
+                    ));
+                }
+            }
+            let outage = z
+                .boss
+                .as_ref()
+                .and_then(|b| self.unit_def(&b.unit))
+                .and_then(|u| match &u.encounter {
+                    Some(EncounterDef::Outage(o)) => Some(o),
+                    _ => None,
+                });
+            if let Some(o) = outage {
+                let regions = z
+                    .platforms
+                    .iter()
+                    .filter(|p| p.kind == PlatformKind::Region)
+                    .count();
+                let hubs = z
+                    .platforms
+                    .iter()
+                    .filter(|p| p.kind == PlatformKind::Hub)
+                    .count();
+                let first_ok = z
+                    .platforms
+                    .iter()
+                    .any(|p| p.id == o.first && p.kind == PlatformKind::Region);
+                if !(2..=16).contains(&regions) || hubs != 1 || !first_ok {
+                    return bad(format!(
+                        "zone {}: an outage boss needs 2-16 regions, one hub and a known first region",
+                        z.id
+                    ));
+                }
             }
             for l in &z.links {
                 if self.zone(&l.to).is_none() {

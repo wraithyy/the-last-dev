@@ -165,8 +165,9 @@ impl RaidDef {
         for z in &self.zones {
             match c.zone(z) {
                 None => return bad(format!("unknown zone {z}")),
-                // A dungeon may open with a trash gauntlet (The Migration's loading dock).
-                Some(d) if d.boss.is_none() && !self.is_dungeon() => {
+                // A dungeon may open with a trash gauntlet (The Migration's loading dock), and so
+                // may an Ilmari wing (Wing 4's Cooling Deck).
+                Some(d) if d.boss.is_none() && !self.is_dungeon() && !self.ilmari => {
                     return bad(format!("zone {z} has no boss"));
                 }
                 _ => {}
@@ -446,6 +447,7 @@ impl Sim {
         }
         self.illusion_on_join(player);
         self.wing3_on_join(player);
+        self.wing4_on_join(player);
     }
 
     /// The door from outside into a raid opens only with everyone at the level cap (a dungeon:
@@ -842,6 +844,7 @@ impl Sim {
         self.update_twins();
         self.update_hr();
         self.update_wing3();
+        self.update_wing4();
     }
 
     // ---- kills, loot, lockout ----

@@ -686,6 +686,7 @@ fn only_ability(c: &mut Content, key: &str, spell: u32, target: AiTarget) {
             yells: Vec::new(),
             requires_aura: None,
             mode: Default::default(),
+            original_only: false,
         }];
         ai.phases.clear();
         ai.melee_damage = 0;

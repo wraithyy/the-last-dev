@@ -89,7 +89,7 @@ impl Sim {
         }
     }
 
-    fn kill_add(&mut self, a: usize) {
+    pub(crate) fn kill_add(&mut self, a: usize) {
         let id = Self::id_of(a);
         let keys: Vec<String> = self.units[a].auras.iter().map(|x| x.key.clone()).collect();
         for k in keys {

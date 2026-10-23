@@ -812,6 +812,28 @@ pub enum Event {
         integrity: Vec<u16>,
         marked: Vec<bool>,
     },
+    /// The cloud bill of the Autoscaler's fight (0..=1000 points) with the replicas out and
+    /// whether a Reserved Instance rack halves it now. Sent when the bill crosses a tenth of
+    /// the meter or one of the other two changes, and to a joiner; 0 / 0 ends the display.
+    CloudBill {
+        bill: u16,
+        copies: u8,
+        reserved: bool,
+    },
+    /// Platform `idx` (the zone's `ZoneDef::platforms` order) entered `state` at `at_ms` of sim
+    /// time. Every platform is sent when the encounter arms (all `Live`) and to a joiner.
+    PlatformState {
+        idx: u8,
+        state: PlatformPhase,
+        at_ms: u64,
+    },
+    /// The next region to degrade is `idx`, at `at_ms`; Story also lists the whole rotation in
+    /// `order` (platform indices, next first), Full leaves it empty. `idx` 255: nothing pending.
+    PlatformWarn {
+        idx: u8,
+        at_ms: u64,
+        order: Vec<u8>,
+    },
     /// The boss will replay a recorded cast of `as_player` in `at_ms` at `at_cm` (x, z in
     /// centimetres): the ghost plays the animation and a telegraph marks the spot.
     Echoed {
@@ -820,6 +842,17 @@ pub enum Event {
         at_ms: u32,
         at_cm: [i32; 2],
     },
+}
+
+/// State of a platform of the Region Outage's room (docs/ILMARI_10.md C.3.5).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PlatformPhase {
+    Live,
+    /// Warning: orange, and still safe to stand on.
+    Degraded,
+    /// Off the grid: whoever stands on it fails over.
+    Dark,
+    Restoring,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

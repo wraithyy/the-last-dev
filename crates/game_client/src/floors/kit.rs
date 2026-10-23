@@ -790,6 +790,39 @@ pub enum Sign {
     IlEpoch,
     IlLabRevolve,
     IlStatusGreen,
+    // Ilmari Wing 4, The Cloud (`ilmari4.rs`): the roof, the data hall that keeps adding racks and the sky of regions.
+    IlW4Door,
+    IlW4Back,
+    IlW4ToAutoscale,
+    IlW4ToCloud,
+    IlW4Out,
+    IlLadder,
+    IlRoofSla,
+    IlFan,
+    IlRackGarden,
+    IlCoolingNote,
+    IlBillBoard,
+    IlInvoice,
+    IlReservedRack,
+    IlScaleUp,
+    IlEgress,
+    IlFreeTier,
+    IlSurprise,
+    IlDashboard,
+    IlRegionHub,
+    IlRegionUsEast,
+    IlRegionEuWest,
+    IlRegionApSouth,
+    IlRegionSaEast,
+    IlRegionAfSouth,
+    IlStatusDegraded,
+    IlStatusInvest,
+    IlStatusDark503,
+    IlSomeoneElse,
+    IlMultiRegion,
+    IlNotBug,
+    IlSla,
+    IlTeaser,
 }
 
 #[derive(Clone, Debug)]
@@ -1489,6 +1522,38 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
         | Sign::IlTruth
         | Sign::IlTrainingLoss
         | Sign::IlStatusGreen => (256, 128),
+        Sign::IlW4Door
+        | Sign::IlW4Back
+        | Sign::IlW4ToAutoscale
+        | Sign::IlW4ToCloud
+        | Sign::IlW4Out
+        | Sign::IlRoofSla
+        | Sign::IlFan
+        | Sign::IlRackGarden
+        | Sign::IlCoolingNote
+        | Sign::IlReservedRack
+        | Sign::IlScaleUp
+        | Sign::IlEgress
+        | Sign::IlFreeTier
+        | Sign::IlSurprise
+        | Sign::IlSomeoneElse
+        | Sign::IlMultiRegion
+        | Sign::IlNotBug
+        | Sign::IlSla => (256, 96),
+        Sign::IlLadder
+        | Sign::IlBillBoard
+        | Sign::IlInvoice
+        | Sign::IlDashboard
+        | Sign::IlRegionHub
+        | Sign::IlRegionUsEast
+        | Sign::IlRegionEuWest
+        | Sign::IlRegionApSouth
+        | Sign::IlRegionSaEast
+        | Sign::IlRegionAfSouth
+        | Sign::IlStatusDegraded
+        | Sign::IlStatusInvest
+        | Sign::IlStatusDark503
+        | Sign::IlTeaser => (256, 128),
         Sign::IlFacePatch => (256, 192),
         Sign::IlPatchIdle
         | Sign::IlPatchDone

@@ -363,6 +363,12 @@ pub fn mine(
     if def.kind == PropKind::Portal && outcome == 0 {
         return Some("No case to appeal. You have not been managed out. Yet.".to_string());
     }
+    if def.kind == PropKind::Rack && outcome == 0 {
+        return Some(
+            "Nothing to reserve against right now, or the reservation is still cooling down. Commitments take a minute."
+                .to_string(),
+        );
+    }
     if def.kind == PropKind::Draft && outcome == 0 {
         return Some(
             "Nothing is eating this one right now, or it is already marked. The crawler only respects a sign once in a while."
@@ -470,7 +476,8 @@ pub fn mine(
         | PropKind::Ballot
         | PropKind::Portal
         | PropKind::Draft
-        | PropKind::Truth => String::new(),
+        | PropKind::Truth
+        | PropKind::Rack => String::new(),
     })
 }
 
@@ -537,6 +544,7 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::Portal => "File an appeal against being managed out",
         PropKind::Draft => "Mark Confidential (the swarm skips it for 12 s)",
         PropKind::Truth => "Check the real hazards (8 s, 25 s cooldown)",
+        PropKind::Rack => "Reserve capacity (the cloud bill's rate is halved for 30 s)",
     };
     let extra = match def.kind {
         PropKind::FireAlarm => "WARNING: every enemy on this floor will come for you.".to_string(),

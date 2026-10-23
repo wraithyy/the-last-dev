@@ -19,7 +19,7 @@
 //! - `WOW_BOSS_PCT=<pct>@<secs>`: the zone boss drops to that HP percent at that time (phase shots).
 //! - `WOW_FPS=1`: log average frame time and drawn mesh count every 3 s (vsync caps the rate, so read the ms).
 //!   `WOW_SHOW_FPS=1` turns the on-screen FPS readout on for the run (settings.rs).
-//! - `WOW_BENCH=lake|plaza|campus|campus_occupied|carpark|raid|swarm|ilmari3_halluc|ilmari3_collapse|tower1`: perf benchmark (see `docs/PERF.md`). Starts in
+//! - `WOW_BENCH=lake|plaza|campus|campus_occupied|carpark|raid|swarm|ilmari3_halluc|ilmari3_collapse|ilmari4_autoscaler|ilmari4_outage|tower1`: perf benchmark (see `docs/PERF.md`). Starts in
 //!   that scenario's zone/spot, orbits the camera, warms up `WOW_BENCH_WARMUP` s (default 5, after
 //!   the first frame), records `WOW_BENCH_FRAMES` frames (default 600), logs one `BENCH ...` line, exits.
 //!   Native: uncapped present mode and update loop, 1600x900 window (`WOW_BENCH_SCALE=2` emulates retina). Web: `?bench=<name>` (line goes to the console).
@@ -698,7 +698,7 @@ pub struct BenchSpec {
     pub height: f32,
 }
 
-const BENCHES: [BenchSpec; 10] = [
+const BENCHES: [BenchSpec; 12] = [
     // Wellness Park: lake at (-150, -5), water radius ~20.
     BenchSpec {
         name: "lake",
@@ -776,6 +776,24 @@ const BENCHES: [BenchSpec; 10] = [
         target: None,
         radius: 18.0,
         height: 8.0,
+    },
+    // The Autoscale Floor's pit with three replicas out and the bill climbing (`wing4_fx::stage_qa`).
+    BenchSpec {
+        name: "ilmari4_autoscaler",
+        zone: "ilmari4/2",
+        player_at: Some((30.0, 0.0, 90.0)),
+        target: Some(Vec3::new(46.0, 0.0, 0.0)),
+        radius: 20.0,
+        height: 9.0,
+    },
+    // The Server Cloud with its platform sequence running: the hub and five regions in the frame.
+    BenchSpec {
+        name: "ilmari4_outage",
+        zone: "ilmari4/3",
+        player_at: Some((46.0, 6.0, 0.0)),
+        target: Some(Vec3::new(46.0, 0.0, 0.0)),
+        radius: 30.0,
+        height: 18.0,
     },
     BenchSpec {
         name: "tower1",

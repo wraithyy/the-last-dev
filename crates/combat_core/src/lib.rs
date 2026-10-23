@@ -43,6 +43,7 @@ pub mod time;
 pub mod types;
 mod wander;
 mod wing3;
+mod wing4;
 pub mod world;
 pub mod world_events;
 mod zones;
@@ -52,14 +53,14 @@ pub use calendar::{
     CalendarChain, CalendarDef, CalendarGame, CalendarReward, ChainStatus, TICKET_BOARD_MULT,
 };
 pub use content::{
-    AiAbility, AiDef, AiTarget, ApplyAura, Area, AuraDef, AutoAttackDef, CcCat, ClassDef,
+    AiAbility, AiDef, AiTarget, ApplyAura, Area, AuraDef, AutoAttackDef, BillDef, CcCat, ClassDef,
     CompanionDef, CompanionRole, Config, ConsumeAura, Content, ContentError, DispelType, Effect,
     EncounterDef, EnrageDef, Execute, FleeDef, FrontalShield, ITEM_DESC_MAX, ITEM_STACK_CAP,
     IdlePose, ItemBonus, ItemDef, ItemKind, ItemTotals, LevelDef, LootEntry, MAX_ACTION_BAR,
-    MobScaling, Objective, OpenerDef, PackDef, PeriodicDef, PhaseDef, QuestDef, QuestGiver,
-    QuestReward, Role, School, SpellDef, SpellId, SpellTarget, SwarmDef, TOKEN_STACK_CAP,
-    TelegraphAt, TelegraphDef, UnitDef, Unlock, XpRules, YellDef, ZoneDef, ZoneKind, ZoneLink,
-    ZoneSpawn,
+    MobScaling, Objective, OpenerDef, OutageDef, PackDef, PeriodicDef, PhaseDef, PlatformDef,
+    PlatformKind, PlatformShape, QuestDef, QuestGiver, QuestReward, Role, School, SpellDef,
+    SpellId, SpellTarget, SplitDef, SwarmDef, TOKEN_STACK_CAP, TelegraphAt, TelegraphDef, UnitDef,
+    Unlock, XpRules, YellDef, ZoneDef, ZoneKind, ZoneLink, ZoneSpawn,
 };
 pub use dailies::{BoardView, GoalSpec, GoalView, SavedTask, TaskState, TaskView};
 pub use duel::{DuelError, DuelOutcome};
@@ -103,7 +104,7 @@ pub use terrain::{Feature as TerrainFeature, Terrain};
 pub use time::{FixedStepper, TICK_HZ, Tick, ms_to_ticks, ticks_to_ms};
 pub use types::{
     AiState, Audience, AuraEnd, AuraView, Career, CastError, CastView, Command, CooldownView,
-    Event, ItemError, UnitState,
+    Event, ItemError, PlatformPhase, UnitState,
 };
 pub use world::{
     AchievementDef, FULLSTACK_FAIL_PCT, PROP_DONE, PROP_FULLSTACK, PROP_OK, PROP_REFUSED, PropDef,
