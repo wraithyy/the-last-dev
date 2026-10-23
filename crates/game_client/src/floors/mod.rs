@@ -19,6 +19,7 @@ mod entrances;
 mod export;
 mod frontier;
 mod hack24;
+mod ilmari1;
 mod kit;
 mod lab;
 mod layout;
@@ -155,6 +156,7 @@ impl Plugin for FloorsPlugin {
         app.add_message::<LoadFloor>()
             .add_message::<LoadZone>()
             .init_resource::<BlinkMats>()
+            .init_resource::<PatchScreen>()
             .add_systems(Startup, spawn_sun)
             // Same frame as the sim floor swap, so movement never slides against old blockers.
             .add_systems(Update, load_floor.after(crate::game::FloorSwap))
@@ -207,6 +209,28 @@ struct Look<'w, 's> {
 /// The zone's shared office-window material, if its layout has windows.
 #[derive(Resource, Default)]
 pub struct WindowMats(pub Option<Handle<StandardMaterial>>);
+
+/// The shared material of Patch Tuesday's wall screens (every screen of a zone is one material,
+/// so changing its texture changes them all), if the zone has any.
+#[derive(Resource, Default)]
+pub struct PatchScreen(pub Option<Handle<StandardMaterial>>);
+
+/// The wall-screen picture for a patch aura (`patch_*`), the idle one (`None`) or the final
+/// "failed to install" one (`Some("")`).
+pub fn patch_image(aura: Option<&str>) -> Option<Image> {
+    use kit::{Sign, Tex};
+    let sign = match aura {
+        None => Sign::IlPatchIdle,
+        Some("") => Sign::IlPatchDone,
+        Some("patch_meeting_moved") => Sign::IlPatchMeeting,
+        Some("patch_dependencies") => Sign::IlPatchDeps,
+        Some("patch_breaking") => Sign::IlPatchBreaking,
+        Some("patch_deprecation") => Sign::IlPatchDeprecation,
+        Some("patch_pair") => Sign::IlPatchPair,
+        Some(_) => return None,
+    };
+    Some(textures::tex_image(Tex::Sign(sign)))
+}
 
 /// The zone's street lamps for the night: their shared head and ground-pool materials and
 /// the head positions, where `live::daynight` parks its few real lights.
@@ -667,6 +691,9 @@ fn load_floor(
     {
         m.base_color_texture = Some(images.add(textures::lamp_pool_image()));
     }
+    commands.insert_resource(PatchScreen(
+        texs.get(&Tex::Sign(kit::Sign::IlPatchIdle)).cloned(),
+    ));
     commands.insert_resource(StreetLamps {
         head: mats.get(&Mat::StreetLamp).cloned(),
         pool: mats.get(&Mat::LampPool).cloned(),

@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 
 /// Lockout and achievement key prefix of Async Attendance kills.
 pub const ASYNC_PREFIX: &str = "async:";
+/// The same for Story difficulty in an Ilmari wing, which keeps its own weekly lockout.
+pub const STORY_PREFIX: &str = "story:";
 /// Key prefix of a dungeon's daily clear counter, kept in the same daily lockout as its bosses.
 const CLEAR_PREFIX: &str = "clear:";
 /// Tethers check their range this often.
@@ -95,6 +97,15 @@ pub struct RaidDef {
     /// framework (Async scaling, loot, reputation) is shared with raids.
     #[serde(default)]
     pub lockout: LockoutPeriod,
+    /// An Ilmari wing (docs/ILMARI_09.md B.3): the difficulty is the group's choice, not its
+    /// size. Story is available to any group, solo included, and uses the `async_*` figures;
+    /// Full is the authored unit. Each locks apart (`STORY_PREFIX`).
+    #[serde(default)]
+    pub ilmari: bool,
+    /// Ilmari tokens each member earns per boss kill on Full, half on Story (the weekly cap
+    /// of `ilmari.rs` still applies).
+    #[serde(default)]
+    pub boss_tokens: u32,
 }
 
 impl RaidDef {
@@ -191,6 +202,11 @@ pub(crate) fn validate_all(c: &Content) -> Result<(), ContentError> {
 pub struct RaidView {
     pub zone: String,
     pub async_mode: bool,
+    /// Story difficulty of an Ilmari wing (`async_mode` is true with it): the lockout keys carry
+    /// `STORY_PREFIX` instead of `ASYNC_PREFIX`.
+    pub story: bool,
+    /// The difficulty the next wing door opens on (`true`: Story), for the switch at the door.
+    pub story_next: bool,
     pub week: u32,
     /// Encounters (zone boss keys, `async:`-prefixed for Async Attendance) killed this week.
     pub locked: Vec<String>,
@@ -200,6 +216,15 @@ pub struct RaidView {
 }
 
 impl RaidView {
+    /// The lockout key of `boss` on the difficulty in force.
+    pub fn key(&self, boss: &str) -> String {
+        if self.story {
+            format!("{STORY_PREFIX}{boss}")
+        } else {
+            lock_key(boss, self.async_mode)
+        }
+    }
+
     /// The lockout of ISO week `week`: empty once the reset passed.
     pub fn locked_in(&self, week: u32) -> &[String] {
         if self.week == week { &self.locked } else { &[] }
@@ -239,6 +264,11 @@ pub(crate) struct RaidState {
     async_mode: bool,
     /// QA/tests: the difficulty regardless of group size.
     force: Option<bool>,
+    /// An Ilmari wing's difficulty as the group lead picked it (`true`: Story); `None` follows
+    /// the group size (solo and pairs get Story, three or more Full).
+    pick: Option<bool>,
+    /// The loaded wing runs on Story. Implies `async_mode`, which carries the scaling and loot.
+    pub(crate) story: bool,
     lock: Lockout,
     /// Dungeon encounters: the same bookkeeping keyed by UTC day instead of ISO week.
     lock_daily: Lockout,
@@ -273,6 +303,11 @@ impl Sim {
         self.zone.as_deref().and_then(|z| self.content.raid_of(z))
     }
 
+    /// The loaded zone is in an Ilmari wing (its bosses drop `GearSource::Ilmari` pieces).
+    pub(crate) fn cur_raid_is_ilmari(&self) -> bool {
+        self.cur_raid().is_some_and(|r| r.ilmari)
+    }
+
     pub(crate) fn cur_raid_is_dungeon(&self) -> bool {
         self.cur_raid().is_some_and(RaidDef::is_dungeon)
     }
@@ -296,6 +331,8 @@ impl Sim {
                 String::new()
             },
             async_mode: self.raid.async_mode,
+            story: self.raid.story,
+            story_next: self.content.raids.iter().any(|r| r.ilmari) && self.wing_story(),
             week,
             // Dungeon and raid locks share one list; boss keys are unique across both.
             locked: {
@@ -310,11 +347,43 @@ impl Sim {
 
     /// True while encounter `boss` stays dead on this difficulty until the weekly reset.
     pub fn raid_locked(&self, boss: &str, async_mode: bool) -> bool {
-        let key = lock_key(boss, async_mode);
+        let key = self.key_of(boss, async_mode);
         if self.raid_def_of_boss(boss).is_some_and(RaidDef::is_dungeon) {
             self.raid.lock_daily.contains(self.raid_day(), &key)
         } else {
             self.raid.lock.contains(self.raid_week(), &key)
+        }
+    }
+
+    /// The lockout key of `boss` on a difficulty: in an Ilmari wing the reduced one is Story.
+    fn key_of(&self, boss: &str, async_mode: bool) -> String {
+        if async_mode && self.raid_def_of_boss(boss).is_some_and(|r| r.ilmari) {
+            format!("{STORY_PREFIX}{boss}")
+        } else {
+            lock_key(boss, async_mode)
+        }
+    }
+
+    /// Whether the next Ilmari wing loads on Story: QA force, else the lead's pick, else by group
+    /// size (the wings' `normal_min_players`).
+    fn wing_story(&self) -> bool {
+        let min = self
+            .content
+            .raids
+            .iter()
+            .find(|r| r.ilmari)
+            .map_or(3, |r| usize::from(r.normal_min_players));
+        self.raid
+            .force
+            .or(self.raid.pick)
+            .unwrap_or(self.players.len() < min)
+    }
+
+    /// `Command::SetIlmariStory`: the group lead picks the wings' difficulty.
+    pub(crate) fn set_ilmari_story(&mut self, actor: EntityId, story: bool) {
+        if self.players.first() == Some(&actor) && self.raid.pick != Some(story) {
+            self.raid.pick = Some(story);
+            self.raid_broadcast();
         }
     }
 
@@ -325,7 +394,12 @@ impl Sim {
 
     pub(crate) fn raid_on_join(&mut self, player: EntityId) {
         let view = self.raid_view();
-        if view != RaidView::default() {
+        // The wing switch alone is not news to a player outside every raid.
+        let quiet = RaidView {
+            story_next: false,
+            ..view.clone()
+        };
+        if quiet != RaidView::default() {
             self.emit_to(player, Event::Raid { view });
         }
     }
@@ -347,12 +421,25 @@ impl Sim {
         let was = self.in_raid() || !self.raid.tethers.is_empty();
         self.raid.tethers.clear();
         self.raid.next_swap = u64::MAX;
-        let min = self.content.raid_of(id).map(|r| r.normal_min_players);
-        if let Some(min) = min {
-            self.raid.async_mode = self
-                .raid
-                .force
-                .unwrap_or(self.players.len() < usize::from(min));
+        let def = self
+            .content
+            .raid_of(id)
+            .map(|r| (r.normal_min_players, r.ilmari));
+        let min = def.map(|d| d.0);
+        match def {
+            // A wing's difficulty is a choice; Story is the Async scaling under its own name.
+            Some((_, true)) => {
+                self.raid.story = self.wing_story();
+                self.raid.async_mode = self.raid.story;
+            }
+            Some((min, false)) => {
+                self.raid.story = false;
+                self.raid.async_mode = self
+                    .raid
+                    .force
+                    .unwrap_or(self.players.len() < usize::from(min));
+            }
+            None => self.raid.story = false,
         }
         self.raid.announce = min.is_some() || was;
     }
@@ -698,7 +785,7 @@ impl Sim {
         }
     }
 
-    fn has_aura(&self, i: usize, key: &str) -> bool {
+    pub(crate) fn has_aura(&self, i: usize, key: &str) -> bool {
         self.units[i].auras.iter().any(|a| a.key == key)
     }
 
@@ -728,16 +815,24 @@ impl Sim {
             let finale = r.bosses(&self.content).last() == Some(&key);
             let clear =
                 finale.then(|| format!("{}{}", clear_prefix(r), self.dungeon_clears(r) + 1));
-            self.raid.lock_daily.insert(day, lock_key(&key, async_mode));
+            self.raid
+                .lock_daily
+                .insert(day, self.key_of(&key, async_mode));
             if let Some(c) = clear {
                 self.raid.lock_daily.insert(day, c);
             }
         } else {
             let week = self.raid_week();
-            self.raid.lock.insert(week, lock_key(&key, async_mode));
+            let lock = self.key_of(&key, async_mode);
+            self.raid.lock.insert(week, lock);
         }
         self.raid.tethers.clear();
-        let mode = if async_mode { "async" } else { "normal" };
+        self.raid_pay_tokens(self.raid.story);
+        let mode = match (async_mode, self.raid.story) {
+            (_, true) => "story",
+            (true, _) => "async",
+            _ => "normal",
+        };
         let keys = [format!("raid:{key}"), format!("raid:{mode}:{key}")];
         for p in self.players.clone() {
             self.check_achievements(
@@ -746,6 +841,48 @@ impl Sim {
             );
         }
         self.raid_broadcast();
+    }
+
+    /// A player's kill of a unit with `UnitDef::death_spawn` (the Hydra's cables) grows its
+    /// replacements where it fell, under the same boss and never past the cap. A boss's death
+    /// takes its adds with it first (their summoner is already dead), so nothing grows then.
+    pub(crate) fn death_spawn(&mut self, ti: usize, killer: Option<EntityId>) {
+        if !killer.is_some_and(|k| self.is_player(k)) {
+            return;
+        }
+        let Some(d) = self.content.units[self.units[ti].def].death_spawn.clone() else {
+            return;
+        };
+        let Some(owner) = self.units[ti]
+            .summoner
+            .and_then(|s| self.index(s))
+            .filter(|&o| self.units[o].state.alive)
+        else {
+            return;
+        };
+        let n = if self.raid.story {
+            d.story_count.unwrap_or(d.count)
+        } else {
+            d.count
+        };
+        let at = self.units[ti].state.pos;
+        self.summon(owner, at, &d.unit, n, d.max_alive, 0);
+    }
+
+    /// An Ilmari wing's boss pays tokens to every member (half on Story), within the weekly cap.
+    fn raid_pay_tokens(&mut self, story: bool) {
+        let Some(n) = self
+            .cur_raid()
+            .filter(|r| r.ilmari)
+            .map(|r| r.boss_tokens)
+            .filter(|n| *n > 0)
+        else {
+            return;
+        };
+        let n = if story { n / 2 } else { n };
+        for p in self.players.clone() {
+            self.grant_ilmari_tokens(p, n);
+        }
     }
 
     /// Full clears of the loaded dungeon this UTC day (finale kills), whatever the difficulty.
@@ -825,9 +962,12 @@ impl Sim {
         keys.iter()
             .filter(|k| {
                 k.starts_with(CLEAR_PREFIX)
-                    || bosses
-                        .iter()
-                        .any(|b| k.strip_prefix(ASYNC_PREFIX).unwrap_or(k) == b)
+                    || bosses.iter().any(|b| {
+                        k.strip_prefix(ASYNC_PREFIX)
+                            .or_else(|| k.strip_prefix(STORY_PREFIX))
+                            .unwrap_or(k)
+                            == b
+                    })
             })
             .cloned()
             .collect()

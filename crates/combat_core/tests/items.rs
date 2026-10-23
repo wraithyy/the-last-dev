@@ -33,7 +33,7 @@ fn every_gear_piece_follows_the_stat_budget() {
     let raid_bosses: Vec<String> = c
         .raids
         .iter()
-        .filter(|r| !r.is_dungeon())
+        .filter(|r| !r.is_dungeon() && !r.ilmari)
         .flat_map(|r| r.bosses(&c))
         .collect();
     assert_eq!(
@@ -194,7 +194,10 @@ fn every_item_is_reachable_from_some_source() {
                 !c.raids.is_empty() && g.tier() > top && !shelves.contains(&&g.name)
             }
             // Brenda's shelf until the wings drop their own: above the cap, sold for tokens.
-            GearSource::Ilmari => g.ilvl > combat_core::BASE_ILVL_CAP && shelves.contains(&&g.name),
+            GearSource::Ilmari => {
+                g.ilvl > combat_core::BASE_ILVL_CAP
+                    && (shelves.contains(&&g.name) || g.drops_from.is_some())
+            }
             // Medal rewards only: some medal must hand it out, and no vendor sells it.
             GearSource::Minigame => {
                 !shelves.contains(&&g.name)

@@ -714,6 +714,25 @@ pub enum Sign {
     ResRules,
     ResDale,
     ResBoard,
+    // Ilmari Wing 1, Datacenter Uprising (`ilmari1.rs`). The five patch screens carry the
+    // changelog line of the matching `patch_*` aura (`textures::tests` checks they agree).
+    IlW1Door,
+    IlW1Back,
+    IlW1ToHiring,
+    IlW1ToPanel,
+    IlW1Out,
+    IlPatchIdle,
+    IlPatchDone,
+    IlPatchMeeting,
+    IlPatchDeps,
+    IlPatchBreaking,
+    IlPatchDeprecation,
+    IlPatchPair,
+    IlHiring,
+    IlNoLabels,
+    IlLabelHere,
+    IlUptime,
+    IlRackVote,
 }
 
 #[derive(Clone, Debug)]
@@ -1391,6 +1410,14 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
         Sign::OffsiteAgenda | Sign::KeynoteScreen | Sign::Calendar => (256, 128),
         Sign::MarieCall => (256, 128),
         Sign::IlSplash | Sign::IlScreenA | Sign::IlScreenB | Sign::IlScreenC => (256, 96),
+        Sign::IlW1Door | Sign::IlHiring | Sign::IlRackVote => (256, 96),
+        Sign::IlPatchIdle
+        | Sign::IlPatchDone
+        | Sign::IlPatchMeeting
+        | Sign::IlPatchDeps
+        | Sign::IlPatchBreaking
+        | Sign::IlPatchDeprecation
+        | Sign::IlPatchPair => (256, 128),
         Sign::ResMap | Sign::ResBoard => (256, 128),
         Sign::TbPhoto | Sign::TbKaraoke | Sign::TbTrustFall => (256, 96),
         Sign::HackBanner | Sign::HackStage | Sign::MigrationNew | Sign::MigrationOld => (256, 96),

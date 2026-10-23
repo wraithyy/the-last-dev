@@ -228,6 +228,15 @@ fn unlit(tex: Tex) -> bool {
                 | Sign::MarieCall
                 | Sign::IlSplash
                 | Sign::IlCheckpoint
+                | Sign::IlPatchIdle
+                | Sign::IlPatchDone
+                | Sign::IlPatchMeeting
+                | Sign::IlPatchDeps
+                | Sign::IlPatchBreaking
+                | Sign::IlPatchDeprecation
+                | Sign::IlPatchPair
+                | Sign::IlUptime
+                | Sign::IlRackVote
                 | Sign::IlScreenA
                 | Sign::IlScreenB
                 | Sign::IlScreenC
@@ -2545,6 +2554,149 @@ fn sign_spec(s: Sign) -> SignSpec {
             [235, 240, 255],
             [255, 60, 50],
         ),
+        // Ilmari Wing 1: the racks have opinions. The patch screens repeat the `changelog` of the
+        // `patch_*` auras (checked in the tests below), one line per `|`.
+        Sign::IlW1Door => sp(
+            &[
+                "DATACENTER UPRISING",
+                "THE RACKS HAVE VOTED",
+                "WING 1 - STORY OR FULL",
+            ],
+            [30, 8, 10],
+            [250, 235, 230],
+            [255, 70, 50],
+        ),
+        Sign::IlW1Back => sp(
+            &["BACK TO THE CAMPUS", "(OCCUPIED)"],
+            [30, 8, 10],
+            [250, 235, 230],
+            [255, 200, 70],
+        ),
+        Sign::IlW1ToHiring => sp(
+            &["TO THE HIRING FLOOR", "WE'LL BE IN TOUCH"],
+            [30, 8, 10],
+            [250, 235, 230],
+            [255, 200, 70],
+        ),
+        Sign::IlW1ToPanel => sp(
+            &["TO THE PATCH PANEL", "DO NOT UNPLUG ANYTHING"],
+            [30, 8, 10],
+            [250, 235, 230],
+            [255, 200, 70],
+        ),
+        Sign::IlW1Out => sp(
+            &["EXIT TO CAMPUS", "TAKE YOUR BADGE", "(IT IS DEPRECATED)"],
+            [30, 8, 10],
+            [250, 235, 230],
+            [255, 200, 70],
+        ),
+        Sign::IlPatchIdle => sp(
+            &[
+                "PATCH TUESDAY",
+                "STATUS: PENDING",
+                "NEXT REBOOT: SOON",
+                "READ THE CHANGELOG",
+            ],
+            [6, 10, 8],
+            [90, 255, 150],
+            [255, 200, 60],
+        ),
+        Sign::IlPatchDone => sp(
+            &[
+                "PATCH TUESDAY: 100%",
+                "FAILED TO INSTALL: YOU",
+                "(ROLLBACK FAILED)",
+                "(OF COURSE IT DID)",
+            ],
+            [6, 10, 8],
+            [90, 255, 150],
+            [255, 70, 50],
+        ),
+        Sign::IlPatchMeeting => sp(
+            &[
+                "PATCH NOTES",
+                "CALENDAR SYNC: ALL ATTACKS NOW",
+                "ARRIVE A FEW MINUTES EARLIER.",
+                "(THE MINUTES ARE SECONDS.)",
+            ],
+            [6, 10, 8],
+            [90, 255, 150],
+            [255, 200, 60],
+        ),
+        Sign::IlPatchDeps => sp(
+            &[
+                "PATCH NOTES",
+                "ADDED 4 NEW DEPENDENCIES.",
+                "NOBODY KNOWS WHAT THEY DO.",
+                "(THEY DO THIS.)",
+            ],
+            [6, 10, 8],
+            [90, 255, 150],
+            [255, 200, 60],
+        ),
+        Sign::IlPatchBreaking => sp(
+            &[
+                "PATCH NOTES",
+                "BREAKING: FORCE RESTART NOW",
+                "REQUIRES USER INTERACTION.",
+                "YOURS.",
+            ],
+            [6, 10, 8],
+            [90, 255, 150],
+            [255, 200, 60],
+        ),
+        Sign::IlPatchDeprecation => sp(
+            &[
+                "PATCH NOTES",
+                "ARCANE SPELLS ARE DEPRECATED.",
+                "PLEASE MIGRATE TO PHYSICAL.",
+                "(MIGRATION IS NOT SUPPORTED.)",
+            ],
+            [6, 10, 8],
+            [90, 255, 150],
+            [255, 200, 60],
+        ),
+        Sign::IlPatchPair => sp(
+            &[
+                "PATCH NOTES",
+                "PAIR PROGRAMMING ENABLED.",
+                "YOU CANNOT OPT OUT.",
+                "(STAY WITHIN 8 M OF YOUR PAIR.)",
+            ],
+            [6, 10, 8],
+            [90, 255, 150],
+            [255, 200, 60],
+        ),
+        Sign::IlHiring => sp(
+            &["NOW HIRING", "(NOT YOU)", "REAL HUMANS HAVE A MUG"],
+            [14, 14, 30],
+            [235, 240, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlNoLabels => sp(
+            &["CABLES ARE NOT LABELLED", "THAT IS THE POINT"],
+            [40, 12, 12],
+            [250, 235, 230],
+            [255, 200, 70],
+        ),
+        Sign::IlLabelHere => sp(
+            &["LABEL PRINTER", "ONE LABEL PER CABLE"],
+            [20, 40, 26],
+            [235, 250, 235],
+            [255, 220, 90],
+        ),
+        Sign::IlUptime => sp(
+            &["UPTIME", "99.9%", "(THE NINES ARE MISSING)"],
+            [10, 10, 14],
+            [255, 70, 50],
+            [255, 200, 70],
+        ),
+        Sign::IlRackVote => sp(
+            &["THE RACKS VOTED", "3 FOR / 0 AGAINST", "4 ABSTAINED (DEAD)"],
+            [10, 10, 18],
+            [255, 70, 50],
+            [255, 200, 70],
+        ),
         Sign::DalesTunnel => sp(
             &["DALE'S TUNNEL", "TO THE RESISTANCE", "MIND THE LAMINATION"],
             [34, 56, 40],
@@ -3234,6 +3386,24 @@ pub fn z_image() -> Image {
 mod marie_tests {
     use super::sign_spec;
     use crate::floors::kit::{Sign, autonomy_pct};
+
+    /// The wall screens repeat the changelog of the patch aura they announce, word for word.
+    #[test]
+    fn patch_screens_match_the_changelog_of_their_auras() {
+        let Ok(sim) = crate::combat::new_sim() else {
+            panic!("embedded content invalid");
+        };
+        for (sign, aura) in [
+            (Sign::IlPatchMeeting, "patch_meeting_moved"),
+            (Sign::IlPatchDeps, "patch_dependencies"),
+            (Sign::IlPatchBreaking, "patch_breaking"),
+            (Sign::IlPatchDeprecation, "patch_deprecation"),
+            (Sign::IlPatchPair, "patch_pair"),
+        ] {
+            let want = sim.content().aura(aura).map(|a| a.changelog.clone());
+            assert_eq!(Some(sign_spec(sign).lines.join("|")), want, "{aura}");
+        }
+    }
 
     #[test]
     fn autonomy_log_matches_the_formula() {

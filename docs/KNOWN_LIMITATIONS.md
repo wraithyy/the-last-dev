@@ -157,3 +157,12 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
   splash is on its east face because its neon takes the front.
 - The Prologue is offline only: online rooms never get the hatch (the Opening needs the offline
   stamp), and the net client counts Ilmari pieces at the base cap.
+
+## Wing 1: Datacenter Uprising (docs/ILMARI_09.md B6-B10)
+
+- No companion AI (B15) yet: Story is solo-completable by numbers alone (Async scaling under its own lock key), verified by bots for every class over seeds 7, 42 and 1234.
+- Label Cable is a printer prop (`PropKind::Label`), not an action-bar spell: every class bar already holds ten spells. DevOps labels two cables per use and reloads three times faster; other classes label one.
+- Candidate humans cost every player 15% burnout (`death_burnout` is per mille); the spec's 12 would not read as a spike.
+- Enrage is a damage and haste aura (`il_overrun`) at 150-180 s rather than 7-8 minutes; without it a lone COBOL Dev cleared Full.
+- The patch changelog is baked into sign textures that share one material, so every screen in a room swaps together.
+- The Full bot trio is Backend, Fullstack and Frontend; a healer-in-trio run wiped at the Recruiter and is not a gate.

@@ -20,6 +20,7 @@ mod gear;
 mod hair;
 mod hud;
 mod ilmari_open;
+mod ilmari_wing;
 mod ilmari_world;
 mod input;
 mod keybinds;
@@ -158,6 +159,7 @@ fn main() {
         cutscene::CutscenePlugin,
         ilmari_open::IlmariOpenPlugin,
         ilmari_world::IlmariWorldPlugin,
+        ilmari_wing::IlmariWingPlugin,
     ))
     .add_plugins(social::SocialPlugin)
     .add_plugins(roasts::RoastPlugin)

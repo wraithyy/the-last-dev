@@ -82,8 +82,19 @@ fn qa_locks(mut sim: ResMut<CombatSim>, mut done: Local<bool>) {
 }
 
 /// Banner title and subtitle for entering the raid on a difficulty.
-pub fn difficulty_banner(raid_name: &str, async_mode: bool, dungeon: bool) -> (String, String) {
-    if async_mode {
+pub fn difficulty_banner(
+    raid_name: &str,
+    async_mode: bool,
+    story: bool,
+    dungeon: bool,
+) -> (String, String) {
+    if story {
+        (
+            format!("{}: STORY", raid_name.to_uppercase()),
+            "Softer bosses and fewer rules, so one colleague can see it all. Full wants three."
+                .into(),
+        )
+    } else if async_mode {
         (
             format!("{}: ASYNC ATTENDANCE", raid_name.to_uppercase()),
             "Fewer than three of you: the recorded version. Softer bosses, fewer gifts, same lanyard."
@@ -108,7 +119,7 @@ pub fn locked_notice(
     boss_key: &str,
     dungeon: bool,
 ) -> Option<String> {
-    let key = combat_core::raid::lock_key(boss_key, view.async_mode);
+    let key = view.key(boss_key);
     view.locked_in(view.week).contains(&key).then(|| {
         if dungeon {
             // A locked dungeon boss still spawns: it only pays no gear until the reset.
@@ -126,7 +137,7 @@ pub fn locked_notice(
 fn events(
     sim: SimView,
     me: Option<Single<&SimUnit, With<crate::player::Player>>>,
-    mut last: Local<(String, bool)>,
+    mut last: Local<(String, bool, bool)>,
     mut reader: MessageReader<CombatEvent>,
     mut banners: MessageWriter<Banner>,
     mut notices: MessageWriter<UiNotice>,
@@ -152,8 +163,8 @@ fn events(
         let raid = content.raid_of(&view.zone).map_or("", |r| r.name.as_str());
         let dungeon = content.raid_of(&view.zone).is_some_and(|r| r.is_dungeon());
         let new_raid = content.raid_of(&last.0).is_none_or(|r| r.name != raid);
-        if entered && (new_raid || last.1 != view.async_mode) {
-            let (title, subtitle) = difficulty_banner(raid, view.async_mode, dungeon);
+        if entered && (new_raid || last.1 != view.async_mode || last.2 != view.story) {
+            let (title, subtitle) = difficulty_banner(raid, view.async_mode, view.story, dungeon);
             banners.write(Banner {
                 title,
                 subtitle,
@@ -168,7 +179,7 @@ fn events(
                 notices.write(UiNotice(n));
             }
         }
-        *last = (view.zone.clone(), view.async_mode);
+        *last = (view.zone.clone(), view.async_mode, view.story);
     }
 }
 
@@ -249,13 +260,15 @@ mod tests {
 
     #[test]
     fn the_banner_names_the_difficulty_and_locked_rooms_say_so() {
-        let (t, s) = difficulty_banner("All-Hands Offsite", true, false);
+        let (t, s) = difficulty_banner("All-Hands Offsite", true, false, false);
         assert!(t.contains("ASYNC ATTENDANCE") && s.contains("three"));
-        let (t, _) = difficulty_banner("All-Hands Offsite", false, false);
+        let (t, _) = difficulty_banner("All-Hands Offsite", false, false, false);
         assert!(t.contains("FULL PROGRAMME"));
         let view = RaidView {
             zone: "offsite/1".into(),
             async_mode: true,
+            story: false,
+            story_next: false,
             week: 7,
             locked: vec!["async:icebreaker_facilitator".into()],
             ..Default::default()
@@ -263,6 +276,8 @@ mod tests {
         assert!(locked_notice(&view, "Icebreaker", "icebreaker_facilitator", false).is_some());
         let normal = RaidView {
             async_mode: false,
+            story: false,
+            story_next: false,
             ..view
         };
         assert!(locked_notice(&normal, "Icebreaker", "icebreaker_facilitator", false).is_none());

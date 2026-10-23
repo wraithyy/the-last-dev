@@ -601,6 +601,7 @@ impl Sim {
             | Command::LeaveMinigame
             | Command::StampIlmari { .. }
             | Command::IlmariReveal
+            | Command::SetIlmariStory { .. }
             | Command::MinigamePick { .. } => {}
         }
         self.pending.push((Some(player), cmd));
@@ -829,6 +830,7 @@ impl Sim {
             Command::IlmariReveal => {
                 self.reveal_ilmari();
             }
+            Command::SetIlmariStory { story } => self.set_ilmari_story(actor, story),
             other => self.apply_named(other),
         }
     }
@@ -890,6 +892,7 @@ impl Sim {
             | Command::LeaveMinigame
             | Command::StampIlmari { .. }
             | Command::IlmariReveal
+            | Command::SetIlmariStory { .. }
             | Command::MinigamePick { .. } => {}
         }
     }
@@ -1843,6 +1846,8 @@ impl Sim {
         let id = Self::id_of(ti);
         self.duel_cancel_for(id);
         self.spread_auras(ti);
+        // Read before the auras go: a labelled cable stays dead.
+        let keep_dead = self.has_aura_flag(ti, |a| a.no_death_spawn);
         let keys: Vec<String> = self.units[ti].auras.iter().map(|a| a.key.clone()).collect();
         for k in keys {
             self.remove_aura(ti, &k, AuraEnd::Death);
@@ -1867,6 +1872,10 @@ impl Sim {
         u.fleeing = false;
         self.events.push(Event::Death { unit: id, killer });
         self.kill_adds_of(id);
+        if !keep_dead {
+            self.death_spawn(ti, killer);
+        }
+        self.death_burnout(ti, killer);
         self.request_yell(ti, YellKind::Death);
         if self.is_player(id) {
             self.burnout_on_death(ti);

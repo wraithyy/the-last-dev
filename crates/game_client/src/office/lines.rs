@@ -352,6 +352,9 @@ pub fn mine(
     if def.kind == PropKind::Class {
         return Some(class_prop_line(def, outcome, nth, class));
     }
+    if def.kind == PropKind::Label && outcome == 0 {
+        return Some("No cable to label. They only come out when there is a fight.".to_string());
+    }
     let n = outcome;
     let own_lines = !def.lines.is_empty()
         && !matches!(
@@ -442,7 +445,7 @@ pub fn mine(
             def.name
         ),
         // Answered at the top of the function.
-        PropKind::Class => String::new(),
+        PropKind::Class | PropKind::Label => String::new(),
     })
 }
 
@@ -504,6 +507,7 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::Inspect => "Photograph it for the report",
         PropKind::Device => "Operate",
         PropKind::Class => "Use",
+        PropKind::Label => "Print a label for the targeted cable",
     };
     let extra = match def.kind {
         PropKind::FireAlarm => "WARNING: every enemy on this floor will come for you.".to_string(),

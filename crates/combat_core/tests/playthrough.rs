@@ -58,6 +58,7 @@ const CACHE_INVAL: SpellId = SpellId(38);
 const DROP_TABLE: SpellId = SpellId(39);
 const KILL_9: SpellId = SpellId(40);
 const HOTFIX: SpellId = SpellId(41);
+const BLUE_GREEN: SpellId = SpellId(48);
 const SIGSTOP: SpellId = SpellId(42);
 const AUTO_SCALING: SpellId = SpellId(43);
 const CHAOS_MONKEY: SpellId = SpellId(44);
@@ -117,6 +118,8 @@ const CLASSES: [&str; 8] = [
     "cobol",
 ];
 /// Shields of linked raid bosses: the open member is the only one worth hitting.
+const HUMAN: &str = "il_candidate_human";
+const CABLE: &str = "il_cable";
 const LINK_SHIELDS: [&str; 2] = ["synergy_shield", "panel_muted"];
 
 /// Packs on a straight corridor toward -Z, the boss at the end, NPCs off to the side.
@@ -189,6 +192,11 @@ struct Bot {
     /// HP % below which the bot drinks between pulls.
     rest_hp_pct: u32,
     last_pos: Vec3,
+    /// Wing 1: printer rotation and the earliest tick of the next label try.
+    labels: u32,
+    label_next: u64,
+    /// Wing 1: human candidates this bot killed (it must never).
+    human_kills: u32,
 }
 
 fn yaw_to(from: Vec3, to: Vec3) -> f32 {
@@ -212,6 +220,19 @@ impl Bot {
         if let Err(e) = sim.load_zone(zone, &anchor, Vec::new()) {
             panic!("load_zone {zone}: {e}");
         }
+        Bot::seated(sim, player, class, zone, level, seed, start)
+    }
+
+    /// A bot for `player` of an already built sim.
+    fn seated(
+        sim: Sim,
+        player: u64,
+        class: &'static str,
+        zone: &str,
+        level: u8,
+        seed: u64,
+        start: Vec3,
+    ) -> Bot {
         Bot {
             sim,
             player,
@@ -229,6 +250,9 @@ impl Bot {
             rest_alert: false,
             rest_hp_pct: 60,
             last_pos: start,
+            labels: 0,
+            label_next: 0,
+            human_kills: 0,
         }
     }
 
@@ -240,17 +264,30 @@ impl Bot {
     }
 
     fn tick(&mut self) {
+        self.push_move();
+        let events = self.sim.tick();
+        self.observe(&events);
+    }
+
+    /// Reports this bot's position and facing for the coming tick.
+    fn push_move(&mut self) {
         let yaw = self
             .target
             .and_then(|t| self.sim.unit(t))
             .map_or(0.0, |t| yaw_to(self.pos, t.pos));
-        self.sim.push(Command::PlayerMoved {
-            pos: self.pos,
-            yaw,
-            moving: std::mem::take(&mut self.moving),
-            jumping: false,
-        });
-        let events = self.sim.tick();
+        self.sim.apply_as(
+            self.player,
+            Command::PlayerMoved {
+                pos: self.pos,
+                yaw,
+                moving: std::mem::take(&mut self.moving),
+                jumping: false,
+            },
+        );
+    }
+
+    /// Books the events of a tick that has just run (a group's bots share one tick).
+    fn observe(&mut self, events: &[Event]) {
         let now = self.sim.now().0;
         if let Some(me) = self.sim.unit(self.player).filter(|u| u.alive) {
             self.low_hp_pct = self.low_hp_pct.min(me.hp * 100 / me.max_hp.max(1));
@@ -266,7 +303,7 @@ impl Bot {
             self.report.travel_ms += (hop / RUN_MPS * 1000.0) as u64;
         }
         self.last_pos = self.pos;
-        for e in &events {
+        for e in events {
             match e {
                 Event::LevelUp { unit, level } if *unit == self.player => {
                     self.report.level_ups.push((now, *level));
@@ -281,6 +318,12 @@ impl Bot {
                 }
                 Event::Teleported { unit, pos } if *unit == self.player => self.pos = *pos,
                 Event::Death { unit, .. } if *unit == self.player => self.report.died = true,
+                Event::Death {
+                    unit,
+                    killer: Some(k),
+                } if *k == self.player && self.sim.unit(*unit).is_some_and(|u| u.key == HUMAN) => {
+                    self.human_kills += 1;
+                }
                 Event::ZoneCleared { .. } => self.report.cleared = true,
                 _ => {}
             }
@@ -293,19 +336,25 @@ impl Bot {
     }
 
     fn cast(&mut self, spell: SpellId) {
-        self.sim.push(Command::Cast {
-            caster: self.player,
-            spell,
-        });
+        self.sim.apply_as(
+            self.player,
+            Command::Cast {
+                caster: self.player,
+                spell,
+            },
+        );
     }
 
     fn set_target(&mut self, t: u64) {
         if self.target != Some(t) {
             self.target = Some(t);
-            self.sim.push(Command::SetTarget {
-                unit: self.player,
-                target: Some(t),
-            });
+            self.sim.apply_as(
+                self.player,
+                Command::SetTarget {
+                    unit: self.player,
+                    target: Some(t),
+                },
+            );
             self.sim
                 .push(Command::StartAutoAttack { unit: self.player });
         }
@@ -371,6 +420,9 @@ impl Bot {
             .filter(|u| {
                 u.hostile && u.alive && u.in_combat && u.ai != Some(combat_core::AiState::Evade)
             })
+            // Wing 1: the people stay unhurt, and a cable is cut only once it wears a label.
+            .filter(|u| u.key != HUMAN)
+            .filter(|u| u.key != CABLE || u.auras.iter().any(|a| a.key == "labelled"))
             .filter(|u| !(open_boss && shielded(u)))
             .min_by(|a, b| {
                 a.max_hp.cmp(&b.max_hp).then(
@@ -506,7 +558,53 @@ impl Bot {
         }
     }
 
+    /// Wing 1's Cable Hydra: tags the cable it targets (else any) at a label printer, one try
+    /// every two seconds, rotating the four printers. The Interact rides in the same tick as a
+    /// move to the printer, then the usual position report puts the bot back.
+    fn label_cables(&mut self) {
+        let now = self.sim.now().0;
+        if self.label_next > now || !self.me().alive || self.me().stunned {
+            return;
+        }
+        let cable = self
+            .sim
+            .units()
+            .filter(|u| u.key == CABLE && u.alive && !u.auras.iter().any(|a| a.key == "labelled"))
+            .min_by(|a, b| {
+                combat_core::distance(a.pos, self.pos)
+                    .total_cmp(&combat_core::distance(b.pos, self.pos))
+            })
+            .map(|u| u.id);
+        let Some(cable) = cable else { return };
+        self.label_next = now + ms_to_ticks(2000);
+        self.labels += 1;
+        let prop = format!("il_label_printer_{}", self.labels % 4 + 1);
+        let Some((at, _)) = anchor(&format!("prop:{prop}")) else {
+            return;
+        };
+        self.sim.apply_as(
+            self.player,
+            Command::SetTarget {
+                unit: self.player,
+                target: Some(cable),
+            },
+        );
+        self.sim.apply_as(
+            self.player,
+            Command::PlayerMoved {
+                pos: at,
+                yaw: 0.0,
+                moving: false,
+                jumping: false,
+            },
+        );
+        self.sim.apply_as(self.player, Command::Interact { prop });
+        // The target goes back to the fight on the next pick.
+        self.target = None;
+    }
+
     fn act(&mut self) {
+        self.label_cables();
         if self.me().alive && !self.me().stunned && self.tether() {
             return;
         }
@@ -521,9 +619,12 @@ impl Bot {
             && self.off_cooldown(stun)
             && self.sim.unit(id).is_some_and(|u| !u.boss)
         {
-            self.sim.push(Command::StopCasting {
-                caster: self.player,
-            });
+            self.sim.apply_as(
+                self.player,
+                Command::StopCasting {
+                    caster: self.player,
+                },
+            );
         }
         match self.class {
             "frontend" => self.act_frontend(),
@@ -668,7 +769,55 @@ impl Bot {
         }
     }
 
+    /// In a group the healer looks after the others first: Blue-Green when two are hurt, else a
+    /// Hotfix on the worst-off teammate. Alone, the policy below heals only itself.
+    fn heal_allies(&mut self) -> bool {
+        let me = self.me();
+        if !me.alive || me.stunned || self.busy(&me) {
+            return false;
+        }
+        let allies: Vec<combat_core::UnitState> = self
+            .sim
+            .players()
+            .iter()
+            .filter_map(|p| self.sim.unit(*p))
+            .filter(|u| u.alive)
+            .cloned()
+            .collect();
+        if allies.len() < 2 {
+            return false;
+        }
+        let hurt = |u: &&combat_core::UnitState, pct: u32| u.hp * 100 < u.max_hp * pct;
+        if allies.iter().filter(|u| hurt(u, 65)).count() >= 2 && self.ready(BLUE_GREEN) {
+            self.cast(BLUE_GREEN);
+            return true;
+        }
+        let worst = allies
+            .iter()
+            .filter(|u| hurt(u, 70))
+            .min_by_key(|u| u.hp * 1000 / u.max_hp.max(1))
+            .map(|u| u.id);
+        if let Some(w) = worst
+            && self.ready(HOTFIX)
+        {
+            self.sim.apply_as(
+                self.player,
+                Command::SetTarget {
+                    unit: self.player,
+                    target: Some(w),
+                },
+            );
+            self.target = Some(w);
+            self.cast(HOTFIX);
+            return true;
+        }
+        false
+    }
+
     fn act_devops(&mut self) {
+        if self.heal_allies() {
+            return;
+        }
         let Some((me, t)) = self.engage() else { return };
         let reflecting = Self::reflecting(&t);
         if reflecting
@@ -676,9 +825,12 @@ impl Bot {
                 .cast
                 .is_some_and(|c| c.spell == KILL_9 || c.spell == TERRAFORM)
         {
-            self.sim.push(Command::StopCasting {
-                caster: self.player,
-            });
+            self.sim.apply_as(
+                self.player,
+                Command::StopCasting {
+                    caster: self.player,
+                },
+            );
         }
         if !reflecting && self.try_kick(&t, SIGSTOP, SIGSTOP) {
             return;
@@ -730,9 +882,12 @@ impl Bot {
         let Some((me, t)) = self.engage() else { return };
         let reflecting = Self::reflecting(&t);
         if reflecting && me.cast.is_some() {
-            self.sim.push(Command::StopCasting {
-                caster: self.player,
-            });
+            self.sim.apply_as(
+                self.player,
+                Command::StopCasting {
+                    caster: self.player,
+                },
+            );
         }
         let hp_pct = me.hp * 100 / me.max_hp.max(1);
         // The dodge: a long enemy cast about to land that the kick cannot stop.
@@ -792,9 +947,12 @@ impl Bot {
         let Some((me, t)) = self.engage() else { return };
         let reflecting = Self::reflecting(&t);
         if reflecting && me.cast.is_some() {
-            self.sim.push(Command::StopCasting {
-                caster: self.player,
-            });
+            self.sim.apply_as(
+                self.player,
+                Command::StopCasting {
+                    caster: self.player,
+                },
+            );
         }
         if !reflecting && self.try_kick(&t, EARLY_STOP, EARLY_STOP) {
             return;
@@ -950,9 +1108,12 @@ impl Bot {
             || t.cast.is_some_and(|c| c.spell == ALIGNMENT);
         if reflecting {
             if me.cast.is_some() {
-                self.sim.push(Command::StopCasting {
-                    caster: self.player,
-                });
+                self.sim.apply_as(
+                    self.player,
+                    Command::StopCasting {
+                        caster: self.player,
+                    },
+                );
             }
             let hp_pct = me.hp * 100 / me.max_hp.max(1);
             if hp_pct < 50 && self.ready(ROLLBACK) {
@@ -1110,10 +1271,13 @@ impl Bot {
         for (id, pos) in corpses {
             self.pos = Vec3::new(pos.x, 0.0, pos.z + 1.0);
             self.tick();
-            self.sim.push(Command::Loot {
-                looter: self.player,
-                corpse: id,
-            });
+            self.sim.apply_as(
+                self.player,
+                Command::Loot {
+                    looter: self.player,
+                    corpse: id,
+                },
+            );
             self.tick();
         }
     }
@@ -1131,7 +1295,7 @@ impl Bot {
         for (id, pos) in wanted {
             self.pos = Vec3::new(pos.x + 1.0, 0.0, pos.z);
             self.tick();
-            self.sim.push(Command::Talk { unit: id });
+            self.sim.apply_as(self.player, Command::Talk { unit: id });
             self.tick();
         }
     }
@@ -1142,9 +1306,12 @@ impl Bot {
         };
         self.pos = at;
         self.tick();
-        self.sim.push(Command::Interact {
-            prop: key.to_string(),
-        });
+        self.sim.apply_as(
+            self.player,
+            Command::Interact {
+                prop: key.to_string(),
+            },
+        );
         self.tick();
     }
 
@@ -1218,7 +1385,7 @@ impl Bot {
             let Some(npc) = self.sim.units().find(|u| u.key == f.unit).map(|u| u.id) else {
                 continue;
             };
-            self.sim.push(Command::Talk { unit: npc });
+            self.sim.apply_as(self.player, Command::Talk { unit: npc });
             self.tick();
             for q in quests {
                 let Some(def) = self.sim.content().quest(q).cloned() else {
@@ -1226,12 +1393,12 @@ impl Bot {
                 };
                 let quest = q.to_string();
                 match self.sim.quest_status(q) {
-                    QuestStatus::Ready if def.ender().npc == f.unit => {
-                        self.sim.push(Command::TurnInQuest { quest, choice: 0 })
-                    }
-                    QuestStatus::Available if def.giver.npc == f.unit => {
-                        self.sim.push(Command::AcceptQuest { quest })
-                    }
+                    QuestStatus::Ready if def.ender().npc == f.unit => self
+                        .sim
+                        .apply_as(self.player, Command::TurnInQuest { quest, choice: 0 }),
+                    QuestStatus::Available if def.giver.npc == f.unit => self
+                        .sim
+                        .apply_as(self.player, Command::AcceptQuest { quest }),
                     _ => continue,
                 }
                 self.tick();
@@ -1895,10 +2062,13 @@ impl Bot {
     /// A whole sprint with the bot as host: it loads each stage when the sim asks, pulls the
     /// nearest enemy until the stage is empty and takes the respawn when it dies.
     fn sprint(&mut self, building: &str, level: u8) -> SprintRun {
-        self.sim.push(Command::StartSprint {
-            building: building.into(),
-            level,
-        });
+        self.sim.apply_as(
+            self.player,
+            Command::StartSprint {
+                building: building.into(),
+                level,
+            },
+        );
         self.tick();
         let deadline = self.sim.now().0 + 40 * 60 * 30;
         while self.sim.sprint_last_result().is_none() && self.sim.now().0 < deadline {
@@ -1910,7 +2080,7 @@ impl Bot {
                 continue;
             }
             if self.report.died || !self.me().alive {
-                self.sim.push(Command::RespawnPlayer);
+                self.sim.apply_as(self.player, Command::RespawnPlayer);
                 self.tick();
                 self.pos = self.me().pos;
                 self.report.died = false;
@@ -2411,6 +2581,307 @@ fn every_class_clears_async_attendance_solo() {
                     ));
                 }
             }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+// ---- Ilmari Wing 1, Datacenter Uprising (docs/ILMARI_09.md B.4): Story solo, Full as a group.
+
+const WING1: [&str; 3] = ["ilmari1/1", "ilmari1/2", "ilmari1/3"];
+
+fn boss_of(sim: &Sim, zone: &str) -> String {
+    sim.content()
+        .zone(zone)
+        .and_then(|z| z.boss.as_ref())
+        .map(|b| b.unit.clone())
+        .unwrap_or_default()
+}
+
+impl Bot {
+    /// Wing 1 alone on `story` (true) or Full (false): rooms in order, packs then the boss, topping
+    /// off before each boss. Returns bosses killed, seconds, lowest HP %, human candidates killed.
+    fn wing1(&mut self, story: bool) -> (usize, u64, u32, u32) {
+        self.sim.debug_force_raid_async(Some(story));
+        let start = self.sim.now().0;
+        let mut bosses = 0;
+        for zone in WING1 {
+            // The rooms share one corridor, so the last boss's spot is the next boss's: walk
+            // back to the door first or the next boss pulls on the load.
+            self.pos = Vec3::new(0.0, 0.0, 20.0);
+            self.tick();
+            if let Err(e) = self.sim.load_zone(zone, &anchor, Vec::new()) {
+                panic!("load_zone {zone}: {e}");
+            }
+            self.tick();
+            self.pos = self.me().pos;
+            self.rest(true);
+            self.run_geared(zone);
+            let boss = boss_of(&self.sim, zone);
+            if self.report.died || !self.sim.raid_locked(&boss, story) {
+                break;
+            }
+            bosses += 1;
+        }
+        let secs = (self.sim.now().0 - start) / 30;
+        (bosses, secs, self.low_hp_pct, self.human_kills)
+    }
+}
+
+/// Several bots in one sim, one per player. Only `bots[0]` holds the real `Sim`; the others
+/// borrow it for their turn (`with`), so every bot's policy runs unchanged on the shared world.
+struct Group {
+    bots: Vec<Bot>,
+    /// Seconds each boss fight took (pull to the end of combat).
+    boss_secs: Vec<u64>,
+}
+
+impl Group {
+    fn new(classes: &[&'static str], level: u8, seed: u64) -> Group {
+        let mut first = Bot::new_as(classes[0], "campus", level, seed);
+        first.sim.debug_force_raid_async(Some(false));
+        let start = Vec3::new(0.0, 0.0, 20.0);
+        let mut bots = Vec::new();
+        let mut ids = vec![first.player];
+        for (k, class) in classes.iter().enumerate().skip(1) {
+            let id = first.sim.spawn_player(class, start, 0.0);
+            assert_ne!(id, 0, "unknown class {class}");
+            first.sim.set_level_of(id, level);
+            ids.push(id);
+            let _ = k;
+        }
+        // The seated bots keep placeholder sims that are never ticked.
+        for (k, class) in classes.iter().enumerate().skip(1) {
+            let mut b = Bot::seated(
+                Sim::new(content(), seed),
+                ids[k],
+                class,
+                "campus",
+                level,
+                seed,
+                start,
+            );
+            b.rest_alert = true;
+            bots.push(b);
+        }
+        first.rest_alert = true;
+        bots.insert(0, first);
+        let mut g = Group {
+            bots,
+            boss_secs: Vec::new(),
+        };
+        for i in 0..g.bots.len() {
+            g.with(i, |b| b.wear_legacy_gear());
+        }
+        g
+    }
+
+    fn with<R>(&mut self, i: usize, f: impl FnOnce(&mut Bot) -> R) -> R {
+        if i > 0 {
+            let (a, b) = self.bots.split_at_mut(1);
+            std::mem::swap(&mut a[0].sim, &mut b[i - 1].sim);
+        }
+        let r = f(&mut self.bots[i]);
+        if i > 0 {
+            let (a, b) = self.bots.split_at_mut(1);
+            std::mem::swap(&mut a[0].sim, &mut b[i - 1].sim);
+        }
+        r
+    }
+
+    fn tick(&mut self) {
+        for i in 0..self.bots.len() {
+            self.with(i, |b| b.push_move());
+        }
+        let events = self.bots[0].sim.tick();
+        for i in 0..self.bots.len() {
+            self.with(i, |b| b.observe(&events));
+        }
+    }
+
+    fn sim(&self) -> &Sim {
+        &self.bots[0].sim
+    }
+
+    fn died(&self) -> bool {
+        self.bots.iter().any(|b| b.report.died)
+    }
+
+    fn unit_of(&self, b: &Bot) -> combat_core::UnitState {
+        match self.sim().unit(b.player) {
+            Some(u) => u.clone(),
+            None => panic!("no player"),
+        }
+    }
+
+    fn all_full(&self) -> bool {
+        self.bots.iter().all(|b| {
+            let u = self.unit_of(b);
+            !u.alive
+                || (u.hp * 100 >= u.max_hp * 95
+                    && (b.class == "cobol" || u.mana * 100 >= u.max_mana * 95))
+        })
+    }
+
+    fn rest(&mut self) {
+        let mut n = 0;
+        while !self.all_full() && n < 60_000 {
+            self.tick();
+            n += 1;
+        }
+    }
+
+    fn pull(&mut self, at: Vec3, boss: bool) {
+        for (k, b) in self.bots.iter_mut().enumerate() {
+            let melee = matches!(b.class, "frontend" | "backend" | "security" | "cobol");
+            let gap = if melee { 4.0 } else { 20.0 };
+            b.pos = Vec3::new(at.x + (k as f32 - 1.0) * 2.5, 0.0, at.z + gap);
+            b.in_boss = boss;
+            b.target = None;
+        }
+        self.tick();
+        let first = self
+            .sim()
+            .units()
+            .filter(|u| u.hostile && u.alive && combat_core::distance(u.pos, at) < 6.0)
+            .min_by(|a, b| a.max_hp.cmp(&b.max_hp))
+            .map(|u| u.id);
+        let Some(first) = first else { return };
+        for i in 0..self.bots.len() {
+            self.with(i, |b| b.set_target(first));
+        }
+        self.tick();
+        let start = self.sim().now().0;
+        let mut n = 0;
+        while (self.sim().now().0 - start < 90
+            || self.bots.iter().any(|b| {
+                let u = self.unit_of(b);
+                u.in_combat || u.cast.is_some()
+            }))
+            && n < 60_000
+            && !self.bots.iter().all(|b| !self.unit_of(b).alive)
+        {
+            for i in 0..self.bots.len() {
+                self.with(i, |b| b.act());
+            }
+            self.tick();
+            n += 1;
+        }
+        for b in &mut self.bots {
+            b.target = None;
+        }
+        if !boss {
+            // Dead friends stay dead until the boss: a graveyard run is a lost run.
+            self.rest();
+        }
+    }
+
+    /// Wing 1 on Full, the whole group: packs and boss per room. (bosses, seconds, deaths).
+    fn wing1(&mut self) -> (usize, u64, usize) {
+        let start = self.sim().now().0;
+        let mut bosses = 0;
+        for zone in WING1 {
+            for b in &mut self.bots {
+                b.pos = Vec3::new(0.0, 0.0, 20.0);
+            }
+            self.tick();
+            if let Err(e) = self.bots[0].sim.load_zone(zone, &anchor, Vec::new()) {
+                panic!("load_zone {zone}: {e}");
+            }
+            self.tick();
+            self.rest();
+            let packs = self.sim().content().zone(zone).map_or(0, |z| z.packs.len());
+            for k in 1..=packs {
+                if self.died() {
+                    break;
+                }
+                if let Some((at, _)) = anchor(&format!("pack_{k}")) {
+                    self.pull(at, false);
+                }
+            }
+            if !self.died()
+                && let Some((at, _)) = anchor("boss")
+            {
+                self.rest();
+                let t0 = self.sim().now().0;
+                self.pull(at, true);
+                self.boss_secs.push((self.sim().now().0 - t0) / 30);
+            }
+            let boss = boss_of(self.sim(), zone);
+            if self.died() || !self.sim().raid_locked(&boss, false) {
+                break;
+            }
+            bosses += 1;
+        }
+        let deaths = self.bots.iter().filter(|b| b.report.died).count();
+        ((bosses), (self.sim().now().0 - start) / 30, deaths)
+    }
+}
+
+/// Story is the solo difficulty: every class (the healer included) clears all three bosses on
+/// three seeds, without ever hitting a human candidate.
+#[test]
+fn every_class_clears_wing_one_on_story_solo() {
+    let mut failures = Vec::new();
+    for class in CLASSES {
+        for seed in [7, 42, 1234] {
+            let mut b = Bot::new_as(class, "campus", 10, seed);
+            b.wear_legacy_gear();
+            b.rest_alert = true;
+            let (bosses, secs, low, humans) = b.wing1(true);
+            println!(
+                "{class:14} Wing 1 Story seed {seed:4}: {bosses}/3 bosses in {secs} s, low {low}%, humans hit {humans}"
+            );
+            if bosses < 3 || humans > 0 {
+                failures.push(format!(
+                    "{class} seed {seed}: {bosses}/3 bosses, {humans} humans hit"
+                ));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Full is the group difficulty: a tank and two damage dealers clear it
+/// on three seeds; the same wing alone is meant to fail.
+#[test]
+fn a_trio_clears_wing_one_on_full_and_a_lone_player_does_not() {
+    let mut failures = Vec::new();
+    for seed in [7, 42, 1234] {
+        let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
+        let (bosses, secs, deaths) = g.wing1();
+        println!(
+            "trio Wing 1 Full seed {seed:4}: {bosses}/3 bosses in {secs} s, {deaths} dead, boss fights {:?} s",
+            g.boss_secs
+        );
+        if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+            let _ = std::fs::write(
+                PathBuf::from(dir).join(format!("trio_{seed}.log")),
+                &g.bots[0].log,
+            );
+        }
+        if bosses < 3 {
+            failures.push(format!("trio seed {seed}: {bosses}/3 bosses"));
+        }
+        let humans: u32 = g.bots.iter().map(|b| b.human_kills).sum();
+        if humans > 0 {
+            failures.push(format!("trio seed {seed}: {humans} humans hit"));
+        }
+    }
+    for class in CLASSES {
+        let mut b = Bot::new_as(class, "campus", 10, 7);
+        b.wear_legacy_gear();
+        b.rest_alert = true;
+        let (bosses, secs, low, _) = b.wing1(false);
+        println!("{class:14} Wing 1 Full alone: {bosses}/3 bosses in {secs} s, low {low}%");
+        if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+            let _ = std::fs::write(
+                PathBuf::from(dir).join(format!("solo_full_{class}.log")),
+                &b.log,
+            );
+        }
+        if bosses >= 3 {
+            failures.push(format!("{class} cleared Full alone"));
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));

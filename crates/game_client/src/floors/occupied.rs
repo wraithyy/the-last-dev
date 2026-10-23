@@ -50,6 +50,7 @@ pub fn overlay(p: &mut Plan) {
     field_post(p);
     checkpoints(p);
     quest_spots(p);
+    gate(p);
 }
 
 /// "ILMARI" on the Tower, the Data Center and the Lab, and a closed sign at each door. Signs
@@ -74,6 +75,18 @@ fn tunnel(p: &mut Plan) {
     let north = facade_door(p, SHED, Face::NegZ, Sign::TunnelHome);
     p.anchor("door:resistance/1", south.0, south.1);
     p.anchor("door:campus", north.0, north.1);
+}
+
+/// The Server Room Gate (docs/ILMARI_09.md B.4): a second door in the Data Center's west wall,
+/// 8.5 m north of the one the occupation closed. Opens with the golem's quest (`il_04`).
+fn gate(p: &mut Plan) {
+    let (at, yaw) = facade_door(
+        p,
+        (Vec2::new(98.0, -75.5), Vec3::new(24.0, 11.0, 30.0)),
+        Face::NegX,
+        Sign::IlW1Door,
+    );
+    p.anchor("door:ilmari1/1", at, yaw);
 }
 
 /// Dale's folding table, a laminated sign, crates and a sandbag wall: the Resistance's forward

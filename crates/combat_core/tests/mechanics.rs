@@ -61,6 +61,8 @@ fn only(c: &mut Content, key: &str, spell: SpellId, initial_ms: u32, target: AiT
         target,
         phases: vec![],
         yells: vec![],
+        requires_aura: None,
+        mode: Default::default(),
     }];
     ai.melee_damage = 0;
     ai.enrage = None;

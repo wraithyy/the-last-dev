@@ -226,6 +226,14 @@ pub struct AuraDef {
     /// from the caster instead of standing still.
     #[serde(default)]
     pub fear: bool,
+    /// A unit with this aura leaves nothing behind when it dies (`UnitDef::death_spawn`): the
+    /// Cable Hydra's "labelled" cables.
+    #[serde(default)]
+    pub no_death_spawn: bool,
+    /// The release-note line a rule-change aura shows on the Patch Tuesday wall screens (at most
+    /// five short lines, `|`-separated). Empty for every other aura.
+    #[serde(default)]
+    pub changelog: String,
 }
 
 /// Crowd-control family for diminishing returns: repeats within one family shorten, families
@@ -362,6 +370,10 @@ pub enum Effect {
         unit: String,
         count: u8,
         max_alive: u8,
+        /// Ring slots to leave free, so a second `Summon` of one spell (the Recruiter's real and
+        /// fake candidates) lands beside the first and not on top of it.
+        #[serde(default)]
+        skip: u8,
     },
     /// Caster-centric: every threat entry of the caster and its allies in range drops to 1.
     ResetAllyThreat {
@@ -774,6 +786,44 @@ pub struct AiAbility {
     /// Shouted when the ability starts; empty falls back to the unit's `blast` lines.
     #[serde(default)]
     pub yells: Vec<String>,
+    /// Used only while the caster carries this aura: a rule-change boss (Patch Tuesday) enables
+    /// one ability per patch.
+    #[serde(default)]
+    pub requires_aura: Option<String>,
+    /// Which Ilmari difficulty uses it; every other fight runs the `Both` and `FullOnly` rules.
+    #[serde(default)]
+    pub mode: AbilityMode,
+}
+
+/// The Ilmari wings tune a boss twice: Story drops or softens mechanics (docs/ILMARI_09.md B.3).
+/// Elsewhere Story never happens, so `StoryOnly` abilities stay silent and `FullOnly` ones fire.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+pub enum AbilityMode {
+    #[default]
+    Both,
+    StoryOnly,
+    FullOnly,
+}
+
+impl AbilityMode {
+    pub fn active(self, story: bool) -> bool {
+        match self {
+            AbilityMode::Both => true,
+            AbilityMode::StoryOnly => story,
+            AbilityMode::FullOnly => !story,
+        }
+    }
+}
+
+/// What a unit leaves behind when a player kills it: `count` more of `unit` (`story_count` on
+/// Story), never past `max_alive` of them under the same boss. A `no_death_spawn` aura stops it.
+#[derive(Clone, Debug, Deserialize)]
+pub struct DeathSpawn {
+    pub unit: String,
+    pub count: u8,
+    #[serde(default)]
+    pub story_count: Option<u8>,
+    pub max_alive: u8,
 }
 
 /// Soft timer: after `after_ms` in combat the unit gains `aura` until the fight ends.
@@ -962,6 +1012,12 @@ pub struct UnitDef {
     /// Mana gained for every direct hit this unit takes.
     #[serde(default)]
     pub mana_on_hurt: u32,
+    /// Burnout (per mille) every group member gains when a player kills this unit: the Recruiter's
+    /// human candidates are not for hitting.
+    #[serde(default)]
+    pub death_burnout: u16,
+    #[serde(default)]
+    pub death_spawn: Option<DeathSpawn>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
@@ -1649,6 +1705,14 @@ impl Content {
                     u.key, l.item
                 ));
             }
+            if let Some(d) = &u.death_spawn
+                && (self.unit_def(&d.unit).is_none() || d.count == 0 || d.max_alive == 0)
+            {
+                return bad(format!(
+                    "unit {} death spawn needs a known unit, a count and a cap",
+                    u.key
+                ));
+            }
             let Some(ai) = &u.ai else { continue };
             for ab in &ai.abilities {
                 if self.spell(ab.spell).is_none() {
@@ -1657,6 +1721,9 @@ impl Content {
                 let init_bad = ab.initial_ms.is_some_and(|(lo, hi)| lo > hi);
                 if ab.cooldown_min_ms > ab.cooldown_max_ms || init_bad {
                     return bad(format!("unit {} ability cooldown min > max", u.key));
+                }
+                if let Some(a) = ab.requires_aura.as_ref().filter(|a| self.aura(a).is_none()) {
+                    return bad(format!("unit {} ability requires unknown aura {a}", u.key));
                 }
             }
             if let Some(e) = &ai.enrage
@@ -1668,7 +1735,7 @@ impl Content {
                 ));
             }
             if let Some(f) = &ai.flee {
-                let phases = 2..=ai.phases.len() as u8 + 1;
+                let phases = 1..=ai.phases.len() as u8 + 1;
                 if self.spell(f.spell).is_none() || !phases.contains(&f.phase) || f.speed_mps <= 0.0
                 {
                     return bad(format!(

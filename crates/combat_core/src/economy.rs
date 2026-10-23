@@ -278,6 +278,9 @@ pub struct GearDef {
     pub perk_text: String,
     #[serde(default)]
     pub source: GearSource,
+    /// `Ilmari` pieces: the wing boss (unit key) whose kill rolls it; the vendor's pieces have none.
+    #[serde(default)]
+    pub drops_from: Option<String>,
     pub visual: GearVisual,
     /// Vendor price in SP; 0 derives it from rarity and item level.
     #[serde(default)]
@@ -743,6 +746,15 @@ impl Economy {
                 && content.unit_def(u).is_none()
             {
                 return bad(format!("gear {} drops from unknown unit {u}", g.name));
+            }
+            if let Some(b) = &g.drops_from
+                && (g.source != GearSource::Ilmari
+                    || content.unit_def(b).is_none_or(|u| !u.boss || !u.hostile))
+            {
+                return bad(format!(
+                    "gear {} drops from {b}, which must be a hostile boss, and be an Ilmari piece",
+                    g.name
+                ));
             }
             // The sync only means something if Ilmari pieces are the only ones above the cap.
             if (g.source == GearSource::Ilmari) != (g.ilvl > BASE_ILVL_CAP) {
@@ -1734,6 +1746,7 @@ impl Sim {
         let dungeon = self.cur_raid_is_dungeon();
         let legacy = legacy_floor || (self.in_raid() && !dungeon);
         let raid = self.raid_loot(mob);
+        let ilmari_wing = self.cur_raid_is_ilmari();
         let raid_sets = self.raid_sets();
         let rolls = match (legacy_floor, boss) {
             _ if raid.is_some() => raid.map_or(0, |r| r.0),
@@ -1793,7 +1806,10 @@ impl Sim {
                         // Raid pieces come in one rarity: any rolled rarity takes them. A dungeon
                         // boss rolls its own pieces (source Boss) instead of the raid tier.
                         (if raid.is_some() {
-                            if dungeon {
+                            if ilmari_wing {
+                                g.source == GearSource::Ilmari
+                                    && g.drops_from.as_deref() == Some(d.key.as_str())
+                            } else if dungeon {
                                 matches!(&g.source, GearSource::Boss(k) if *k == d.key)
                             } else {
                                 g.source == GearSource::Raid

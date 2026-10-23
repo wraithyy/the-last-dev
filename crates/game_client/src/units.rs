@@ -32,7 +32,15 @@ pub struct UnitAssets {
     dark: Handle<StandardMaterial>,
     halo_mesh: Handle<Mesh>,
     halo: Handle<StandardMaterial>,
+    /// Wing 1 candidates: the human's mug, the android's lanyard (white, no photo; red on Story).
+    mug: Handle<StandardMaterial>,
+    lanyard: Handle<StandardMaterial>,
 }
+
+/// The android candidate's lanyard strip; `ilmari_wing` turns it red on Story (the tell the
+/// difficulty hands a solo player).
+#[derive(Component)]
+pub struct Lanyard;
 
 impl Plugin for UnitsPlugin {
     fn build(&self, app: &mut App) {
@@ -54,6 +62,14 @@ fn setup_unit_assets(
         cube: meshes.add(Cuboid::from_length(1.0)),
         dark: materials.add(StandardMaterial {
             base_color: Color::srgb(0.08, 0.08, 0.1),
+            ..default()
+        }),
+        mug: materials.add(StandardMaterial {
+            base_color: Color::srgb(0.55, 0.3, 0.15),
+            ..default()
+        }),
+        lanyard: materials.add(StandardMaterial {
+            base_color: Color::srgb(0.92, 0.92, 0.95),
             ..default()
         }),
         halo_mesh: meshes.add(Torus::new(0.2, 0.3)),
@@ -144,6 +160,32 @@ pub fn spawn_unit(
                 Transform::from_xyz(0.0, height + 0.3, 0.0),
                 Halo,
             ));
+        }
+        // The tells the Opening taught: people carry a mug, androids a lanyard with no photo.
+        "il_candidate_human" => {
+            commands.entity(e).with_child((
+                Mesh3d(assets.cube.clone()),
+                MeshMaterial3d(assets.mug.clone()),
+                Transform::from_xyz(0.3, height * 0.5, -0.14)
+                    .with_scale(Vec3::new(0.09, 0.11, 0.09)),
+            ));
+        }
+        "il_candidate_fake" => {
+            commands.entity(e).with_children(|c| {
+                c.spawn((
+                    Lanyard,
+                    Mesh3d(assets.cube.clone()),
+                    MeshMaterial3d(assets.lanyard.clone()),
+                    Transform::from_xyz(0.0, height * 0.74, -0.15)
+                        .with_scale(Vec3::new(0.12, 0.34, 0.02)),
+                ));
+                c.spawn((
+                    Mesh3d(assets.cube.clone()),
+                    MeshMaterial3d(assets.lanyard.clone()),
+                    Transform::from_xyz(0.0, height * 0.55, -0.16)
+                        .with_scale(Vec3::new(0.14, 0.18, 0.02)),
+                ));
+            });
         }
         "rollback_wraith" => {
             // The ring, the "v1.0" tag and the cold floor ring that make it read as a release.

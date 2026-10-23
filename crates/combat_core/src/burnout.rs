@@ -38,6 +38,8 @@ pub enum BurnoutCause {
     Debug,
     /// A quest chain's turn-in (`QuestReward::burnout`).
     Quest,
+    /// A bystander died by a player's hand (`UnitDef::death_burnout`): the Recruiter's candidates.
+    Collateral,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -305,6 +307,19 @@ impl Sim {
                 i32::from(value.min(BURNOUT_MAX)) - now,
                 BurnoutCause::Debug,
             );
+        }
+    }
+
+    /// A player killed a unit that costs the whole group burnout (`UnitDef::death_burnout`).
+    pub(crate) fn death_burnout(&mut self, ti: usize, killer: Option<EntityId>) {
+        let by = self.content.units[self.units[ti].def].death_burnout;
+        if by == 0 || !killer.is_some_and(|k| self.is_player(k)) {
+            return;
+        }
+        for p in self.players.clone() {
+            if let Some(i) = self.index(p) {
+                self.add_burnout(i, i32::from(by), BurnoutCause::Collateral);
+            }
         }
     }
 

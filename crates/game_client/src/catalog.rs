@@ -2391,6 +2391,122 @@ static TABLE: &[(&str, UnitVisual)] = &[
             ],
         ),
     ),
+    // ---- Ilmari Wing 1: Datacenter Uprising (docs/ILMARI_09.md B.4). The candidates share one look
+    // apart from the tells `units.rs` draws on them (a mug for the people, a lanyard with no photo
+    // for the androids); the paints differ only in the grey of the android skin.
+    (
+        "il_server_golem",
+        v(
+            "prim/cutover_rack",
+            2.6,
+            "Server Golem",
+            "<Rack-Mounted. Mood-Mounted.>",
+            &[],
+        ),
+    ),
+    (
+        "il_tentacle_rack",
+        v(
+            "prim/tentacle_rack",
+            2.0,
+            "Tentacle Rack",
+            "<Cabling by a Committee of Octopuses>",
+            &[],
+        ),
+    ),
+    (
+        "il_delivery_drone",
+        v(
+            "prim/drone",
+            1.7,
+            "Delivery Drone",
+            "<Has an Attitude and a Parcel>",
+            &[],
+        ),
+    ),
+    (
+        "il_dep_drone",
+        v(
+            "prim/drone",
+            1.7,
+            "New Dependency",
+            "<Nobody Knows What It Does>",
+            &[],
+        ),
+    ),
+    (
+        "il_patch_tuesday",
+        v(
+            "prim/patch_tuesday",
+            4.4,
+            "Patch Tuesday",
+            "<Reboots Weekly. On Tuesday. Every Minute.>",
+            &[],
+        ),
+    ),
+    (
+        "il_candidate_human",
+        v(
+            CASUAL2,
+            1.78,
+            "Candidate",
+            "<Interviewing. Hopefully.>",
+            &[
+                paint("Shirt", 0.85, 0.85, 0.9),
+                paint("Pants", 0.2, 0.22, 0.3),
+                paint("Hair", 0.3, 0.2, 0.12),
+            ],
+        ),
+    ),
+    (
+        "il_candidate_fake",
+        v(
+            CASUAL2,
+            1.78,
+            "Candidate",
+            "<Interviewing. Hopefully.>",
+            &[
+                paint("Shirt", 0.85, 0.85, 0.9),
+                paint("Pants", 0.2, 0.22, 0.3),
+                paint("Hair", 0.3, 0.2, 0.12),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_recruiter",
+        v(
+            SUIT_F,
+            2.1,
+            "The Recruiter",
+            "<We'll Be In Touch>",
+            &[
+                paint("Black", 0.12, 0.1, 0.2),
+                paint("Shirt", 0.95, 0.95, 0.98),
+                glow("Hair", 1.0, 0.25, 0.3),
+            ],
+        ),
+    ),
+    (
+        "il_cable",
+        v(
+            "prim/cable_head",
+            1.6,
+            "Cable Head",
+            "<Not Labelled. That Is the Point.>",
+            &[],
+        ),
+    ),
+    (
+        "il_cable_hydra",
+        v(
+            "prim/cable_hydra",
+            4.6,
+            "The Cable Hydra",
+            "<Single Point of Failure, Plural>",
+            &[],
+        ),
+    ),
     // ---- VibeCon (raid): lanyard neon on black, the founders in vests ----
     (
         "vc_registration",

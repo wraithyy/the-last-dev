@@ -503,6 +503,14 @@ impl Sim {
             if !ab.phases.is_empty() && !ab.phases.contains(&u.state.phase) {
                 continue;
             }
+            if !ab.mode.active(self.raid.story)
+                || ab
+                    .requires_aura
+                    .as_ref()
+                    .is_some_and(|a| !self.has_aura(i, a))
+            {
+                continue;
+            }
             if u.ability_next.get(k).is_none_or(|t| *t > self.now) {
                 continue;
             }

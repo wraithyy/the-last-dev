@@ -8,6 +8,7 @@ use super::client;
 use super::corporate;
 use super::datacenter;
 use super::hack24;
+use super::ilmari1;
 use super::kit::{Plan, Sign};
 use super::lab;
 use super::layout::{FloorLayout, TOWER_ZONES, build_floor, yaw_towards};
@@ -24,7 +25,7 @@ use combat_core::Aabb;
 
 /// Every zone id of the contract, in a stable order.
 #[allow(dead_code)] // contract surface; the tests iterate it
-pub const ZONE_IDS: [&str; 36] = [
+pub const ZONE_IDS: [&str; 39] = [
     "campus",
     carpark::ZONE,
     "tower/1",
@@ -60,6 +61,9 @@ pub const ZONE_IDS: [&str; 36] = [
     "hack24/2",
     "hack24/3",
     "hack24/4",
+    "ilmari1/1",
+    "ilmari1/2",
+    "ilmari1/3",
     // The occupied campus has packs and rares like the campus; the Resistance base (a hub like
     // the easter-egg zone) stays out of the list and its tests.
     "campus_occupied",
@@ -100,6 +104,9 @@ pub fn build_zone(id: &str) -> Option<FloorLayout> {
         "hack24/2" => Some(hack24::build(2)),
         "hack24/3" => Some(hack24::build(3)),
         "hack24/4" => Some(hack24::build(4)),
+        "ilmari1/1" => Some(ilmari1::build(1)),
+        "ilmari1/2" => Some(ilmari1::build(2)),
+        "ilmari1/3" => Some(ilmari1::build(3)),
         client::ZONE => Some(client::build()),
         teambuilding::ZONE => Some(teambuilding::build()),
         id if corporate::ZONES.contains(&id) => corporate::build(id),
@@ -201,7 +208,7 @@ mod tests {
             "campus" | "campus_occupied" => 8,
             "datacenter/1" | "datacenter/2" | "lab/1" | "lab/2" => 5,
             "onboarding/1" | "onboarding/2" | "onboarding/3" => 2,
-            "basement/1" | "qbr/1" | "hack24/2" => 3,
+            "basement/1" | "qbr/1" | "hack24/2" | "ilmari1/1" | "ilmari1/2" | "ilmari1/3" => 3,
             "basement/2" | "basement/3" | "basement/4" | "qbr/2" | "qbr/3" | "qbr/4"
             | "hack24/1" | "hack24/3" | "hack24/4" => 2,
             "offsite/1" | "offsite/2" | "vibecon/1" | "vibecon/2" => 4,
@@ -222,7 +229,7 @@ mod tests {
             // The Migration: the project manager is `npc_2` beside the arrival (not required); only
             // the on-call engineer of the last room is `npc_1`.
             "basement/1" | "basement/2" | "basement/3" | "qbr/1" | "qbr/2" | "qbr/3"
-            | "hack24/1" | "hack24/2" | "hack24/3" => 0,
+            | "hack24/1" | "hack24/2" | "hack24/3" | "ilmari1/1" | "ilmari1/2" | "ilmari1/3" => 0,
             "vibecon/2" | "vibecon/3" | "vibecon/4" | "vibecon/5" => 0,
             _ => 1,
         };
@@ -244,7 +251,10 @@ mod tests {
                 &["door:campus", "elevator", "elevator_exit"]
             }
             carpark::ZONE => &["door:campus", "door:resistance/1"],
-            "campus_occupied" => &["door:resistance/1", "door:campus"],
+            "campus_occupied" => &["door:resistance/1", "door:campus", "door:ilmari1/1"],
+            "ilmari1/1" => &["door:campus_occupied", "door:ilmari1/2"],
+            "ilmari1/2" => &["door:ilmari1/1", "door:ilmari1/3"],
+            "ilmari1/3" => &["door:ilmari1/2", "door:campus_occupied"],
             "datacenter/1" => &["door:campus", "door:datacenter/2"],
             "datacenter/2" => &["door:datacenter/1", "door:campus"],
             "lab/1" => &["door:campus", "door:lab/2"],

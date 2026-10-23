@@ -79,6 +79,10 @@ pub enum PropKind {
     Device,
     /// A prop only one class can use (`PropDef::class`): bonus only, never needed by a quest.
     Class,
+    /// The Cable Hydra's label printers: prints a `labelled` tag (`PropDef::auras`) onto the cable
+    /// you target, else the nearest one. Anyone may use it; `PropDef::class` does it twice as
+    /// fast and twice over.
+    Label,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -543,6 +547,9 @@ impl Sim {
         }
         if def.kind == PropKind::Class {
             return self.use_class_prop(pi, k);
+        }
+        if def.kind == PropKind::Label {
+            return self.use_label_prop(pi, k);
         }
         // Mirrored controls in a fight would be a griefing tool, not a joke; a shuttle would be
         // a free escape.

@@ -128,3 +128,72 @@ impl Sim {
         );
     }
 }
+
+impl Sim {
+    /// A label printer (`PropKind::Label`): tags the cable the player targets, else the nearest
+    /// one, so it stays dead when killed. The class named by the prop labels two at a time and
+    /// reloads three times faster; everyone else still gets the one tag, so nothing needs a
+    /// class. Outcome `PROP_OK` when a cable was tagged, 0 when there was none to tag.
+    pub(crate) fn use_label_prop(&mut self, pi: usize, k: usize) {
+        let player = Self::id_of(pi);
+        let def = self.content.world.props[k].clone();
+        let now = self.now;
+        let fun = self.fun.players.entry(player).or_default();
+        if fun.next_use.get(&k).is_some_and(|t| *t > now) {
+            return;
+        }
+        let own = self.class_at(pi).is_some_and(|c| c.key == def.class);
+        let wait = if own {
+            def.cooldown_ms / 3
+        } else {
+            def.cooldown_ms
+        };
+        self.fun
+            .players
+            .entry(player)
+            .or_default()
+            .next_use
+            .insert(k, now + ticks(wait));
+        let Some((aura, ms)) = def.auras.first().cloned() else {
+            return;
+        };
+        let me = self.units[pi].state.pos;
+        let marked = |s: &Sim, i: usize| {
+            let u = &s.units[i];
+            u.state.alive
+                && !u.despawned
+                && u.state.hostile
+                && s.content.units[u.def].death_spawn.is_some()
+                && !s.has_aura(i, &aura)
+        };
+        let mut cables: Vec<usize> = (0..self.units.len()).filter(|&i| marked(self, i)).collect();
+        cables.sort_by(|&a, &b| {
+            crate::geom::distance(self.units[a].state.pos, me)
+                .total_cmp(&crate::geom::distance(self.units[b].state.pos, me))
+                .then(a.cmp(&b))
+        });
+        // The targeted cable first, then the nearest ones.
+        if let Some(t) = self.units[pi].state.target.and_then(|t| self.index(t))
+            && let Some(at) = cables.iter().position(|&c| c == t)
+        {
+            cables.swap(0, at);
+        }
+        let tagged = cables.len().min(if own { 2 } else { 1 });
+        for &ci in &cables[..tagged] {
+            self.apply_aura(ci, &aura, ms, None, player, None);
+            // The boss reacts to being documented ("I feel seen. I hate it.").
+            if let Some(owner) = self.units[ci].summoner.and_then(|s| self.index(s)) {
+                self.request_yell(owner, crate::content::YellKind::Talk);
+            }
+        }
+        self.events.push(Event::Interacted {
+            unit: player,
+            prop: def.key.clone(),
+            outcome: if tagged > 0 { PROP_OK } else { 0 },
+        });
+        self.quest_credit(
+            player,
+            |o| matches!(o, crate::content::Objective::Interact(key, _) if *key == def.key),
+        );
+    }
+}

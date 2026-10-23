@@ -187,6 +187,7 @@ fn hover_radius(kind: PropKind) -> f32 {
         | PropKind::ShuttleStop
         | PropKind::Inspect
         | PropKind::Class
+        | PropKind::Label
         | PropKind::Device => 0.9,
         PropKind::Pickup => 0.6,
         PropKind::QuietRoom => 1.2,

@@ -417,9 +417,13 @@ impl Sim {
                     unit,
                     count,
                     max_alive,
+                    skip,
                 },
                 _,
-            ) => self.summon(ci, unit, *count, *max_alive),
+            ) => {
+                let at = self.units[ci].state.pos;
+                self.summon(ci, at, unit, *count, *max_alive, *skip);
+            }
             (
                 Effect::PairUp {
                     aura,
@@ -608,7 +612,17 @@ impl Sim {
         });
     }
 
-    fn summon(&mut self, ci: usize, key: &str, count: u8, max_alive: u8) {
+    /// Adds of `key` around `at`, owned by unit `ci` (a boss summons at itself, a dying cable's
+    /// spawn lands where it fell). `skip` ring slots stay free.
+    pub(crate) fn summon(
+        &mut self,
+        ci: usize,
+        at: Vec3,
+        key: &str,
+        count: u8,
+        max_alive: u8,
+        skip: u8,
+    ) {
         let Ok(def) = self.def_index(key) else { return };
         let caster = Self::id_of(ci);
         let alive = self
@@ -617,14 +631,16 @@ impl Sim {
             .filter(|u| u.summoner == Some(caster) && u.state.alive && u.def == def)
             .count();
         let n = usize::from(count).min(usize::from(max_alive).saturating_sub(alive));
-        let (pos, yaw, level, pack) = {
+        let (yaw, level, pack) = {
             let c = &self.units[ci];
-            (c.state.pos, c.state.yaw, c.state.level, c.state.pack)
+            (c.state.yaw, c.state.level, c.state.pack)
         };
+        let pos = at;
         let target = self.units[ci].state.target;
         // Offset ring index 0 is the centre, which the summoner occupies.
-        let offsets = crate::floors::pack_offsets(n + 1);
-        for (dx, dz) in offsets.into_iter().skip(1) {
+        let skip = usize::from(skip);
+        let offsets = crate::floors::pack_offsets(n + skip + 1);
+        for (dx, dz) in offsets.into_iter().skip(1 + skip) {
             let at = Vec3::new(pos.x + dx, pos.y, pos.z + dz);
             let id = self.spawn(
                 def,
@@ -667,7 +683,11 @@ impl Sim {
             return;
         };
         let cc = def.cc_cat();
-        if self.units[ti].state.boss && (def.stun || cc.is_some_and(|c| c.boss_immune())) {
+        // A boss shrugs off other people's stuns, not its own: Patch Tuesday's reboot is authored.
+        if self.units[ti].state.boss
+            && source != Self::id_of(ti)
+            && (def.stun || cc.is_some_and(|c| c.boss_immune()))
+        {
             return;
         }
         // Outside a duel players never debuff each other (a cast that outlived the duel).

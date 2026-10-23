@@ -147,6 +147,10 @@ fn parts(kind: &str) -> Vec<Part> {
         "overheated_rack" => overheated_rack(),
         "cooling_failure" => cooling_failure(),
         "cutover_rack" => cutover_rack(),
+        "tentacle_rack" => tentacle_rack(),
+        "patch_tuesday" => patch_tuesday(),
+        "cable_hydra" => cable_hydra(),
+        "cable_head" => cable_head(),
         "slide_golem" => slide_golem(),
         "kpi_dashboard" => kpi_dashboard(),
         "pizza_overlord" => pizza_overlord(),
@@ -173,6 +177,170 @@ fn parts(kind: &str) -> Vec<Part> {
             [1.0, 0.0, 1.0],
         )],
     }
+}
+
+/// A stalk of cable: `n` cylinders that rise and curl over towards `+X` (`side` flips it), each
+/// a little thinner, ending in a plug with a red eye. Parts are in the rig's local frame.
+fn stalk(base: [f32; 3], side: f32, n: usize, len: f32, thick: f32, curl: f32) -> Vec<Part> {
+    let mut v = Vec::new();
+    let (mut x, mut y) = (base[0], base[1]);
+    let mut t = 8.0_f32;
+    for k in 0..n {
+        let r = (t.to_radians().sin() * side, t.to_radians().cos());
+        let d = thick * (1.0 - 0.1 * k as f32);
+        let c = [x + r.0 * len / 2.0, y + r.1 * len / 2.0, base[2]];
+        let col = if k % 3 == 1 {
+            [0.8, 0.1, 0.1]
+        } else {
+            [0.06, 0.06, 0.07]
+        };
+        v.push(Part::cyl(c, d, len, col).rot([0.0, 0.0, -t * side]));
+        x += r.0 * len;
+        y += r.1 * len;
+        t += curl;
+    }
+    v.push(Part::cube([x, y, base[2]], [0.3, 0.2, 0.2], STEEL).rot([0.0, 0.0, -t * side]));
+    v.push(
+        Part::ball(
+            [x + 0.1 * side, y - 0.05, base[2] - 0.1],
+            0.1,
+            [1.0, 0.1, 0.1],
+        )
+        .glow(3.5),
+    );
+    v
+}
+
+/// Trash: a rack with cable arms that have come loose and reach for you.
+fn tentacle_rack() -> Vec<Part> {
+    let mut v = overheated_rack();
+    v.extend(stalk([-0.4, 1.2, -0.1], -1.0, 4, 0.5, 0.12, 22.0));
+    v.extend(stalk([0.4, 1.25, -0.1], 1.0, 4, 0.55, 0.12, 24.0));
+    v.extend(stalk([0.0, 1.25, 0.2], 1.0, 3, 0.45, 0.1, 30.0));
+    v
+}
+
+/// Boss of the Cold Aisle: a tall rack that is mid-update. A progress bar that never finishes,
+/// a spinning reboot cross and a blue siren on top, red LEDs down both flanks.
+fn patch_tuesday() -> Vec<Part> {
+    const RED: [f32; 3] = [1.0, 0.08, 0.08];
+    const GREEN: [f32; 3] = [0.1, 1.0, 0.3];
+    let mut v = vec![
+        Part::cube([0.0, 1.9, 0.0], [2.2, 3.5, 1.3], [0.09, 0.1, 0.13]),
+        Part::cube([0.0, 1.85, -0.67], [2.0, 3.2, 0.04], [0.14, 0.15, 0.2]),
+        Part::cube([0.0, 0.12, 0.0], [2.4, 0.24, 1.5], DARK),
+        // The screen: "UPDATING", a bar at 99% that has been at 99% since Tuesday.
+        Part::cube([0.0, 2.5, -0.7], [1.7, 0.9, 0.03], [0.02, 0.05, 0.08]),
+        Part::cube([-0.1, 2.35, -0.72], [1.35, 0.14, 0.02], GREEN).glow(2.5),
+        Part::cube([0.76, 2.35, -0.72], [0.1, 0.14, 0.02], RED)
+            .glow(2.5)
+            .bob(0.01, 9.0),
+        Part::cube([0.0, 2.75, -0.72], [1.0, 0.1, 0.02], CYAN).glow(2.0),
+        // Eyes and a mouth of "Restart now".
+        Part::cube([-0.5, 3.3, -0.7], [0.5, 0.16, 0.03], RED).glow(3.0),
+        Part::cube([0.5, 3.3, -0.7], [0.5, 0.16, 0.03], RED).glow(3.0),
+        Part::cube([0.0, 1.3, -0.7], [1.4, 0.3, 0.03], HOT).glow(2.5),
+        Part::cyl([0.0, 3.8, 0.0], 0.5, 0.18, DARK),
+        Part::cyl([0.0, 4.0, 0.0], 0.36, 0.24, [0.2, 0.5, 1.0]).glow(3.0),
+        Part::cube([0.0, 4.35, 0.0], [0.0, 0.0, 0.0], STEEL)
+            .with(vec![
+                Part::cube([0.4, 0.0, 0.0], [0.7, 0.07, 0.1], CYAN).glow(1.5),
+                Part::cube([-0.4, 0.0, 0.0], [0.7, 0.07, 0.1], CYAN).glow(1.5),
+            ])
+            .spin(Vec3::Y, 6.0),
+    ];
+    for row in 0..6 {
+        for side in [-1.0_f32, 1.0] {
+            v.push(
+                Part::cube(
+                    [side * 0.98, 0.8 + row as f32 * 0.38, -0.5],
+                    [0.04, 0.12, 0.5],
+                    if (row + side as i32) % 3 == 0 {
+                        GREEN
+                    } else {
+                        RED
+                    },
+                )
+                .glow(2.2)
+                .bob(0.01, 6.0 + row as f32),
+            );
+        }
+    }
+    for side in [-1.0_f32, 1.0] {
+        v.push(
+            Part::cyl([side * 1.4, 2.2, -0.2], 0.3, 1.8, [0.06, 0.06, 0.07]).rot([
+                0.0,
+                0.0,
+                side * 14.0,
+            ]),
+        );
+        v.push(Part::cube(
+            [side * 1.75, 1.2, -0.3],
+            [0.5, 0.45, 0.4],
+            STEEL,
+        ));
+    }
+    v
+}
+
+/// Boss of the Patch Panel: a black rack wall that has grown five cable heads, each with a
+/// red eye. The heads sway; the cables pool on the floor in front of it.
+fn cable_hydra() -> Vec<Part> {
+    const RED: [f32; 3] = [1.0, 0.08, 0.08];
+    let mut v = vec![
+        Part::cube([0.0, 1.7, 0.0], [3.2, 3.0, 1.5], [0.08, 0.08, 0.1]),
+        Part::cube([0.0, 1.7, -0.78], [3.0, 2.8, 0.04], [0.15, 0.15, 0.18]),
+        Part::cube([0.0, 0.1, 0.0], [3.4, 0.2, 1.8], DARK),
+        Part::cube([-0.7, 2.6, -0.8], [0.6, 0.2, 0.03], RED).glow(3.5),
+        Part::cube([0.7, 2.6, -0.8], [0.6, 0.2, 0.03], RED).glow(3.5),
+        Part::cube([0.0, 1.0, -0.8], [2.0, 0.3, 0.03], HOT).glow(2.5),
+    ];
+    for row in 0..4 {
+        for col in 0..6 {
+            let m = if (row * 5 + col * 3) % 8 == 0 {
+                [0.1, 1.0, 0.3]
+            } else {
+                RED
+            };
+            v.push(
+                Part::cube(
+                    [-1.2 + col as f32 * 0.48, 0.5 + row as f32 * 0.4, -0.8],
+                    [0.24, 0.1, 0.02],
+                    m,
+                )
+                .glow(2.2)
+                .bob(0.01, 5.0 + (row + col) as f32),
+            );
+        }
+    }
+    for (k, x) in [-1.3_f32, -0.65, 0.0, 0.65, 1.3].into_iter().enumerate() {
+        let side = if k % 2 == 0 { -1.0 } else { 1.0 };
+        let head = stalk([x, 3.1, -0.2], side, 4, 0.7, 0.18, 30.0 + k as f32 * 3.0);
+        v.push(
+            Part::cube([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], DARK)
+                .with(head)
+                .bob(0.05, 1.5 + k as f32 * 0.3),
+        );
+    }
+    for (x, z, yaw, c) in [
+        (-1.0, -1.6, 20.0, [0.06, 0.06, 0.07]),
+        (0.6, -1.9, -30.0, RED),
+        (0.0, -1.3, 80.0, [1.0, 0.8, 0.1]),
+        (1.4, -1.5, 10.0, [0.06, 0.06, 0.07]),
+    ] {
+        v.push(Part::cyl([x, 0.09, z], 0.18, 1.6, c).rot([90.0, yaw, 0.0]));
+    }
+    v
+}
+
+/// One cable head on the floor: a coil, a stalk and a plug with a red eye.
+fn cable_head() -> Vec<Part> {
+    let mut v = vec![
+        Part::cyl([0.0, 0.08, 0.0], 0.8, 0.16, [0.06, 0.06, 0.07]),
+        Part::cyl([0.0, 0.2, 0.0], 0.55, 0.12, [0.7, 0.1, 0.1]),
+    ];
+    v.extend(stalk([0.0, 0.2, 0.0], 1.0, 4, 0.32, 0.14, 30.0));
+    v
 }
 
 /// The Exit Barrier of Car Park P3: a striped post with a ticket slot, a red eye and a long
@@ -1430,6 +1598,10 @@ mod tests {
             "overheated_rack",
             "cooling_failure",
             "cutover_rack",
+            "tentacle_rack",
+            "patch_tuesday",
+            "cable_hydra",
+            "cable_head",
             "slide_golem",
             "kpi_dashboard",
             "pizza_overlord",

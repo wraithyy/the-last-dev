@@ -231,6 +231,14 @@ fn the_attunement_chain_completes_solo_and_offline() {
     w.kill_and_loot("il_gate_golem");
     w.turn_in("il_04_wing1_attune");
 
+    // Wing 1's door opened with the golem; its last boss ends the wing's quest (Story: solo).
+    assert!(link_open(&w.sim, "campus_occupied", "ilmari1/1"));
+    w.accept("il_dale_field", "il_w1_done");
+    w.load("ilmari1/3");
+    w.kill_and_loot("il_cable_hydra");
+    w.load("campus_occupied");
+    w.turn_in("il_w1_done");
+
     w.accept("il_dale_field", "il_05_hr_intel");
     for k in 1..=3 {
         w.use_prop(&format!("il_hr_pass_{k}"));
@@ -241,14 +249,16 @@ fn the_attunement_chain_completes_solo_and_offline() {
     w.kill_and_loot("il_lobby_marshal");
     w.turn_in("il_06_wing2_attune");
 
-    // 2 + 4 + 6 + 8 + 8 + 10 tokens, all inside the weekly cap.
-    assert_eq!(w.tokens(), 38);
-    assert_eq!(w.sim.ilmari_tokens_left(), ilmari::TOKEN_WEEK_CAP - 38);
+    // 2 + 4 + 6 + 8 + 8 + 10 tokens, the wing's quest (8) and a Story boss kill (6), all inside
+    // the weekly cap.
+    assert_eq!(w.tokens(), 52);
+    assert_eq!(w.sim.ilmari_tokens_left(), ilmari::TOKEN_WEEK_CAP - 52);
     for q in [
         "il_01_dale",
         "il_02_sign_in",
         "il_03_node",
         "il_04_wing1_attune",
+        "il_w1_done",
         "il_05_hr_intel",
         "il_06_wing2_attune",
     ] {
@@ -624,7 +634,7 @@ fn the_phase_toggle_round_trips_and_the_normal_campus_stays_put() {
         occupied
             .links
             .iter()
-            .all(|l| ["resistance/1", "campus"].contains(&l.to.as_str())),
+            .all(|l| ["resistance/1", "campus", "ilmari1/1"].contains(&l.to.as_str())),
         "the closed buildings have no doors in this phase"
     );
     // No normal zone links into the occupation except the booth hatch.

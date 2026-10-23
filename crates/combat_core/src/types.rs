@@ -263,6 +263,11 @@ pub enum Command {
     /// Offline only: the Opening has played or was skipped (needs a stamp), which retires the
     /// post-credits Marie beats and completes the opening quest.
     IlmariReveal,
+    /// Group lead: Story (true) or Full (false) for the next Ilmari wing loads (`raid.rs`).
+    /// Without a pick a group of three or more gets Full, a smaller one Story.
+    SetIlmariStory {
+        story: bool,
+    },
 }
 
 /// Why an item command did nothing; routed to the player.

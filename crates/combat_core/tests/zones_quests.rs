@@ -684,6 +684,8 @@ fn only_ability(c: &mut Content, key: &str, spell: u32, target: AiTarget) {
             target,
             phases: Vec::new(),
             yells: Vec::new(),
+            requires_aura: None,
+            mode: Default::default(),
         }];
         ai.phases.clear();
         ai.melee_damage = 0;
@@ -968,7 +970,9 @@ fn every_quest_is_given_where_its_work_happens() {
                 continue;
             }
             let here = zones.iter().any(|z| {
-                *z == q.giver.zone
+                // The wing's completion quest is given on the occupied campus and done in the wing.
+                (q.id.starts_with("il_") && combat_core::ilmari::is_ilmari_zone(z))
+                    || *z == q.giver.zone
                     || *z == ender
                     || area(z) == area(&q.giver.zone) && z != &"campus"
             });

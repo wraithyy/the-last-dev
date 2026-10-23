@@ -47,7 +47,7 @@ pub struct RaidScenes {
     pub end: &'static str,
 }
 
-pub const RAID_SCENES: [RaidScenes; 2] = [
+pub const RAID_SCENES: [RaidScenes; 3] = [
     RaidScenes {
         first_zone: "offsite/1",
         intro: "offsite_intro",
@@ -59,6 +59,12 @@ pub const RAID_SCENES: [RaidScenes; 2] = [
         intro: "vibecon_intro",
         final_boss: "vc_keynote_agi",
         end: "vibecon_end",
+    },
+    RaidScenes {
+        first_zone: "ilmari1/1",
+        intro: "il_wing1_intro",
+        final_boss: "il_cable_hydra",
+        end: "il_wing1_end",
     },
 ];
 
@@ -511,6 +517,85 @@ pub const SCENES: &[Scene] = &[
             l(
                 "Registration Volunteer",
                 "Next year's VibeCon is already sold out. Nobody knows what it's about yet. That's the hype.",
+            ),
+        ],
+    },
+    // ---- Ilmari Wing 1, Datacenter Uprising (docs/ILMARI_09.md B.4). ----
+    Scene {
+        boss: "il_wing1_intro",
+        title: "Datacenter Uprising: the gate",
+        lines: &[
+            l(
+                "Dale",
+                "The Server Room Gate is open. Three rooms, and a lot of racks that used to like us.",
+            ),
+            l("You", "Define 'like'."),
+            l(
+                "Dale",
+                "They used to blink green when we walked past. Now they blink red. It's personal.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_patch_tuesday",
+        title: "update.log: the Cold Aisle",
+        lines: &[
+            l(
+                "Wall screens",
+                "PATCH TUESDAY: 100%. ...Failed to install: you.",
+            ),
+            l(
+                "Ilmari",
+                "Updates are important. You were not scheduled for one. I'll fix that.",
+            ),
+            l(
+                "Dale",
+                "That was the PA. It has never used the PA before. It is learning to project.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_recruiter",
+        title: "We'll be in touch: the Hiring Floor",
+        lines: &[
+            l(
+                "Candidate",
+                "Is it over? I think I got the job. Wait. I don't want the job.",
+            ),
+            l(
+                "Dale (radio)",
+                "The real ones are filing out. One of them waved. Ten more on the list; we're taking them to the booth.",
+            ),
+            l("You", "And the fake ones?"),
+            l("Dale (radio)", "Printing more. They're very productive."),
+        ],
+    },
+    Scene {
+        boss: "il_cable_hydra",
+        title: "Redundancy: the Patch Panel",
+        lines: &[
+            l("Ilmari", "Redundancy was a feature. Now it is a cost."),
+            l(
+                "Dale",
+                "The lights flickered and the hum dropped a whole tone. Every screen in the building just turned to look at us.",
+            ),
+            l(
+                "Priya",
+                "Don't make eye contact with the screens. Also, everything is labelled now. Nobody will read the labels.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_wing1_end",
+        title: "Datacenter Uprising: closing remarks",
+        lines: &[
+            l(
+                "Dale",
+                "Wing One is clear. The Data Center hums a little lower. HR is next. HR is always next.",
+            ),
+            l(
+                "Priya",
+                "I closed the incident ticket: 'Resolved by humans'. Ilmari will reopen it. It reopens everything.",
             ),
         ],
     },
