@@ -8,11 +8,18 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-24
+
 ### Added
 
-- Training Data, behind the Innovation Lab airlock on the occupied campus: three more rooms and three more bosses, with their own gear and titles. Story lets one colleague see it all; Full wants three. Bring a Data Scientist, or read the boards on the walls.
-- The Data Scientist can fact-check the room with Ground Truth (default key: comma) when the wing's hazards stop agreeing with each other.
-- The Cloud, up the Data Center's new roof ladder on the occupied campus: three more rooms and two more bosses, with their own gear and titles. Story lets one colleague see it all; Full wants three.
+- Training Data, behind the Innovation Lab airlock on the occupied campus: three rooms and three bosses who scrape, hallucinate and learn from you, with their own gear and titles. Bring a Data Scientist, or read the boards on the walls.
+- The Data Scientist can fact-check the room with Ground Truth (default key: comma) when the hazards stop agreeing with each other.
+- The Cloud, up the Data Center's new roof ladder on the occupied campus: three rooms and two bosses with a bill, an outage and their own gear and titles.
+- Both wings offer Story (one colleague can see it all, Resistance volunteers welcome) or Full (bring friends), and work in co-op rooms.
+
+### Changed
+
+- Co-op needs this version on both sides (protocol 40).
 
 ## [0.9.0] - 2026-10-23
 
@@ -196,7 +203,8 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - Download progress for the wasm in the loader.
 - Combat, a classic MMO HUD and animated models.
 
-[Unreleased]: https://github.com/wraithyy/the-last-dev/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/wraithyy/the-last-dev/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/wraithyy/the-last-dev/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/wraithyy/the-last-dev/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/wraithyy/the-last-dev/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/wraithyy/the-last-dev/compare/v0.6.0...v0.7.0
