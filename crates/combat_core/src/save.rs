@@ -561,7 +561,7 @@ impl Sim {
             marie_met: self.marie_met(player),
             ilmari_stamp: self.ilmari.stamp.clone(),
             ilmari_revealed: self.ilmari.revealed,
-            ilmari_tokens: self.ilmari.tokens,
+            ilmari_tokens: self.ilmari.tokens.get(&player).copied().unwrap_or_default(),
             quest_days: self
                 .quests_of(player)
                 .days
@@ -688,7 +688,7 @@ impl Sim {
         self.restore_taken_props(player, &save.taken_props);
         self.restore_marie_met(player, save.marie_met);
         self.restore_ilmari(save.ilmari_stamp.clone(), save.ilmari_revealed);
-        self.restore_ilmari_tokens(save.ilmari_tokens.0, save.ilmari_tokens.1);
+        self.restore_ilmari_tokens(player, save.ilmari_tokens.0, save.ilmari_tokens.1);
         let class = self.class_at(i).map(|c| c.key.clone()).unwrap_or_default();
         self.units[i].state.talents = self.content.talents.sanitize(&class, &save.talents, level);
         let title = Some(&save.title)

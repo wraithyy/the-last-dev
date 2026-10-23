@@ -425,3 +425,41 @@ fn remote_movement_is_smooth_and_auras_count_down() {
     assert_eq!(a.total_ms, 8_000);
     assert!((5_900..=6_100).contains(&a.remaining_ms), "{a:?}");
 }
+
+/// The Opening online: the room announces it, a client's stamp and reveal go over the wire like
+/// any command, and afterwards the client's own view has the hatch open and the quest done.
+#[test]
+fn the_rooms_opening_reaches_the_client_and_opens_the_hatch() {
+    let (mut sim, you, _bob, mut world) = campus_room();
+    let hatch = |w: &NetWorld| {
+        w.zone_links("parking_p3")
+            .iter()
+            .any(|l| l.to == "resistance/1" && l.unlocked)
+    };
+    // What the session does with the frame, after it survived the wire.
+    let announced = |on| match wire(&ServerMsg::IlmariPending { on }) {
+        ServerMsg::IlmariPending { on } => on,
+        other => panic!("{other:?}"),
+    };
+    assert!(!hatch(&world));
+    sim.debug_ilmari_opening();
+    world.set_ilmari_pending(announced(true));
+    assert!(world.ilmari_pending);
+    let unix_secs = sim.unix_s();
+    client_cmd(
+        &mut sim,
+        you,
+        Command::StampIlmari {
+            unix_secs,
+            utc_offset_min: 120,
+            tz: "CEST".into(),
+        },
+    );
+    client_cmd(&mut sim, you, Command::IlmariReveal);
+    let ev = events_for(&mut sim, you);
+    feed(&mut world, ev, 1.0);
+    world.set_ilmari_pending(announced(false));
+    assert!(!world.ilmari_pending);
+    assert!(hatch(&world));
+    assert!(world.quests().completed.iter().any(|q| q == "il_00_wake"));
+}

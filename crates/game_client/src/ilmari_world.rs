@@ -1,7 +1,7 @@
 //! The post-credits world on the client (docs/ILMARI_09.md B.2): the glow over the hatch behind
 //! the Car Park P3 attendant's booth that leads down to the Resistance base. The hatch itself is
 //! plain steel in the P3 layout, so the car park gives nothing away before the Opening; once it
-//! has played, this marks the way. Offline only (the Opening is), and per zone load: the marker
+//! has played, this marks the way. Offline the local save decides, online the room's door; per zone load: the marker
 //! is `ZoneDecor`, which the zone switch clears.
 
 use crate::combat::{CombatSim, SimReady};
@@ -41,7 +41,14 @@ fn mark_hatch(
         return;
     }
     seen.clone_from(&flow.zone);
-    if flow.zone != carpark::ZONE || net.is_some() || !sim.0.ilmari_open() {
+    // Online the room's door state is the truth: the hatch link opens with the room's reveal.
+    let open = match net.as_deref() {
+        Some(n) => crate::combat::SimRead::zone_links(n, carpark::ZONE)
+            .iter()
+            .any(|l| l.to == combat_core::ilmari::BASE_ZONE && l.unlocked),
+        None => sim.0.ilmari_open(),
+    };
+    if flow.zone != carpark::ZONE || !open {
         return;
     }
     let (x, z) = carpark::HATCH;

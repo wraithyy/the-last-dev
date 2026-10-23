@@ -1,9 +1,10 @@
 //! The Opening after the credits (docs/ILMARI_09.md B.1): the player's own clock on every screen,
 //! the all-staff email, Ill Marie's "I'm feeling much better now" in the plaza and the badge
 //! prompt. Plays once, on the first campus entry after the AGI Prototype is down (so a save that
-//! finished the game long ago gets it too), skippable with Esc. Offline only: the sim has no wall
-//! clock, so this reads the device clock and tells the sim once (`Command::StampIlmari`); online
-//! the server never takes either command.
+//! finished the game long ago gets it too), skippable with Esc. The sim has no wall clock, so this
+//! reads the device clock and tells the sim once (`Command::StampIlmari`). Online, the room's
+//! server announces the Opening (`IlmariPending`) and every client plays its own copy with its own
+//! clock; the first stamp and the first finished or skipped Opening count for the room.
 //!
 //! QA hook: `WOW_ILMARI=1` plays it from the start on the campus, `WOW_ILMARI=mail|reveal|badge`
 //! starts at that beat (screenshots).
@@ -15,7 +16,7 @@ use crate::combat::{CombatSim, PendingCommands, SimReady};
 use crate::copy;
 use crate::game::GameFlow;
 use crate::hud::{ACCENT, DIM, KEY_RIM, KEY_TOP, KEY_TOP_HI, label, set_text, vgrad};
-use crate::net::GameMode;
+use crate::net::{GameMode, NetWorld};
 use crate::player::{Player, PlayerBody};
 use bevy::input::InputSystems;
 use bevy::prelude::*;
@@ -56,6 +57,10 @@ struct Opening {
     start_at: Option<Phase>,
     /// Esc or the skip button was pressed this frame.
     skip: bool,
+    /// Online: this client's own stamp line (the room's sim holds the first one sent, not ours).
+    line: Option<String>,
+    /// Online: this room's Opening was played or skipped here; reset when the room is not pending.
+    done_online: bool,
 }
 
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
@@ -153,33 +158,61 @@ fn begin(
     sim: Res<CombatSim>,
     mut pending: ResMut<PendingCommands>,
     mode: Res<GameMode>,
+    net: Option<Res<NetWorld>>,
     cinema: Res<crate::cutscene::Cinema>,
     sprint: Res<crate::sprint::SprintHud>,
     mut body: Single<&mut PlayerBody, With<Player>>,
     mut cam: Single<&mut OrbitCamera>,
 ) {
+    // Online the room says when it is due; the local sim only knows its own (offline) save.
+    let online = mode.is_online();
+    let due = match (online, net.as_deref()) {
+        (true, Some(n)) => n.ilmari_pending,
+        (true, None) => false,
+        (false, _) => sim.0.ilmari_pending(),
+    };
+    if online && !due {
+        opening.done_online = false;
+    }
     if opening.phase != Phase::Idle
-        || mode.is_online()
+        || (online && opening.done_online)
         || flow.zone != "campus"
         || flow.input_locked()
         || sprint.active
         || cinema.holds_victory()
-        || !sim.0.ilmari_pending()
+        || !due
     {
         return;
     }
-    if sim.0.ilmari_stamp().is_none() {
-        let (unix_secs, utc_offset_min, tz) = device_clock();
+    let (unix_secs, utc_offset_min, tz) = device_clock();
+    if online {
+        opening.done_online = true;
         pending.0.push(Command::StampIlmari {
             unix_secs,
             utc_offset_min,
-            tz,
+            tz: tz.clone(),
         });
-    }
-    // "Lands at the campus spawn": the reveal Marie stands 8 m up the path, facing it.
-    if let Some(&(_, pos, yaw)) = flow.anchors.iter().find(|a| a.0 == "player_spawn") {
-        body.teleport_facing(pos, yaw);
-        cam.set_yaw(yaw);
+        // A save that watched it before is not made to sit through it again for a new room.
+        if sim.0.ilmari_open() {
+            pending.0.push(Command::IlmariReveal);
+            return;
+        }
+        opening.line =
+            Some(combat_core::ilmari::IlmariStamp::new(unix_secs, utc_offset_min, &tz).line());
+        // The server owns where we stand: no teleport to the spawn, the reveal Marie is near it.
+    } else {
+        if sim.0.ilmari_stamp().is_none() {
+            pending.0.push(Command::StampIlmari {
+                unix_secs,
+                utc_offset_min,
+                tz,
+            });
+        }
+        // "Lands at the campus spawn": the reveal Marie stands 8 m up the path, facing it.
+        if let Some(&(_, pos, yaw)) = flow.anchors.iter().find(|a| a.0 == "player_spawn") {
+            body.teleport_facing(pos, yaw);
+            cam.set_yaw(yaw);
+        }
     }
     flow.opening = true;
     opening.phase = opening.start_at.take().unwrap_or(Phase::Screens);
@@ -289,7 +322,10 @@ fn draw(
     overlay.0 = Color::srgba(tint.0, tint.1, tint.2, alpha);
 
     let (met, line) = match sim.0.player() {
-        Some(p) => (sim.0.marie_met(p), copy::ilmari_stamp(&sim.0)),
+        Some(p) => (
+            sim.0.marie_met(p),
+            opening.line.clone().or_else(|| copy::ilmari_stamp(&sim.0)),
+        ),
         None => (0, None),
     };
     let (speaker, speech) = match phase {

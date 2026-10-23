@@ -13,6 +13,7 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - Ill Marie turns up in more places, and she has two errands for you. Bring tissues.
 - Something happens after the credits, and there is plenty to do about it: new places, quests, a daily and some gear that is only as good as the place it is worn.
 - The server room behind the occupied campus's west gate is open: Datacenter Uprising, three rooms and three bosses who read their own release notes. Pick Story (one colleague can see it all) or Full (bring friends) at the gate; Story clears pay half the tokens and lock out separately.
+- The post-credits world, Datacenter Uprising and Human Resources now also work in a co-op room: the room opens it together, and each player earns their own tokens.
 - The Tower's lobby leads to Human Resources: three more rooms, three more bosses and a reorganisation nobody asked for, with its own gear, titles and a closing chapter. Same Story and Full choice at the door, same weekly lockouts.
 
 ### Changed

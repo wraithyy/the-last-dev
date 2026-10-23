@@ -232,7 +232,45 @@ Crate `crates/net_proto`, shared by the server and the client. Dependencies: `co
   have been an email`, `/take this offline`, `/no bandwidth`, `/blocked`, `/ship it`) with
   `command()`, `text()`, `text_at(name)` ("Let's sync on this, Alice.") and `from_command()`. No
   free text on the wire. An emote can carry the targeted teammate's id; the server keeps it only for
-  another member of the room. Version 5 added `TelegraphStarted` / `TelegraphResolved` (enemy ground telegraphs); see `net_proto::PROTOCOL_VERSION` for the current one.
+  another member of the room. Version 36 added `ServerMsg::IlmariPending { on }` and opened `StampIlmari` and `IlmariReveal` to the wire (see "Trust model: Ilmari" below). Version 5 added `TelegraphStarted` / `TelegraphResolved` (enemy ground telegraphs); see `net_proto::PROTOCOL_VERSION` for the current one.
+
+### Trust model: Ilmari (docs/ILMARI_09.md B16)
+
+Online characters are ephemeral and start fresh, so a room's progress is whatever its own sim has
+seen; the server imports nothing from a client's offline save and the post-credits content follows
+the same rule as every other room unlock.
+
+- **Access is the room's own progress.** The Opening is due when the room's sim has killed
+  `agi_prototype` (`Sim::ilmari_pending`); the quest `il_00_wake`, the hatch link and everything behind
+  it (`resistance/1`, `campus_occupied`, the wings) open from the sim's own state. No client claim can
+  create that state: before the credits, `StampIlmari` and `IlmariReveal` are no-ops, no `il_*` unit
+  loads in a base zone and the doors stay shut. There is no "Ilmari unlocked" room option and no QA
+  hook; the spec's lead-set option was dropped in favour of this.
+- **What a client may send.** `StampIlmari` (any member; the sim keeps only the first, and only while
+  the Opening is due; the wire bounds the offset to UTC+14/-12 and the zone to 16 bytes, and the room
+  drops a stamp more than two days from the server's clock; the text is cosmetic: a line on a loading
+  screen) and `IlmariReveal` (any member; the sim needs the stamp first). The first member to finish or
+  skip the Opening reveals it for the room, which marks `il_00_wake` done for every member; a member
+  still watching finishes their own copy, one who joins later never sees it. `SetIlmariStory` is the
+  lead's alone, like `SetLegacy`; the pick belongs to the room and passes with the lead role.
+- **The server tells the client when it is due.** `IlmariPending { on }` goes to a joiner while true
+  and to everyone on each change. Each client plays its own Opening with its own device clock; a
+  client whose offline save already watched it stamps and reveals at once, without the cutscene.
+- **Joiners after the reveal** get `il_00_wake` in their own log (the chain after it needs it) and
+  the door stays open when the member who watched has left (`Unlock::QuestDone` of the Opening quest
+  reads the room's flag, not the members' logs).
+- **Tokens, the daily, quests and the item band are per player or per room as elsewhere.** The
+  token stack lives in the player's bag; the weekly earning cap (200) is per player, not shared by the
+  group. The item band is applied by the server's sim in Ilmari zones; the client's tooltip totals do
+  not track the zone and count Ilmari pieces at the base cap.
+- **Phases and locks are per room.** The occupied campus is a different zone the group walks into,
+  never a toggle on the normal campus; the two phases of two rooms never meet. Wing lockouts
+  (Story and Full keys) are the room's weekly lockout and reach late joiners in `Event::Raid`, with the
+  vote, ballots and last passed policy; `Mirrored` and `Review` events use the sim's usual audiences.
+  Ballot terminals, HR Portals and label printers are `Interact` commands: the prop key is length-capped
+  on the wire, the sim checks the sender's own position and cooldown, and the actor is always the
+  sender.
+- **No companions online**: the companion AI is offline-only content (B15, not built yet).
 
 ### Hosting and operations
 

@@ -79,11 +79,18 @@ pub struct IlmariStamp {
 pub(crate) struct IlmariState {
     pub(crate) stamp: Option<IlmariStamp>,
     pub(crate) revealed: bool,
-    /// Tokens earned in ISO week `.0`: the weekly cap counts against `.1`.
-    pub(crate) tokens: (u32, u32),
+    /// Per player: tokens earned in ISO week `.0`; the weekly cap counts against `.1`. One
+    /// entry offline, one per member in a co-op room so the cap is not shared by the group.
+    pub(crate) tokens: std::collections::BTreeMap<EntityId, (u32, u32)>,
     /// Whether the worn Ilmari pieces were last summed as in Ilmari content.
     worn_in: bool,
+    /// Tick of the first stamp or reveal from a non-lead member; after `LEAD_GRACE_MS` any
+    /// member may finish the Opening, so an AFK lead cannot block the room.
+    pub(crate) asked_at: Option<u64>,
 }
+
+/// How long the room waits for its lead to stamp and reveal before any member may.
+pub(crate) const LEAD_GRACE_MS: u32 = 120_000;
 
 /// `UTC+02:00`, the zone name when the platform has no abbreviation.
 pub fn utc_label(offset_min: i16) -> String {
@@ -169,6 +176,16 @@ impl IlmariStamp {
 }
 
 impl Sim {
+    /// Stamp and reveal come from the room lead (the stamp is the room's Judgment Day and the
+    /// reveal ends everyone's Opening); others only after the lead had `LEAD_GRACE_MS` to do it.
+    pub(crate) fn ilmari_actor_ok(&mut self, actor: EntityId) -> bool {
+        if self.players.first() == Some(&actor) {
+            return true;
+        }
+        let since = *self.ilmari.asked_at.get_or_insert(self.now);
+        self.now >= since + crate::content::ticks(LEAD_GRACE_MS)
+    }
+
     /// The AGI is down and the Opening has not played yet.
     pub fn ilmari_pending(&self) -> bool {
         !self.ilmari.revealed && self.campaign_world().bosses_killed.contains(CREDITS_BOSS)
@@ -218,6 +235,17 @@ impl Sim {
         }
         self.check_unlocks();
         true
+    }
+
+    /// A player joining a room whose Opening has played is past it too: the reveal marked the
+    /// members of that moment, and the chain after it needs the quest in the joiner's own log.
+    pub(crate) fn ilmari_on_join(&mut self, pid: EntityId) {
+        if self.ilmari.revealed {
+            let log = self.quest_logs.entry(pid).or_default();
+            if !log.completed.iter().any(|c| c == OPENING_QUEST) {
+                log.completed.push(OPENING_QUEST.to_string());
+            }
+        }
     }
 
     /// Debug/test (`WOW_ILMARI`): the AGI counts as down and the Opening has not played, even on
@@ -299,10 +327,17 @@ impl Sim {
         self.bag_event(pi);
     }
 
-    /// Tokens still earnable this ISO week (`TOKEN_WEEK_CAP`).
+    /// Tokens still earnable this ISO week (`TOKEN_WEEK_CAP`) by the first player.
     pub fn ilmari_tokens_left(&self) -> u32 {
+        self.players
+            .first()
+            .map_or(TOKEN_WEEK_CAP, |p| self.ilmari_tokens_left_of(*p))
+    }
+
+    /// Same for any player of the room.
+    pub fn ilmari_tokens_left_of(&self, pid: EntityId) -> u32 {
         let week = week_index(self.unix_s());
-        let (w, earned) = self.ilmari.tokens;
+        let (w, earned) = self.ilmari.tokens.get(&pid).copied().unwrap_or_default();
         TOKEN_WEEK_CAP.saturating_sub(if w == week { earned } else { 0 })
     }
 
@@ -318,17 +353,21 @@ impl Sim {
             return 0;
         }
         let week = week_index(self.unix_s());
-        if self.ilmari.tokens.0 != week {
-            self.ilmari.tokens = (week, 0);
+        let slot = self.ilmari.tokens.entry(pid).or_default();
+        if slot.0 != week {
+            *slot = (week, 0);
         }
+        let earned = slot.1;
         let held = self.token_count(pi, TOKEN);
         let n = n
-            .min(TOKEN_WEEK_CAP - self.ilmari.tokens.1.min(TOKEN_WEEK_CAP))
+            .min(TOKEN_WEEK_CAP - earned.min(TOKEN_WEEK_CAP))
             .min(TOKEN_STACK_CAP.saturating_sub(held));
         if n == 0 {
             return 0;
         }
-        self.ilmari.tokens.1 += n;
+        if let Some(slot) = self.ilmari.tokens.get_mut(&pid) {
+            slot.1 += n;
+        }
         let inv = &mut self.units[pi].state.inventory;
         match inv.iter_mut().find(|(m, _)| m == TOKEN) {
             Some((_, c)) => *c += n,
@@ -339,8 +378,10 @@ impl Sim {
     }
 
     /// Restores the saved week counter (`ilmari_tok`).
-    pub(crate) fn restore_ilmari_tokens(&mut self, week: u32, earned: u32) {
-        self.ilmari.tokens = (week, earned.min(TOKEN_WEEK_CAP));
+    pub(crate) fn restore_ilmari_tokens(&mut self, pid: EntityId, week: u32, earned: u32) {
+        self.ilmari
+            .tokens
+            .insert(pid, (week, earned.min(TOKEN_WEEK_CAP)));
     }
 
     /// Restores the saved stamp and flag (`ilmari_at`, `ilmari_flags`). A flag without a stamp

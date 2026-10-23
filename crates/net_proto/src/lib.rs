@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 35;
+pub const PROTOCOL_VERSION: u16 = 36;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -40,6 +40,10 @@ pub const MAX_ROOM_LIST: usize = 50;
 pub const MAX_TITLE_CHARS: usize = 24;
 /// Raw titles longer than this are rejected before sanitising.
 pub const MAX_RAW_TITLE_BYTES: usize = 64;
+/// A `StampIlmari` zone offset beyond UTC+14:00 / UTC-12:00 is not a real zone.
+pub const MAX_UTC_OFFSET_MIN: u16 = 14 * 60;
+/// Zone abbreviations ("CEST", "UTC+02:00") are short; the sim keeps at most nine characters.
+pub const MAX_TZ_BYTES: usize = 16;
 /// Sanitised display names (`sanitize_name`) are at most this long.
 pub const MAX_NAME_CHARS: usize = 16;
 
@@ -185,6 +189,12 @@ pub enum ServerMsg {
         public: bool,
         title: String,
         leader: EntityId,
+    },
+    /// The room's AGI is down and its Opening has not been revealed yet (docs/ILMARI_09.md B.8).
+    /// Sent on join while true and on every change; the client plays its own Opening while `on`
+    /// and answers with `StampIlmari` and `IlmariReveal`, which the server only takes then.
+    IlmariPending {
+        on: bool,
     },
 }
 
@@ -666,8 +676,12 @@ pub fn is_player_command(cmd: &Command) -> bool {
         Command::SetIlmariStory { .. } => true,
         Command::StartMinigame { key } => key.len() <= combat_core::minigame::MINIGAME_KEY_MAX,
         Command::LeaveMinigame | Command::MinigamePick { .. } => true,
-        // Offline-only: the sim has no wall clock and the server never reads one for gameplay.
-        Command::StampIlmari { .. } | Command::IlmariReveal => false,
+        // The stamp is a line of text for the Opening; the room's own sim decides whether the
+        // Opening is due (`ilmari_pending`), and the server checks the clock against its own.
+        Command::StampIlmari {
+            utc_offset_min, tz, ..
+        } => utc_offset_min.unsigned_abs() <= MAX_UTC_OFFSET_MIN && tz.len() <= MAX_TZ_BYTES,
+        Command::IlmariReveal => true,
     }
 }
 
@@ -820,6 +834,7 @@ impl Msg for ServerMsg {
             ServerMsg::PlayerLeft { .. }
             | ServerMsg::Emoted { .. }
             | ServerMsg::Pong { .. }
+            | ServerMsg::IlmariPending { .. }
             | ServerMsg::TickStat { .. } => true,
         };
         if ok {
@@ -2079,17 +2094,27 @@ mod tests {
         for cmd in [
             Command::StampIlmari {
                 unix_secs: 1,
-                utc_offset_min: 0,
+                utc_offset_min: -720,
                 tz: "UTC".into(),
             },
             Command::IlmariReveal,
         ] {
+            let c = ClientMsg::Cmd(cmd);
+            assert_eq!(roundtrip(&c), Ok(c.clone()));
+        }
+        for (offset, tz) in [(841, "UTC"), (-841, "UTC"), (0, "a very long zone name")] {
             assert_eq!(
-                roundtrip(&ClientMsg::Cmd(cmd)),
+                roundtrip(&ClientMsg::Cmd(Command::StampIlmari {
+                    unix_secs: 1,
+                    utc_offset_min: offset,
+                    tz: tz.into(),
+                })),
                 Err(ProtoError::IllegalCommand),
-                "the Opening is offline-only"
+                "{offset} {tz}"
             );
         }
+        let pending = ServerMsg::IlmariPending { on: true };
+        assert_eq!(roundtrip(&pending), Ok(pending.clone()));
         let long_key = ClientMsg::Cmd(Command::StartMinigame {
             key: "k".repeat(combat_core::minigame::MINIGAME_KEY_MAX + 1),
         });

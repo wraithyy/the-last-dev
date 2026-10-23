@@ -195,6 +195,8 @@ pub struct NetWorld {
     cleared: BTreeSet<String>,
     bosses_killed: BTreeSet<String>,
     unlocked: BTreeSet<String>,
+    /// The room's AGI is down and its Opening has not been revealed (`ServerMsg::IlmariPending`).
+    pub ilmari_pending: bool,
     tick: u64,
     cooldowns: HashMap<SpellId, (u64, u32)>,
     gcd: (u64, u32),
@@ -247,6 +249,7 @@ impl NetWorld {
             cleared: BTreeSet::new(),
             bosses_killed: BTreeSet::new(),
             unlocked: BTreeSet::new(),
+            ilmari_pending: false,
             tick: 0,
             cooldowns: HashMap::new(),
             gcd: (0, 0),
@@ -276,6 +279,18 @@ impl NetWorld {
 
     /// The `Welcome` state snapshots do not carry: this player's quest log and the zones the
     /// group cleared or opened before the join.
+    /// `IlmariPending`. The reveal marks the opening quest done in every member's log without a
+    /// quest event, so the end of the announcement is when this view records it.
+    pub fn set_ilmari_pending(&mut self, on: bool) {
+        let revealed = self.ilmari_pending && !on;
+        self.ilmari_pending = on;
+        let quest = combat_core::ilmari::OPENING_QUEST;
+        if revealed && !self.quests.completed.iter().any(|q| q == quest) {
+            self.quests.active.retain(|q| q.id != quest);
+            self.quests.completed.push(quest.to_string());
+        }
+    }
+
     pub fn apply_welcome(&mut self, quests: &QuestSnap, cleared: &[String], unlocked: &[String]) {
         self.quests = quests.to_log();
         self.cleared.extend(cleared.iter().cloned());
@@ -1233,8 +1248,8 @@ impl SimRead for NetWorld {
             .units
             .get(&self.you)
             .map_or(&[][..], |u| u.equipped.as_slice());
-        // Ilmari content is offline-only (docs/ILMARI_09.md B.8), so online an Ilmari piece is
-        // always worn outside it and counts at the base item-level cap.
+        // The server applies the Ilmari item band in Ilmari zones; this view does not track the
+        // zone, so its totals count an Ilmari piece at the base item-level cap.
         self.content
             .economy
             .player_totals(&self.content, self.inventory(), equipped, false)

@@ -207,13 +207,15 @@ impl Sim {
         hr.ballots.clear();
         if !self.raid.story {
             let mut pool = v.policies.clone();
-            for k in 0..usize::from(v.show) {
+            // Content may list fewer policies than `show`: offer what exists, never panic.
+            let show = usize::from(v.show).min(pool.len());
+            for k in 0..show {
                 let j = k + self.rng.below((pool.len() - k) as u32) as usize;
                 pool.swap(k, j);
             }
             let hr = &mut self.raid.hr;
-            hr.offered = pool[..usize::from(v.show)].to_vec();
-            hr.ballots = vec![0; usize::from(v.show)];
+            hr.offered = pool[..show].to_vec();
+            hr.ballots = vec![0; show];
         }
         self.raid_broadcast();
     }

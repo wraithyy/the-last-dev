@@ -476,6 +476,10 @@ impl Sim {
             Unlock::ZoneCleared(z) => self.world.cleared.contains(z),
             Unlock::BossKilled(k) => self.world.bosses_killed.contains(k),
             // The zone is shared, so one member's turn-in opens it for the whole group.
+            // The Opening is the room's: it stays done after the member who watched has left.
+            Unlock::QuestDone(q) if q == crate::ilmari::OPENING_QUEST && self.ilmari.revealed => {
+                true
+            }
             Unlock::QuestDone(q) => self
                 .quest_logs
                 .values()

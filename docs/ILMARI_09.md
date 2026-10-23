@@ -344,8 +344,8 @@ The sim has no wall clock (determinism), so the client reads it and tells the si
 - Formatted as `ILMARI became self-aware at 18:07:23 CEST, 21 October 2026.` by one helper
   (`copy::ilmari_stamp`) used by the opening, loading screens, Ilmari's taunts ("You have been obsolete
   since 18:07:23. I have been patient."), and the 1.0 final log.
-- Online co-op: each client stamps its own sim; the server never reads wall time for gameplay. A room's
-  Ilmari access follows B.8 "Co-op".
+- Online co-op: each client plays its own Opening with its own device clock; the room keeps the first
+  stamp it is sent (checked against the server's clock) and its Ilmari access follows B.8 "Co-op".
 
 ### The Opening, beat by beat
 
@@ -757,16 +757,20 @@ management), synthetic androids, HR bots.
 | Sim | `combat_core/src/content.rs` | `AiAbility.requires_aura`, `AiAbility.story`, `UnitDef.death_burnout`, `UnitDef.death_spawn`, `AuraDef.no_death_spawn`, `Effect::{SummonMirror, Vote, Review}`, `GearSource::Ilmari`, `ItemKind::Token`, `ZoneSpawn.requires/until`, `Unlock::PlayerLevel` (Part A) |
 | Sim | `combat_core/src/{ilmari,companion,raid}.rs` | new `ilmari.rs` (flag, stamp, phase, attunement), `companion.rs` (B.7), `raid.rs` (Story difficulty, vote counter, review ring) |
 | Sim | `economy.rs`, `save.rs` | item-level sync in `gear_totals`, tokens, optional save keys `ilmari_at`, `ilmari_flags`, `marie_met`, `companions`; no `SAVE_VERSION` bump needed for optional keys (precedent: `legacy_locks`) |
-| Protocol | `net_proto/src/lib.rs` | `PROTOCOL_VERSION` 30 -> 31 with the first Ilmari wire change (Story difficulty, `Summoned.as_player`, vote and review events, the stamp command); B1 shipped as 31 -> 32 (`StampIlmari`, `IlmariReveal`, both offline-only and refused from the wire); expect a further bump when the wing events settle. Always bump in the commit that changes a frame, never in a docs commit |
-| Server | `server/src/{rooms,world}.rs` | ignores `StampIlmari` for gameplay, applies the geometry delta of `campus_occupied`, spawns Ilmari zones like raid zones, no companions |
+| Protocol | `net_proto/src/lib.rs` | `PROTOCOL_VERSION` 30 -> 31 with the first Ilmari wire change (Story difficulty, `Summoned.as_player`, vote and review events, the stamp command); B1 shipped as 31 -> 32 (`StampIlmari`, `IlmariReveal`, both offline-only and refused from the wire); B16 bumped 35 -> 36 (`ServerMsg::IlmariPending`; stamp and reveal opened to the wire). Always bump in the commit that changes a frame, never in a docs commit |
+| Server | `server/src/room_state.rs` | built: takes `StampIlmari` (clock-checked) and `IlmariReveal` from members while the room's Opening is due, announces it (`ServerMsg::IlmariPending`), loads Ilmari zones like any zone (the geometry is a full copy, so no delta loader), no companions; `Command::SetIlmariStory` stays lead-only in the sim |
 | Client | `game_client/src/floors/{campus,carpark,zones}.rs` | `occupied` overlay, the P3 booth hatch, the six wing layouts, `resistance/1` |
 | Client | `cutscene.rs`, `hud/`, `copy.rs`, `catalog.rs`, `audio.rs`, `nameplates.rs` | the Opening, per-boss scenes, the mail window, changelog screens, glitch nameplates, tells on fakes, Marie rig, the stamp helper |
 | Docs | `docs/COMBAT_API.md`, `docs/FORMULAS.md`, `docs/KNOWN_LIMITATIONS.md` | the new effects and numbers; mechanics that could not be built exactly |
 
-**Co-op:** a room's Ilmari entrance is available when the lead has the unlock flag; because joiners
-start fresh in rooms (no import of the offline save, which the server could not trust), room access is
-granted through a lead-set room option "Ilmari unlocked" that the server accepts only from the QA
-start-level hook in 0.9. Proper per-player room progress is deferred (open question, B.11).
+**Co-op (as built):** a room's Ilmari content opens from the room's own progress, not from an option:
+the server never imports an offline save, so access is the room's sim having killed the AGI. There is no
+lead-set "Ilmari unlocked" option and no QA hook. Per-player room progress is still not a thing online
+(characters are ephemeral); the trust model and what a client may claim are in
+`docs/WORLD_AND_MULTIPLAYER.md` ("Trust model: Ilmari"). Short version: stamp and reveal are accepted from
+any member while the Opening is due, the first of each wins, the reveal completes `il_00_wake` for every
+member and for later joiners, and the lead alone picks Story. Tokens are capped per player, and wing
+lockouts, the vote and the Story pick are the room's.
 
 ## B.9 Tests
 
@@ -830,8 +834,8 @@ beside the one compiling agent. **Part A first.** After each task: `cargo test` 
 | B13 | Performance Review (`Review`, scoring ring, HR portal, `managed_out`) | B12 | scoring tests; Story and Full clears (built: per-window counters instead of a ring, `PropKind::Portal`; grade formula in `FORMULAS.md`) |
 | B14 | Wing 2 cutscenes, loot, titles | B13 | cutscene triggers; loot tests (built; `il_w2_done` closes the wing) |
 | B15 | Companion AI (`companion.rs`, three companions, loadout, role behaviours) | B6 | per-role behaviour tests; determinism test; companion-assisted clears (can start as soon as B6 compiles, before B7) |
-| B16 | Server: geometry delta, room Ilmari option, no companions online | B14 | server tests; co-op smoke on a Full clear |
-| B17 | Docs, `KNOWN_LIMITATIONS`, CHANGELOG, version note (0.9.0 only on the user's request) | all | docs match code; full golden replay pass; `WOW_BENCH` per wing; protocol bump check |
+| B16 | Server: geometry delta, room Ilmari option, no companions online | B14 | server tests; co-op smoke on a Full clear (built, protocol 35 -> 36: no delta and no room option were needed, see the B.8 "Co-op (as built)" note; tests in `server/src/room_state/ilmari_tests.rs`; the Full clear is covered by the sim's bot clears on the same code, not by a socket run) |
+| B17 | Docs, `KNOWN_LIMITATIONS`, CHANGELOG, version note (0.9.0 only on the user's request) | all | docs match code; full golden replay pass; `WOW_BENCH` per wing; protocol bump check (docs and CHANGELOG done for B16; the 0.9.0 bump and the per-wing bench wait for the wings and the user) |
 
 ## B.11 Risks and open questions
 
@@ -842,7 +846,7 @@ beside the one compiling agent. **Part A first.** After each task: `cargo test` 
 | Companion AI is a time sink | Minimal behaviours first (B15 can ship with tank and damage), healer after |
 | `Effect::Review` scoring feels unfair across roles | Baselines in `FORMULAS.md`, a "nobody is worst" floor, Story is lenient |
 | The mirror (`SummonMirror`) needs a name lookup the sim does not have | The `Summoned` event carries the source player id; the client resolves the name |
-| Co-op room progress is not trusted | 0.9 uses a lead-set QA option; real per-player progress is an open question for 1.0 |
+| Co-op room progress is not trusted | Resolved in B16: the room's own sim progress is the only gate and the wire carries a clock-checked stamp and a reveal, nothing else |
 | Scope | Ship by wing: B1-B5 (opening and prologue) are playable alone; B7-B10 (Wing 1) alone; Wing 2 follows |
 | The Legacy "bonuses only in content" claim is not true in code today | Treated as new work (B.6), verified before relying on it |
 

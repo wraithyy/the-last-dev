@@ -47,6 +47,8 @@ const POSITIONS_EVERY_TICKS: u64 = 3;
 const KNOCK_WINDOW_S: f32 = 1.0;
 /// Float noise a stunned player's reports may carry (a facing-only update, a stop flag).
 const STUNNED_SLACK_M: f32 = 0.05;
+/// How far a client's stamp may sit from the server's clock (wrong date, not wrong zone).
+const MAX_STAMP_SKEW_S: u64 = 2 * 24 * 3600;
 /// One player alone in an exit takes the group along only after this long and only out of
 /// combat, so a single griefer cannot yank everyone else through a door mid-fight.
 const EXIT_DWELL: std::time::Duration = std::time::Duration::from_secs(3);
@@ -100,6 +102,8 @@ pub struct RoomState {
     pub title: String,
     /// Leader named by the last `RoomSettings`, so a leader change is announced once.
     leader_sent: EntityId,
+    /// What the last `IlmariPending` said, so a change goes out once.
+    ilmari_pending_sent: bool,
 }
 
 /// What the public room list shows about a room; refreshed by the room task.
@@ -183,6 +187,7 @@ impl RoomState {
             public: false,
             title: String::new(),
             leader_sent: 0,
+            ilmari_pending_sent: false,
         }
     }
 
@@ -332,6 +337,12 @@ impl RoomState {
         }
         let settings = self.settings();
         self.push(Audience::Only(player), &settings);
+        if self.sim.ilmari_pending() {
+            self.push(
+                Audience::Only(player),
+                &ServerMsg::IlmariPending { on: true },
+            );
+        }
         true
     }
 
@@ -391,6 +402,13 @@ impl RoomState {
                 // account if pets ever grant more than a junk sweep.
                 if let combat_core::Command::SummonPet { pet } = &cmd {
                     self.sim.grant_pet(eid, pet);
+                }
+                // The stamp is a line of text on a loading screen, but it is stored with the
+                // room: a device clock days off the server's is a lie, not a time zone.
+                if let combat_core::Command::StampIlmari { unix_secs, .. } = &cmd
+                    && unix_secs.abs_diff(self.sim.unix_s()) > MAX_STAMP_SKEW_S
+                {
+                    return;
                 }
                 self.sim.apply_as(eid, cmd)
             }
@@ -515,6 +533,11 @@ impl RoomState {
         }
         self.route(&routed);
         self.push_timers(&routed);
+        let pending = self.sim.ilmari_pending();
+        if pending != self.ilmari_pending_sent {
+            self.ilmari_pending_sent = pending;
+            self.broadcast(None, &ServerMsg::IlmariPending { on: pending });
+        }
         let now = self.sim.now().0;
         if self.snapshot_due || now.is_multiple_of(SNAPSHOT_EVERY_TICKS) {
             self.snapshot_due = false;
@@ -780,6 +803,10 @@ impl RoomState {
         })
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod ilmari_tests;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]

@@ -328,6 +328,7 @@ impl Sim {
         self.raid_on_join(id);
         self.ladder_on_join(id);
         self.burnout_on_join(id);
+        self.ilmari_on_join(id);
         id
     }
 
@@ -342,6 +343,7 @@ impl Sim {
         self.despawn(i);
         self.players.retain(|p| *p != id);
         self.quest_logs.remove(&id);
+        self.ilmari.tokens.remove(&id);
         self.live.tasks.remove(&id);
         self.duels.next_request.remove(&id);
         self.burnout_on_leave(id);
@@ -825,10 +827,14 @@ impl Sim {
                 utc_offset_min,
                 tz,
             } => {
-                self.stamp_ilmari(unix_secs, utc_offset_min, &tz);
+                if self.ilmari_actor_ok(actor) {
+                    self.stamp_ilmari(unix_secs, utc_offset_min, &tz);
+                }
             }
             Command::IlmariReveal => {
-                self.reveal_ilmari();
+                if self.ilmari_actor_ok(actor) {
+                    self.reveal_ilmari();
+                }
             }
             Command::SetIlmariStory { story } => self.set_ilmari_story(actor, story),
             other => self.apply_named(other),

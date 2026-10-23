@@ -133,8 +133,10 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - The stamp shows on one full-screen overlay, not on every in-world screen (tower sign, LED wall,
   scooter docks): world signs are baked textures with no runtime text. The chord and the sirens have no
   sound, and Marie does not walk to the tower; the reveal retires her where she stands.
-- Offline only. The sim has no wall clock, so the client stamps it; online rooms never take
-  `StampIlmari`/`IlmariReveal`, so the Opening does not play in co-op until room progress exists (B.8).
+- The sim has no wall clock, so the client stamps it. Online, every client plays its own Opening
+  when the room announces it (`IlmariPending`); the first member to finish or skip it reveals it for
+  the room, and a member who joins afterwards never sees it. The room keeps the first stamp sent, not
+  the lead's, and the stamp line each client shows is its own.
 - Native reads the zone with `date +%z %Z`; Windows has no such `date` and stamps UTC. The web build
   has the offset but no abbreviation, so it prints `UTC+hh:mm`. The date is always `D Month YYYY`, 24 h.
 - A player with the "Cough Drops" ticket still open when the Opening plays loses its giver (the queue
@@ -155,8 +157,9 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - Ambient android extras are presentation only (`live/ambient.rs`): they pace fixed lines, do not
   react, and have no sim unit. The "ILMARI" screens are baked textures on the landmarks; the Lab's
   splash is on its east face because its neon takes the front.
-- The Prologue is offline only: online rooms never get the hatch (the Opening needs the offline
-  stamp), and the net client counts Ilmari pieces at the base cap.
+- Online the hatch, the occupied campus, the base, quests, tokens and the item band run on the
+  server's sim like the rest of the room; the net client's tooltip totals do not track the zone and
+  count Ilmari pieces at the base cap. There is no online save: a room's progress ends with the room.
 
 ## Wing 1: Datacenter Uprising (docs/ILMARI_09.md B6-B10)
 
@@ -174,3 +177,12 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - The wall boards (vote, grades) are one shared texture per room, redrawn from the raid view: every board of a room shows the same lines. A copy of the room's state is not stored on the server beyond `RaidView`.
 - The review grades what the sim counted since the previous review, not a rolling 30 s: the first window starts when a boss fight does. Healers who only heal get credit at the healing/absorb rate; a healer with nobody to heal grades low, which is the point and the Story threshold (25%) forgives.
 - The Wing 3 door is not in the game: the closing cutscene only mentions a button that lit and went dark.
+
+## Ilmari co-op: accepted risks (security review 2026-10-23)
+
+- Ballot terminals count every use (the Culture Committee mechanic is running between terminals
+  to lobby), so in a group one player can swing the vote alone. Accepted: it is the designed
+  mechanic and only affects players who chose to group together, not other rooms.
+- Ilmari tokens online live as long as the room session (like the rest of the online inventory),
+  so leaving and rejoining a room starts a fresh weekly cap there.
+- The label printer may tag cables anywhere in the Hydra room, not only near it.
