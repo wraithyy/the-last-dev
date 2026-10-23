@@ -380,6 +380,11 @@
             changelog: "PATCH NOTES|ARCANE SPELLS ARE DEPRECATED.|PLEASE MIGRATE TO PHYSICAL.|(MIGRATION IS NOT SUPPORTED.)"),
         (key: "patch_pair", name: "Patch: Pair Programming", icon: "family", harmful: false, dispel: Never,
             changelog: "PATCH NOTES|PAIR PROGRAMMING ENABLED.|YOU CANNOT OPT OUT.|(STAY WITHIN 8 M OF YOUR PAIR.)"),
+        // Model Collapse's recorder (docs/ILMARI_10.md C.3.3): Overfitting stacks while the party repeats itself,
+        // Underfit opens the free damage window when it varies, the ward is what a recorded absorb becomes.
+        (key: "il_overfitting", name: "Overfitting", icon: "hallucinate_copies", harmful: false, max_stacks: 10, dispel: Never),
+        (key: "il_underfit", name: "Underfit", icon: "restart_pod", harmful: false, damage_taken_pct: 20, dispel: Never),
+        (key: "il_echo_ward", name: "Echo Ward", icon: "padlock", harmful: false, dispel: Never),
         (key: "il_cold_outreach", name: "Cold Outreach", icon: "paper_plane", harmful: true, silence: true, dispel: Magic),
         (key: "il_overrun", name: "Overrun", icon: "hourglass", harmful: false, damage_done_pct: 300, haste_pct: 50, dispel: Never),
         (key: "labelled", name: "Labelled", icon: "sticky", harmful: false, no_death_spawn: true, dispel: Never),
@@ -13093,6 +13098,21 @@
                 player_killed: ["Unfortunately we've decided to move forward with other candidates. Posthumously."],
                 death: ["We'll... be... in... touch... (that is a threat)"],
             ),
+        ),
+        // Wing 3 swarm cluster (docs/ILMARI_10.md C.3.1): one unit that stands for 125 drones, the
+        // client draws them. Not placed in any zone yet; the Scraper Queen's wave (C5) uses it.
+        (
+            key: "il_scraper_swarm", name: "Scraper Swarm", title: "<Respects robots.txt Sometimes>", level: 14, hostile: true,
+            max_hp: 3750, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0,
+            loot: [],
+            swarm: Some((per_drone_hp: 30, eat_per_drone_per_s: 40, speed: 3.5, merge_below: 12, max_clusters: 32)),
+            ai: Some((
+                aggro_m: 0.0, leash_m: 500.0, melee_range_m: 2.5, melee_ms: 1500,
+                melee_damage: 18, chase_speed_mps: 4.0, respawn_ms: 0,
+                abilities: [],
+            )),
         ),
         (
             key: "il_cable", name: "Cable Head", title: "<Not Labelled. That Is the Point.>", level: 12, hostile: true,

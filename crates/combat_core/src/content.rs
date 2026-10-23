@@ -1062,6 +1062,33 @@ pub struct UnitDef {
     /// A Resistance companion: friendly, no `ai`, driven by `companion.rs` instead.
     #[serde(default)]
     pub companion: Option<CompanionDef>,
+    /// A swarm cluster: one unit that stands for a crowd of drones (`swarm.rs`).
+    #[serde(default)]
+    pub swarm: Option<SwarmDef>,
+}
+
+/// A cluster of drones simulated as one unit (docs/ILMARI_10.md C.3.1). The HP pool is
+/// `count * per_drone_hp`, so the drone count is always derived from HP and needs no state of
+/// its own, on the wire or in the sim.
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
+pub struct SwarmDef {
+    pub per_drone_hp: u32,
+    /// Draft integrity eaten per drone per second, in thousandths of an integrity point.
+    pub eat_per_drone_per_s: u32,
+    /// Walking speed toward the nearest draft, metres per second.
+    pub speed: f32,
+    /// A cluster with fewer drones joins a neighbour within `swarm::MERGE_RANGE_M`.
+    pub merge_below: u16,
+    /// Population bound; a spawn past it merges the two smallest clusters first.
+    pub max_clusters: u16,
+}
+
+impl SwarmDef {
+    /// Drones alive in a cluster with `hp` left; the last sliver of HP still counts as a drone.
+    pub fn count(&self, hp: u32) -> u16 {
+        hp.div_ceil(self.per_drone_hp.max(1))
+            .min(u32::from(u16::MAX)) as u16
+    }
 }
 
 /// What a companion does in a fight; the spells are ordinary `Content::spells` entries.

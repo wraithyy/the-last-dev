@@ -119,7 +119,10 @@ impl Sim {
                 continue;
             }
             if let Some(ai) = self.ai_of(i) {
-                self.ai_unit(i, &ai);
+                match self.content.units[self.units[i].def].swarm {
+                    Some(sw) => self.swarm_unit(i, &ai, sw),
+                    None => self.ai_unit(i, &ai),
+                }
             }
         }
     }
@@ -143,7 +146,7 @@ impl Sim {
         }
     }
 
-    fn ai_unit(&mut self, i: usize, ai: &AiDef) {
+    pub(crate) fn ai_unit(&mut self, i: usize, ai: &AiDef) {
         if !self.units[i].state.alive {
             if self.units[i].respawn_at.is_some_and(|t| t <= self.now) {
                 self.respawn_unit(i);

@@ -795,6 +795,21 @@ pub enum Event {
         count: u32,
         sp: u32,
     },
+    /// An illusion cycle began (or, to a joiner, is running): the seeded draw every client
+    /// derives its own fakes from (`illusion::layout`) and the arena they are laid over.
+    IllusionCycle {
+        cycle: u32,
+        salt: u64,
+        arena: crate::illusion::IllusionArena,
+    },
+    /// The boss will replay a recorded cast of `as_player` in `at_ms` at `at_cm` (x, z in
+    /// centimetres): the ghost plays the animation and a telegraph marks the spot.
+    Echoed {
+        as_player: EntityId,
+        kind: crate::echo::EchoKind,
+        at_ms: u32,
+        at_cm: [i32; 2],
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

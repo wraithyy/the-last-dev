@@ -19,7 +19,7 @@
 //! - `WOW_BOSS_PCT=<pct>@<secs>`: the zone boss drops to that HP percent at that time (phase shots).
 //! - `WOW_FPS=1`: log average frame time and drawn mesh count every 3 s (vsync caps the rate, so read the ms).
 //!   `WOW_SHOW_FPS=1` turns the on-screen FPS readout on for the run (settings.rs).
-//! - `WOW_BENCH=lake|plaza|campus|campus_occupied|carpark|raid|tower1`: perf benchmark (see `docs/PERF.md`). Starts in
+//! - `WOW_BENCH=lake|plaza|campus|campus_occupied|carpark|raid|swarm|tower1`: perf benchmark (see `docs/PERF.md`). Starts in
 //!   that scenario's zone/spot, orbits the camera, warms up `WOW_BENCH_WARMUP` s (default 5, after
 //!   the first frame), records `WOW_BENCH_FRAMES` frames (default 600), logs one `BENCH ...` line, exits.
 //!   Native: uncapped present mode and update loop, 1600x900 window (`WOW_BENCH_SCALE=2` emulates retina). Web: `?bench=<name>` (line goes to the console).
@@ -698,7 +698,7 @@ pub struct BenchSpec {
     pub height: f32,
 }
 
-const BENCHES: [BenchSpec; 7] = [
+const BENCHES: [BenchSpec; 8] = [
     // Wellness Park: lake at (-150, -5), water radius ~20.
     BenchSpec {
         name: "lake",
@@ -749,6 +749,16 @@ const BENCHES: [BenchSpec; 7] = [
         target: None,
         radius: 12.0,
         height: 4.0,
+    },
+    // 32 swarm clusters of 75 drones around the player (`swarm_fx::stage_swarm`); the zone is a
+    // stand-in until the Scrape Pit exists.
+    BenchSpec {
+        name: "swarm",
+        zone: "parking_p3",
+        player_at: None,
+        target: None,
+        radius: 22.0,
+        height: 9.0,
     },
     BenchSpec {
         name: "tower1",
@@ -828,6 +838,7 @@ fn run_bench(
     points: Query<&ViewVisibility, With<PointLight>>,
     spots: Query<&ViewVisibility, With<SpotLight>>,
     window: Single<&Window>,
+    drawn: Res<crate::swarm_fx::SwarmDrawn>,
     mut exit: MessageWriter<AppExit>,
 ) {
     if bench.done {
@@ -865,7 +876,7 @@ fn run_bench(
         .unwrap_or(0.0);
     let vis = |it: &mut dyn Iterator<Item = &ViewVisibility>| it.filter(|v| v.get()).count();
     info!(
-        "BENCH scenario={} frames={} avg_ms={avg:.2} p50_ms={:.2} p95_ms={:.2} p99_ms={:.2} max_ms={:.2} fps={:.1} entities={entities:.0} meshes={} meshes_visible={} point_lights={} point_visible={} spot_lights={} spot_visible={} window={}x{}@{:.1}x",
+        "BENCH scenario={} frames={} avg_ms={avg:.2} p50_ms={:.2} p95_ms={:.2} p99_ms={:.2} max_ms={:.2} fps={:.1} entities={entities:.0} meshes={} meshes_visible={} point_lights={} point_visible={} spot_lights={} spot_visible={} window={}x{}@{:.1}x drones_drawn={} drones_claimed={} clusters={}",
         spec.name,
         s.len(),
         pct(&s, 0.5),
@@ -882,6 +893,9 @@ fn run_bench(
         window.physical_width(),
         window.physical_height(),
         window.scale_factor(),
+        drawn.drawn,
+        drawn.claimed,
+        drawn.clusters,
     );
     // The page stays open on the web; the caller reads the console line.
     #[cfg(not(target_arch = "wasm32"))]

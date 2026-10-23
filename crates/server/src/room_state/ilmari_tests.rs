@@ -563,3 +563,64 @@ async fn companions_belong_to_their_owner_and_a_room_stops_at_two() {
     s.world.load(&mut s.sim, "ilmari1/2", None).unwrap();
     assert!(s.sim.companions_of(a).is_empty(), "Full has none");
 }
+
+/// Illusions in a room (docs/ILMARI_10.md C.3.2): both members get the same public salt, each
+/// derives a different fake layout from it, and damage follows the truth whatever either believes.
+#[tokio::test(start_paused = true)]
+async fn illusions_are_cosmetic_in_a_room_and_a_joiner_learns_the_running_cycle() {
+    use combat_core::illusion::{IllusionArena, layout};
+    let mut s = room();
+    s.on_join(0, "Lead", "backend");
+    s.on_join(1, "Dps", "fullstack");
+    s.tick();
+    let (a, b) = (eid_of(&s, 0), eid_of(&s, 1));
+    s.world.load(&mut s.sim, "ilmari1/1", None).unwrap();
+    let source = s.sim.units().find(|u| u.hostile).map(|u| u.id).unwrap();
+    let arena = IllusionArena {
+        x_cm: 0,
+        z_cm: 0,
+        tile_cm: 400,
+    };
+    let cycle = s.sim.illusion_begin(arena, source, 100, 1000);
+    let (_, salt, _) = s.sim.illusion_cycle().unwrap();
+    let out = s.tick();
+    for p in [0, 1] {
+        let got = events(&out, p).into_iter().find_map(|e| match e {
+            Event::IllusionCycle { cycle, salt, .. } => Some((cycle, salt)),
+            _ => None,
+        });
+        assert_eq!(got, Some((cycle, salt)), "member {p} got a different draw");
+    }
+    let (la, lb) = (
+        layout(salt, a, cycle, &arena),
+        layout(salt, b, cycle, &arena),
+    );
+    assert_ne!(la, lb, "two members were shown the same illusion");
+    assert_eq!(la, layout(salt, a, cycle, &arena), "layout is not pure");
+
+    // Standing on a real overflow tile hurts both, whatever each believes is safe.
+    let real = s.sim.illusion_real().unwrap();
+    let k = (0..9).find(|k| real.overflow >> k & 1 == 1).unwrap();
+    let (cx, cz) = arena.tile_center(k);
+    let spot = s.sim.unit(a).unwrap().pos;
+    let pos = Vec3::new(cx as f32 / 100.0, spot.y, cz as f32 / 100.0);
+    let (hp_a, hp_b) = (s.sim.unit(a).unwrap().hp, s.sim.unit(b).unwrap().hp);
+    for e in [a, b] {
+        move_sim(&mut s, e, pos);
+    }
+    for _ in 0..40 {
+        s.tick();
+    }
+    assert!(s.sim.unit(a).unwrap().hp < hp_a && s.sim.unit(b).unwrap().hp < hp_b);
+
+    // A late joiner is told the cycle that is already running.
+    s.sim.illusion_begin(arena, source, 100, 60_000);
+    s.on_join(2, "Late", "devops");
+    let out = s.tick();
+    assert!(
+        events(&out, 2)
+            .iter()
+            .any(|e| matches!(e, Event::IllusionCycle { .. })),
+        "the joiner never saw the cycle"
+    );
+}

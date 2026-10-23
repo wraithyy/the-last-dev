@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 37;
+pub const PROTOCOL_VERSION: u16 = 38;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -925,6 +925,8 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
                 Err(ProtoError::TooMany)
             }
         }
+        // The layout maths squares centimetre offsets in i64: an absurd arena must not reach it.
+        Event::IllusionCycle { arena, .. } if !arena.sane() => Err(ProtoError::BadNumber),
         Event::Yell { text, .. } if text.len() > MAX_TEXT_BYTES => Err(ProtoError::TooMany),
         Event::TalentsChanged { talents, .. } if !talents_ok(talents) => Err(ProtoError::TooMany),
         Event::SprintStarted { status, zones } => check_sprint(status).and(names(zones)),

@@ -102,6 +102,9 @@ impl Sim {
         self.legacy_on_load(id);
         self.raid_on_load(id);
         self.companion_on_load();
+        // An encounter's recorder and hazard cycle belong to the zone that armed them.
+        self.echo_stop();
+        self.illusion_end();
         self.minigame_on_load(id);
         let state = self.world.zones.get(id);
         let recent = state

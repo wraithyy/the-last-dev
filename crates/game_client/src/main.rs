@@ -43,6 +43,7 @@ mod social;
 mod spell_fx;
 mod sprint;
 mod stealth;
+mod swarm_fx;
 mod targeting;
 mod telegraph_fx;
 mod touch;
@@ -160,6 +161,7 @@ fn main() {
         ilmari_open::IlmariOpenPlugin,
         ilmari_world::IlmariWorldPlugin,
         ilmari_wing::IlmariWingPlugin,
+        swarm_fx::SwarmFxPlugin,
     ))
     .add_plugins(social::SocialPlugin)
     .add_plugins(roasts::RoastPlugin)

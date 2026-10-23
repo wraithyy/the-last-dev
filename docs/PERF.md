@@ -5,7 +5,7 @@ to the tables below; always re-run with the same commands.
 
 ## Method
 
-Hook: `WOW_BENCH=<lake|plaza|campus|carpark|raid|tower1>` (`crates/game_client/src/debug.rs`).
+Hook: `WOW_BENCH=<lake|plaza|campus|carpark|raid|swarm|tower1>` (`crates/game_client/src/debug.rs`).
 It starts in the scenario's zone and spot, orbits the camera around a fixed centre (one turn per
 40 s), waits `WOW_BENCH_WARMUP` s (default 5), records `WOW_BENCH_FRAMES` frames (default 600) of
 `Time::delta`, logs one `BENCH ...` line and exits. Native runs use `PresentMode::Immediate`, a
@@ -109,3 +109,24 @@ for a 22% smaller module). First install precaches ~12 MB instead of ~43 MB.
 
 Caveat: macOS throttles an occluded window to 60 Hz even with `PresentMode::Immediate`; keep the
 bench window visible or every scenario reads 16.67 ms.
+
+## Swarm drones (2026-10-23, docs/ILMARI_10.md C.7)
+
+`WOW_BENCH=swarm`: 32 swarm clusters of 75 drones (2,400 claimed) around the player, five drafts,
+staged in Car Park P3 as a stand-in for the Scrape Pit (`swarm_fx::stage_swarm`; `WOW_SWARM=<n>`
+stages the same for screenshots). Native release, M2 Pro, load ~6, one run each, 1600x900 @1x;
+baseline is `carpark` at High: avg 4.50 ms, 4,490 entities. The BENCH line gains `drones_drawn`,
+`drones_claimed` and `clusters`.
+
+| quality | drawn | avg ms | p95 | p99 | max | entities |
+|---|---|---|---|---|---|---|
+| Low | 576 | 4.59 | 5.09 | 5.61 | 13.06 | 6,433 |
+| Medium | 1,184 | 4.49 | 5.01 | 5.33 | 8.10 | 7,041 |
+| High | 2,400 | 4.68 | 5.21 | 5.59 | 7.68 | 8,257 |
+| Ultra | 2,400 | 4.93 | 5.71 | 7.03 | 8.71 | 8,257 |
+
+High meets the avg (<= 8 ms) and p99 (<= 16.7 ms) budgets. Entities are 8,257 against the
+<= 8,000 budget: the scene itself is 4,490 before drones, so the budget needs a rebase (or the
+Scrape Pit's own count) once that zone exists. Ultra draws 2,400 here because only 2,400 are
+claimed (its budget is 4,000). The pooled-entity route holds natively; the web (WebGPU) number is
+not measured yet.

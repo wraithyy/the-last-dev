@@ -534,6 +534,13 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             result.score,
             result.group_score
         ),
+        Event::IllusionCycle { cycle, salt, .. } => format!("illusion cycle {cycle} salt {salt:x}"),
+        Event::Echoed {
+            as_player,
+            kind,
+            at_ms,
+            ..
+        } => format!("echo of {} ({kind:?}) in {at_ms} ms", t(*as_player)),
     };
     format!("[{tick:05}] {body}")
 }
@@ -589,4 +596,30 @@ pub fn geometry() -> std::collections::HashMap<String, Geo> {
             (z.id, geo)
         })
         .collect()
+}
+
+/// Order-sensitive digest of everything a run produced: the event stream plus the final state of
+/// every unit. Two runs of the same seeded scenario must match bit for bit, and a layer that is
+/// supposed to be cosmetic must not move it.
+pub fn sim_hash(sim: &Sim, events: &[(u64, Event)]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for (t, e) in events {
+        t.hash(&mut h);
+        format!("{e:?}").hash(&mut h);
+    }
+    for u in sim.units() {
+        (
+            u.id,
+            u.hp,
+            u.max_hp,
+            u.mana,
+            u.alive,
+            u.pos.x.to_bits(),
+            u.pos.z.to_bits(),
+        )
+            .hash(&mut h);
+        format!("{:?}", u.auras).hash(&mut h);
+    }
+    h.finish()
 }

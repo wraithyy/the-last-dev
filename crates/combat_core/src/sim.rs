@@ -235,6 +235,14 @@ pub struct Sim {
     pub(crate) ilmari: crate::ilmari::IlmariState,
     /// Resistance companions: each player's loadout and the units out in the zone (`companion.rs`).
     pub(crate) companions: crate::companion::CompanionState,
+    /// Drafts the swarm clusters eat (`swarm.rs`).
+    pub(crate) swarm: crate::swarm::SwarmState,
+    /// The running hazard cycle of an illusion encounter (`illusion.rs`).
+    pub(crate) illusion: crate::illusion::IllusionState,
+    /// The action recorder of an armed encounter (`echo.rs`).
+    pub(crate) echo: crate::echo::EchoState,
+    /// True while an area spell resolves its effects: swarm clusters take a bigger share.
+    pub(crate) area_hit: bool,
     /// Ground of the loaded zone, and of every zone a loader registered (`terrain.rs`).
     pub(crate) terrain: crate::terrain::Terrain,
     pub(crate) zone_terrains: BTreeMap<String, crate::terrain::Terrain>,
@@ -279,6 +287,10 @@ impl Sim {
             quest_rt: Default::default(),
             ilmari: Default::default(),
             companions: Default::default(),
+            swarm: Default::default(),
+            illusion: Default::default(),
+            echo: Default::default(),
+            area_hit: false,
             terrain: Default::default(),
             zone_terrains: BTreeMap::new(),
         }
@@ -728,6 +740,9 @@ impl Sim {
         self.update_auto_attack();
         self.update_ai();
         self.update_companions();
+        self.update_swarms();
+        self.update_illusion();
+        self.update_echo();
         self.update_telegraphs();
         self.update_wander();
         self.update_escorts();
@@ -1598,6 +1613,7 @@ impl Sim {
             self.spell_yell(ci, spell);
         }
         self.note_cast(ci, spell.id);
+        self.echo_record(ci, spell);
         // Telegraphs land later in `update_telegraphs`, for either side (Batch Job).
         if spell.telegraph.is_some() {
             let ti = target.and_then(|t| self.index(t));
@@ -1607,6 +1623,7 @@ impl Sim {
             Some(area) => self.area_targets(ci, area),
             None => target.and_then(|t| self.index(t)).into_iter().collect(),
         };
+        self.area_hit = spell.area.is_some();
         for e in spell.effects() {
             if e.caster_centric() {
                 self.apply_effect(ci, spell, e, None);
@@ -1616,6 +1633,7 @@ impl Sim {
                 }
             }
         }
+        self.area_hit = false;
         self.spend_bonus_pct = 0;
         if let (None, [primary]) = (spell.area, targets.as_slice())
             && let Some((extra, pct)) = self.perk_splash(ci, spell, *primary)
@@ -1730,6 +1748,7 @@ impl Sim {
             return self.deal_damage(target, source, hit);
         }
         let amount = self.modified_damage(source, ti, amount);
+        let amount = self.swarm_crowd(ti, amount);
         let amount = self.sprint_damage(source, ti, amount, spell, school);
         let amount = if duel {
             crate::duel::pvp_amount(amount)
@@ -1819,6 +1838,8 @@ impl Sim {
             self.duel_won(source, target);
         } else if hp == 0 {
             self.die(ti, Some(source));
+        } else {
+            self.swarm_after_hit(ti);
         }
     }
 

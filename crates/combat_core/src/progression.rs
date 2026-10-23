@@ -145,7 +145,11 @@ impl Sim {
     pub(crate) fn rescale_group_hp(&mut self) {
         for i in 0..self.units.len() {
             let u = &self.units[i];
-            if u.despawned || self.is_player(u.state.id) {
+            // A cluster's pool is its drone count, not a function of the group size.
+            if u.despawned
+                || self.is_player(u.state.id)
+                || self.content.units[u.def].swarm.is_some()
+            {
                 continue;
             }
             let (old_max, hp, mana, level) =

@@ -128,6 +128,16 @@ impl Quality {
         }
     }
 
+    /// Swarm drones drawn at once, shared across clusters (docs/ILMARI_10.md C.7).
+    pub fn drone_budget(self) -> usize {
+        match self {
+            Quality::Low => 600,
+            Quality::Medium => 1200,
+            Quality::High => 2400,
+            Quality::Ultra => 4000,
+        }
+    }
+
     /// Most point lights worth lighting at once (keeps the low end cheap).
     #[allow(dead_code)] // consumed by the render round's light, water and particle code
     pub fn max_lights(self) -> usize {

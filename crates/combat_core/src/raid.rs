@@ -444,6 +444,7 @@ impl Sim {
         if quiet != RaidView::default() {
             self.emit_to(player, Event::Raid { view });
         }
+        self.illusion_on_join(player);
     }
 
     /// The door from outside into a raid opens only with everyone at the level cap (a dungeon:

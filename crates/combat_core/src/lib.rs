@@ -12,12 +12,14 @@ pub mod content;
 pub mod corporate;
 pub mod dailies;
 pub mod duel;
+pub mod echo;
 pub mod economy;
 mod effects;
 pub mod endgame;
 mod floors;
 pub mod geom;
 mod hr;
+pub mod illusion;
 pub mod ilmari;
 pub mod legacy;
 pub mod live;
@@ -31,6 +33,7 @@ mod rng;
 mod save;
 mod sim;
 pub mod sprint;
+pub mod swarm;
 pub mod talents;
 pub mod targeting;
 pub mod teambuilding;
@@ -53,8 +56,8 @@ pub use content::{
     EnrageDef, Execute, FleeDef, FrontalShield, ITEM_DESC_MAX, ITEM_STACK_CAP, IdlePose, ItemBonus,
     ItemDef, ItemKind, ItemTotals, LevelDef, LootEntry, MAX_ACTION_BAR, MobScaling, Objective,
     OpenerDef, PackDef, PeriodicDef, PhaseDef, QuestDef, QuestGiver, QuestReward, Role, School,
-    SpellDef, SpellId, SpellTarget, TOKEN_STACK_CAP, TelegraphAt, TelegraphDef, UnitDef, Unlock,
-    XpRules, YellDef, ZoneDef, ZoneKind, ZoneLink, ZoneSpawn,
+    SpellDef, SpellId, SpellTarget, SwarmDef, TOKEN_STACK_CAP, TelegraphAt, TelegraphDef, UnitDef,
+    Unlock, XpRules, YellDef, ZoneDef, ZoneKind, ZoneLink, ZoneSpawn,
 };
 pub use dailies::{BoardView, GoalSpec, GoalView, SavedTask, TaskState, TaskView};
 pub use duel::{DuelError, DuelOutcome};

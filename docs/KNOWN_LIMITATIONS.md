@@ -186,3 +186,11 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - Ilmari tokens online live as long as the room session (like the rest of the online inventory),
   so leaving and rejoining a room starts a fresh weekly cap there.
 - The label printer may tag cables anywhere in the Hydra room, not only near it.
+
+## Ilmari 0.10 engine pieces (docs/ILMARI_10.md C.3)
+
+- Only the engines exist: no Wing 3 or 4 zone, boss, quest or door yet. The swarm, illusion and recorder hooks are reachable from tests, `Sim::spawn_swarm` and the `WOW_SWARM` QA hook only.
+- Illusions are drawn by the client from the public salt, so a modified client can draw only the real hazards. Accepted for PvE; server-generated per-recipient fakes are a later option.
+- Drones are pooled entities, not sim units: the sim never sees a drone position, and a drone killed by a hit is not individually animated. The drawn count is capped per quality preset, so a Low-quality player sees a smaller cloud than the HP pool claims.
+- The `swarm` bench stages the clusters in Car Park P3 as a stand-in for the Scrape Pit; compare its numbers with `carpark`.
+- Ground Truth stays Ilmari-only, ilvl 20 stays reserved for the 1.0 core.
