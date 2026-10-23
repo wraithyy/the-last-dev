@@ -83,6 +83,11 @@ pub enum PropKind {
     /// you target, else the nearest one. Anyone may use it; `PropDef::class` does it twice as
     /// fast and twice over.
     Label,
+    /// The Culture Committee's ballot terminals: one use adds one to the slot of the open vote
+    /// (`VoteDef::terminals`), with a short cooldown per player.
+    Ballot,
+    /// The HR Portal: an appeal that takes the auras listed in `PropDef::auras` off the user.
+    Portal,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -515,6 +520,17 @@ impl Sim {
             .any(|(r, t)| r + 1 == crate::talents::TALENT_ROWS && t.key == key)
     }
 
+    /// Starts prop `k`'s per-player cooldown; false (and nothing changes) while it still runs.
+    pub(crate) fn prop_ready(&mut self, player: EntityId, k: usize, cooldown_ms: u32) -> bool {
+        let now = self.now;
+        let fun = self.fun.players.entry(player).or_default();
+        if fun.next_use.get(&k).is_some_and(|t| *t > now) {
+            return false;
+        }
+        fun.next_use.insert(k, now + ticks(cooldown_ms));
+        true
+    }
+
     pub(crate) fn interact(&mut self, player: EntityId, key: &str) {
         let Some(pi) = self.index(player).filter(|_| self.is_player(player)) else {
             return;
@@ -550,6 +566,12 @@ impl Sim {
         }
         if def.kind == PropKind::Label {
             return self.use_label_prop(pi, k);
+        }
+        if def.kind == PropKind::Ballot {
+            return self.use_ballot_prop(pi, k);
+        }
+        if def.kind == PropKind::Portal {
+            return self.use_portal_prop(pi, k);
         }
         // Mirrored controls in a fight would be a griefing tool, not a joke; a shuttle would be
         // a free escape.

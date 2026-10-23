@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 34;
+pub const PROTOCOL_VERSION: u16 = 35;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -950,9 +950,13 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
         }
         Event::Raid { view } => {
             names(&view.locked)?;
+            names(&view.vote)?;
             list(view.tethers.len())?;
+            list(view.ballots.len())?;
+            names(std::slice::from_ref(&view.passed))?;
             names(std::slice::from_ref(&view.zone))
         }
+        Event::Review { grades, .. } => list(grades.len()),
         Event::Ladder { view } => {
             list(view.entries.len())?;
             for e in &view.entries {
@@ -1918,6 +1922,13 @@ mod tests {
             locked: vec!["async:icebreaker_facilitator".into()],
             tethers: vec![(4, 7), (9, 12)],
             tether_m: 8,
+            vote: vec![
+                "pol_pizza".into(),
+                "pol_rto".into(),
+                "pol_efficiency".into(),
+            ],
+            ballots: vec![2, 0, 5],
+            passed: "pol_open_plan".into(),
         };
         let ladder = LadderView {
             week: 2_960,
@@ -1939,10 +1950,13 @@ mod tests {
         assert_eq!(roundtrip(&msg), Ok(msg.clone()));
         let cmd = ClientMsg::Cmd(Command::StartWeeklySprint);
         assert_eq!(roundtrip(&cmd), Ok(cmd.clone()));
+        let raid_with_vote = raid.clone();
         let mut many_ties = raid.clone();
         many_ties.tethers = vec![(1, 2); MAX_LIST_LEN + 1];
         let mut long_lock = raid;
         long_lock.locked = vec!["x".repeat(MAX_ITEM_NAME_BYTES + 1)];
+        let mut long_vote = raid_with_vote.clone();
+        long_vote.vote = vec!["p".repeat(MAX_ITEM_NAME_BYTES + 1)];
         let mut crowd = ladder.clone();
         crowd.entries = vec![LadderEntry::default(); MAX_LIST_LEN + 1];
         let mut long_name = ladder;
@@ -1950,6 +1964,12 @@ mod tests {
         for e in [
             Event::Raid { view: many_ties },
             Event::Raid { view: long_lock },
+            Event::Raid { view: long_vote },
+            Event::Review {
+                grades: vec![(1, 100); MAX_LIST_LEN + 1],
+                worst: None,
+                best: None,
+            },
             Event::Ladder { view: crowd },
             Event::Ladder { view: long_name },
         ] {

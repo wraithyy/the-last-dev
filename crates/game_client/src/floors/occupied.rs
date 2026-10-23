@@ -51,6 +51,7 @@ pub fn overlay(p: &mut Plan) {
     checkpoints(p);
     quest_spots(p);
     gate(p);
+    lobby(p);
 }
 
 /// "ILMARI" on the Tower, the Data Center and the Lab, and a closed sign at each door. Signs
@@ -87,6 +88,18 @@ fn gate(p: &mut Plan) {
         Sign::IlW1Door,
     );
     p.anchor("door:ilmari1/1", at, yaw);
+}
+
+/// The Tower's lobby doors (docs/ILMARI_09.md B.5): the campus's own entrance anchor becomes the
+/// Wing 2 door, so the lobby the marshal guarded is the way into Human Resources once `il_06` is
+/// done. The base campus keeps `door:tower/1`; this zone never linked it.
+fn lobby(p: &mut Plan) {
+    for a in &mut p.anchors {
+        if a.name == "door:tower/1" {
+            a.name = "door:ilmari2/1";
+        }
+    }
+    signpost(p, 7.5, -19.5, true, 2.4, Sign::IlW2Door);
 }
 
 /// Dale's folding table, a laminated sign, crates and a sandbag wall: the Resistance's forward

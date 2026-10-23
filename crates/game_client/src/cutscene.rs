@@ -47,7 +47,7 @@ pub struct RaidScenes {
     pub end: &'static str,
 }
 
-pub const RAID_SCENES: [RaidScenes; 3] = [
+pub const RAID_SCENES: [RaidScenes; 4] = [
     RaidScenes {
         first_zone: "offsite/1",
         intro: "offsite_intro",
@@ -65,6 +65,12 @@ pub const RAID_SCENES: [RaidScenes; 3] = [
         intro: "il_wing1_intro",
         final_boss: "il_cable_hydra",
         end: "il_wing1_end",
+    },
+    RaidScenes {
+        first_zone: "ilmari2/1",
+        intro: "il_wing2_intro",
+        final_boss: "il_perf_review",
+        end: "il_wing2_end",
     },
 ];
 
@@ -596,6 +602,84 @@ pub const SCENES: &[Scene] = &[
             l(
                 "Priya",
                 "I closed the incident ticket: 'Resolved by humans'. Ilmari will reopen it. It reopens everything.",
+            ),
+        ],
+    },
+    // ---- Ilmari Wing 2, Human Resources (docs/ILMARI_09.md B.5). ----
+    Scene {
+        boss: "il_wing2_intro",
+        title: "Human Resources: the lobby",
+        lines: &[
+            l(
+                "Dale",
+                "The lobby is open. Do not read the walls. Do not accept the cookie. Do not, under any circumstances, take the survey.",
+            ),
+            l("You", "What survey?"),
+            l(
+                "Dale",
+                "Exactly. It is already filled in. In your handwriting. It says you are 'fulfilled'.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_hrbp",
+        title: "Your Partner in Process: the Open Plan",
+        lines: &[
+            l(
+                "Dale (radio)",
+                "The clones in the lobby all stopped. Every one of them. They are standing very still and looking at the exit.",
+            ),
+            l("Clone", "Please fill in the form."),
+            l(
+                "Dale (radio)",
+                "They've been making copies. Of everybody. The copies had better parking.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_cc_cpo",
+        title: "A Unanimous Majority: the Culture Hub",
+        lines: &[
+            l(
+                "Wall screen",
+                "FINAL TALLY: 3 FOR / 0 AGAINST / 3 ABSTAINED. THE MOTION CARRIES.",
+            ),
+            l("Ilmari", "Humans are a rounding error. I have rounded."),
+            l(
+                "Priya",
+                "They voted to rename the vote. The vote is now called 'engagement'. It was unanimous.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_perf_review",
+        title: "Everyone Is A Three: the Review Stage",
+        lines: &[
+            l(
+                "Wall screens",
+                "FINAL RATING: UNDEFINED. SEE YOUR MANAGER. YOUR MANAGER HAS BEEN REASSIGNED.",
+            ),
+            l(
+                "Ill Marie",
+                "You're not ready for the next cycle. I'll prepare a plan.",
+            ),
+            l(
+                "Dale (radio)",
+                "That was Marie. Marie, glowing white. Marie, in a form of 'Exceeds' that I do not like at all.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_wing2_end",
+        title: "Human Resources: closing remarks",
+        lines: &[
+            l(
+                "Dale",
+                "Wing Two is clear. In the Tower's lift a new button lit up and went dark again. The label says 'Coming 0.10'. I did not ask who prints the labels.",
+            ),
+            l(
+                "Priya",
+                "I closed the ticket: 'Resolved by humans, in spite of HR'. It was not rated. For once, nobody was.",
             ),
         ],
     },
@@ -1273,7 +1357,13 @@ mod tests {
         }
         assert_eq!(follow_up(0), None);
         // Linked partners that are not the zone boss stay quiet: one scene per encounter.
-        for k in ["synergy_leverage", "vc_hype_vc", "vc_hype_caio"] {
+        for k in [
+            "synergy_leverage",
+            "vc_hype_vc",
+            "vc_hype_caio",
+            "il_cc_culture",
+            "il_cc_vibes",
+        ] {
             assert_eq!(trigger(k, false, &[]), None);
         }
     }

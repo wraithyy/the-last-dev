@@ -536,6 +536,7 @@ impl Sim {
     pub(crate) fn note_telegraph_hit(&mut self, pid: EntityId) {
         if self.is_player(pid) {
             self.quest_rt.telegraph_hit.insert(pid, self.now);
+            self.hr_fail(pid);
         }
     }
 

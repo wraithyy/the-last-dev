@@ -1,19 +1,22 @@
-//! Ilmari Wing 1 on the client (docs/ILMARI_09.md B.4): the changelog on Patch Tuesday's wall
-//! screens, the red lanyard that marks the android candidate on Story, and the Story | Full
-//! switch at the wing door. All presentation: the rules live in `combat_core::raid`.
+//! Ilmari Wings 1 and 2 on the client (docs/ILMARI_09.md B.4, B.5): the changelog on Patch
+//! Tuesday's wall screens, the red lanyard that marks the android candidate on Story, the
+//! Story | Full switch at the wing doors, and Wing 2's live boards (the Committee's vote, the
+//! Review's grades) and the HR Business Partner's copies, whose nameplates glitch. All
+//! presentation: the rules live in `combat_core::raid` and `hr.rs`.
 // Bevy system signatures are inherently wide; splitting them would only obscure data flow.
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
-use crate::combat::{CombatEvent, PendingCommands, SimReady, SimView};
-use crate::floors::{PatchScreen, patch_image};
+use crate::combat::{CombatEvent, PendingCommands, SimReady, SimView, UiNotice};
+use crate::floors::{LiveBoards, PatchScreen, Sign, live_board_image, patch_image};
 use crate::game::{GameFlow, zone_label};
-use crate::hud::{DIM, KEY_RIM, drop_shadow, label, panel_bg, set_text};
+use crate::hud::{Banner, DIM, KEY_RIM, drop_shadow, label, panel_bg, set_text};
+use crate::nameplates::PlateName;
 use crate::player::{Player, PlayerBody};
 use crate::sprint::SprintHud;
 use crate::touch::TouchMode;
 use crate::units::Lanyard;
 use bevy::prelude::*;
-use combat_core::{Command, Event};
+use combat_core::{Command, EntityId, Event};
 use std::collections::HashMap;
 
 /// Red of the Ilmari screens.
@@ -27,10 +30,20 @@ pub struct IlmariWingPlugin;
 
 impl Plugin for IlmariWingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_ui).add_systems(
-            Update,
-            (patch_screens, lanyards, difficulty_switch).in_set(SimReady),
-        );
+        app.init_resource::<Mirrors>()
+            .add_systems(Startup, spawn_ui)
+            .add_systems(
+                Update,
+                (
+                    patch_screens,
+                    lanyards,
+                    difficulty_switch,
+                    vote_board,
+                    grade_board,
+                    mirror_names,
+                )
+                    .in_set(SimReady),
+            );
     }
 }
 
@@ -277,5 +290,246 @@ fn difficulty_switch(
         } else {
             DIM
         };
+    }
+}
+
+/// What each ballot slot of the Culture Hub does, as the wall board says it.
+fn policy_line(key: &str) -> &'static str {
+    match key {
+        "pol_rto" => "RETURN TO OFFICE: SLOWER",
+        "pol_open_plan" => "OPEN PLAN: +25% DAMAGE TAKEN",
+        "pol_efficiency" => "EFFICIENCY: CASTS 30% LONGER",
+        "pol_unlimited_pto" => "UNLIMITED VACATION: -20% HP",
+        "pol_pizza" => "PIZZA FRIDAY: HASTE, WITH STRINGS",
+        _ => "A POLICY",
+    }
+}
+
+fn set_board(
+    handle: Option<&Handle<StandardMaterial>>,
+    sign: Sign,
+    lines: Option<&[String]>,
+    materials: &mut Assets<StandardMaterial>,
+    images: &mut Assets<Image>,
+) {
+    let Some(mut mat) = handle.and_then(|h| materials.get_mut(h)) else {
+        return;
+    };
+    // `None` puts the sign's own picture back (the board's idle text).
+    let image = match lines {
+        Some(l) => live_board_image(sign, l),
+        None => crate::floors::sign_image(sign),
+    };
+    mat.base_color_texture = Some(images.add(image));
+}
+
+/// The Culture Hub's vote boards: the ballot's three slots with what each does and how many have
+/// been cast, then the policy that passed. Redrawn on every change of the raid view. Banner and
+/// notice tell the same to a player who is not looking at a wall.
+fn vote_board(
+    sim: SimView,
+    boards: Res<LiveBoards>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
+    mut banners: MessageWriter<Banner>,
+    mut last: Local<(Vec<String>, Vec<u32>, String)>,
+) {
+    let view = sim.raid_view();
+    let now = (view.vote.clone(), view.ballots.clone(), view.passed.clone());
+    if *last == now {
+        return;
+    }
+    let content = sim.content();
+    let name = |k: &str| {
+        content.aura(k).map_or(k.to_string(), |a| {
+            a.name.trim_start_matches("Policy: ").to_string()
+        })
+    };
+    // A new policy passing is announced once, when the ballot or the pass changes.
+    if now.2 != last.2 && !now.2.is_empty() {
+        banners.write(Banner {
+            title: "POLICY PASSED".into(),
+            subtitle: format!(
+                "{}. Effective immediately. Retroactive, also.",
+                name(&now.2)
+            ),
+            color: Color::srgb(1.0, 0.75, 0.3),
+        });
+    }
+    let lines: Option<Vec<String>> = if !now.0.is_empty() {
+        let mut l = vec!["THE COMMITTEE VOTES".to_string()];
+        for (k, key) in now.0.iter().enumerate() {
+            let slot = ['A', 'B', 'C'].get(k).copied().unwrap_or('?');
+            let n = now.1.get(k).copied().unwrap_or(0);
+            l.push(format!("{slot}  {} ({n})", policy_line(key)));
+        }
+        l.push(if now.2.is_empty() {
+            "USE THE BALLOT TERMINALS".to_string()
+        } else {
+            format!("LAST: {}", name(&now.2).to_uppercase())
+        });
+        Some(l)
+    } else if !now.2.is_empty() {
+        Some(vec![
+            "THE COMMITTEE HAS VOTED".to_string(),
+            "UNANIMOUSLY (3 TO 1, ROUNDED)".to_string(),
+            policy_line(&now.2).to_string(),
+            "THE BALLOT IS SKIPPED ON STORY".to_string(),
+        ])
+    } else {
+        None
+    };
+    set_board(
+        boards.vote.as_ref(),
+        Sign::IlVoteBoard,
+        lines.as_deref(),
+        &mut materials,
+        &mut images,
+    );
+    *last = now;
+}
+
+/// The Review Stage's grade boards: each player's grade of the last review, the one managed out
+/// and the best of them, or the idle board before the first review and after a reset.
+fn grade_board(
+    mut reader: MessageReader<CombatEvent>,
+    sim: SimView,
+    boards: Res<LiveBoards>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
+    mut banners: MessageWriter<Banner>,
+    mut notices: MessageWriter<UiNotice>,
+) {
+    let me = sim.player();
+    let name = |id: EntityId| {
+        sim.unit(id).map_or("?".to_string(), |u| {
+            u.name.to_uppercase().chars().take(14).collect()
+        })
+    };
+    for CombatEvent(e) in reader.read() {
+        match e {
+            Event::Review {
+                grades,
+                worst,
+                best,
+            } => {
+                let mut l = vec!["REVIEW: LAST 30 SECONDS".to_string()];
+                for (id, pct) in grades.iter().rev().take(5) {
+                    let tag = if Some(*id) == *worst {
+                        "  MANAGED OUT"
+                    } else if Some(*id) == *best {
+                        "  EXCEEDS"
+                    } else {
+                        ""
+                    };
+                    l.push(format!("{}  {pct}%{tag}", name(*id)));
+                }
+                l.push("EVERYONE IS A 3".to_string());
+                set_board(
+                    boards.grades.as_ref(),
+                    Sign::IlGradeBoard,
+                    Some(&l),
+                    &mut materials,
+                    &mut images,
+                );
+                if *worst == me && me.is_some() {
+                    banners.write(Banner {
+                        title: "MANAGED OUT".into(),
+                        subtitle: "Return your badge. And your thermos. Or file an appeal at an HR Portal."
+                            .into(),
+                        color: Color::srgb(1.0, 0.35, 0.3),
+                    });
+                } else if *best == me && me.is_some() {
+                    notices.write(UiNotice(
+                        "Exceeds expectations. We will revisit the goalposts.".into(),
+                    ));
+                }
+            }
+            Event::AiState { unit, state }
+                if *state == combat_core::AiState::Evade
+                    && sim.unit(*unit).is_some_and(|u| u.key == "il_perf_review") =>
+            {
+                set_board(
+                    boards.grades.as_ref(),
+                    Sign::IlGradeBoard,
+                    None,
+                    &mut materials,
+                    &mut images,
+                );
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Which player each HR copy wears the name of (`Event::Mirrored`).
+#[derive(Resource, Default)]
+struct Mirrors(HashMap<EntityId, EntityId>);
+
+/// Every 0.4 s the copy's nameplate re-rolls: some letters become noise, the colour flickers
+/// between the enemy red and a cold cyan. The real teammate's plate is steady and blue, so the
+/// copy is the one that will not hold still.
+fn mirror_names(
+    mut reader: MessageReader<CombatEvent>,
+    sim: SimView,
+    time: Res<Time>,
+    mut mirrors: ResMut<Mirrors>,
+    mut plates: Query<(&PlateName, &mut Text, &mut TextColor)>,
+) {
+    for CombatEvent(e) in reader.read() {
+        if let Event::Mirrored { mirror, player } = e {
+            mirrors.0.insert(*mirror, *player);
+        }
+    }
+    if mirrors.0.is_empty() {
+        return;
+    }
+    let tick = (time.elapsed_secs() / 0.4) as u32;
+    for (plate, mut text, mut color) in &mut plates {
+        let Some(owner) = mirrors.0.get(&plate.0).and_then(|p| sim.unit(*p)) else {
+            continue;
+        };
+        let level = sim.unit(plate.0).map_or(13, |u| u.level);
+        text.0 = format!("{level} {}", glitch(&owner.name, tick));
+        color.0 = if tick.is_multiple_of(3) {
+            Color::srgb(0.4, 0.95, 1.0)
+        } else {
+            Color::srgb(1.0, 0.3, 0.3)
+        };
+    }
+}
+
+/// `name` with a few letters swapped for noise, which ones depending on `tick` only.
+fn glitch(name: &str, tick: u32) -> String {
+    const NOISE: [char; 6] = ['#', '@', '%', '&', '0', '$'];
+    name.chars()
+        .enumerate()
+        .map(|(i, c)| {
+            let h = (i as u32 + 1)
+                .wrapping_mul(2_654_435_761)
+                .wrapping_add(tick.wrapping_mul(40_503));
+            if c != ' ' && (h >> 7).is_multiple_of(4) {
+                NOISE[(h >> 13) as usize % NOISE.len()]
+            } else {
+                c
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::glitch;
+
+    #[test]
+    fn a_glitched_name_keeps_its_length_and_changes_between_ticks() {
+        let a = glitch("Josef", 3);
+        assert_eq!(a.chars().count(), 5);
+        assert_eq!(a, glitch("Josef", 3), "the same tick looks the same");
+        assert!(
+            (0..40).any(|t| glitch("Josef", t) != "Josef"),
+            "some tick glitches"
+        );
+        assert!((0..40).any(|t| glitch("Josef", t) != glitch("Josef", t + 1)));
     }
 }

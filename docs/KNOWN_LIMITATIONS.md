@@ -166,3 +166,11 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - Enrage is a damage and haste aura (`il_overrun`) at 150-180 s rather than 7-8 minutes; without it a lone COBOL Dev cleared Full.
 - The patch changelog is baked into sign textures that share one material, so every screen in a room swaps together.
 - The Full bot trio is Backend, Fullstack and Frontend; a healer-in-trio run wiped at the Recruiter and is not a gate.
+
+## Wing 2: Human Resources (docs/ILMARI_09.md B11-B14)
+
+- Story is solo-completable by numbers alone (no companion yet, B15), verified by bots for every class over seeds 7, 42 and 1234; the Full bot trio is Backend, Fullstack and Frontend (no healer, no dispel: they appeal at the HR Portals, lobby the ballot terminals for the policy that hurts bots least and clear without a death). A lone COBOL Dev beats the Full bosses without the enrage, so Full enrages at 118-120 s.
+- The mirror is of a role, not of the player's class: the copy of a tank, a healer or a damage dealer has that role's three-line kit and wears the class model of the role with a cold glow, and its nameplate is the player's name, glitching and red against the teammates' steady blue.
+- The wall boards (vote, grades) are one shared texture per room, redrawn from the raid view: every board of a room shows the same lines. A copy of the room's state is not stored on the server beyond `RaidView`.
+- The review grades what the sim counted since the previous review, not a rolling 30 s: the first window starts when a boss fight does. Healers who only heal get credit at the healing/absorb rate; a healer with nobody to heal grades low, which is the point and the Story threshold (25%) forgives.
+- The Wing 3 door is not in the game: the closing cutscene only mentions a button that lit and went dark.

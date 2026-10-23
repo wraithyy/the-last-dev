@@ -50,6 +50,24 @@ pub struct TwinsDef {
     /// Twins trade places on a swap; a panel stays seated.
     #[serde(default = "yes")]
     pub swap_places: bool,
+    /// The Culture Committee: each swap closes a vote on a raid-wide policy.
+    #[serde(default)]
+    pub vote: Option<VoteDef>,
+}
+
+/// A panel that votes on a policy at every swap (docs/ILMARI_09.md B.5). `show` of the
+/// `policies` are on the ballot; each ballot terminal (a `PropKind::Ballot` prop) adds one to its
+/// slot, and the slot with the most uses over the window passes (ties and silence: the first).
+/// The passed policy is an aura on every living player. Story skips the ballot: `story_policy`
+/// passes every time.
+#[derive(Clone, Debug, Deserialize)]
+pub struct VoteDef {
+    pub policies: Vec<String>,
+    pub show: u8,
+    /// Ballot terminal prop keys, one per ballot slot (`show` of them).
+    pub terminals: Vec<String>,
+    pub duration_ms: u32,
+    pub story_policy: String,
 }
 
 impl TwinsDef {
@@ -169,6 +187,19 @@ impl RaidDef {
             if c.aura(&t.shield_aura).is_none() || t.swap_ms == 0 {
                 return bad("twins need a shield aura and a swap period".into());
             }
+            if let Some(v) = &t.vote
+                && (v.show == 0
+                    || usize::from(v.show) > v.policies.len()
+                    || v.terminals.len() != usize::from(v.show)
+                    || v.duration_ms == 0
+                    || !v.policies.contains(&v.story_policy)
+                    || v.policies.iter().any(|a| c.aura(a).is_none())
+                    || v.terminals
+                        .iter()
+                        .any(|k| !c.world.props.iter().any(|p| p.key == *k)))
+            {
+                return bad("a vote needs known policies, terminals and a story policy".into());
+            }
         }
         for s in &self.sets {
             if !c.economy.gear.iter().any(|g| g.set.as_ref() == Some(s)) {
@@ -213,6 +244,12 @@ pub struct RaidView {
     pub tethers: Vec<(EntityId, EntityId)>,
     /// Tether range in metres.
     pub tether_m: u8,
+    /// The Culture Committee's open vote: the policy auras on the ballot, one per terminal ...
+    pub vote: Vec<String>,
+    /// ... the uses each has had this window ...
+    pub ballots: Vec<u32>,
+    /// ... and the policy that passed last (an aura key, "" before the first).
+    pub passed: String,
 }
 
 impl RaidView {
@@ -279,6 +316,8 @@ pub(crate) struct RaidState {
     /// Guards the linked-HP mirror against recursion.
     linking: bool,
     announce: bool,
+    /// Wing 2's mirrors, votes and review scores (`hr.rs`).
+    pub(crate) hr: crate::hr::HrState,
 }
 
 impl Sim {
@@ -342,6 +381,9 @@ impl Sim {
             },
             tethers: self.raid.tethers.iter().map(|t| (t.a, t.b)).collect(),
             tether_m: max.round().clamp(0.0, 255.0) as u8,
+            vote: self.raid.hr.offered.clone(),
+            ballots: self.raid.hr.ballots.clone(),
+            passed: self.raid.hr.passed.clone(),
         }
     }
 
@@ -387,7 +429,7 @@ impl Sim {
         }
     }
 
-    fn raid_broadcast(&mut self) {
+    pub(crate) fn raid_broadcast(&mut self) {
         let view = self.raid_view();
         self.events.push(Event::Raid { view });
     }
@@ -421,6 +463,7 @@ impl Sim {
         let was = self.in_raid() || !self.raid.tethers.is_empty();
         self.raid.tethers.clear();
         self.raid.next_swap = u64::MAX;
+        self.hr_on_load(id);
         let def = self
             .content
             .raid_of(id)
@@ -453,7 +496,7 @@ impl Sim {
             .map(|r| r.is_dungeon() || !self.raid_locked(boss, self.raid.async_mode))
     }
 
-    fn twins(&self) -> Option<TwinsDef> {
+    pub(crate) fn twins(&self) -> Option<TwinsDef> {
         self.cur_raid().and_then(|r| r.twins.clone())
     }
 
@@ -717,16 +760,19 @@ impl Sim {
         let fighting = idx.iter().any(|&i| self.units[i].state.in_combat);
         if !fighting {
             self.raid.next_swap = u64::MAX;
+            self.vote_reset();
             return;
         }
         if self.raid.next_swap == u64::MAX {
             self.raid.next_swap = self.now + ticks(t.swap_ms);
+            self.vote_open(&t);
             return;
         }
         if self.now < self.raid.next_swap {
             return;
         }
         self.raid.next_swap = self.now + ticks(t.swap_ms);
+        self.vote_close(&t, idx[0]);
         let n = idx.len();
         if t.swap_places {
             // Everyone takes the seat of the next member (two twins simply trade places).
@@ -792,6 +838,7 @@ impl Sim {
     pub(crate) fn update_raid(&mut self) {
         self.update_tethers();
         self.update_twins();
+        self.update_hr();
     }
 
     // ---- kills, loot, lockout ----

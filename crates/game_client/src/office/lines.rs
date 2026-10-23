@@ -355,6 +355,14 @@ pub fn mine(
     if def.kind == PropKind::Label && outcome == 0 {
         return Some("No cable to label. They only come out when there is a fight.".to_string());
     }
+    if def.kind == PropKind::Ballot && outcome == 0 {
+        return Some(
+            "The ballot is closed. The committee votes when it is in session.".to_string(),
+        );
+    }
+    if def.kind == PropKind::Portal && outcome == 0 {
+        return Some("No case to appeal. You have not been managed out. Yet.".to_string());
+    }
     let n = outcome;
     let own_lines = !def.lines.is_empty()
         && !matches!(
@@ -445,7 +453,7 @@ pub fn mine(
             def.name
         ),
         // Answered at the top of the function.
-        PropKind::Class | PropKind::Label => String::new(),
+        PropKind::Class | PropKind::Label | PropKind::Ballot | PropKind::Portal => String::new(),
     })
 }
 
@@ -508,6 +516,8 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::Device => "Operate",
         PropKind::Class => "Use",
         PropKind::Label => "Print a label for the targeted cable",
+        PropKind::Ballot => "Cast a vote (the slot with the most votes wins)",
+        PropKind::Portal => "File an appeal against being managed out",
     };
     let extra = match def.kind {
         PropKind::FireAlarm => "WARNING: every enemy on this floor will come for you.".to_string(),

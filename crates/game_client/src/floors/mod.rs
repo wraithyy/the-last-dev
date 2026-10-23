@@ -20,7 +20,9 @@ mod export;
 mod frontier;
 mod hack24;
 mod ilmari1;
+mod ilmari2;
 mod kit;
+pub use kit::Sign;
 mod lab;
 mod layout;
 mod marie;
@@ -157,6 +159,7 @@ impl Plugin for FloorsPlugin {
             .add_message::<LoadZone>()
             .init_resource::<BlinkMats>()
             .init_resource::<PatchScreen>()
+            .init_resource::<LiveBoards>()
             .add_systems(Startup, spawn_sun)
             // Same frame as the sim floor swap, so movement never slides against old blockers.
             .add_systems(Update, load_floor.after(crate::game::FloorSwap))
@@ -230,6 +233,44 @@ pub fn patch_image(aura: Option<&str>) -> Option<Image> {
         Some(_) => return None,
     };
     Some(textures::tex_image(Tex::Sign(sign)))
+}
+
+/// The picture on a rig's screen part (`rigs.rs`): Patch Tuesday's update face, Performance
+/// Review's rating card.
+pub fn rig_screen(which: &str) -> Option<Image> {
+    use kit::{Sign, Tex};
+    // A `Cuboid` face maps the texture upright on its -Z side and upside down on its +Z side
+    // (rigs face -Z), so the back-of-the-rig screens ask for the flipped picture.
+    let (sign, flipped) = match which {
+        "patch" => (Sign::IlFacePatch, false),
+        "patch_back" => (Sign::IlFacePatch, true),
+        "review" => (Sign::IlFaceReview, false),
+        "review_back" => (Sign::IlFaceReview, true),
+        _ => return None,
+    };
+    Some(if flipped {
+        textures::tex_image_flipped(Tex::Sign(sign))
+    } else {
+        textures::tex_image(Tex::Sign(sign))
+    })
+}
+
+/// A sign's own picture, for putting an idle board back (`ilmari_wing.rs`).
+pub fn sign_image(sign: kit::Sign) -> Image {
+    textures::tex_image(kit::Tex::Sign(sign))
+}
+
+/// A board redrawn at run time (`ilmari_wing.rs`): the sign's colours, these lines.
+pub fn live_board_image(sign: kit::Sign, lines: &[String]) -> Image {
+    textures::live_board(sign, lines)
+}
+
+/// The shared material of the Culture Hub's vote boards and the Review Stage's grade boards
+/// (every board of a sign is one material, like `PatchScreen`).
+#[derive(Resource, Default)]
+pub struct LiveBoards {
+    pub vote: Option<Handle<StandardMaterial>>,
+    pub grades: Option<Handle<StandardMaterial>>,
 }
 
 /// The zone's street lamps for the night: their shared head and ground-pool materials and
@@ -694,6 +735,10 @@ fn load_floor(
     commands.insert_resource(PatchScreen(
         texs.get(&Tex::Sign(kit::Sign::IlPatchIdle)).cloned(),
     ));
+    commands.insert_resource(LiveBoards {
+        vote: texs.get(&Tex::Sign(kit::Sign::IlVoteBoard)).cloned(),
+        grades: texs.get(&Tex::Sign(kit::Sign::IlGradeBoard)).cloned(),
+    });
     commands.insert_resource(StreetLamps {
         head: mats.get(&Mat::StreetLamp).cloned(),
         pool: mats.get(&Mat::LampPool).cloned(),

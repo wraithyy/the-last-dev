@@ -589,6 +589,28 @@ lockout       = per encounter and difficulty ("async:" prefix), UTC day index (u
 rest          = same as the raids: boss_items, async_*_pct, boss_rep, sets
 ```
 
+## Ilmari wings
+
+Item band, tokens and sync: see Gear. Difficulty: Story is the raid's Async scaling (40% HP, 50% damage, one piece at 50%, half the tokens) under its own weekly lockout; Full is the authored unit, built for three. Each boss fight carries an enrage aura (`il_overrun`, +300% damage, +50% haste) that a trio beats and a lone player does not.
+
+```
+              Patch Tuesday  Recruiter  Cable Hydra | HR Partner  Committee  Perf. Review
+HP (Full)         15500        14200      17500     |   11000     3 x 13500     13500   (one shared bar for the panel)
+melee             62           56         52        |   46        36 / 22 / 18  42
+enrage (s)        180          150        170       |   120       118           120
+trio, Full        88-123       117-124    128-144   |   82-100    101-102       93-100   (s, nobody died, seeds 7/42/1234)
+solo, Story       every class clears all three, lowest HP 33%-85% (Wing 2)
+solo, Full        every class fails (a lone COBOL Dev clears Wing 2 without the enrage)
+```
+
+### Wing 2: Human Resources
+
+The mirror (HR Business Partner 2.0): one copy every 40 s of a random living player without one (phase 2, below 50% HP: two at once), 28 s life (Story: one copy every 50 s, 40 s life), `mirrored` makes the copied player deal 30% less while it lives. Copies by role: tank 1300 HP (melee 20, Hold the Line 60), healer 1000 HP (Self-Care heals everything hostile for 240 on a 1.8 s cast), damage 1000 HP (Core Competency 140 on a 2.2 s cast); a copy's HP and damage scale with Story like any enemy.
+
+The vote (Culture Committee): the panel swaps its open member every 30 s (`swap_ms`), which closes a vote. Policies (20 s on every living player, `duration_ms`): Return to Office, five days (players move 30% slower), Open Plan Everything (+25% damage taken), Efficiency Review (casts 30% longer), Unlimited Vacation (-20% max HP), Pizza Friday (+10% haste and 14 damage every 2 s). Three of the five are on the ballot, drawn at the start of each window; a terminal use counts one for its slot, one use per player per 3 s per terminal; most uses wins, a tie or silence goes to the earlier slot. Story: no ballot, Pizza Friday every time. Shielded members take 10% damage (`committee_quorum`, -90%); the shared bar follows the proportional rule of the other panels.
+
+The review (Performance Review): `grade = 100 * max(0, damage + healing + absorb + interrupts * 150 + (tank ? 2 * damage_taken : 0) - 150 * avoidable_hits) / baseline[role]`, over the damage dealt to anything while a boss fights, since the last review (30 s apart, the first 24 s into the fight plus a 3 s cast). Baselines per window: tank 3400, healer 2400, melee 3200, ranged 2600 (the bots in tests/playthrough.rs grade 60-300 on these). `avoidable_hits` are landed telegraphs. The lowest grade is `managed_out` (Full: -25% damage dealt, 12 s, a 420-damage hit at the end unless cleansed by a healer's Dispel or an HR Portal appeal) only if it is under 85 (Story: 25, and the aura is `managed_out_story`: -15% damage, 10 s, no end hit); the highest at 100 or more (and not the managed-out player) gets `employee_of_the_month` (+15% damage, 15 s). Ties go to the earlier player id. A portal appeal has a 15 s cooldown per player.
+
 ## Weekly Sprint ladder
 
 ```

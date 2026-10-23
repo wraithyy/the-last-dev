@@ -43,12 +43,12 @@ pub fn build(level: u8) -> FloorLayout {
 /// Corridor from the arrival, a hall, a corridor to the far pod and three cells off the hall
 /// (one per pack): the Migration's plan with a cell more, because every room here has three
 /// packs and a pack never stands within 8 m of the route.
-const ARRIVAL_X: f32 = -44.0;
-const HALL: (f32, f32, f32) = (-8.0, 26.0, 11.0);
-const CELLS: [(f32, f32); 3] = [(-20.0, -26.0), (6.0, 26.0), (10.0, -26.0)];
-const POD: (f32, f32, f32) = (42.0, 13.0, 12.0);
+pub(super) const ARRIVAL_X: f32 = -44.0;
+pub(super) const HALL: (f32, f32, f32) = (-8.0, 26.0, 11.0);
+pub(super) const CELLS: [(f32, f32); 3] = [(-20.0, -26.0), (6.0, 26.0), (10.0, -26.0)];
+pub(super) const POD: (f32, f32, f32) = (42.0, 13.0, 12.0);
 
-fn pods(p: &mut Plan) {
+pub(super) fn pods(p: &mut Plan) {
     let w = Mat::Wall;
     let ((hx, hhx, hhz), (bx, bhx, bhz), a) = (HALL, POD, ARRIVAL_X);
     p.fp.pod(rounded_rect(pt(a, 0.0), 6.0, 6.0, 3.0, 0.0), w);
@@ -209,12 +209,12 @@ fn patch_screens(p: &mut Plan, spots: &[(f32, f32, f32)]) {
     }
 }
 
-fn lamps(p: &mut Plan, list: &[(f32, f32)], intensity: f32) {
+pub(super) fn lamps(p: &mut Plan, list: &[(f32, f32)], intensity: f32) {
     point_lights(p, list, Color::srgb(1.0, 0.42, 0.38), intensity);
 }
 
 /// Arrival nook shared by the rooms: a coat rack and a plant that has given up.
-fn arrival(p: &mut Plan) {
+pub(super) fn arrival(p: &mut Plan) {
     p.prop(&COAT_RACK, v(-47.0, 0.0, -5.0), 0.0, false);
     sad_plant(p, -48.5, 4.8);
 }

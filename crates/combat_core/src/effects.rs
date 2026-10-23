@@ -312,14 +312,17 @@ impl Sim {
                     duration_ms,
                 },
                 Some(ti),
-            ) => self.apply_aura(
-                ti,
-                aura,
-                *duration_ms,
-                Some(*amount),
-                caster,
-                Some(spell.id),
-            ),
+            ) => {
+                self.hr_absorb(caster, *amount);
+                self.apply_aura(
+                    ti,
+                    aura,
+                    *duration_ms,
+                    Some(*amount),
+                    caster,
+                    Some(spell.id),
+                );
+            }
             (Effect::Interrupt { lockout_ms }, Some(ti)) => {
                 self.cancel_cast(ti, Some(caster), *lockout_ms);
             }
@@ -424,6 +427,39 @@ impl Sim {
                 let at = self.units[ci].state.pos;
                 self.summon(ci, at, unit, *count, *max_alive, *skip);
             }
+            (
+                Effect::SummonMirror {
+                    tank,
+                    healer,
+                    damage,
+                    aura,
+                    life_ms,
+                },
+                _,
+            ) => self.summon_mirror(ci, [tank, healer, damage], aura, *life_ms),
+            (
+                Effect::Review {
+                    worst,
+                    worst_ms,
+                    best,
+                    best_ms,
+                    fine_pct,
+                    interrupt_value,
+                    fail_cost,
+                    baselines,
+                },
+                _,
+            ) => self.review(
+                ci,
+                worst,
+                *worst_ms,
+                best.as_deref(),
+                *best_ms,
+                *fine_pct,
+                *interrupt_value,
+                *fail_cost,
+                baselines,
+            ),
             (
                 Effect::PairUp {
                     aura,
@@ -604,6 +640,7 @@ impl Sim {
         }
         let amount = amount.min(t.max_hp - t.hp);
         t.hp += amount;
+        self.hr_heal(source, amount);
         self.events.push(Event::Heal {
             source,
             target: Self::id_of(ti),

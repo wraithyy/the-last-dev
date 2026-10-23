@@ -733,6 +733,33 @@ pub enum Sign {
     IlLabelHere,
     IlUptime,
     IlRackVote,
+    // Ilmari Wing 2, Human Resources (`ilmari2.rs`). The vote and grade boards are redrawn at
+    // run time (`textures::live_board`); the nine-box is a drawn grid, not lines of text.
+    IlW2Door,
+    IlW2Back,
+    IlW2ToCommittee,
+    IlW2ToReview,
+    IlW2Out,
+    IlCulture1,
+    IlCulture2,
+    IlCulture3,
+    IlWellbeing,
+    IlBeanbag,
+    IlOkr,
+    IlOpenPlan,
+    IlCopies,
+    IlBallotA,
+    IlBallotB,
+    IlBallotC,
+    IlVoteBoard,
+    IlGradeBoard,
+    IlNineBox,
+    IlPortal,
+    IlQuorum,
+    IlReorg,
+    // Faces drawn on the rigs of Wing 1 and Wing 2 bosses (`rigs.rs`, `rig_screen`).
+    IlFacePatch,
+    IlFaceReview,
 }
 
 #[derive(Clone, Debug)]
@@ -1411,6 +1438,10 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
         Sign::MarieCall => (256, 128),
         Sign::IlSplash | Sign::IlScreenA | Sign::IlScreenB | Sign::IlScreenC => (256, 96),
         Sign::IlW1Door | Sign::IlHiring | Sign::IlRackVote => (256, 96),
+        Sign::IlW2Door | Sign::IlCulture1 | Sign::IlCulture2 | Sign::IlCulture3 => (256, 96),
+        Sign::IlWellbeing | Sign::IlOkr | Sign::IlVoteBoard | Sign::IlGradeBoard => (256, 128),
+        Sign::IlNineBox | Sign::IlFaceReview => (192, 192),
+        Sign::IlFacePatch => (256, 192),
         Sign::IlPatchIdle
         | Sign::IlPatchDone
         | Sign::IlPatchMeeting

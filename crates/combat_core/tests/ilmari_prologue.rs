@@ -634,7 +634,7 @@ fn the_phase_toggle_round_trips_and_the_normal_campus_stays_put() {
         occupied
             .links
             .iter()
-            .all(|l| ["resistance/1", "campus", "ilmari1/1"].contains(&l.to.as_str())),
+            .all(|l| ["resistance/1", "campus", "ilmari1/1", "ilmari2/1"].contains(&l.to.as_str())),
         "the closed buildings have no doors in this phase"
     );
     // No normal zone links into the occupation except the booth hatch.

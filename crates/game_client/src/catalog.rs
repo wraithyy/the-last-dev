@@ -2507,6 +2507,149 @@ static TABLE: &[(&str, UnitVisual)] = &[
             &[],
         ),
     ),
+    // ---- Ilmari Wing 2: Human Resources (docs/ILMARI_09.md B.5). The committee are androids
+    // (grey skin) in the three looks HR runs on: executive suit, pizza hoodie, "good vibes" neon.
+    // The mirrors wear the class models of their role with a cold glow; the real teammate's plate
+    // is blue, the copy's glitches in red (`ilmari_wing.rs`). ----
+    (
+        "il_hr_generalist",
+        v(
+            WORKER,
+            2.1,
+            "HR Generalist",
+            "<Generalises. Aggressively.>",
+            &[
+                paint("Shirt", 0.85, 0.88, 0.95),
+                paint("Pants", 0.2, 0.25, 0.4),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_wellness_coach",
+        v(
+            CASUAL_F,
+            1.8,
+            "Wellness Coach (Mandatory)",
+            "<Breathe In. The Deadline Is Out.>",
+            &[
+                paint("Shirt", 0.2, 0.7, 0.65),
+                paint("Pants", 0.25, 0.2, 0.4),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_hr_bot",
+        v("prim/hr_bot", 1.7, "HR Bot", "<Your Call Is Valued>", &[]),
+    ),
+    (
+        "il_mirror_tank",
+        v(
+            BACKEND,
+            1.9,
+            "Copy (Tank)",
+            "<A Perfect Copy. Lower Salary.>",
+            &[glow("Skin", 0.35, 0.8, 1.0)],
+        ),
+    ),
+    (
+        "il_mirror_healer",
+        v(
+            DEVOPS,
+            1.8,
+            "Copy (Healer)",
+            "<A Perfect Copy. Lower Salary.>",
+            &[glow("Skin", 0.35, 0.8, 1.0)],
+        ),
+    ),
+    (
+        "il_mirror_dps",
+        v(
+            ENGINEER,
+            1.8,
+            "Copy (Damage)",
+            "<A Perfect Copy. Lower Salary.>",
+            &[glow("Skin", 0.35, 0.8, 1.0)],
+        ),
+    ),
+    (
+        "il_hrbp",
+        v(
+            SUIT_F,
+            2.4,
+            "HR Business Partner 2.0",
+            "<Your Partner in Process>",
+            &[
+                paint("Black", 0.1, 0.16, 0.34),
+                paint("Shirt", 0.95, 0.95, 0.98),
+                glow("Hair", 0.3, 0.9, 1.0),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_cc_cpo",
+        v(
+            SUIT_M_BALD,
+            2.3,
+            "Chief People Officer",
+            "<Our People Are Our Resources>",
+            &[
+                paint("Black", 0.28, 0.1, 0.22),
+                paint("Shirt", 0.95, 0.95, 0.98),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_cc_culture",
+        v(
+            CASUAL2,
+            2.2,
+            "Head of Culture",
+            "<Pizza Fridays>",
+            &[
+                paint("Shirt", 0.95, 0.5, 0.15),
+                paint("Pants", 0.25, 0.25, 0.3),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_cc_vibes",
+        v(
+            CASUAL3,
+            2.2,
+            "Director of Vibes",
+            "<Vibes. Directed.>",
+            &[
+                glow("Shirt", 0.9, 0.3, 1.0),
+                paint("Pants", 0.2, 0.9, 0.8),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_stakeholder",
+        v(
+            "prim/stakeholder",
+            2.2,
+            "Stakeholder",
+            "<Just A Quick Question>",
+            &[],
+        ),
+    ),
+    (
+        "il_perf_review",
+        v(
+            "prim/perf_review",
+            4.6,
+            "Performance Review",
+            "<Everyone Is A Three>",
+            &[],
+        ),
+    ),
     // ---- VibeCon (raid): lanyard neon on black, the founders in vests ----
     (
         "vc_registration",

@@ -366,6 +366,14 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
         Event::Summoned { unit, summoner } => {
             format!("{} summons {} #{unit}", t(*summoner), t(*unit))
         }
+        Event::Mirrored { mirror, player } => {
+            format!("{} copies {}", t(*mirror), t(*player))
+        }
+        Event::Review {
+            grades,
+            worst,
+            best,
+        } => format!("review {grades:?} worst {worst:?} best {best:?}"),
         Event::Despawned { unit } => format!("#{unit} despawns"),
         Event::FloorLoaded { floor } => format!("floor {floor} loaded"),
         Event::FloorCleared { floor } => format!("floor {floor} cleared"),

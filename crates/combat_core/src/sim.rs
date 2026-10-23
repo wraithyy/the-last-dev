@@ -1653,6 +1653,9 @@ impl Sim {
                 );
             }
         }
+        if let Some(by) = by {
+            self.hr_interrupt(by);
+        }
         self.events.push(Event::CastInterrupted {
             caster: Self::id_of(ci),
             spell: cast.spell,
@@ -1748,6 +1751,7 @@ impl Sim {
         if duel {
             self.duel_hit(ti);
         }
+        self.hr_damage(source, target, dealt);
         self.events.push(Event::Damage {
             source,
             target,

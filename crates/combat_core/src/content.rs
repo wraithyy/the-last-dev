@@ -430,6 +430,37 @@ pub enum Effect {
         radius_m: f32,
         count: u8,
     },
+    /// Caster-centric raid mechanic (the HR Business Partner's copy): a random living player is
+    /// "copied" by a unit of their role (`tank`, `healer` or `damage`, unit keys), summoned beside
+    /// the caster, while the player wears `aura` for as long as the copy lives. The copy dies on
+    /// its own after `life_ms`. `Event::Mirrored` names the pair so the client can show the
+    /// player's name on the impostor.
+    SummonMirror {
+        tank: String,
+        healer: String,
+        damage: String,
+        aura: String,
+        life_ms: u32,
+    },
+    /// Caster-centric raid mechanic (Performance Review): grades every living player on what
+    /// they did since the previous review (see `hr.rs` and docs/FORMULAS.md): the lowest grade
+    /// below `fine_pct` of baseline gets `worst`, the highest at or above 100 gets `best`.
+    Review {
+        worst: String,
+        worst_ms: u32,
+        #[serde(default)]
+        best: Option<String>,
+        #[serde(default)]
+        best_ms: u32,
+        /// Nobody is "worst" while the lowest grade is at least this percent of its baseline.
+        fine_pct: u32,
+        /// What one interrupt is worth, in damage points.
+        interrupt_value: u32,
+        /// What one avoidable hit (a landed telegraph) costs, in damage points.
+        fail_cost: u32,
+        /// Per role: the points a competent player scores in one window.
+        baselines: Vec<(Role, u32)>,
+    },
     Nothing,
 }
 
@@ -442,6 +473,8 @@ impl Effect {
                 | Effect::ThreatSwap
                 | Effect::PairUp { .. }
                 | Effect::Detonate { .. }
+                | Effect::SummonMirror { .. }
+                | Effect::Review { .. }
         )
     }
 
@@ -458,9 +491,13 @@ impl Effect {
                 .collect(),
             Effect::Absorb { aura, .. }
             | Effect::Aura { aura, .. }
+            | Effect::SummonMirror { aura, .. }
             | Effect::PairUp { aura, .. } => {
                 vec![aura.as_str()]
             }
+            Effect::Review { worst, best, .. } => std::iter::once(worst.as_str())
+                .chain(best.iter().map(String::as_str))
+                .collect(),
             Effect::RandomAura { auras, .. } => auras.iter().map(String::as_str).collect(),
             Effect::Detonate { boost_aura } => boost_aura.iter().map(String::as_str).collect(),
             _ => vec![],
@@ -1601,6 +1638,37 @@ impl Content {
                     && self.unit_def(unit).is_none()
                 {
                     return bad(format!("spell {} summons unknown unit {unit}", s.name));
+                }
+                if let Effect::SummonMirror {
+                    tank,
+                    healer,
+                    damage,
+                    life_ms,
+                    ..
+                } = e
+                    && (*life_ms == 0
+                        || [tank, healer, damage]
+                            .iter()
+                            .any(|u| self.unit_def(u).is_none()))
+                {
+                    return bad(format!(
+                        "spell {} mirrors with no life or an unknown unit",
+                        s.name
+                    ));
+                }
+                if let Effect::Review {
+                    baselines,
+                    fine_pct,
+                    ..
+                } = e
+                    && (*fine_pct == 0
+                        || baselines.len() != 4
+                        || baselines.iter().any(|b| b.1 == 0))
+                {
+                    return bad(format!(
+                        "spell {} reviews without a baseline for each of the four roles",
+                        s.name
+                    ));
                 }
                 if let Effect::RandomAura { auras, .. } = e
                     && auras.is_empty()

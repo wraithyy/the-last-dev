@@ -651,6 +651,18 @@ pub enum Event {
     Legacy {
         view: crate::legacy::LegacyView,
     },
+    /// The HR Business Partner copied `player`: `mirror` is the impostor wearing their name.
+    Mirrored {
+        mirror: EntityId,
+        player: EntityId,
+    },
+    /// A Performance Review closed: each living player's grade (percent of the role baseline),
+    /// the one managed out and the one who exceeded expectations.
+    Review {
+        grades: Vec<(EntityId, u32)>,
+        worst: Option<EntityId>,
+        best: Option<EntityId>,
+    },
     /// The raid: zone, difficulty, weekly lockout and tethers; on every change, every raid
     /// zone load (and leaving the raid) and to a joiner.
     Raid {

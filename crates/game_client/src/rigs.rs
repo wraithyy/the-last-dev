@@ -66,6 +66,8 @@ enum Role {
     Plain,
     Door(f32),
     Facade,
+    /// A flat panel wearing a drawn picture (`floors::rig_screen`), lit like a screen.
+    Screen(&'static str),
 }
 
 struct Part {
@@ -115,6 +117,10 @@ impl Part {
         self.rot = deg;
         self
     }
+    /// A panel that shows `picture` (see `floors::rig_screen`), full brightness.
+    fn screen(pos: [f32; 3], size: [f32; 3], picture: &'static str) -> Self {
+        Self::new(Shape::Box, pos, size, [1.0; 3]).role(Role::Screen(picture))
+    }
     fn role(mut self, r: Role) -> Self {
         self.role = r;
         self
@@ -149,6 +155,9 @@ fn parts(kind: &str) -> Vec<Part> {
         "cutover_rack" => cutover_rack(),
         "tentacle_rack" => tentacle_rack(),
         "patch_tuesday" => patch_tuesday(),
+        "perf_review" => perf_review(),
+        "hr_bot" => hr_bot(),
+        "stakeholder" => stakeholder(),
         "cable_hydra" => cable_hydra(),
         "cable_head" => cable_head(),
         "slide_golem" => slide_golem(),
@@ -220,67 +229,208 @@ fn tentacle_rack() -> Vec<Part> {
     v
 }
 
-/// Boss of the Cold Aisle: a tall rack that is mid-update. A progress bar that never finishes,
-/// a spinning reboot cross and a blue siren on top, red LEDs down both flanks.
+/// Boss of the Cold Aisle: a light-grey server monolith, taller than any raid, mid-update. The
+/// face is one big update screen ("Working on updates, 99%", a progress bar that has not moved
+/// since Tuesday, "Don't turn off your computer"), warning tape across the belly, and the update
+/// icons turning on top and at the shoulders. The case is light so it never reads as a black slab.
 fn patch_tuesday() -> Vec<Part> {
     const RED: [f32; 3] = [1.0, 0.08, 0.08];
     const GREEN: [f32; 3] = [0.1, 1.0, 0.3];
+    const CASE: [f32; 3] = [0.42, 0.45, 0.52];
+    const PANEL: [f32; 3] = [0.3, 0.32, 0.38];
+    const TAPE: [f32; 3] = [1.0, 0.8, 0.05];
+    const UPDATE: [f32; 3] = [0.25, 0.65, 1.0];
     let mut v = vec![
-        Part::cube([0.0, 1.9, 0.0], [2.2, 3.5, 1.3], [0.09, 0.1, 0.13]),
-        Part::cube([0.0, 1.85, -0.67], [2.0, 3.2, 0.04], [0.14, 0.15, 0.2]),
-        Part::cube([0.0, 0.12, 0.0], [2.4, 0.24, 1.5], DARK),
-        // The screen: "UPDATING", a bar at 99% that has been at 99% since Tuesday.
-        Part::cube([0.0, 2.5, -0.7], [1.7, 0.9, 0.03], [0.02, 0.05, 0.08]),
-        Part::cube([-0.1, 2.35, -0.72], [1.35, 0.14, 0.02], GREEN).glow(2.5),
-        Part::cube([0.76, 2.35, -0.72], [0.1, 0.14, 0.02], RED)
-            .glow(2.5)
-            .bob(0.01, 9.0),
-        Part::cube([0.0, 2.75, -0.72], [1.0, 0.1, 0.02], CYAN).glow(2.0),
-        // Eyes and a mouth of "Restart now".
-        Part::cube([-0.5, 3.3, -0.7], [0.5, 0.16, 0.03], RED).glow(3.0),
-        Part::cube([0.5, 3.3, -0.7], [0.5, 0.16, 0.03], RED).glow(3.0),
-        Part::cube([0.0, 1.3, -0.7], [1.4, 0.3, 0.03], HOT).glow(2.5),
-        Part::cyl([0.0, 3.8, 0.0], 0.5, 0.18, DARK),
-        Part::cyl([0.0, 4.0, 0.0], 0.36, 0.24, [0.2, 0.5, 1.0]).glow(3.0),
-        Part::cube([0.0, 4.35, 0.0], [0.0, 0.0, 0.0], STEEL)
-            .with(vec![
-                Part::cube([0.4, 0.0, 0.0], [0.7, 0.07, 0.1], CYAN).glow(1.5),
-                Part::cube([-0.4, 0.0, 0.0], [0.7, 0.07, 0.1], CYAN).glow(1.5),
-            ])
-            .spin(Vec3::Y, 6.0),
+        // The chassis, a plinth and the flank panels.
+        Part::cube([0.0, 2.0, 0.0], [2.8, 3.8, 1.5], CASE),
+        Part::cube([0.0, 0.15, 0.0], [3.1, 0.3, 1.9], DARK),
+        Part::cube([-1.42, 2.0, 0.0], [0.06, 3.4, 1.3], PANEL),
+        Part::cube([1.42, 2.0, 0.0], [0.06, 3.4, 1.3], PANEL),
+        // The beacon.
+        Part::cyl([0.0, 4.05, 0.0], 0.5, 0.18, DARK),
+        Part::cyl([0.0, 4.25, 0.0], 0.36, 0.26, UPDATE).glow(3.0),
     ];
-    for row in 0..6 {
-        for side in [-1.0_f32, 1.0] {
+    // The face is on both the front and the back of the case: a boss turns to whoever it fights,
+    // and from behind a monolith with only a screen on one side is a plain slab.
+    for s in [-1.0_f32, 1.0] {
+        v.extend([
+            Part::cube([0.0, 2.85, 0.76 * s], [2.5, 2.1, 0.08], PANEL),
+            Part::screen(
+                [0.0, 2.85, 0.82 * s],
+                [2.2, 1.8, 0.04],
+                if s < 0.0 { "patch" } else { "patch_back" },
+            ),
+            // The eyes above the screen: two status lamps stuck on "busy".
+            Part::cube([-0.6, 3.95, 0.76 * s], [0.5, 0.12, 0.05], RED).glow(3.0),
+            Part::cube([0.6, 3.95, 0.76 * s], [0.5, 0.12, 0.05], RED).glow(3.0),
+            // A power button the size of a head: the one thing it forbids you to press.
+            Part::cyl([0.0, 1.35, 0.8 * s], 0.5, 0.1, [0.9, 0.9, 0.95])
+                .rot([90.0, 0.0, 0.0])
+                .glow(1.2),
+            Part::cube([0.0, 1.35, 0.86 * s], [0.08, 0.3, 0.02], RED).glow(3.0),
+        ]);
+        // Warning tape across the belly: alternating yellow and dark slashes.
+        for k in 0..6 {
+            let c = if k % 2 == 0 { TAPE } else { DARK };
             v.push(
                 Part::cube(
-                    [side * 0.98, 0.8 + row as f32 * 0.38, -0.5],
-                    [0.04, 0.12, 0.5],
-                    if (row + side as i32) % 3 == 0 {
-                        GREEN
-                    } else {
-                        RED
-                    },
+                    [-1.2 + k as f32 * 0.22, 0.75, 0.78 * s],
+                    [0.16, 0.38, 0.03],
+                    c,
                 )
-                .glow(2.2)
-                .bob(0.01, 6.0 + row as f32),
+                .rot([0.0, 0.0, 25.0])
+                .glow(if k % 2 == 0 { 0.5 } else { 0.0 }),
             );
         }
+        // Rack LEDs down both sides of the screen.
+        for row in 0..4 {
+            for side in [-1.0_f32, 1.0] {
+                v.push(
+                    Part::cube(
+                        [side * 1.3, 1.7 + row as f32 * 0.5, 0.78 * s],
+                        [0.08, 0.1, 0.03],
+                        if (row + side as i32) % 3 == 0 {
+                            GREEN
+                        } else {
+                            RED
+                        },
+                    )
+                    .glow(2.4)
+                    .bob(0.012, 5.0 + row as f32),
+                );
+            }
+        }
     }
+    // Update icons: a ring of eight dashes that turns, three of them (shoulders and crown).
+    for (x, y, size) in [(-1.75, 3.5, 1.0_f32), (1.75, 3.5, 1.0), (0.0, 4.9, 1.3)] {
+        let mut dashes = Vec::new();
+        for k in 0..8 {
+            let a = k as f32 * std::f32::consts::TAU / 8.0;
+            dashes.push(
+                Part::cube(
+                    [a.cos() * 0.32 * size, a.sin() * 0.32 * size, 0.0],
+                    [0.1 * size, 0.1 * size, 0.06],
+                    if k < 6 { UPDATE } else { [0.1, 0.2, 0.5] },
+                )
+                .glow(if k < 6 { 3.0 } else { 0.0 })
+                .rot([0.0, 0.0, a.to_degrees()]),
+            );
+        }
+        v.push(
+            Part::cube([x, y, -0.5], [0.0, 0.0, 0.0], DARK)
+                .with(dashes)
+                .spin(Vec3::Z, 3.0)
+                .bob(0.06, 1.8),
+        );
+    }
+    // Two cable arms, ready to reboot something.
     for side in [-1.0_f32, 1.0] {
         v.push(
-            Part::cyl([side * 1.4, 2.2, -0.2], 0.3, 1.8, [0.06, 0.06, 0.07]).rot([
+            Part::cyl([side * 1.8, 2.0, -0.2], 0.3, 1.8, [0.06, 0.06, 0.07]).rot([
                 0.0,
                 0.0,
                 side * 14.0,
             ]),
         );
         v.push(Part::cube(
-            [side * 1.75, 1.2, -0.3],
-            [0.5, 0.45, 0.4],
+            [side * 2.1, 1.0, -0.3],
+            [0.55, 0.5, 0.45],
             STEEL,
         ));
     }
     v
+}
+
+/// Boss of the Review Stage: a standing review form, a giant clipboard with a binder clip on top, a
+/// rating card for a face (a big 3) and the whole room's cards turning round it. Everyone is a
+/// three; the pencil is the only thing that disagrees.
+fn perf_review() -> Vec<Part> {
+    const PAPER: [f32; 3] = [0.93, 0.91, 0.82];
+    const BOARD: [f32; 3] = [0.45, 0.3, 0.18];
+    const INK: [f32; 3] = [0.12, 0.2, 0.5];
+    let mut v = vec![
+        Part::cube([0.0, 2.2, 0.0], [2.6, 3.8, 0.3], BOARD),
+        Part::cube([0.0, 2.2, -0.17], [2.3, 3.5, 0.04], PAPER),
+        Part::screen([0.0, 3.0, -0.2], [1.7, 1.7, 0.03], "review"),
+        Part::cube([0.0, 2.2, 0.17], [2.3, 3.5, 0.04], PAPER),
+        Part::screen([0.0, 3.0, 0.2], [1.7, 1.7, 0.03], "review_back"),
+        // Form lines under the card, the last one a signature that is not yours.
+        Part::cube([0.0, 1.85, -0.2], [1.8, 0.07, 0.02], INK),
+        Part::cube([0.0, 1.6, -0.2], [1.8, 0.07, 0.02], INK),
+        Part::cube([0.0, 1.35, -0.2], [1.8, 0.07, 0.02], INK),
+        Part::cube([-0.3, 0.95, -0.2], [1.2, 0.05, 0.02], [0.6, 0.1, 0.1]),
+        // The clip.
+        Part::cube([0.0, 4.15, -0.05], [1.0, 0.3, 0.3], STEEL),
+        Part::cyl([0.0, 4.4, -0.05], 0.3, 0.12, STEEL).rot([0.0, 0.0, 90.0]),
+        // Two legs and a pair of tiny arms, because it came to the meeting in person.
+        Part::cyl([-0.6, 0.35, 0.0], 0.28, 0.7, DARK),
+        Part::cyl([0.6, 0.35, 0.0], 0.28, 0.7, DARK),
+        Part::cyl([-1.55, 2.2, -0.1], 0.2, 1.6, DARK).rot([0.0, 0.0, 22.0]),
+        Part::cyl([1.55, 2.2, -0.1], 0.2, 1.6, DARK).rot([0.0, 0.0, -22.0]),
+        // The pencil, yellow, in its fist.
+        Part::cyl([1.9, 1.3, -0.4], 0.1, 1.2, [1.0, 0.8, 0.1]).rot([0.0, 0.0, 35.0]),
+        Part::cyl([2.25, 0.8, -0.4], 0.1, 0.18, [0.1, 0.1, 0.1]).rot([0.0, 0.0, 35.0]),
+    ];
+    // Rating cards: seven white slabs on a slow orbit, all the same.
+    let mut cards = Vec::new();
+    for k in 0..7 {
+        let a = k as f32 * std::f32::consts::TAU / 7.0;
+        cards.push(
+            Part::cube(
+                [a.cos() * 2.5, 0.0, a.sin() * 2.5],
+                [0.5, 0.7, 0.04],
+                [0.96, 0.95, 0.88],
+            )
+            .glow(0.5)
+            .rot([0.0, -a.to_degrees() + 90.0, 0.0]),
+        );
+    }
+    v.push(
+        Part::cube([0.0, 2.6, 0.0], [0.0, 0.0, 0.0], DARK)
+            .with(cards)
+            .spin(Vec3::Y, 0.6),
+    );
+    v
+}
+
+/// An HR bot: a white egg of a body, a lanyard, a glowing smile and one arm that holds a form.
+fn hr_bot() -> Vec<Part> {
+    const SHELL: [f32; 3] = [0.92, 0.93, 0.97];
+    vec![
+        Part::cyl([0.0, 0.55, 0.0], 0.75, 0.9, SHELL),
+        Part::ball([0.0, 0.5, 0.0], 0.9, SHELL),
+        Part::ball([0.0, 1.15, 0.0], 0.62, SHELL),
+        Part::cube([0.0, 1.17, -0.3], [0.5, 0.2, 0.04], DARK),
+        Part::cube([-0.12, 1.2, -0.33], [0.1, 0.1, 0.02], CYAN).glow(3.0),
+        Part::cube([0.12, 1.2, -0.33], [0.1, 0.1, 0.02], CYAN).glow(3.0),
+        Part::cube([0.0, 1.1, -0.33], [0.3, 0.04, 0.02], CYAN).glow(2.5),
+        Part::cube([0.0, 0.7, -0.4], [0.12, 0.36, 0.03], [0.85, 0.1, 0.1]),
+        Part::cube([0.0, 0.48, -0.41], [0.26, 0.2, 0.03], [0.95, 0.95, 0.95]),
+        Part::cyl([0.0, 1.55, 0.0], 0.05, 0.3, STEEL),
+        Part::ball([0.0, 1.74, 0.0], 0.14, [1.0, 0.3, 0.3])
+            .glow(3.0)
+            .bob(0.03, 4.0),
+        Part::cube([0.55, 0.65, -0.3], [0.36, 0.46, 0.04], [0.95, 0.92, 0.8])
+            .rot([0.0, 0.0, -12.0]),
+        Part::cyl([0.0, 0.08, 0.0], 0.9, 0.16, DARK),
+    ]
+}
+
+/// A stakeholder: a speech bubble with a question mark and a tail, bobbing at head height.
+fn stakeholder() -> Vec<Part> {
+    const BUBBLE: [f32; 3] = [0.97, 0.97, 0.99];
+    vec![
+        Part::ball([0.0, 1.5, 0.0], 1.5, BUBBLE),
+        Part::cube([0.0, 0.7, -0.1], [0.3, 0.5, 0.3], BUBBLE).rot([0.0, 0.0, 30.0]),
+        // The question mark: an arc of cubes, a stem and a dot.
+        Part::cube([-0.2, 1.95, -0.74], [0.18, 0.18, 0.05], [0.15, 0.2, 0.55]),
+        Part::cube([0.0, 2.05, -0.74], [0.2, 0.18, 0.05], [0.15, 0.2, 0.55]),
+        Part::cube([0.2, 1.9, -0.74], [0.18, 0.2, 0.05], [0.15, 0.2, 0.55]),
+        Part::cube([0.1, 1.6, -0.74], [0.18, 0.2, 0.05], [0.15, 0.2, 0.55]),
+        Part::cube([0.0, 1.35, -0.74], [0.18, 0.2, 0.05], [0.15, 0.2, 0.55]),
+        Part::cube([0.0, 1.0, -0.74], [0.2, 0.2, 0.05], [0.15, 0.2, 0.55]),
+        Part::cyl([0.0, 0.1, 0.0], 0.8, 0.12, [0.2, 0.2, 0.3]),
+    ]
 }
 
 /// Boss of the Patch Panel: a black rack wall that has grown five cable heads, each with a
@@ -1378,6 +1528,8 @@ fn scooter() -> Vec<Part> {
 struct RigAssets {
     shapes: Option<[Handle<Mesh>; 3]>,
     mats: HashMap<[u8; 4], Handle<StandardMaterial>>,
+    /// One lit material per screen picture.
+    screens: HashMap<&'static str, Handle<StandardMaterial>>,
 }
 
 pub struct RigsPlugin;
@@ -1397,9 +1549,32 @@ fn spawn_part(
     parent: &mut ChildSpawnerCommands,
     part: &Part,
     shapes: &[Handle<Mesh>; 3],
-    mats: &mut HashMap<[u8; 4], Handle<StandardMaterial>>,
+    assets: &mut RigAssets,
     materials: &mut Assets<StandardMaterial>,
+    images: &mut Assets<Image>,
 ) {
+    if let Role::Screen(picture) = part.role {
+        let mat = assets
+            .screens
+            .entry(picture)
+            .or_insert_with(|| {
+                materials.add(StandardMaterial {
+                    base_color_texture: crate::floors::rig_screen(picture).map(|i| images.add(i)),
+                    base_color: Color::WHITE,
+                    emissive: LinearRgba::rgb(0.9, 0.9, 0.9),
+                    emissive_texture: None,
+                    unlit: true,
+                    ..default()
+                })
+            })
+            .clone();
+        let tf =
+            Transform::from_translation(Vec3::from(part.pos)).with_scale(Vec3::from(part.size));
+        let mut e = parent.spawn((Mesh3d(shapes[0].clone()), MeshMaterial3d(mat), tf));
+        e.insert(NotShadowCaster);
+        return;
+    }
+    let mats = &mut assets.mats;
     let key = [
         quant(part.color[0]),
         quant(part.color[1]),
@@ -1453,7 +1628,7 @@ fn spawn_part(
         Role::Facade => {
             e.insert(RigFacade);
         }
-        Role::Plain => {}
+        Role::Plain | Role::Screen(_) => {}
     }
     if let Some((axis, rate)) = part.spin {
         e.insert(Spin { axis, rate });
@@ -1468,7 +1643,7 @@ fn spawn_part(
     if !part.children.is_empty() {
         e.with_children(|c| {
             for child in &part.children {
-                spawn_part(c, child, shapes, mats, materials);
+                spawn_part(c, child, shapes, assets, materials, images);
             }
         });
     }
@@ -1479,6 +1654,7 @@ fn build_rigs(
     mut assets: ResMut<RigAssets>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
     rigs: Query<(Entity, &PrimRig), Without<RigState>>,
 ) {
     if rigs.is_empty() {
@@ -1501,7 +1677,7 @@ fn build_rigs(
         let mut body = commands.spawn((RigBody, Transform::default(), Visibility::default()));
         body.with_children(|body| {
             for part in &list {
-                spawn_part(body, part, &shapes, &mut assets.mats, &mut materials);
+                spawn_part(body, part, &shapes, assets, &mut materials, &mut images);
             }
             if shelled {
                 body.spawn((
@@ -1600,6 +1776,9 @@ mod tests {
             "cutover_rack",
             "tentacle_rack",
             "patch_tuesday",
+            "perf_review",
+            "hr_bot",
+            "stakeholder",
             "cable_hydra",
             "cable_head",
             "slide_golem",

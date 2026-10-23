@@ -237,6 +237,14 @@ fn unlit(tex: Tex) -> bool {
                 | Sign::IlPatchPair
                 | Sign::IlUptime
                 | Sign::IlRackVote
+                | Sign::IlVoteBoard
+                | Sign::IlGradeBoard
+                | Sign::IlBallotA
+                | Sign::IlBallotB
+                | Sign::IlBallotC
+                | Sign::IlPortal
+                | Sign::IlFacePatch
+                | Sign::IlFaceReview
                 | Sign::IlScreenA
                 | Sign::IlScreenB
                 | Sign::IlScreenC
@@ -2697,6 +2705,174 @@ fn sign_spec(s: Sign) -> SignSpec {
             [255, 70, 50],
             [255, 200, 70],
         ),
+        // Ilmari Wing 2: Human Resources. The culture is on every wall; the people are not.
+        Sign::IlW2Door => sp(
+            &[
+                "HUMAN RESOURCES",
+                "PLEASE TAKE A NUMBER",
+                "WING 2 - STORY OR FULL",
+            ],
+            [14, 18, 40],
+            [235, 240, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlW2Back => sp(
+            &["BACK TO THE LOBBY", "(OCCUPIED)"],
+            [14, 18, 40],
+            [235, 240, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlW2ToCommittee => sp(
+            &["TO THE CULTURE HUB", "ALL OPINIONS WELCOME", "(NOT THEIRS)"],
+            [14, 18, 40],
+            [235, 240, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlW2ToReview => sp(
+            &["TO THE REVIEW STAGE", "BRING EVIDENCE", "OF YOURSELF"],
+            [14, 18, 40],
+            [235, 240, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlW2Out => sp(
+            &[
+                "EXIT TO CAMPUS",
+                "YOUR BADGE WILL BE",
+                "DEACTIVATED SHORTLY",
+            ],
+            [14, 18, 40],
+            [235, 240, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlCulture1 => sp(
+            &["OUR CULTURE:", "WE ARE A FAMILY", "(WITH HEADCOUNT)"],
+            [250, 235, 200],
+            [60, 40, 90],
+            [220, 70, 70],
+        ),
+        Sign::IlCulture2 => sp(
+            &["PASSION. SYNERGY.", "RESILIENCE. PIZZA.", "(IN THAT ORDER)"],
+            [210, 235, 250],
+            [30, 50, 110],
+            [220, 70, 70],
+        ),
+        Sign::IlCulture3 => sp(
+            &[
+                "CULTURE FIT",
+                "WE CANNOT DEFINE IT",
+                "BUT YOU DO NOT HAVE IT",
+            ],
+            [235, 215, 245],
+            [70, 30, 100],
+            [220, 70, 70],
+        ),
+        Sign::IlWellbeing => sp(
+            &[
+                "WELLBEING WALL",
+                "HOW ARE YOU TODAY?",
+                "1  2  3  4  4  4",
+                "(5 IS NOT AN OPTION)",
+            ],
+            [210, 240, 220],
+            [30, 90, 60],
+            [220, 70, 70],
+        ),
+        Sign::IlBeanbag => sp(
+            &["BEANBAG ZONE", "NOBODY HAS EVER SAT HERE", "(LIABILITY)"],
+            [250, 220, 235],
+            [90, 30, 70],
+            [220, 70, 70],
+        ),
+        Sign::IlOkr => sp(
+            &[
+                "OKR: ALIGN ON OKRS",
+                "KR1: MORE OKRS",
+                "KR2: FEWER PEOPLE",
+                "KR3: SYNERGY (TBD)",
+            ],
+            [20, 24, 50],
+            [235, 240, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlOpenPlan => sp(
+            &[
+                "OPEN PLAN. OPEN DOOR.",
+                "OPEN-ENDED.",
+                "(NO WALLS, NO EXCUSES)",
+            ],
+            [250, 235, 200],
+            [60, 40, 90],
+            [220, 70, 70],
+        ),
+        Sign::IlCopies => sp(
+            &[
+                "PLEASE MIND THE COPIES",
+                "ONE OF THESE IS YOU",
+                "(THE CHEAPER ONE)",
+            ],
+            [30, 10, 14],
+            [250, 235, 230],
+            [255, 200, 70],
+        ),
+        Sign::IlBallotA => sp(
+            &["BALLOT", "A"],
+            [10, 14, 34],
+            [120, 220, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlBallotB => sp(
+            &["BALLOT", "B"],
+            [10, 14, 34],
+            [120, 220, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlBallotC => sp(
+            &["BALLOT", "C"],
+            [10, 14, 34],
+            [120, 220, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlVoteBoard => sp(
+            &[
+                "THE COMMITTEE WILL VOTE",
+                "ALL IN FAVOUR: AYE",
+                "ALL OPPOSED: NOTED",
+            ],
+            [10, 14, 34],
+            [120, 220, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlGradeBoard => sp(
+            &["PERFORMANCE REVIEW", "NO GRADES YET", "EVERYONE IS A 3"],
+            [10, 14, 34],
+            [120, 220, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlNineBox => sp(&["9-BOX"], [236, 232, 220], [40, 40, 70], [200, 60, 60]),
+        Sign::IlFacePatch => sp(&["UPDATE"], [0, 70, 170], [255, 255, 255], [255, 220, 90]),
+        Sign::IlFaceReview => sp(&["3"], [240, 236, 220], [30, 40, 80], [200, 60, 60]),
+        Sign::IlPortal => sp(
+            &["HR PORTAL", "FILE AN APPEAL", "(UPHELD ONCE, 2011)"],
+            [20, 40, 26],
+            [235, 250, 235],
+            [255, 220, 90],
+        ),
+        Sign::IlQuorum => sp(
+            &["QUORUM: 3 OF 3", "(ALL ANDROIDS)", "(THE MINUTES AGREE)"],
+            [14, 18, 40],
+            [235, 240, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlReorg => sp(
+            &[
+                "RESTRUCTURING?",
+                "WE SAY 'RIGHT-SIZING'",
+                "YOU SAY 'RESIGN'",
+            ],
+            [40, 12, 12],
+            [250, 235, 230],
+            [255, 200, 70],
+        ),
         Sign::DalesTunnel => sp(
             &["DALE'S TUNNEL", "TO THE RESISTANCE", "MIND THE LAMINATION"],
             [34, 56, 40],
@@ -2805,6 +2981,21 @@ fn draw_sign(s: Sign) -> Canvas {
         c.line((140.0, 100.0), (90.0, 112.0), [60, 60, 70]);
         return c;
     }
+    if s == Sign::IlNineBox {
+        nine_box(&mut c, spec.fg, spec.hi);
+        return c;
+    }
+    if s == Sign::IlFacePatch {
+        update_face(&mut c, spec.fg, spec.hi);
+        return c;
+    }
+    if s == Sign::IlFaceReview {
+        c.frame(4, 4, wi - 8, hi - 8, 3, spec.hi);
+        c.text_c(14, 2, "RATING", spec.fg);
+        c.text_c(50, 12, "3", spec.hi);
+        c.text_c(hi - 24, 1, "MEETS EXPECTATIONS", spec.fg);
+        return c;
+    }
     c.frame(3, 3, wi - 6, hi - 6, 2, spec.hi);
     let n = spec.lines.len() as i32;
     let slot = (hi - 12) / n;
@@ -2824,6 +3015,71 @@ fn draw_sign(s: Sign) -> Canvas {
 
 pub fn tex_image(tex: Tex) -> Image {
     draw(tex).into_image()
+}
+
+/// The same picture upside down, for a cube face: a `Cuboid` maps its texture the other way up
+/// from a wall panel, so a rig's screen part is drawn flipped to read upright.
+pub fn tex_image_flipped(tex: Tex) -> Image {
+    let mut c = draw(tex);
+    let w = c.w as usize;
+    c.px = c.px.chunks(w).rev().flatten().copied().collect();
+    c.into_image()
+}
+
+/// The talent grid of a performance review: three potential bands by three performance bands,
+/// every cell a 3, the middle one the place you are.
+fn nine_box(c: &mut Canvas, fg: Rgb, hi: Rgb) {
+    let (x0, y0, cell) = (22, 22, 50);
+    c.text_c(6, 1, "PERFORMANCE", fg);
+    for row in 0..3 {
+        for col in 0..3 {
+            let (x, y) = (x0 + col * cell, y0 + row * cell);
+            let here = row == 1 && col == 1;
+            if here {
+                c.rect(x + 2, y + 2, cell - 4, cell - 4, [250, 214, 150]);
+            }
+            c.frame(x, y, cell, cell, 2, if here { hi } else { fg });
+            c.text(x + 18, y + 14, 3, "3", if here { hi } else { fg });
+        }
+    }
+    c.text_c(y0 + 3 * cell + 6, 1, "YOU ARE HERE (ALSO 3)", hi);
+    c.text(4, y0 + 66, 1, "POT.", fg);
+}
+
+/// The face of Patch Tuesday: an update screen that has sat at 99% since Tuesday.
+fn update_face(c: &mut Canvas, fg: Rgb, hi: Rgb) {
+    c.text_c(18, 2, "Working on updates", fg);
+    c.text_c(44, 3, "99%", fg);
+    c.text_c(76, 1, "complete", fg);
+    // The progress bar that does not move, and the dots that do not stop.
+    c.frame(28, 100, 200, 14, 2, fg);
+    c.rect(31, 103, 193, 8, hi);
+    for k in 0..5 {
+        c.rect(108 + k * 10, 128, 5, 5, fg);
+    }
+    c.text_c(150, 1, "Don't turn off your computer", fg);
+    c.text_c(166, 1, "This will take a while", fg);
+}
+
+/// A screen that is redrawn while the game runs (the vote and grade boards): the colours of
+/// `sign`, these lines, the last one in the accent colour like every sign.
+pub fn live_board(sign: Sign, lines: &[String]) -> Image {
+    let spec = sign_spec(sign);
+    let (w, h) = sign_canvas(sign);
+    let mut c = Canvas::new(w, h, spec.bg);
+    let (wi, hi) = (w as i32, h as i32);
+    c.frame(3, 3, wi - 6, hi - 6, 2, spec.hi);
+    let n = lines.len().max(1) as i32;
+    let slot = (hi - 12) / n;
+    for (i, line) in lines.iter().enumerate() {
+        let len = line.chars().count() as i32;
+        let fit = (wi - 20) / (6 * len).max(1);
+        let scale = fit.clamp(1, 3).min((slot - 4) / 7).max(1);
+        let col = if i as i32 == n - 1 { spec.hi } else { spec.fg };
+        let y = 6 + i as i32 * slot + (slot - 7 * scale) / 2;
+        c.text_c(y, scale, line, col);
+    }
+    c.into_image()
 }
 
 fn draw(tex: Tex) -> Canvas {

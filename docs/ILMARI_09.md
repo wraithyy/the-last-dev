@@ -618,6 +618,17 @@ management), synthetic androids, HR bots.
 - **Cutscene:** the clones in the lobby all stand still, then blink out in sequence; the nearest one
   mouths "Please fill in the form." Dale: "They've been making copies. Of everybody."
 
+> **As built (B11-B14).** The spec below holds with these differences: (1) the mirror is of a *role*, not a class
+> (`il_mirror_tank|healer|dps` wear the class model of their role with a cold glow), picked from the living players
+> that have no copy yet; the client names it after the player with a glitching plate. (2) The vote is part of the
+> twin framework (`TwinsDef.vote`) rather than a separate `Effect::Vote`: the swap closes it, ballots live in the
+> raid state, `RaidView.vote/ballots/passed` drive the wall boards. (3) Performance Review keeps per-window
+> counters (reset at every review) instead of a 30 s ring of events, so the window is the time since the previous
+> review (30 s apart); the score is the formula in `FORMULAS.md`, baselines per role are tuned by the bots. Story
+> managed-out is `managed_out_story` (-15% damage, 10 s, no end hit; the HR Portal clears it), there is no companion
+> to cleanse it (B15). (4) Wing 2 trash is level 13 (`il_hr_generalist`, `il_wellness_coach`, `il_hr_bot`) beside the
+> level-12 prompt managers and android colleagues of Wing 1. (5) The Wing 3 teaser is only the closing cutscene's line.
+
 ### Boss 5: The Culture Committee, "A Unanimous Majority" (`il_cc_cpo` and two partners)
 
 (Renamed from "The Board", which collides with the QBR dungeon boss.)
@@ -809,15 +820,15 @@ beside the one compiling agent. **Part A first.** After each task: `cargo test` 
 | B3 | `campus_occupied`, `resistance/1`, geometry delta, P3 hatch | B2 | `ilmari_gating` passes; `WOW_BENCH=campus_occupied` within budget (built; the geometry is a full copy, not a delta) |
 | B4 | Resistance NPCs, tokens (`ItemKind::Token`), quartermaster, attunement chain, world quests, daily | B3 | quest-chain bot from `il_00_wake` to `il_06`; token cap test (built, `tests/ilmari_prologue.rs`) |
 | B5 | `GearSource::Ilmari` and item-level sync | B1 | the item-level sync test; Legacy/raid pieces unchanged (built) |
-| B6 | `RaidDef` Wing 1, `Difficulty::Story`, `AiAbility.story` | B4, B5 | a three-room framework test with a stub boss |
-| B7 | Patch Tuesday (`requires_aura`, patch auras, screens) | B6 | mechanic tests; Story and Full bot clears |
-| B8 | The Recruiter (`death_burnout`, candidates, tells) | B7 | `Candidate` tests; bot never kills humans |
-| B9 | The Cable Hydra (`death_spawn`, `labelled`, Label Cable, printers) | B8 | spawn count tests; bot clears Story and Full |
-| B10 | Wing 1 cutscenes, loot, titles, Wing 1 completion quest `il_w1_done` | B9 | cutscene triggers; loot tests |
-| B11 | `RaidDef` Wing 2 and `SummonMirror`; HR Business Partner 2.0 | B10 | mirror determinism test; Story and Full clears |
-| B12 | The Culture Committee (`Vote`, ballot terminals, three-member `TwinsDef`) | B11 | vote tests; Story auto-vote; Full group clear |
-| B13 | Performance Review (`Review`, scoring ring, HR portal, `managed_out`) | B12 | scoring tests; Story and Full clears |
-| B14 | Wing 2 cutscenes, loot, titles | B13 | cutscene triggers; loot tests |
+| B6 | `RaidDef` Wing 1, `Difficulty::Story`, `AiAbility.story` | B4, B5 | a three-room framework test with a stub boss (built: `RaidDef.ilmari`, `Command::SetIlmariStory`, `AiAbility.mode`, the `story:` lockout prefix; `tests/ilmari_wing1.rs`) |
+| B7 | Patch Tuesday (`requires_aura`, patch auras, screens) | B6 | mechanic tests; Story and Full bot clears (built, with the server-monolith rig and its update-screen face) |
+| B8 | The Recruiter (`death_burnout`, candidates, tells) | B7 | `Candidate` tests; bot never kills humans (built) |
+| B9 | The Cable Hydra (`death_spawn`, `labelled`, Label Cable, printers) | B8 | spawn count tests; bot clears Story and Full (built; Label Cable is a printer prop, `PropKind::Label`) |
+| B10 | Wing 1 cutscenes, loot, titles, Wing 1 completion quest `il_w1_done` | B9 | cutscene triggers; loot tests (built) |
+| B11 | `RaidDef` Wing 2 and `SummonMirror`; HR Business Partner 2.0 | B10 | mirror determinism test; Story and Full clears (built: zones `ilmari2/1..3`, `il_hrbp`, `Effect::SummonMirror`, `Event::Mirrored`; `tests/ilmari_wing2.rs`) |
+| B12 | The Culture Committee (`Vote`, ballot terminals, three-member `TwinsDef`) | B11 | vote tests; Story auto-vote; Full group clear (built as `TwinsDef.vote` and `PropKind::Ballot`, not an `Effect::Vote`: the swap is the vote) |
+| B13 | Performance Review (`Review`, scoring ring, HR portal, `managed_out`) | B12 | scoring tests; Story and Full clears (built: per-window counters instead of a ring, `PropKind::Portal`; grade formula in `FORMULAS.md`) |
+| B14 | Wing 2 cutscenes, loot, titles | B13 | cutscene triggers; loot tests (built; `il_w2_done` closes the wing) |
 | B15 | Companion AI (`companion.rs`, three companions, loadout, role behaviours) | B6 | per-role behaviour tests; determinism test; companion-assisted clears (can start as soon as B6 compiles, before B7) |
 | B16 | Server: geometry delta, room Ilmari option, no companions online | B14 | server tests; co-op smoke on a Full clear |
 | B17 | Docs, `KNOWN_LIMITATIONS`, CHANGELOG, version note (0.9.0 only on the user's request) | all | docs match code; full golden replay pass; `WOW_BENCH` per wing; protocol bump check |

@@ -120,7 +120,7 @@ const CLASSES: [&str; 8] = [
 /// Shields of linked raid bosses: the open member is the only one worth hitting.
 const HUMAN: &str = "il_candidate_human";
 const CABLE: &str = "il_cable";
-const LINK_SHIELDS: [&str; 2] = ["synergy_shield", "panel_muted"];
+const LINK_SHIELDS: [&str; 3] = ["synergy_shield", "panel_muted", "committee_quorum"];
 
 /// Packs on a straight corridor toward -Z, the boss at the end, NPCs off to the side.
 fn anchor(name: &str) -> Option<(Vec3, f32)> {
@@ -197,6 +197,10 @@ struct Bot {
     label_next: u64,
     /// Wing 1: human candidates this bot killed (it must never).
     human_kills: u32,
+    /// Wing 2: HR Portal rotation, ballot terminals and the earliest tick of the next try of each.
+    appeals: u32,
+    appeal_next: u64,
+    lobby_next: u64,
 }
 
 fn yaw_to(from: Vec3, to: Vec3) -> f32 {
@@ -253,6 +257,9 @@ impl Bot {
             labels: 0,
             label_next: 0,
             human_kills: 0,
+            appeals: 0,
+            appeal_next: 0,
+            lobby_next: 0,
         }
     }
 
@@ -603,8 +610,75 @@ impl Bot {
         self.target = None;
     }
 
+    /// Wing 2's Performance Review: a bot that was managed out files an appeal at an HR Portal
+    /// (the Interact rides in a tick with a move to the portal, like the label printers).
+    fn appeal(&mut self) {
+        let now = self.sim.now().0;
+        if self.appeal_next > now || !self.me().alive || self.me().stunned {
+            return;
+        }
+        if !self
+            .me()
+            .auras
+            .iter()
+            .any(|a| a.key.starts_with("managed_out"))
+        {
+            return;
+        }
+        self.appeal_next = now + ms_to_ticks(1000);
+        self.appeals += 1;
+        let prop = format!("il_hr_portal_{}", self.appeals % 2 + 1);
+        self.use_prop_remotely(prop);
+    }
+
+    /// Wing 2's Culture Committee: while a vote is open, every bot votes for the policy that hurts
+    /// a bot least (a bot does not walk, so Return to Office is nearly free).
+    fn lobby(&mut self) {
+        const RANK: [&str; 5] = [
+            "pol_pizza",
+            "pol_rto",
+            "pol_efficiency",
+            "pol_open_plan",
+            "pol_unlimited_pto",
+        ];
+        let now = self.sim.now().0;
+        if self.lobby_next > now || !self.me().alive || self.me().stunned {
+            return;
+        }
+        let view = self.sim.raid_view();
+        let best = view
+            .vote
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, k)| RANK.iter().position(|r| r == k).unwrap_or(RANK.len()))
+            .map(|(i, _)| i);
+        let Some(slot) = best else { return };
+        self.lobby_next = now + ms_to_ticks(3100);
+        self.use_prop_remotely(["il_ballot_a", "il_ballot_b", "il_ballot_c"][slot].to_string());
+    }
+
+    /// Uses a prop from the quiet corner where `anchor` puts every prop, then the usual position
+    /// report puts the bot back in the fight.
+    fn use_prop_remotely(&mut self, prop: String) {
+        let Some((at, _)) = anchor(&format!("prop:{prop}")) else {
+            return;
+        };
+        self.sim.apply_as(
+            self.player,
+            Command::PlayerMoved {
+                pos: at,
+                yaw: 0.0,
+                moving: false,
+                jumping: false,
+            },
+        );
+        self.sim.apply_as(self.player, Command::Interact { prop });
+    }
+
     fn act(&mut self) {
         self.label_cables();
+        self.appeal();
+        self.lobby();
         if self.me().alive && !self.me().stunned && self.tether() {
             return;
         }
@@ -2589,6 +2663,7 @@ fn every_class_clears_async_attendance_solo() {
 // ---- Ilmari Wing 1, Datacenter Uprising (docs/ILMARI_09.md B.4): Story solo, Full as a group.
 
 const WING1: [&str; 3] = ["ilmari1/1", "ilmari1/2", "ilmari1/3"];
+const WING2: [&str; 3] = ["ilmari2/1", "ilmari2/2", "ilmari2/3"];
 
 fn boss_of(sim: &Sim, zone: &str) -> String {
     sim.content()
@@ -2602,10 +2677,15 @@ impl Bot {
     /// Wing 1 alone on `story` (true) or Full (false): rooms in order, packs then the boss, topping
     /// off before each boss. Returns bosses killed, seconds, lowest HP %, human candidates killed.
     fn wing1(&mut self, story: bool) -> (usize, u64, u32, u32) {
+        self.wing(&WING1, story)
+    }
+
+    /// The same for any three-room Ilmari wing.
+    fn wing(&mut self, zones: &[&str], story: bool) -> (usize, u64, u32, u32) {
         self.sim.debug_force_raid_async(Some(story));
         let start = self.sim.now().0;
         let mut bosses = 0;
-        for zone in WING1 {
+        for &zone in zones {
             // The rooms share one corridor, so the last boss's spot is the next boss's: walk
             // back to the door first or the next boss pulls on the load.
             self.pos = Vec3::new(0.0, 0.0, 20.0);
@@ -2778,9 +2858,13 @@ impl Group {
 
     /// Wing 1 on Full, the whole group: packs and boss per room. (bosses, seconds, deaths).
     fn wing1(&mut self) -> (usize, u64, usize) {
+        self.wing(&WING1)
+    }
+
+    fn wing(&mut self, zones: &[&str]) -> (usize, u64, usize) {
         let start = self.sim().now().0;
         let mut bosses = 0;
-        for zone in WING1 {
+        for &zone in zones {
             for b in &mut self.bots {
                 b.pos = Vec3::new(0.0, 0.0, 20.0);
             }
@@ -2877,6 +2961,71 @@ fn a_trio_clears_wing_one_on_full_and_a_lone_player_does_not() {
         if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
             let _ = std::fs::write(
                 PathBuf::from(dir).join(format!("solo_full_{class}.log")),
+                &b.log,
+            );
+        }
+        if bosses >= 3 {
+            failures.push(format!("{class} cleared Full alone"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+// ---- Ilmari Wing 2, Human Resources (docs/ILMARI_09.md B.5): Story solo, Full as a group.
+
+/// Story is the solo difficulty: every class clears all three bosses (the partner's copy, the
+/// committee's automatic vote, the review's mild "managed out") on three seeds.
+#[test]
+fn every_class_clears_wing_two_on_story_solo() {
+    let mut failures = Vec::new();
+    for class in CLASSES {
+        for seed in [7, 42, 1234] {
+            let mut b = Bot::new_as(class, "campus", 10, seed);
+            b.wear_legacy_gear();
+            b.rest_alert = true;
+            let (bosses, secs, low, _) = b.wing(&WING2, true);
+            println!(
+                "{class:14} Wing 2 Story seed {seed:4}: {bosses}/3 bosses in {secs} s, low {low}%"
+            );
+            if bosses < 3 {
+                failures.push(format!("{class} seed {seed}: {bosses}/3 bosses"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Full is the group difficulty: a tank and two damage dealers clear it on three seeds (they
+/// lobby the ballot terminals and appeal at the portal); the same wing alone is meant to fail.
+#[test]
+fn a_trio_clears_wing_two_on_full_and_a_lone_player_does_not() {
+    let mut failures = Vec::new();
+    for seed in [7, 42, 1234] {
+        let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
+        let (bosses, secs, deaths) = g.wing(&WING2);
+        println!(
+            "trio Wing 2 Full seed {seed:4}: {bosses}/3 bosses in {secs} s, {deaths} dead, boss fights {:?} s",
+            g.boss_secs
+        );
+        if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+            let _ = std::fs::write(
+                PathBuf::from(dir).join(format!("trio2_{seed}.log")),
+                &g.bots[0].log,
+            );
+        }
+        if bosses < 3 {
+            failures.push(format!("trio seed {seed}: {bosses}/3 bosses"));
+        }
+    }
+    for class in CLASSES {
+        let mut b = Bot::new_as(class, "campus", 10, 7);
+        b.wear_legacy_gear();
+        b.rest_alert = true;
+        let (bosses, secs, low, _) = b.wing(&WING2, false);
+        println!("{class:14} Wing 2 Full alone: {bosses}/3 bosses in {secs} s, low {low}%");
+        if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+            let _ = std::fs::write(
+                PathBuf::from(dir).join(format!("solo2_full_{class}.log")),
                 &b.log,
             );
         }
