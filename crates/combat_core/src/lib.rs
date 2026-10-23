@@ -48,17 +48,17 @@ pub use calendar::{
 pub use content::{
     AiAbility, AiDef, AiTarget, ApplyAura, Area, AuraDef, AutoAttackDef, CcCat, ClassDef, Config,
     ConsumeAura, Content, ContentError, DispelType, Effect, EnrageDef, Execute, FleeDef,
-    FrontalShield, ITEM_DESC_MAX, ITEM_STACK_CAP, IdlePose, ItemBonus, ItemDef, ItemTotals,
-    LevelDef, LootEntry, MAX_ACTION_BAR, MobScaling, Objective, OpenerDef, PackDef, PeriodicDef,
-    PhaseDef, QuestDef, QuestGiver, QuestReward, Role, School, SpellDef, SpellId, SpellTarget,
-    TelegraphAt, TelegraphDef, UnitDef, Unlock, XpRules, YellDef, ZoneDef, ZoneKind, ZoneLink,
-    ZoneSpawn,
+    FrontalShield, ITEM_DESC_MAX, ITEM_STACK_CAP, IdlePose, ItemBonus, ItemDef, ItemKind,
+    ItemTotals, LevelDef, LootEntry, MAX_ACTION_BAR, MobScaling, Objective, OpenerDef, PackDef,
+    PeriodicDef, PhaseDef, QuestDef, QuestGiver, QuestReward, Role, School, SpellDef, SpellId,
+    SpellTarget, TOKEN_STACK_CAP, TelegraphAt, TelegraphDef, UnitDef, Unlock, XpRules, YellDef,
+    ZoneDef, ZoneKind, ZoneLink, ZoneSpawn,
 };
 pub use dailies::{BoardView, GoalSpec, GoalView, SavedTask, TaskState, TaskView};
 pub use duel::{DuelError, DuelOutcome};
 pub use economy::{
-    ActivePerk, ConsumableDef, Economy, GearDef, GearSource, GearStats, GearVisual, Goods, JunkDef,
-    Perk, PerkView, Rarity, SLOTS, SetDef, Slot, VendorDef, role_package,
+    ActivePerk, BASE_ILVL_CAP, ConsumableDef, Economy, GearDef, GearSource, GearStats, GearVisual,
+    Goods, JunkDef, Perk, PerkView, Rarity, SLOTS, SetDef, Slot, VendorDef, role_package,
 };
 pub use endgame::{DEPARTMENTS, DepartmentDef, EndgameDef, RankDef, RepTier};
 pub use floors::{CORPSE_EMPTY_MS, CORPSE_LOOT_MS, pack_offsets};

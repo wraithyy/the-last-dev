@@ -1233,9 +1233,11 @@ impl SimRead for NetWorld {
             .units
             .get(&self.you)
             .map_or(&[][..], |u| u.equipped.as_slice());
+        // Ilmari content is offline-only (docs/ILMARI_09.md B.8), so online an Ilmari piece is
+        // always worn outside it and counts at the base item-level cap.
         self.content
             .economy
-            .player_totals(&self.content, self.inventory(), equipped)
+            .player_totals(&self.content, self.inventory(), equipped, false)
     }
     fn item_cooldown(&self, _player: EntityId, key: &str) -> (u32, u32) {
         self.item_cds

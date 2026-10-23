@@ -167,6 +167,12 @@ Events: `Bag { unit, sp, bag, equipped, buyback }` (owner only, after every chan
 
 `Command::Buy` also checks `GearDef::required_level()` against the buyer's level (`ItemError::LevelTooLow`). Prices come from `GearDef::price()` (docs/FORMULAS.md, Kudos).
 
+Token shelves (`VendorDef::token` + `token_prices`, the Resistance quartermaster `il_brenda`): every line is paid from the buyer's stack of that `ItemKind::Token` item and never in Kudos; short of tokens the purchase is refused with `ItemError::NotEnoughTokens` (offline Ilmari shops only, so the variant never travels). Level requirements are capped at the top level (`GearDef::required_level().min(max_level)`), so the Ilmari band (item level above `BASE_ILVL_CAP`) can be sold.
+
+`ItemKind::Token` items (`Content::items`) carry no bonus and stack to `TOKEN_STACK_CAP` (99); `ItemKind::Trophy` (the default) must carry one. Ilmari quest loot is token-only so it never leaks power into the base game. `QuestReward::tokens` pays Ilmari Tokens on turn-in through `Sim::grant_ilmari_tokens` (stack cap 99, `TOKEN_WEEK_CAP` 200 per ISO week, counter saved as `ilmari_tok`).
+
+Item-level sync (`GearSource::Ilmari`, docs/FORMULAS.md): `Economy::equipment(equipped, in_ilmari)` is the single place the bonus is decided. `Sim::in_ilmari_content()` (zone id `campus_occupied`, `resistance/1`, or starting with `ilmari`) feeds it from `gear_totals`, and `load_zone` re-sums the gear of players who wear an Ilmari piece when the zone crosses that border (`sync_ilmari_gear`).
+
 Loot uses its own rng stream (`loot_rng`), so changing drop tables never shifts combat replays. Perks (`Perk`) hook into damage, heals, mana cost, cooldowns, spell resolution and taking damage; item spells are ordinary content spells (ids 900+) resolved by `fire_item_spell` without mana, cooldown or cast bar. Saves: `Sim::export_save` / `import_save` and `SaveData::encode` / `decode` (versioned text, tolerant of unknown names and bad numbers).
 
 ## Career Ladder (talents.rs)
@@ -267,6 +273,10 @@ Event order on a zone boss kill: `Death`, `AiState Dead`, `XpGained`/`LevelUp`/`
 
 `load_floor(n, ..)` is `load_zone("tower/<n>", ..)`, kept until the client switches; the `Floor*` events, `Sim::floor()` and `Content::floor()` go with it.
 
+## Ilmari phases
+
+`campus_occupied` is the campus builder with an overlay (`floors/occupied.rs`), another zone id: no per-player world state. Its links lead only to `resistance/1` (the Resistance base, `door:resistance/1`) and to the normal `campus` (`door:campus`); the base leads to `parking_p3` and `campus_occupied`. The only door into any of it is the P3 maintenance hatch, `parking_p3` -> `resistance/1`, gated on `QuestDone("il_00_wake")` and hidden by the client until it opens. `ilmari::is_ilmari_zone(zone)` names Ilmari content; `IlmariDifficulty` (`Story` = the raid's Async figures, `Full` = authored) is the hook the wings read.
+
 ## Quests
 
 `content.quests[]`: `(id, name, giver: (npc, zone), text, progress_text, done_text, objectives: [Kill(unit_key, n) | Loot(item, n) | Talk(npc_key) | ClearZone(zone)], reward: (xp, trophy: Option<item>, sp, gear_tier), requires: Option<quest id>, level_min, turn_in: Option<(npc, zone)>, group: bool)`. Validation: the giver (and `turn_in`) is a friendly spawned in its zone; Kill targets a hostile unit, Talk a friendly one, Loot an `items` entry, ClearZone a zone with a boss; `requires` names a quest listed earlier; `gear_tier` is 0-5. `QuestDef::ender()` is who takes the finished quest (`turn_in` or the giver); `is_breadcrumb()` is a Talk-only quest turned in elsewhere ("report to the next floor's giver").
@@ -278,6 +288,7 @@ Event order on a zone boss kill: `Death`, `AiState Dead`, `XpGained`/`LevelUp`/`
 - Progress: `Kill` counts the killer's and nearby group members' kills (DoTs included); `Loot` counts items the player picks up (after `Looted`); `ClearZone` counts the zone's first clear. Each increment emits `QuestProgress { quest, objective, count, need }` (capped at need); completing the last objective emits `QuestReady` once.
 - Quest-only drops: a unit `loot` entry with `quest: Some(id)` rolls (on the loot rng stream) only for a member with that quest active whose objective for the item is not full.
 - `TurnInQuest { quest, choice }`: Ready and near `ender()`. With `gear_tier > 0`, `Content::quest_gear_choices(def, role)` lists 2-3 world pieces of that tier for the player's role (own role or generalist, Rare/Uncommon, Epic for `group` quests; deterministic, so the client shows the same list) and `choice` picks one (clamped); a full bag refuses the turn-in with `ItemError BagFull`. Emits `QuestCompleted`, grants the trophy (silent pickup), the gear (`Bag`), the XP (`XpGained`/`LevelUp`; nothing at the cap) and SP (`quest_sp_pct` of the XP plus `sp`), then checks unlocks.
+- Daily quests (`QuestDef::daily`, "Disconnect a Node"): done today means `Done` until the UTC day (`live::day_index`, the Scrum board's clock) moves on, then `Available` again; `QuestLog.days` holds the last turn-in day (saved as `quest_days`).
 - `AbandonQuest` removes the quest and its counts silently; it becomes Available again (kill tallies stay, so it may come back Ready).
 - Quests never touch the combat rng.
 

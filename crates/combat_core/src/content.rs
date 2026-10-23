@@ -720,12 +720,29 @@ impl ItemTotals {
     }
 }
 
-/// A loot item: a trophy with a small permanent bonus.
+/// What a loot item is for.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+pub enum ItemKind {
+    /// Carried for its small permanent bonus (`ITEM_STACK_CAP` copies count).
+    #[default]
+    Trophy,
+    /// Quest props and currencies: no bonus, never equipped, stacks up to `TOKEN_STACK_CAP`.
+    /// Ilmari content hands out only these, so its quest loot cannot leak power into the base
+    /// game (docs/ILMARI_RAID.md guardrail 3).
+    Token,
+}
+
+/// Most copies of one token the bag keeps; the rest of a reward is lost, like a full wallet.
+pub const TOKEN_STACK_CAP: u32 = 99;
+
+/// A loot item: a trophy with a small permanent bonus, or a bonus-free token.
 #[derive(Clone, Debug, Deserialize)]
 pub struct ItemDef {
     pub name: String,
     pub icon: String,
     pub description: String,
+    #[serde(default)]
+    pub kind: ItemKind,
     pub bonus: ItemBonus,
 }
 
@@ -1155,6 +1172,9 @@ pub struct QuestReward {
     /// Burnout per mille on turn-in: negative relieves, positive costs (expense reports).
     #[serde(default)]
     pub burnout: i16,
+    /// Ilmari Tokens on turn-in (`ilmari.rs`: stack and weekly caps apply).
+    #[serde(default)]
+    pub tokens: u32,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1188,6 +1208,10 @@ pub struct QuestDef {
     /// band, so the campaign XP budget leaves it out.
     #[serde(default)]
     pub open_world: bool,
+    /// Offered again every UTC day (the dailies' clock): done today means unavailable until the
+    /// date moves on. The turn-in is remembered per day in the save (`quest_days`).
+    #[serde(default)]
+    pub daily: bool,
 }
 
 impl QuestDef {
@@ -1497,12 +1521,14 @@ impl Content {
             if self.items[..i].iter().any(|o| o.name == it.name) {
                 return bad(format!("duplicate item {}", it.name));
             }
+            // A trophy must do something; a token must not.
+            let bonus_ok = it.bonus.totals(1).is_empty() == (it.kind == ItemKind::Token);
             if it.description.chars().count() > ITEM_DESC_MAX
-                || it.bonus.totals(1).is_empty()
+                || !bonus_ok
                 || !(0.0..=5.0).contains(&it.bonus.crit_pct)
             {
                 return bad(format!(
-                    "item {} needs a bonus, crit 0..=5 and a description of at most {ITEM_DESC_MAX} chars",
+                    "item {} needs a bonus (tokens none), crit 0..=5 and a description of at most {ITEM_DESC_MAX} chars",
                     it.name
                 ));
             }
@@ -1895,6 +1921,13 @@ impl Content {
                 && self.item(t).is_none()
             {
                 return bad(format!("quest {} rewards unknown item {t}", q.id));
+            }
+            if q.reward.tokens > 0
+                && self
+                    .item(crate::ilmari::TOKEN)
+                    .is_none_or(|t| t.kind != ItemKind::Token)
+            {
+                return bad(format!("quest {} pays tokens that do not exist", q.id));
             }
             let chain_ok = q
                 .requires

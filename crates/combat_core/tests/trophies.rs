@@ -166,7 +166,14 @@ fn shipped_item_table_respects_the_content_rules() {
     assert!(c.items.len() >= 40);
     for it in &c.items {
         assert!(it.description.chars().count() <= combat_core::ITEM_DESC_MAX);
-        assert!(!it.bonus.totals(1).is_empty(), "{} has no bonus", it.name);
+        // Tokens (quest props, Ilmari currency) are the one kind that must carry no bonus.
+        let token = it.kind == combat_core::ItemKind::Token;
+        assert_eq!(
+            it.bonus.totals(1).is_empty(),
+            token,
+            "{} bonus rule",
+            it.name
+        );
     }
 }
 

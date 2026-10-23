@@ -125,6 +125,14 @@ fn anchor(name: &str) -> Option<(Vec3, f32)> {
     if let Some(n) = num("pack_") {
         return Some((Vec3::new(0.0, 0.0, -PACK_SPACING * n), 0.0));
     }
+    // The occupied campus's four checkpoints are packs of their own, after the eight numbered ones.
+    if let Some(n) = num("il_checkpoint_") {
+        return Some((Vec3::new(0.0, 0.0, -PACK_SPACING * (8.0 + n)), 0.0));
+    }
+    // The Prologue's field spots (node, vending machine, escort goal) share the quiet corner.
+    if name.starts_with("il_") {
+        return Some((Vec3::new(-400.0, 0.0, 400.0), 0.0));
+    }
     if let Some(n) = num("npc_") {
         return Some((Vec3::new(40.0, 0.0, -15.0 * n), 0.0));
     }

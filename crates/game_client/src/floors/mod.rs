@@ -24,12 +24,14 @@ mod lab;
 mod layout;
 mod marie;
 mod models;
+mod occupied;
 mod office;
 mod offsite;
 mod onboarding;
 mod props;
 mod qbr;
 mod quest_spots;
+mod resistance;
 mod shape;
 mod teambuilding;
 #[cfg(test)]

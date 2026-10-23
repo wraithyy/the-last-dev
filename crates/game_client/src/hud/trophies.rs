@@ -399,7 +399,12 @@ fn update_window(
             || (HINT.to_string(), String::new(), String::new()),
             |(d, copies)| {
                 let mut bonus = copy::bonus_text(&d.bonus.totals(copies));
-                if copies > ITEM_STACK_CAP {
+                if d.kind == combat_core::ItemKind::Token {
+                    bonus = format!(
+                        "Token: no bonus (stack cap {})",
+                        combat_core::TOKEN_STACK_CAP
+                    );
+                } else if copies > ITEM_STACK_CAP {
                     bonus.push_str(&format!("  (stack cap {ITEM_STACK_CAP})"));
                 }
                 (

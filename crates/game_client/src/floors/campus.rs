@@ -100,6 +100,16 @@ fn theme() -> Theme {
 }
 
 pub fn build() -> FloorLayout {
+    build_phase(false)
+}
+
+/// The occupied phase (docs/ILMARI_09.md B.2): the same campus, built by the same code, plus the
+/// overlay of `occupied.rs`. A phase is only another zone id, so the normal campus is never touched.
+pub fn build_occupied() -> FloorLayout {
+    build_phase(true)
+}
+
+fn build_phase(occupied: bool) -> FloorLayout {
     let mut p = Plan::default();
     p.terrain = super::districts::terrain();
     p.fp.pod(
@@ -197,6 +207,17 @@ pub fn build() -> FloorLayout {
     }
     for (name, (pos, yaw)) in doors {
         p.anchor(name, pos, yaw);
+    }
+    if occupied {
+        super::occupied::overlay(&mut p);
+        return assemble(
+            combat_core::ilmari::OCCUPIED_ZONE,
+            0,
+            "Synergy Campus (Occupied)",
+            true,
+            p,
+            super::occupied::theme(),
+        );
     }
     assemble("campus", 0, "Synergy Campus", true, p, theme())
 }
@@ -376,7 +397,12 @@ fn quiet_meadow(p: &mut Plan) {
 }
 
 /// Entrance anchor in front of the facade centre: 1.8 m out, facing away from the wall.
-fn facade_door(p: &mut Plan, (c, size): (Vec2, Vec3), face: Face, sign: Sign) -> (Vec3, f32) {
+pub(super) fn facade_door(
+    p: &mut Plan,
+    (c, size): (Vec2, Vec3),
+    face: Face,
+    sign: Sign,
+) -> (Vec3, f32) {
     let d = face.dir();
     let dir = Vec2::new(d.x, d.z);
     let half = if d.x.abs() > 0.5 { size.x } else { size.z } / 2.0;
@@ -413,7 +439,7 @@ fn neon_sign(p: &mut Plan) {
     }
 }
 
-fn building(p: &mut Plan, (c, size): (Vec2, Vec3), mat: Mat) {
+pub(super) fn building(p: &mut Plan, (c, size): (Vec2, Vec3), mat: Mat) {
     p.boxed(v(c.x, size.y / 2.0, c.y), size, mat, true);
 }
 

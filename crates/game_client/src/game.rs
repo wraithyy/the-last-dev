@@ -423,6 +423,8 @@ fn enter_zone(
         .zone_links(&req.zone)
         .into_iter()
         .filter(|l| layout.anchor(&l.anchor).is_some())
+        // The hatch to the Resistance does not exist before the Opening: no door, no lock notice.
+        .filter(|l| l.unlocked || flow.unlock_all || !combat_core::ilmari::is_ilmari_zone(&l.to))
         .map(|l| Exit {
             trigger: if l.anchor == "elevator_exit" {
                 elevator_exit_trigger(&layout)
@@ -530,6 +532,10 @@ fn zone_tagline(id: &str) -> &'static str {
         "hackathon/1" => "Twenty-four hours to build what the roadmap could not.",
         "openspace/1" => "Collaboration happens spontaneously. Constantly. At your desk.",
         "home/1" => "Flexible working: the work is flexible, the hours are not.",
+        "resistance/1" => "Twenty-two years in a booth. The basement was the good part.",
+        "campus_occupied" => {
+            "Efficiency is kindness. Please stay in the lane. The lane is a checkpoint."
+        }
         _ => "A new quarter begins. Same OKRs.",
     }
 }
@@ -550,6 +556,7 @@ fn unlock_subtitle(id: &str) -> &'static str {
         }
         "client/1" => "Your vendor has allocated you. The client has not been told.",
         "campus" => "The door that said 'Badge pending' has nothing more to add.",
+        "resistance/1" => "Dale's booth in Car Park P3 has a hatch. It was always a bunker.",
         _ => "Access granted. The access system is as surprised as you are.",
     }
 }

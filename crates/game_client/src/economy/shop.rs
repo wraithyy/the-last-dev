@@ -15,6 +15,8 @@ use combat_core::{Command, EntityId, ticks_to_ms};
 
 /// Purchases at or above this price ask "are you sure?" first.
 const CONFIRM_SP: u32 = 500;
+/// The same for token shelves.
+const CONFIRM_TOKENS: u32 = 100;
 const CONFIRM_SECS: f32 = 4.0;
 const ROW_ICON: f32 = 22.0;
 
@@ -219,15 +221,24 @@ fn rebuild(
     let now_ms = ticks_to_ms(sim.now().0);
     let stock = content.economy.stock(def, now_ms);
     let confirm = ui.confirm.as_ref().map(|(n, _)| n.clone());
+    // A token shelf (the Resistance quartermaster) is paid from the token stack, not the wallet.
+    let tokens = sim
+        .inventory()
+        .iter()
+        .find(|(n, _)| def.token.as_ref() == Some(n))
+        .map_or(0, |(_, c)| *c);
     let key = format!(
-        "{stock:?}|{:?}|{:?}|{}|{confirm:?}|{:?}|{}|{:?}",
+        "{stock:?}|{:?}|{:?}|{}|{confirm:?}|{:?}|{}|{:?}|{tokens}",
         me.bag, me.buyback, me.sp, me.equipped, me.level, me.career.rep
     );
     for (mut t, title, status) in &mut texts {
         if title.is_some() {
             set_text(&mut t, &def.title);
         } else if status.is_some() {
-            let wallet = format!("Wallet: {}", kudos(me.sp));
+            let wallet = match &def.token {
+                Some(t) => format!("Tokens: {tokens} {t}s"),
+                None => format!("Wallet: {}", kudos(me.sp)),
+            };
             let approved = if def.rotate_count > 0 {
                 format!(
                     "  |  Procurement approved {} extra items this week",
@@ -259,12 +270,15 @@ fn rebuild(
             commands.entity(e).despawn_related::<Children>();
             commands.entity(e).insert(stock_node(cols));
             for name in &stock {
+                let token_price = def.token_price(name);
                 let price = content.economy.goods(name).map_or(0, |g| g.price());
-                let affordable = me.sp >= price;
+                let affordable = token_price.map_or(me.sp >= price, |c| tokens >= c);
+                // Ilmari pieces list an item level above the cap; vendors ask for the top level.
                 let need = content
                     .economy
                     .gear(name)
-                    .map_or(1, combat_core::GearDef::required_level);
+                    .map_or(1, combat_core::GearDef::required_level)
+                    .min(content.max_level());
                 // Department-gated items stay listed so the reward is visible before it is earned.
                 let eg = &content.endgame;
                 let rep_need = content
@@ -335,10 +349,11 @@ fn rebuild(
                         } else {
                             goods::DOWNGRADE_RED
                         };
-                        r.spawn((
-                            label(format!("{} K", thousands(price)), 12.0),
-                            TextColor(price_color),
-                        ));
+                        let price_text = match token_price {
+                            Some(c) => format!("{c} T"),
+                            None => format!("{} K", thousands(price)),
+                        };
+                        r.spawn((label(price_text, 12.0), TextColor(price_color)));
                     })
                     .id();
                 if locked {
@@ -418,9 +433,14 @@ fn clicks(
         }
         match a {
             ShopAction::Buy(item) => {
-                let price = sim.content().economy.goods(item).map_or(0, |g| g.price());
+                let eco = &sim.content().economy;
+                // Token prices are small numbers; the dear pieces (100 tokens up) ask twice too.
+                let (price, limit) = match eco.token_price(item) {
+                    Some((_, c)) => (c, CONFIRM_TOKENS),
+                    None => (eco.goods(item).map_or(0, |g| g.price()), CONFIRM_SP),
+                };
                 let confirmed = ui.confirm.as_ref().is_some_and(|(n, _)| n == item);
-                if price >= CONFIRM_SP && !confirmed {
+                if price >= limit && !confirmed {
                     ui.confirm = Some((item.clone(), CONFIRM_SECS));
                     continue;
                 }

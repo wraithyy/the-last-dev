@@ -236,6 +236,7 @@ pub fn grouped(content: &combat_core::Content, bag: &[String]) -> Vec<(String, u
 fn rebuild(
     mut commands: Commands,
     ui: Res<EconomyUi>,
+    flow: Res<crate::game::GameFlow>,
     sim: SimView,
     assets: Res<AssetServer>,
     mut icons: ResMut<IconCache>,
@@ -259,8 +260,10 @@ fn rebuild(
     let content = sim.content();
     let equipped = goods::slots_of(&me.equipped);
     let totals = sim.item_totals();
+    // The zone decides whether Ilmari pieces keep their perks (they do not outside Ilmari content).
+    let ilmari = combat_core::ilmari::is_ilmari_zone(&flow.zone);
     let key = format!(
-        "{:?}|{:?}|{}|{}|{}|{}",
+        "{:?}|{:?}|{}|{}|{}|{}|{ilmari}",
         equipped, me.bag, me.sp, me.level, me.max_hp, me.max_mana
     );
     if *shown == key {
@@ -345,7 +348,7 @@ fn rebuild(
         String::new(),
     ];
     stats.extend(goods::sheet_lines(&totals));
-    let (_, perks) = content.economy.equipment(&equipped);
+    let (_, perks) = content.economy.equipment(&equipped, ilmari);
     let perk_text = perks
         .iter()
         .map(|p| {

@@ -890,7 +890,7 @@ fn area(zone: &str) -> &str {
 
 /// Campaign order of the zones (`playthrough.rs` WORLD_ORDER); 0 for zones off the path.
 fn campaign_rank(zone: &str) -> usize {
-    const ORDER: [&str; 26] = [
+    const ORDER: [&str; 28] = [
         "parking_p3",
         "campus",
         "tower/1",
@@ -921,6 +921,9 @@ fn campaign_rank(zone: &str) -> usize {
         "hack24/2",
         "hack24/3",
         "hack24/4",
+        // The Prologue after the credits: the base, then the occupied campus its quests work in.
+        "resistance/1",
+        "campus_occupied",
     ];
     ORDER.iter().position(|z| *z == zone).map_or(0, |k| k + 1)
 }
@@ -983,7 +986,8 @@ fn every_quest_is_given_where_its_work_happens() {
     for z in c
         .zones
         .iter()
-        .filter(|z| c.raid_of(&z.id).is_none() && !minigame_zone(&z.id))
+        // A hub without packs (the Resistance base) is where work is handed out, not done.
+        .filter(|z| c.raid_of(&z.id).is_none() && !minigame_zone(&z.id) && !z.packs.is_empty())
     {
         let n = c
             .quests

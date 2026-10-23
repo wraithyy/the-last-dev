@@ -491,12 +491,13 @@ mod tests {
     use super::*;
     use crate::floors::kit::Tex;
     use crate::floors::zones::{ZONE_IDS, build_zone};
-    use crate::floors::{client, corporate, teambuilding};
+    use crate::floors::{client, corporate, resistance, teambuilding};
 
     fn all_zones() -> Vec<&'static str> {
         let mut ids: Vec<&'static str> = ZONE_IDS.to_vec();
         ids.extend(corporate::ZONES);
         ids.push(client::ZONE);
+        ids.push(resistance::ZONE);
         ids.push(teambuilding::ZONE);
         ids
     }

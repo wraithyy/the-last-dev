@@ -11,7 +11,7 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 ### Added
 
 - Ill Marie turns up in more places, and she has two errands for you. Bring tissues.
-- Something happens after the credits.
+- Something happens after the credits, and there is plenty to do about it: new places, quests, a daily and some gear that is only as good as the place it is worn.
 
 ### Fixed
 

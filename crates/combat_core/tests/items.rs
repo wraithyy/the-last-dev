@@ -51,7 +51,11 @@ fn every_gear_piece_follows_the_stat_budget() {
         // Tier levels 2..=10; Legacy Mode's tier sits one tier above the cap, the raid's two.
         let raid = g.source == GearSource::Raid
             || matches!(&g.source, GearSource::Boss(k) if raid_bosses.contains(k));
-        let top = if g.source == GearSource::Legacy {
+        // The Ilmari band (16-20) sits above everything else and is the only band an authored
+        // price may buy back cheaply: its vendor pays in tokens and Kudos are only the sale price.
+        let top = if g.source == GearSource::Ilmari {
+            20
+        } else if g.source == GearSource::Legacy {
             12
         } else if raid {
             14
@@ -80,7 +84,8 @@ fn every_gear_piece_follows_the_stat_budget() {
         if total < want * 70 / 100 || total > want * 135 / 100 {
             bad.push(format!("{}: stat total {total} for budget {want}", g.name));
         }
-        if g.price > 0 && !(g.source == GearSource::Vendor && g.ilvl <= 2 && g.price <= 60) {
+        let cheap_vendor = g.source == GearSource::Vendor && g.ilvl <= 2 && g.price <= 60;
+        if g.price > 0 && !cheap_vendor && g.source != GearSource::Ilmari {
             bad.push(format!("{}: authored price {}", g.name, g.price));
         }
         if g.rarity == Rarity::Legendary && g.source == GearSource::World {
@@ -188,6 +193,8 @@ fn every_item_is_reachable_from_some_source() {
             GearSource::Raid => {
                 !c.raids.is_empty() && g.tier() > top && !shelves.contains(&&g.name)
             }
+            // Brenda's shelf until the wings drop their own: above the cap, sold for tokens.
+            GearSource::Ilmari => g.ilvl > combat_core::BASE_ILVL_CAP && shelves.contains(&&g.name),
             // Medal rewards only: some medal must hand it out, and no vendor sells it.
             GearSource::Minigame => {
                 !shelves.contains(&&g.name)
@@ -218,8 +225,11 @@ fn every_item_is_reachable_from_some_source() {
                 .filter_map(|a| a.trophy.as_ref()),
         )
         .collect();
+    // Tokens also come from quest rewards (`tokens`), not only from loot.
+    let paid = c.quests.iter().any(|q| q.reward.tokens > 0);
     for t in &c.items {
-        if !trophy_sources.contains(&&t.name) {
+        let token_paid = paid && t.name == combat_core::ilmari::TOKEN;
+        if !trophy_sources.contains(&&t.name) && !token_paid {
             bad.push(format!("trophy {}", t.name));
         }
     }

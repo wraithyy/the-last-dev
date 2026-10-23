@@ -209,6 +209,8 @@ fn pickup_look(tag: &str) -> (&'static str, Color) {
         "lab1_usb" => ("gear_usb", Color::srgb(1.0, 0.45, 0.8)),
         "source_receipt" => ("token_invoice", Color::srgb(1.0, 0.95, 0.7)),
         "basement_tag" => ("junk_ticket", Color::srgb(0.35, 0.9, 1.0)),
+        "il_hr_pass" => ("access_badge", Color::srgb(1.0, 0.4, 0.45)),
+        "il_mug_proof" => ("gear_mug", Color::srgb(1.0, 0.85, 0.5)),
         _ => ("box", Color::srgb(1.0, 0.8, 0.25)),
     }
 }

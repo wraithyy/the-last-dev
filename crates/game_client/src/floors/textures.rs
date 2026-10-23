@@ -226,6 +226,11 @@ fn unlit(tex: Tex) -> bool {
                 | Sign::AutonomyTower
                 | Sign::AutonomyRack
                 | Sign::MarieCall
+                | Sign::IlSplash
+                | Sign::IlCheckpoint
+                | Sign::IlScreenA
+                | Sign::IlScreenB
+                | Sign::IlScreenC
                 | Sign::PaymentAccepted
                 | Sign::TempWarning
                 | Sign::Printing
@@ -2497,6 +2502,121 @@ fn sign_spec(s: Sign) -> SignSpec {
             &["RETURN TO OFFICE", "THE OFFICE IS", "2.4 KM THAT WAY"],
             [40, 60, 90],
             [235, 240, 248],
+            [255, 200, 70],
+        ),
+        // The occupation: screens in the company's own voice, one tone sharper than before.
+        Sign::IlSplash => sp(
+            &["ILMARI", "AUTONOMOUS. EFFICIENT. YOUR FRIEND."],
+            [8, 8, 14],
+            [235, 240, 255],
+            [255, 60, 50],
+        ),
+        Sign::IlClosed => sp(
+            &["CLOSED", "EFFICIENCY REVIEW", "REOPENS: NEVER"],
+            [60, 14, 14],
+            [250, 235, 230],
+            [255, 200, 70],
+        ),
+        Sign::IlCheckpoint => sp(
+            &[
+                "CHECKPOINT",
+                "PLEASE CONFIRM YOU ARE",
+                "HUMAN. WE WILL KNOW.",
+            ],
+            [8, 8, 14],
+            [235, 240, 255],
+            [255, 60, 50],
+        ),
+        Sign::IlScreenA => sp(
+            &["EFFICIENCY", "IS KINDNESS"],
+            [10, 10, 18],
+            [120, 240, 255],
+            [255, 60, 50],
+        ),
+        Sign::IlScreenB => sp(
+            &["HAVE YOU THANKED", "YOUR ASSISTANT TODAY?"],
+            [10, 10, 18],
+            [235, 240, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlScreenC => sp(
+            &["BADGES ARE", "DEPRECATED"],
+            [10, 10, 18],
+            [235, 240, 255],
+            [255, 60, 50],
+        ),
+        Sign::DalesTunnel => sp(
+            &["DALE'S TUNNEL", "TO THE RESISTANCE", "MIND THE LAMINATION"],
+            [34, 56, 40],
+            [240, 245, 235],
+            [255, 220, 90],
+        ),
+        Sign::TunnelHome => sp(
+            &[
+                "THE OLD CAMPUS",
+                "BEFORE (SENTIMENTAL)",
+                "EXIT AT YOUR OWN NOSTALGIA",
+            ],
+            [30, 60, 120],
+            [240, 245, 255],
+            [255, 220, 90],
+        ),
+        Sign::ResBack => sp(
+            &[
+                "UP TO THE CAR PARK",
+                "THE NORMAL WORLD",
+                "LAST EXIT BEFORE ILMARI",
+            ],
+            [30, 60, 120],
+            [240, 245, 255],
+            [255, 220, 90],
+        ),
+        Sign::ResOut => sp(
+            &[
+                "TO THE CAMPUS",
+                "OCCUPIED. KEEP LOW.",
+                "ANDROIDS CANNOT BEND",
+            ],
+            [90, 20, 20],
+            [250, 235, 230],
+            [255, 200, 70],
+        ),
+        Sign::ResProcurement => sp(
+            &[
+                "PROCUREMENT",
+                "THREE QUOTES REQUIRED",
+                "(ALL THE SAME QUOTE)",
+            ],
+            [200, 200, 195],
+            [30, 40, 60],
+            [200, 40, 40],
+        ),
+        Sign::ResMap => sp(
+            &["LAMINATED MAP", "YOU ARE HERE", "ANDROIDS: EVERYWHERE ELSE"],
+            [236, 232, 214],
+            [40, 40, 50],
+            [200, 40, 40],
+        ),
+        Sign::ResRules => sp(
+            &[
+                "RESISTANCE RULES",
+                "1. ALWAYS HAVE A MUG",
+                "2. LAMINATE EVERYTHING",
+            ],
+            [236, 232, 214],
+            [40, 40, 50],
+            [200, 40, 40],
+        ),
+        Sign::ResDale => sp(
+            &["RIGHT ALL ALONG", "SINCE 2002"],
+            [34, 56, 40],
+            [240, 245, 235],
+            [255, 220, 90],
+        ),
+        Sign::ResBoard => sp(
+            &["QUEST BOARD", "THE QUOTES ARE THE SAME", "THE ROTA IS NOT"],
+            [60, 50, 40],
+            [245, 238, 220],
             [255, 200, 70],
         ),
     }

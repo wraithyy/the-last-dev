@@ -53,6 +53,8 @@ pub struct QuestLog {
     pub completed: Vec<String>,
     /// Own and shared kills per unit key over the run (retro credit); sim side only.
     pub kills: BTreeMap<String, u32>,
+    /// UTC day of the last turn-in of each `QuestDef::daily` quest.
+    pub days: BTreeMap<String, u32>,
 }
 
 /// Runtime of the objectives that watch the world rather than count events.
@@ -95,6 +97,7 @@ static EMPTY_LOG: QuestLog = QuestLog {
     active: Vec::new(),
     completed: Vec::new(),
     kills: BTreeMap::new(),
+    days: BTreeMap::new(),
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -126,6 +129,11 @@ impl Sim {
         self.quest_logs.get(&player).unwrap_or(&EMPTY_LOG)
     }
 
+    /// The UTC day the dailies run on (`QuestDef::daily`, like the Scrum board).
+    pub(crate) fn quest_day(&self) -> u32 {
+        crate::live::day_index(self.unix_s())
+    }
+
     /// Where the first player stands with quest `id`; `Locked` for an unknown id.
     pub fn quest_status(&self, id: &str) -> QuestStatus {
         self.quest_status_of(self.player().unwrap_or(0), id)
@@ -137,7 +145,10 @@ impl Sim {
             return QuestStatus::Locked;
         };
         let log = self.quests_of(player);
-        if log.completed.iter().any(|c| c == id) {
+        // A daily is done until the date moves on, then it is on offer again.
+        let done = log.completed.iter().any(|c| c == id)
+            && (!def.daily || log.days.get(id) == Some(&self.quest_day()));
+        if done {
             return QuestStatus::Done;
         }
         if let Some(q) = log.active.iter().find(|q| q.id == id) {
@@ -261,15 +272,24 @@ impl Sim {
             self.item_error(pid, ItemError::BagFull);
             return;
         }
+        let today = self.quest_day();
         let log = self.quest_logs.entry(pid).or_default();
         log.active.retain(|q| q.id != id);
-        log.completed.push(id.to_string());
+        if def.daily {
+            log.days.insert(id.to_string(), today);
+        }
+        if !log.completed.iter().any(|c| c == id) {
+            log.completed.push(id.to_string());
+        }
         self.emit_to(
             pid,
             Event::QuestCompleted {
                 quest: id.to_string(),
             },
         );
+        if def.reward.tokens > 0 {
+            self.grant_ilmari_tokens(pid, def.reward.tokens);
+        }
         if let Some(t) = &def.reward.trophy {
             self.add_trophies(pi, std::slice::from_ref(t));
         }

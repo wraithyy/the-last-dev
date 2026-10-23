@@ -19,7 +19,7 @@
 //! - `WOW_BOSS_PCT=<pct>@<secs>`: the zone boss drops to that HP percent at that time (phase shots).
 //! - `WOW_FPS=1`: log average frame time and drawn mesh count every 3 s (vsync caps the rate, so read the ms).
 //!   `WOW_SHOW_FPS=1` turns the on-screen FPS readout on for the run (settings.rs).
-//! - `WOW_BENCH=lake|plaza|campus|carpark|raid|tower1`: perf benchmark (see `docs/PERF.md`). Starts in
+//! - `WOW_BENCH=lake|plaza|campus|campus_occupied|carpark|raid|tower1`: perf benchmark (see `docs/PERF.md`). Starts in
 //!   that scenario's zone/spot, orbits the camera, warms up `WOW_BENCH_WARMUP` s (default 5, after
 //!   the first frame), records `WOW_BENCH_FRAMES` frames (default 600), logs one `BENCH ...` line, exits.
 //!   Native: uncapped present mode and update loop, 1600x900 window (`WOW_BENCH_SCALE=2` emulates retina). Web: `?bench=<name>` (line goes to the console).
@@ -698,7 +698,7 @@ pub struct BenchSpec {
     pub height: f32,
 }
 
-const BENCHES: [BenchSpec; 6] = [
+const BENCHES: [BenchSpec; 7] = [
     // Wellness Park: lake at (-150, -5), water radius ~20.
     BenchSpec {
         name: "lake",
@@ -720,6 +720,15 @@ const BENCHES: [BenchSpec; 6] = [
     BenchSpec {
         name: "campus",
         zone: "campus",
+        player_at: Some((0.0, 0.0, 0.0)),
+        target: Some(Vec3::ZERO),
+        radius: 240.0,
+        height: 140.0,
+    },
+    // The same camera over the occupied phase (docs/ILMARI_09.md B.9: within 1 ms of the campus).
+    BenchSpec {
+        name: "campus_occupied",
+        zone: "campus_occupied",
         player_at: Some((0.0, 0.0, 0.0)),
         target: Some(Vec3::ZERO),
         radius: 240.0,

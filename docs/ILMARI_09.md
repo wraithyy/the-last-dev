@@ -806,9 +806,9 @@ beside the one compiling agent. **Part A first.** After each task: `cargo test` 
 |---|---|---|---|
 | B1 | `ilmari.rs` state, `StampIlmari`, save keys, `ilmari_pending`, `copy::ilmari_stamp` | A6 | tests: gating, old save, stamp format; protocol bump 31 -> 32 (built) |
 | B2 | The Opening cutscene and the mail window, `il_marie_awake`, `il_00_wake` | B1 | scripted playthrough reaches the quest; screenshot of the mail |
-| B3 | `campus_occupied`, `resistance/1`, geometry delta, P3 hatch | B2 | `ilmari_gating` passes; `WOW_BENCH=campus_occupied` within budget |
-| B4 | Resistance NPCs, tokens (`ItemKind::Token`), quartermaster, attunement chain, world quests, daily | B3 | quest-chain bot from `il_00_wake` to `il_06`; token cap test |
-| B5 | `GearSource::Ilmari` and item-level sync | B1 | the item-level sync test; Legacy/raid pieces unchanged |
+| B3 | `campus_occupied`, `resistance/1`, geometry delta, P3 hatch | B2 | `ilmari_gating` passes; `WOW_BENCH=campus_occupied` within budget (built; the geometry is a full copy, not a delta) |
+| B4 | Resistance NPCs, tokens (`ItemKind::Token`), quartermaster, attunement chain, world quests, daily | B3 | quest-chain bot from `il_00_wake` to `il_06`; token cap test (built, `tests/ilmari_prologue.rs`) |
+| B5 | `GearSource::Ilmari` and item-level sync | B1 | the item-level sync test; Legacy/raid pieces unchanged (built) |
 | B6 | `RaidDef` Wing 1, `Difficulty::Story`, `AiAbility.story` | B4, B5 | a three-room framework test with a stub boss |
 | B7 | Patch Tuesday (`requires_aura`, patch auras, screens) | B6 | mechanic tests; Story and Full bot clears |
 | B8 | The Recruiter (`death_burnout`, candidates, tells) | B7 | `Candidate` tests; bot never kills humans |

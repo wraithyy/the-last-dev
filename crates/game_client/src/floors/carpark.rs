@@ -51,6 +51,8 @@ const CAST: [Spot; 10] = [
     ("npc_pilot", (-8.0, -22.0), (0.0, -26.0)),
 ];
 const BOSS: (f32, f32) = (9.0, -71.0);
+/// The hatch behind the attendant's booth (booth east wall x 29.5, plus the door convention).
+pub const HATCH: (f32, f32) = (31.3, 28.0);
 
 fn theme() -> Theme {
     let c = Color::srgb;
@@ -92,6 +94,7 @@ pub fn build() -> FloorLayout {
     onboarding_corner(&mut p);
     badge_office(&mut p);
     attendant_booth(&mut p);
+    maintenance_hatch(&mut p);
     super::marie::p3(&mut p);
     vendor_kiosk(&mut p);
     jokes(&mut p);
@@ -299,6 +302,30 @@ fn attendant_booth(p: &mut Plan) {
         (mx, 1.2, mz + 0.25),
         (mx, mz + 1.8),
     );
+}
+
+/// A steel maintenance hatch in the lot behind the attendant's booth. It is a hatch in a car
+/// park until the Opening has played (docs/ILMARI_09.md B.2); the client then marks it, and
+/// Dale's basement links to it (`door:resistance/1`, hidden by `game.rs` until the link opens).
+fn maintenance_hatch(p: &mut Plan) {
+    let (x, z) = HATCH;
+    p.boxed(v(x, 0.03, z), v(1.8, 0.06, 1.8), Mat::Metal, false);
+    for (dx, dz, sx, sz) in [
+        (0.0, -0.85, 1.8, 0.1),
+        (0.0, 0.85, 1.8, 0.1),
+        (-0.85, 0.0, 0.1, 1.6),
+        (0.85, 0.0, 0.1, 1.6),
+    ] {
+        p.boxed(
+            v(x + dx, 0.065, z + dz),
+            v(sx, 0.02, sz),
+            Mat::Hazard,
+            false,
+        );
+    }
+    p.boxed(v(x, 0.1, z), v(0.5, 0.05, 0.12), Mat::Dark, false);
+    // 1.8 m in front of the booth's east wall, facing away from it (the door convention).
+    p.anchor("door:resistance/1", v(x, 0.0, z), -FRAC_PI_2);
 }
 
 /// The lanyard kiosk: the only vendor in P3, cash only, card reader decorative.

@@ -318,6 +318,11 @@ fn update_tooltip(
         .and_then(|u| sim.content().class_of_unit(&u.key))
         .map(|c| c.role);
     let (level, kudos) = me.map_or((1, 0), |u| (u.level, u.sp));
+    let tokens = sim
+        .inventory()
+        .iter()
+        .find(|(n, _)| n == combat_core::ilmari::TOKEN)
+        .map_or(0, |(_, c)| *c);
     // The play camera's viewport is the HUD's screen (it differs from the window in screenshots).
     let view = camera
         .iter()
@@ -327,7 +332,7 @@ fn update_tooltip(
     let (w, h) = (view.x / scale.0.max(0.01), view.y / scale.0.max(0.01));
     let panel_w = TIP_W.min(w - 2.0 * TIP_EDGE);
     let key = format!(
-        "{item}|{buying}|{level}|{kudos}|{panel_w}|{}",
+        "{item}|{buying}|{level}|{kudos}|{tokens}|{panel_w}|{}",
         equipped.join("|")
     );
     if shown.as_deref() != Some(key.as_str()) {
@@ -337,6 +342,7 @@ fn update_tooltip(
             role,
             level,
             kudos,
+            tokens,
             buying,
         };
         let tip = goods::tooltip(sim.content(), &item, &viewer);

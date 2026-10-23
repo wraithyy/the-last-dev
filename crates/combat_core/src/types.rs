@@ -287,6 +287,8 @@ pub enum ItemError {
     Protected,
     /// The department behind that item does not like you enough yet (`RepGoods::tier`).
     RepTooLow,
+    /// A token vendor wants more of its currency (`VendorDef::token`); offline Ilmari shops only.
+    NotEnoughTokens,
 }
 
 impl ItemError {
@@ -309,6 +311,9 @@ impl ItemError {
             ItemError::Protected => "That one is load-bearing. Compliance would notice.",
             ItemError::RepTooLow => {
                 "That department has not added you to the right mailing list yet. Earn more reputation."
+            }
+            ItemError::NotEnoughTokens => {
+                "Brenda needs three quotes and you have one. Come back with more tokens."
             }
         }
     }

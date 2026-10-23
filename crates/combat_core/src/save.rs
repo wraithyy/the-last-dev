@@ -90,6 +90,10 @@ pub struct SaveData {
     /// played (`ilmari_flags`); optional keys, old saves load as locked.
     pub ilmari_stamp: Option<crate::ilmari::IlmariStamp>,
     pub ilmari_revealed: bool,
+    /// Ilmari Tokens earned this ISO week (`ilmari_tok`: week, count); optional key.
+    pub ilmari_tokens: (u32, u32),
+    /// UTC day of the last turn-in per daily quest (`quest_days`); optional key.
+    pub quest_days: Vec<(String, u32)>,
 }
 
 fn list(v: &str) -> Vec<String> {
@@ -228,6 +232,20 @@ impl SaveData {
                 u8::from(self.ilmari_revealed)
             ));
         }
+        if self.ilmari_tokens.1 > 0 {
+            out.push_str(&format!(
+                "ilmari_tok={},{}\n",
+                self.ilmari_tokens.0, self.ilmari_tokens.1
+            ));
+        }
+        if !self.quest_days.is_empty() {
+            let rows: Vec<String> = self
+                .quest_days
+                .iter()
+                .map(|(k, d)| format!("{k}*{d}"))
+                .collect();
+            out.push_str(&format!("quest_days={}\n", rows.join("|")));
+        }
         if !self.minigames.is_empty() {
             let rows: Vec<String> = self
                 .minigames
@@ -333,6 +351,21 @@ impl SaveData {
                     {
                         s.ilmari_stamp = Some(crate::ilmari::IlmariStamp::new(t, o, z));
                     }
+                }
+                "ilmari_tok" => {
+                    let mut f = v.splitn(2, ',').map(|x| x.trim().parse::<u32>());
+                    if let (Some(Ok(w)), Some(Ok(n))) = (f.next(), f.next()) {
+                        s.ilmari_tokens = (w, n);
+                    }
+                }
+                "quest_days" => {
+                    s.quest_days = list(v)
+                        .iter()
+                        .filter_map(|r| {
+                            let (k, d) = r.split_once('*')?;
+                            Some((k.to_string(), d.parse().ok()?))
+                        })
+                        .collect();
                 }
                 "ilmari_flags" => {
                     s.ilmari_revealed = v.split(',').next().is_some_and(|r| r.trim() == "1");
@@ -528,6 +561,13 @@ impl Sim {
             marie_met: self.marie_met(player),
             ilmari_stamp: self.ilmari.stamp.clone(),
             ilmari_revealed: self.ilmari.revealed,
+            ilmari_tokens: self.ilmari.tokens,
+            quest_days: self
+                .quests_of(player)
+                .days
+                .iter()
+                .map(|(k, d)| (k.clone(), *d))
+                .collect(),
         })
     }
 
@@ -603,10 +643,17 @@ impl Sim {
             .filter(|(k, _)| self.content.unit_def(k).is_some())
             .map(|(k, c)| (k.clone(), *c))
             .collect();
+        let days = save
+            .quest_days
+            .iter()
+            .filter(|(k, _)| self.content.quest(k).is_some_and(|q| q.daily))
+            .cloned()
+            .collect();
         let log = self.quest_logs.entry(player).or_default();
         log.active = active;
         log.completed = quests;
         log.kills = kills;
+        log.days = days;
         let opened: Vec<String> = self
             .content
             .zones
@@ -641,6 +688,7 @@ impl Sim {
         self.restore_taken_props(player, &save.taken_props);
         self.restore_marie_met(player, save.marie_met);
         self.restore_ilmari(save.ilmari_stamp.clone(), save.ilmari_revealed);
+        self.restore_ilmari_tokens(save.ilmari_tokens.0, save.ilmari_tokens.1);
         let class = self.class_at(i).map(|c| c.key.clone()).unwrap_or_default();
         self.units[i].state.talents = self.content.talents.sanitize(&class, &save.talents, level);
         let title = Some(&save.title)

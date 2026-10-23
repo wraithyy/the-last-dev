@@ -698,6 +698,22 @@ pub enum Sign {
     H24Sticky,
     H24Cans,
     H24Caution,
+    // The occupied campus and the Resistance base (`occupied.rs`, `resistance.rs`).
+    IlSplash,
+    IlClosed,
+    IlCheckpoint,
+    IlScreenA,
+    IlScreenB,
+    IlScreenC,
+    DalesTunnel,
+    TunnelHome,
+    ResBack,
+    ResOut,
+    ResProcurement,
+    ResMap,
+    ResRules,
+    ResDale,
+    ResBoard,
 }
 
 #[derive(Clone, Debug)]
@@ -1374,6 +1390,8 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
         Sign::MigPlan | Sign::MigTickets | Sign::MigRates | Sign::MigCutover => (256, 128),
         Sign::OffsiteAgenda | Sign::KeynoteScreen | Sign::Calendar => (256, 128),
         Sign::MarieCall => (256, 128),
+        Sign::IlSplash | Sign::IlScreenA | Sign::IlScreenB | Sign::IlScreenC => (256, 96),
+        Sign::ResMap | Sign::ResBoard => (256, 128),
         Sign::TbPhoto | Sign::TbKaraoke | Sign::TbTrustFall => (256, 96),
         Sign::HackBanner | Sign::HackStage | Sign::MigrationNew | Sign::MigrationOld => (256, 96),
         Sign::VibeConBanner | Sign::VibeConKeynote | Sign::VibeConMasterclass => (256, 96),

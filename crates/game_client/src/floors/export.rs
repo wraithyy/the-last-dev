@@ -85,7 +85,11 @@ fn render() -> String {
     // ZONE_IDS and its tests.
     for id in ZONE_IDS
         .into_iter()
-        .chain([super::client::ZONE, super::teambuilding::ZONE])
+        .chain([
+            super::client::ZONE,
+            super::teambuilding::ZONE,
+            super::resistance::ZONE,
+        ])
         .chain(super::corporate::ZONES)
     {
         let l = build_zone(id).unwrap_or_else(|| panic!("zone {id} missing"));

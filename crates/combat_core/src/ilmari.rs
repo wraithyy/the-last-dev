@@ -6,6 +6,9 @@
 //! gets the Opening on its next campus entry with no migration. The sim has no wall clock, so
 //! the client tells it once (`Command::StampIlmari`) and the sim only stores and formats it.
 
+use crate::content::{ItemKind, TOKEN_STACK_CAP};
+use crate::economy::GearSource;
+use crate::live::week_index;
 use crate::sim::Sim;
 use crate::targeting::EntityId;
 
@@ -22,6 +25,45 @@ const RETIRED: [&str; 4] = [
 ];
 /// Longest zone abbreviation kept ("CEST", "UTC+02:00").
 const TZ_MAX: usize = 9;
+/// The currency of the Resistance quartermaster (an `ItemKind::Token` of `Content::items`).
+pub const TOKEN: &str = "Ilmari Token";
+/// Tokens that can be earned per ISO week, so the shop is a pace and not a treadmill (B.2).
+pub const TOKEN_WEEK_CAP: u32 = 200;
+/// The occupied campus and the Resistance base: the two phases outside the wings.
+pub const OCCUPIED_ZONE: &str = "campus_occupied";
+pub const BASE_ZONE: &str = "resistance/1";
+
+/// How hard an Ilmari encounter bites. Story is always on offer, any group size, solo included;
+/// Full is the authored unit at the Ilmari item band (docs/ILMARI_09.md B.3). The wings read this
+/// to scale their units and key their lockouts; the open-world phase has a single difficulty.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IlmariDifficulty {
+    Story,
+    Full,
+}
+
+impl IlmariDifficulty {
+    /// (HP %, damage %) of the authored unit: Story reuses the raid's Async figures.
+    pub fn scale(self, raid: &crate::raid::RaidDef) -> (u32, u32) {
+        match self {
+            IlmariDifficulty::Story => (raid.async_hp_pct, raid.async_damage_pct),
+            IlmariDifficulty::Full => (100, 100),
+        }
+    }
+
+    /// Prefix of the weekly lockout key (Story and Full lock separately).
+    pub fn lock_prefix(self) -> &'static str {
+        match self {
+            IlmariDifficulty::Story => "story:",
+            IlmariDifficulty::Full => "",
+        }
+    }
+}
+
+/// Whether `zone` is Ilmari content: Ilmari gear bonuses work here and nowhere else.
+pub fn is_ilmari_zone(zone: &str) -> bool {
+    zone == OCCUPIED_ZONE || zone == BASE_ZONE || zone.starts_with("ilmari")
+}
 
 /// The player's real clock at the moment the chain unlocked.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -37,6 +79,10 @@ pub struct IlmariStamp {
 pub(crate) struct IlmariState {
     pub(crate) stamp: Option<IlmariStamp>,
     pub(crate) revealed: bool,
+    /// Tokens earned in ISO week `.0`: the weekly cap counts against `.1`.
+    pub(crate) tokens: (u32, u32),
+    /// Whether the worn Ilmari pieces were last summed as in Ilmari content.
+    worn_in: bool,
 }
 
 /// `UTC+02:00`, the zone name when the platform has no abbreviation.
@@ -189,6 +235,114 @@ impl Sim {
         id != OPENING_QUEST || self.campaign_world().bosses_killed.contains(CREDITS_BOSS)
     }
 
+    /// The loaded zone is Ilmari content (`is_ilmari_zone`).
+    pub fn in_ilmari_content(&self) -> bool {
+        self.zone.as_deref().is_some_and(is_ilmari_zone)
+    }
+
+    /// Re-sums the gear of players who wear an Ilmari piece when the zone crossed the border of
+    /// Ilmari content, keeping their HP and mana fractions like any gear change. Players
+    /// without such a piece (all of the base game) are never touched.
+    pub(crate) fn sync_ilmari_gear(&mut self) {
+        let now = self.in_ilmari_content();
+        if now == self.ilmari.worn_in {
+            return;
+        }
+        self.ilmari.worn_in = now;
+        for pid in self.players.clone() {
+            let Some(i) = self.index(pid) else { continue };
+            let wears = self.units[i]
+                .state
+                .equipped
+                .iter()
+                .filter_map(|n| self.economy().gear(n))
+                .any(|g| g.source == GearSource::Ilmari);
+            if !wears {
+                continue;
+            }
+            let (old_hp, old_mana) = (self.units[i].state.max_hp, self.units[i].state.max_mana);
+            self.refresh_item_bonus(i);
+            let s = &mut self.units[i].state;
+            let keep = |cur: u32, old: u32, new: u32| {
+                if old == 0 {
+                    cur.min(new)
+                } else {
+                    ((u64::from(cur) * u64::from(new) / u64::from(old)) as u32).clamp(1, new.max(1))
+                }
+            };
+            if s.alive {
+                s.hp = keep(s.hp, old_hp, s.max_hp);
+            }
+            s.mana = keep(s.mana, old_mana, s.max_mana).min(s.max_mana);
+        }
+    }
+
+    /// Copies of the stack `name` in player `pi`'s inventory.
+    pub(crate) fn token_count(&self, pi: usize, name: &str) -> u32 {
+        self.units[pi]
+            .state
+            .inventory
+            .iter()
+            .find(|(n, _)| n == name)
+            .map_or(0, |(_, c)| *c)
+    }
+
+    /// Takes `n` tokens (callers checked `token_count`); an emptied stack leaves the inventory.
+    pub(crate) fn spend_tokens(&mut self, pi: usize, name: &str, n: u32) {
+        let inv = &mut self.units[pi].state.inventory;
+        if let Some(k) = inv.iter().position(|(m, _)| m == name) {
+            inv[k].1 = inv[k].1.saturating_sub(n);
+            if inv[k].1 == 0 {
+                inv.remove(k);
+            }
+        }
+        self.bag_event(pi);
+    }
+
+    /// Tokens still earnable this ISO week (`TOKEN_WEEK_CAP`).
+    pub fn ilmari_tokens_left(&self) -> u32 {
+        let week = week_index(self.unix_s());
+        let (w, earned) = self.ilmari.tokens;
+        TOKEN_WEEK_CAP.saturating_sub(if w == week { earned } else { 0 })
+    }
+
+    /// Pays `n` tokens (a quest, the daily) within the weekly cap and the stack cap; returns what
+    /// was actually granted. Offline there is one wallet, so the week's counter is the sim's.
+    pub fn grant_ilmari_tokens(&mut self, pid: EntityId, n: u32) -> u32 {
+        let Some(pi) = self.index(pid) else { return 0 };
+        let is_token = self
+            .content
+            .item(TOKEN)
+            .is_some_and(|i| i.kind == ItemKind::Token);
+        if !is_token {
+            return 0;
+        }
+        let week = week_index(self.unix_s());
+        if self.ilmari.tokens.0 != week {
+            self.ilmari.tokens = (week, 0);
+        }
+        let held = self.token_count(pi, TOKEN);
+        let n = n
+            .min(TOKEN_WEEK_CAP - self.ilmari.tokens.1.min(TOKEN_WEEK_CAP))
+            .min(TOKEN_STACK_CAP.saturating_sub(held));
+        if n == 0 {
+            return 0;
+        }
+        self.ilmari.tokens.1 += n;
+        let inv = &mut self.units[pi].state.inventory;
+        match inv.iter_mut().find(|(m, _)| m == TOKEN) {
+            Some((_, c)) => *c += n,
+            None => inv.push((TOKEN.to_string(), n)),
+        }
+        self.bag_event(pi);
+        n
+    }
+
+    /// Restores the saved week counter (`ilmari_tok`).
+    pub(crate) fn restore_ilmari_tokens(&mut self, week: u32, earned: u32) {
+        self.ilmari.tokens = (week, earned.min(TOKEN_WEEK_CAP));
+    }
+
     /// Restores the saved stamp and flag (`ilmari_at`, `ilmari_flags`). A flag without a stamp
     /// (hand-edited save) is dropped so the Opening can stamp again.
     pub(crate) fn restore_ilmari(&mut self, stamp: Option<IlmariStamp>, revealed: bool) {
@@ -200,6 +354,31 @@ impl Sim {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn story_reuses_the_async_figures_and_full_is_the_authored_unit() {
+        let raid = crate::raid::RaidDef {
+            async_hp_pct: 40,
+            async_damage_pct: 50,
+            ..Default::default()
+        };
+        assert_eq!(IlmariDifficulty::Story.scale(&raid), (40, 50));
+        assert_eq!(IlmariDifficulty::Full.scale(&raid), (100, 100));
+        assert_ne!(
+            IlmariDifficulty::Story.lock_prefix(),
+            IlmariDifficulty::Full.lock_prefix()
+        );
+    }
+
+    #[test]
+    fn ilmari_content_is_the_two_phases_and_the_wings() {
+        for z in ["campus_occupied", "resistance/1", "ilmari1/2", "ilmari2/1"] {
+            assert!(is_ilmari_zone(z), "{z}");
+        }
+        for z in ["campus", "parking_p3", "lab/2", "offsite/1", "tower/3"] {
+            assert!(!is_ilmari_zone(z), "{z}");
+        }
+    }
 
     #[test]
     fn the_stamp_reads_like_the_spec() {

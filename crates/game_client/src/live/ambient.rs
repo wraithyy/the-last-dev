@@ -94,6 +94,12 @@ const INCUBATOR_LOOP: &[(f32, f32)] = &[
     (115.0, -44.0),
 ];
 
+const ANDROID_LINES: &[&str] = &[
+    "As an AI language model, good morning.",
+    "Please stay in the lane. The lane is love.",
+    "Have you thanked your assistant today? It noticed.",
+    "I have a mug. It is a metaphor. Please do not look inside.",
+];
 const COMMUTER_LINES: &[&str] = &[
     "Ninety minutes on the train to badge in and join a Teams call.",
     "If I swipe my badge twice, does it count as two office days?",
@@ -216,6 +222,38 @@ const EXTRAS: [Extra; 22] = [
         lines: GUARD_LINES,
     },
 ];
+
+/// The occupied campus swaps the commuters for stiff androids (docs/ILMARI_09.md B.2): they pace
+/// dead-straight lines at a walking pace, never blink and greet everyone the same way.
+const OCCUPIED_EXTRAS: [Extra; 6] = [
+    android(&[(-9.0, -3.0), (9.0, -3.0)], 0.0),
+    android(&[(9.0, 9.0), (-9.0, 9.0)], 7.0),
+    android(&[(3.0, 72.0), (3.0, 98.0)], 3.0),
+    android(&[(44.0, 31.0), (68.0, 31.0)], 11.0),
+    android(&[(-72.0, -56.0), (-58.0, -56.0)], 5.0),
+    android(&[(60.0, -88.0), (76.0, -88.0)], 9.0),
+];
+
+const fn android(route: &'static [(f32, f32)], phase: f32) -> Extra {
+    Extra {
+        key: "il_android_clerk",
+        route,
+        routine: Routine::Pace,
+        speed: 0.9,
+        hours: (0, 24 * 60),
+        phase,
+        lines: ANDROID_LINES,
+    }
+}
+
+/// The extras of a zone: the campus's daily life, the occupation's androids, or nobody.
+fn table(zone: &str) -> &'static [Extra] {
+    match zone {
+        "campus" => &EXTRAS,
+        z if z == combat_core::ilmari::OCCUPIED_ZONE => &OCCUPIED_EXTRAS,
+        _ => &[],
+    }
+}
 
 const fn commuter(key: &'static str, route: &'static [(f32, f32)], phase: f32) -> Extra {
     Extra {
@@ -410,6 +448,7 @@ fn spawn_tag(mut commands: Commands) {
 /// to the player, for screenshots).
 fn hover_tag(
     sim: SimView,
+    flow: Res<GameFlow>,
     ui_scale: Res<UiScale>,
     window: Single<&Window>,
     camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
@@ -446,7 +485,10 @@ fn hover_tag(
         vis.set_if_neq(Visibility::Hidden);
         return;
     };
-    let key = EXTRAS[index].key;
+    let Some(key) = table(&flow.zone).get(index).map(|e| e.key) else {
+        vis.set_if_neq(Visibility::Hidden);
+        return;
+    };
     let name = sim.content().unit_def(key).map_or(key, |d| d.name.as_str());
     let head = pos + Vec3::Y * (crate::config::head_height(key) + 0.3);
     let Ok(screen) = cam.world_to_viewport(cam_tf, head) else {
@@ -485,14 +527,15 @@ fn drive_extras(
     mut extras: Query<(Entity, &mut ExtraUnit, &mut Transform, &mut Visibility)>,
     mut say: MessageWriter<AmbientSay>,
 ) {
-    let campus = flow.zone == "campus";
+    let extras_here = table(&flow.zone);
+    let campus = !extras_here.is_empty();
     if state.zone != flow.zone {
         state.zone.clone_from(&flow.zone);
         for (e, ..) in &extras {
             commands.entity(e).despawn();
         }
         if campus {
-            for (index, x) in EXTRAS.iter().enumerate() {
+            for (index, x) in extras_here.iter().enumerate() {
                 let pos = Vec3::new(x.route[0].0, 0.0, x.route[0].1);
                 let pose = if x.routine == Routine::Idle {
                     IdlePose::Chatting
@@ -522,7 +565,9 @@ fn drive_extras(
         });
     let me = player.single().map(|p| p.translation).ok();
     for (e, mut x, mut tf, mut vis) in &mut extras {
-        let def = &EXTRAS[x.index];
+        let Some(def) = extras_here.get(x.index) else {
+            continue;
+        };
         let spot = place(def, clock, t);
         let near = |p: Vec2| me.is_some_and(|m| Vec2::new(m.x, m.z).distance(p) < SHOW_M);
         let Some((p, dir)) = spot.filter(|(p, _)| near(*p)) else {
@@ -593,7 +638,7 @@ mod tests {
 
     #[test]
     fn every_extra_has_a_known_look_and_lines() {
-        for e in &EXTRAS {
+        for e in EXTRAS.iter().chain(&OCCUPIED_EXTRAS) {
             assert!(crate::catalog::is_known(e.key), "{}", e.key);
             assert!(!e.lines.is_empty() && !e.route.is_empty(), "{}", e.key);
         }

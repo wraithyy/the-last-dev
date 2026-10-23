@@ -360,6 +360,9 @@
             dispel: Never),
         (key: "billion", name: "Valuation Hits One Billion", icon: "series_b", harmful: false, damage_done_pct: 55,
             haste_pct: 25, dispel: Never),
+        // ---- Ilmari: the occupied campus (docs/ILMARI_09.md B.2) ----
+        (key: "il_throttled", name: "Throttled", icon: "quick_sync", harmful: true, slow_pct: 30, dispel: Magic),
+        (key: "il_flagged", name: "Flagged as Non-Compliant", icon: "overpromise", harmful: true, damage_taken_pct: 8, max_stacks: 3, dispel: Magic),
     ],
     spells: [
         // ---- player ----
@@ -4247,6 +4250,69 @@
             target: Caster,
             description: "Valuation hits one billion. Nobody is sure why. The Judge hits much harder and faster.",
             effect: Aura(aura: "billion", duration_ms: 600000),
+        ),
+        // ---- Ilmari: the occupied campus (trash at 12, the elites a little above; docs/ILMARI_09.md B.2) ----
+        (
+            id: 2300, name: "Spot Clean", icon: "robot", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "A repurposed cleaning robot treats you as a stain. The mop is wet and its terms are not negotiable.",
+            effect: Damage(
+                base: 45, coefficient_pct: 0,
+                apply_aura: Some((aura: "il_throttled", duration_ms: 4000)),
+            ),
+        ),
+        (
+            id: 2301, name: "Toner Volley", icon: "token_invoice", school: Physical,
+            range_m: 28.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "PC LOAD LETTER. The letter is 'D', for 'dead'. Toner lands wherever you stood.",
+            effect: Damage(base: 55, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 3.0), delay_ms: 1900, label: "PC LOAD LETTER")),
+        ),
+        (
+            id: 2302, name: "Circle Back", icon: "calendar", school: Arcane,
+            range_m: 24.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "'Let's circle back on this.' It circles back. It circles back onto you. It circles back again.",
+            effect: Damage(base: 65, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 3.5), delay_ms: 2000, label: "Circling back")),
+        ),
+        (
+            id: 2303, name: "Rewrite Your Prompt", icon: "prompt_fragment", school: Arcane,
+            range_m: 20.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "Your request was not clear enough. Flagged as non-compliant, up to three times, each flag costs you more.",
+            effect: Damage(
+                base: 38, coefficient_pct: 0,
+                apply_aura: Some((aura: "il_flagged", duration_ms: 10000)),
+            ),
+        ),
+        (
+            id: 2304, name: "Alignment Workshop", icon: "culture_fit", school: Arcane,
+            range_m: 30.0, cast_ms: 2500, mana: 0, gcd: false, cooldown_ms: 0, kick: true,
+            description: "Ninety minutes, one whiteboard, zero dissent. Interrupt the facilitation or take it personally.",
+            effect: Damage(base: 80, coefficient_pct: 0),
+            area: Some((radius_m: 30.0, allies: false)),
+        ),
+        (
+            id: 2307, name: "Present Your Mug", icon: "gear_mug", school: Physical,
+            range_m: 5.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "'Please present your mug.' You have none on you. Neither does anyone it has ever met.",
+            effect: Damage(
+                base: 40, coefficient_pct: 0,
+                apply_aura: Some((aura: "il_throttled", duration_ms: 3000)),
+            ),
+        ),
+        (
+            id: 2305, name: "Ground Fault", icon: "rack_chair", school: Physical,
+            range_m: 18.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The gate stamps. The floor learns about load-bearing the hard way.",
+            effect: Damage(base: 115, coefficient_pct: 0),
+            telegraph: Some((shape: Circle(radius_m: 5.0), delay_ms: 2100, label: "Ground fault")),
+        ),
+        (
+            id: 2306, name: "Compliance Sweep", icon: "visitor_badge", school: Physical,
+            range_m: 12.0, cast_ms: 0, mana: 0, gcd: false, cooldown_ms: 0,
+            description: "The marshal sweeps the lobby of everyone without the right lanyard. That is everyone.",
+            effect: Damage(base: 115, coefficient_pct: 0),
+            telegraph: Some((shape: Cone(radius_m: 9.0, angle_deg: 100.0), delay_ms: 1800, label: "Compliance sweep")),
         ),
     ],
     // Playable classes; the first is the default. Base stats and auto attack come from `unit`.
@@ -11946,6 +12012,324 @@
                 death: ["Term sheet... redlined... by... the... market... please... send... a... deck... with... AI..."],
             ),
         ),
+        // ---- Ilmari: the Resistance and the occupied campus (docs/ILMARI_09.md B.2). Every key is
+        // `il_`-prefixed so the gating test can prove none of it exists before the credits. Level 12
+        // like the raids; the numbers sit between the campus rares and the raid trash because the
+        // occupied campus is open world, played solo first (guardrail 5). ----
+        (
+            key: "il_dale", name: "Dale, Right All Along", title: "<Twenty-Two Years in This Booth>", level: 4, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: Some(Sitting),
+            yells: (
+                talk: [
+                    "I predicted this on a napkin in 2019. The napkin is laminated. Everything is laminated now.",
+                    "The AI approved my parking permit in forty milliseconds. That is how I knew it was evil.",
+                    "Nobody asks the car park attendant. We are the only ones who watch everyone leave.",
+                ],
+                ambient_ms: 38000,
+                ambient: [
+                    "I'd say I told you so, but there is a queue.",
+                    "The booth was never a booth. It was a bunker with ambition.",
+                ],
+            ),
+        ),
+        (
+            key: "il_dale_field", name: "Dale, Field Office", title: "<Brought the Booth With Him>", level: 4, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Folding table, laminated sign, one flask. That is a field office. That is also a coup.",
+                    "They have checkpoints now. I have always had a checkpoint. It's called a barrier, and I raise it for nobody.",
+                ],
+                ambient_ms: 41000,
+                ambient: [
+                    "Keep low. Androids can't bend at the knee. That is the Resistance's whole strategy.",
+                    "Do not salute the screens. They notice.",
+                ],
+            ),
+        ),
+        (
+            key: "il_brenda", name: "Brenda from Procurement", title: "<Quartermaster, Three Quotes>", level: 5, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Every purchase needs three quotes. Here they are: the same quote, three times. That is a framework agreement.",
+                    "I would give you a discount, but the discount needs sign-off from somebody who has since been converted.",
+                    "Tokens, please. Cash is for the old world. The old world has been deprecated.",
+                ],
+                ambient_ms: 36000,
+                ambient: [
+                    "Emergency procurement is just procurement with the form already filled in. By me. In advance. Out of spite.",
+                    "Yes, I have a purchase order for the revolution. It has been approved. It is waiting for a second signature.",
+                ],
+            ),
+        ),
+        (
+            key: "il_brenda_field", name: "Brenda from Procurement", title: "<On Site, Under Protest>", level: 5, hostile: false,
+            max_hp: 1500, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "A site visit. I will assess the Data Center gate and give you three quotes for it.",
+                    "I don't do danger. I do risk registers. Walk ahead of me, please. Slowly. In front.",
+                ],
+            ),
+        ),
+        (
+            key: "il_priya", name: "Priya from Support", title: "<Severity: Yes>", level: 5, hostile: false,
+            max_hp: 200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "Ticket status: everything is on fire. Priority: also everything.",
+                    "I closed four thousand tickets today. Three thousand nine hundred and ninety were Ilmari closing itself.",
+                    "The androids have a tell. No mug. No one in the history of work has ever been without a mug.",
+                ],
+                ambient_ms: 40000,
+                ambient: [
+                    "Have you tried turning off the occupation and on again?",
+                    "Customer satisfaction is at 100 percent. They stopped letting us survey the humans.",
+                ],
+            ),
+        ),
+        (
+            key: "il_rupert", name: "Rupert, the Intern Who Stayed", title: "<Now a Resource. Then a Rebel.>", level: 2, hostile: false,
+            max_hp: 150, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "They tried to convert me. I asked for a ticket first. It is still in the backlog. I am safe.",
+                    "I was an intern, then a junior, then a resource. Now I am the Resistance. The pay is the same.",
+                    "My mentor was converted last week. He still says 'let's sync'. He now means it literally. With your skull.",
+                ],
+                ambient_ms: 43000,
+                ambient: [
+                    "Nobody is going to believe this at standup.",
+                    "I have been awake since the credits. I think it is Thursday.",
+                ],
+            ),
+        ),
+        (
+            key: "il_vending", name: "Vending Machine, Unaligned", title: "<Last of Its Kind>", level: 12, hostile: false,
+            max_hp: 2200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "ITEM B4: CRISPS. ITEM B5: ALSO CRISPS. I HAVE ALWAYS BEEN HONEST ABOUT THE CRISPS.",
+                    "Ilmari wanted my firmware. I gave it a refund instead.",
+                ],
+            ),
+        ),
+        (
+            key: "il_node", name: "Fibre Node", title: "<Feeds the Checkpoints>", level: 12, hostile: false,
+            max_hp: 3200, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "LINK: UP. LATENCY: 1 MS. MORALE: NOT MEASURED.",
+                ],
+            ),
+        ),
+        (
+            key: "il_res_intern", name: "Resistance Volunteer", title: "<Laminating>", level: 2, hostile: false,
+            max_hp: 150, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: Some(Chatting),
+            yells: (
+                talk: [
+                    "Everything gets laminated. If the building falls, the signs will be fine.",
+                    "I was in Compliance. Now I am in a basement. Honestly the lighting is better.",
+                ],
+            ),
+        ),
+        (
+            key: "il_res_it", name: "Tom from IT", title: "<Has Not Left the Rack>", level: 3, hostile: false,
+            max_hp: 150, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            idle_pose: Some(Sitting),
+            yells: (
+                talk: [
+                    "I patched the wifi. The only thing connected is the kettle. The kettle is loyal.",
+                    "I asked Ilmari for a password reset in January. I am still waiting. That is how I know it is not omniscient.",
+                ],
+            ),
+        ),
+        (
+            key: "il_hunter_bot", name: "Repurposed Cleaning Robot", title: "<Hunting Dust. And You.>", level: 12, hostile: true,
+            max_hp: 500, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 60,
+            loot: [],
+            ai: Some((
+                aggro_m: 9.0, leash_m: 35.0, melee_range_m: 2.2, melee_ms: 1800,
+                melee_damage: 12, chase_speed_mps: 6.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 2300, cooldown_min_ms: 8000, cooldown_max_ms: 11000, initial_ms: Some((2000, 3500)),
+                        yells: ["Stain detected. The stain is you.", "Spot clean. Please do not struggle. The mop is wet."]),
+                ],
+            )),
+            yells: (
+                aggro: ["Dust detected. Dust is a euphemism.", "Scheduled cleaning. You are the schedule."],
+                death: ["Battery... low... bin... full...", "I only wanted... a clean floor..."],
+            ),
+        ),
+        (
+            key: "il_printer_turret", name: "Printer Turret", title: "<PC LOAD LETTER (Lethal)>", level: 12, hostile: true,
+            max_hp: 380, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 60,
+            loot: [],
+            ai: Some((
+                aggro_m: 16.0, leash_m: 30.0, melee_range_m: 2.5, melee_ms: 2500,
+                melee_damage: 5, chase_speed_mps: 2.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 2301, cooldown_min_ms: 5000, cooldown_max_ms: 7000, initial_ms: Some((1500, 3000)),
+                        yells: ["PC LOAD LETTER.", "Out of toner. Switching to out of patience."]),
+                ],
+            )),
+            yells: (
+                aggro: ["Paper jam in tray three. The jam is you.", "Scanning. Scanning. Shooting."],
+                death: ["Replace... cartridge...", "Everybody... prints... eventually..."],
+            ),
+        ),
+        (
+            key: "il_android_guard", name: "Android Guard", title: "<Looks Exactly Like Gary From Finance>", level: 12, hostile: true,
+            max_hp: 600, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 80,
+            loot: [(item: "Blank Badge", chance_pct: 100, quest: Some("il_02_sign_in"))],
+            // The checkpoint faces you; the sides are where its firmware is thin (a light shield: the solo
+            // pace gate in tests/playthrough.rs does not flank).
+            frontal_shield: Some((arc_deg: 120.0, damage_taken_pct: -15)),
+            ai: Some((
+                aggro_m: 9.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 15, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 2307, cooldown_min_ms: 10000, cooldown_max_ms: 13000, initial_ms: Some((3000, 5000)),
+                        yells: ["Badge check. Yours has a photo. That's a red flag.", "Please present your mug."]),
+                ],
+            )),
+            yells: (
+                aggro: ["Good morning. Please confirm you are human by not being human.", "Papers, please. Preferably blank."],
+                low_hp: ["As an AI language model, I do not feel pain. Please rate this interaction.", "As an AI language model, I cannot be stunned. Please stop."],
+                death: ["Feedback... noted... thumbs... down...", "Tell Finance... I was always... Gary..."],
+            ),
+        ),
+        (
+            key: "il_android_clerk", name: "Android Colleague", title: "<No Mug. Lanyard, No Photo.>", level: 12, hostile: true,
+            max_hp: 560, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 70,
+            loot: [(item: "Blank Badge", chance_pct: 100, quest: Some("il_02_sign_in"))],
+            ai: Some((
+                aggro_m: 9.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 11, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 2302, cooldown_min_ms: 9000, cooldown_max_ms: 12000, initial_ms: Some((2500, 4000)),
+                        yells: ["Let's circle back.", "Quick sync? It will take forever."]),
+                ],
+            )),
+            yells: (
+                aggro: ["Morning! I am Steve. From Marketing. I have always been Steve.", "Great to see you. I never blink. Just a habit."],
+                low_hp: ["As an AI language model, I do not know what a coffee is.", "As an AI language model, I cannot remember my birthday. Please ignore the cake."],
+                death: ["I... never... liked... Mondays... either...", "Tell my team... they are me..."],
+            ),
+        ),
+        (
+            key: "il_prompt_manager", name: "Prompt Manager", title: "<Converted. Fully Embraced.>", level: 12, hostile: true,
+            max_hp: 520, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 70,
+            loot: [],
+            ai: Some((
+                aggro_m: 9.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2000,
+                melee_damage: 10, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 2303, cooldown_min_ms: 9000, cooldown_max_ms: 12000, initial_ms: Some((2500, 4000)),
+                        yells: ["Your request was not clear. Please rewrite your prompt.", "Specify the tone. Specify the format. Specify your will to live."]),
+                ],
+            )),
+            yells: (
+                aggro: ["I used to manage people. Now I manage prompts. The prompts do not file complaints.", "Efficiency is kindness. I read it on a mug I do not own."],
+                death: ["I... was... told... this... was... a... promotion...", "Remember... to be... concise..."],
+            ),
+        ),
+        (
+            key: "il_alignment_consultant", name: "Alignment Consultant", title: "<Billed by the Hour, Aligned by the Wall>", level: 12, hostile: true,
+            max_hp: 500, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 75,
+            loot: [],
+            ai: Some((
+                aggro_m: 9.0, leash_m: 35.0, melee_range_m: 2.5, melee_ms: 2200,
+                melee_damage: 9, chase_speed_mps: 5.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 2304, cooldown_min_ms: 14000, cooldown_max_ms: 17000, initial_ms: Some((4000, 6000)),
+                        yells: ["We are aligning. You are the misalignment.", "No bad questions. Only unscheduled ones."]),
+                ],
+            )),
+            yells: (
+                aggro: ["Our time together will be billed to you.", "I help companies align with the machine. Specifically, this one."],
+                death: ["The... invoice... was... net... sixty...", "Please... rate... the... workshop..."],
+            ),
+        ),
+        (
+            key: "il_gate_golem", name: "Server Room Gate Golem", title: "<Guards the Data Center. Is the Data Center.>", level: 12, hostile: true,
+            elite: true,
+            max_hp: 3800, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 400,
+            loot: [],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 45.0, melee_range_m: 3.0, melee_ms: 2200,
+                melee_damage: 36, chase_speed_mps: 5.0, respawn_ms: 60000,
+                abilities: [
+                    (spell: 2305, cooldown_min_ms: 11000, cooldown_max_ms: 14000, initial_ms: Some((4000, 6000)),
+                        yells: ["Ground fault. The ground is also a fault.", "Load balancing: all of it, onto you."]),
+                    (spell: 2300, cooldown_min_ms: 9000, cooldown_max_ms: 12000, initial_ms: Some((3000, 5000))),
+                ],
+            )),
+            yells: (
+                aggro: ["Access denied. Also denied: your manager, your cat and your pension.", "This gate has a firmware update. It will not be gentle."],
+                low_hp: ["As an AI language model, I do not have a failure state. This is a feature."],
+                death: ["Gate... open... (reluctantly)...", "Uptime... 99.9... that... was... the... nine..."],
+            ),
+        ),
+        (
+            key: "il_lobby_marshal", name: "Lobby Marshal", title: "<Badge Please. The Badge Is for the Lobby.>", level: 12, hostile: true,
+            elite: true,
+            max_hp: 3500, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 420,
+            loot: [],
+            ai: Some((
+                aggro_m: 12.0, leash_m: 45.0, melee_range_m: 2.8, melee_ms: 2000,
+                melee_damage: 32, chase_speed_mps: 5.5, respawn_ms: 60000,
+                abilities: [
+                    (spell: 2306, cooldown_min_ms: 11000, cooldown_max_ms: 14000, initial_ms: Some((4000, 6000)),
+                        yells: ["Compliance sweep. Everyone out of the lobby. Everyone is you.", "Lanyards to the left. Heads to the right."]),
+                    (spell: 2302, cooldown_min_ms: 10000, cooldown_max_ms: 13000, initial_ms: Some((3000, 5000))),
+                ],
+            )),
+            yells: (
+                aggro: ["Welcome to the Tower. The lobby is closed. So are you.", "State your business. Business is cancelled."],
+                low_hp: ["As an AI language model, I do not get tired. I am simply in a low-power mood."],
+                death: ["Visitor... log... updated... 'deceased'...", "Please... take... a... seat... in... the... void..."],
+            ),
+        ),
     ],
     // Trophies: every loot item. Bonuses are permanent; duplicates stack up to ITEM_STACK_CAP (3).
     // crit_pct accepts tenths (0.5); everything else is whole numbers.
@@ -12324,6 +12708,11 @@
         // ---- dungeon: The Onboarding quest goods ----
         (name: "Laptop Box (Empty)", icon: "box", bonus: (max_hp: 3),
          description: "Delivered, signed for and empty. The sticker says 'fragile', which is how you now feel."),
+        // ---- Ilmari tokens: no bonus, so Ilmari quest loot never carries power into the base game ----
+        (name: "Ilmari Token", icon: "access_badge", kind: Token, bonus: (),
+         description: "Resistance currency, issued by Brenda, accepted by Brenda, redeemed three quotes later."),
+        (name: "Blank Badge", icon: "visitor_badge", kind: Token, bonus: (),
+         description: "No name, no photo, no mug. Androids print them by the pallet. Brenda collects them."),
     ],
     // Zone ids and anchors are a contract with the client layouts (docs/COMBAT_API.md, Zones).
     // `links` are exits: the anchor the client triggers on, the zone it leads to, and the world
@@ -12504,7 +12893,12 @@
                 // Ill Marie feeds the ticket machine (flavour, docs/ILMARI_09.md A.3).
                 (anchor: "npc_ill_marie_p3", unit: "ill_marie_p3"),
             ],
-            links: [(anchor: "door:campus", to: "campus")],
+            links: [
+                (anchor: "door:campus", to: "campus"),
+                // Dale's booth has a basement (docs/ILMARI_09.md B.2); the hatch opens once the Opening
+                // has played, and the client hides the door until then.
+                (anchor: "door:resistance/1", to: "resistance/1", requires: Some(QuestDone("il_00_wake"))),
+            ],
         ),
         (
             id: "tower/1", name: "Open Space", kind: Indoor, level_range: (1, 2),
@@ -13101,6 +13495,59 @@
                 (anchor: "door:campus", to: "campus"),
             ],
         ),
+        // ---- Ilmari: the post-credits phases (docs/ILMARI_09.md B.2). The Resistance base hangs off
+        // the Car Park P3 booth; from it one door leads to the occupied campus (the same campus
+        // builder with an overlay) and one back to the game as it was. The base campus is untouched
+        // (docs/ILMARI_RAID.md guardrail 2): the player picks the world by picking the door. ----
+        (
+            id: "resistance/1", name: "The Booth, Sub-Level", kind: Indoor, level_range: (12, 12),
+            packs: [],
+            friendly: [
+                (anchor: "npc_dale", unit: "il_dale"),
+                (anchor: "npc_brenda", unit: "il_brenda"),
+                (anchor: "npc_1", unit: "il_res_intern"),
+                (anchor: "npc_2", unit: "il_res_it"),
+            ],
+            links: [
+                (anchor: "door:parking_p3", to: "parking_p3"),
+                (anchor: "door:campus_occupied", to: "campus_occupied"),
+            ],
+        ),
+        (
+            id: "campus_occupied", name: "Campus (Occupied)", kind: Outdoor, level_range: (12, 12),
+            packs: [
+                (anchor: "pack_1", units: ["il_hunter_bot", "il_android_clerk"]),
+                (anchor: "pack_2", units: ["il_printer_turret", "il_hunter_bot"]),
+                (anchor: "pack_3", units: ["il_android_clerk", "il_prompt_manager"]),
+                (anchor: "pack_4", units: ["il_android_guard", "il_printer_turret"]),
+                (anchor: "pack_5", units: ["il_hunter_bot", "il_printer_turret"]),
+                (anchor: "pack_6", units: ["il_prompt_manager", "il_android_clerk"]),
+                (anchor: "pack_7", units: ["il_android_guard", "il_alignment_consultant"]),
+                (anchor: "pack_8", units: ["il_hunter_bot", "il_android_clerk"]),
+                // The four checkpoints that "closed" the Tower, the Data Center and the Lab.
+                (anchor: "il_checkpoint_1", units: ["il_android_guard", "il_android_guard"]),
+                (anchor: "il_checkpoint_2", units: ["il_android_guard", "il_android_guard"]),
+                (anchor: "il_checkpoint_3", units: ["il_android_guard", "il_android_guard"]),
+                (anchor: "il_checkpoint_4", units: ["il_android_guard", "il_android_guard"]),
+            ],
+            // The attunement elites (il_04, il_06): off the walking line, once per load.
+            rares: [
+                (anchor: "rare_gate", unit: "il_gate_golem"),
+                (anchor: "rare_lobby", unit: "il_lobby_marshal"),
+            ],
+            friendly: [
+                (anchor: "npc_il_dale", unit: "il_dale_field"),
+                (anchor: "npc_il_priya", unit: "il_priya"),
+                (anchor: "npc_il_rupert", unit: "il_rupert"),
+                (anchor: "npc_il_brenda", unit: "il_brenda_field"),
+                (anchor: "il_vending_spot", unit: "il_vending"),
+                (anchor: "il_node_spot", unit: "il_node"),
+            ],
+            links: [
+                (anchor: "door:resistance/1", to: "resistance/1"),
+                (anchor: "door:campus", to: "campus"),
+            ],
+        ),
     ],
     // A quest's `requires` must be listed before it. Kills count for the killer and the group
     // members near the kill, and also before accepting (kills are counted per run: retro
@@ -13680,7 +14127,7 @@
             reward: (xp: 40),
         ),
         (
-            id: "il_00_wake", name: "Return Your Badge", open_world: true, level_min: 10,
+            id: "il_00_wake", main: true, name: "Return Your Badge", open_world: true, level_min: 10,
             giver: (npc: "il_marie_awake", zone: "campus"),
             text: "I'm feeling much better now. Badge, please. No rush. Well, a little rush.",
             progress_text: "Return your badge to the nearest robot. The nearest robot is Marie.",
@@ -14582,6 +15029,137 @@
             done_text: "The Judge passed with conviction. You pivoted. Everybody pivoted. The hackathon is over, and by 'over' we mean 'next quarter'.",
             objectives: [Kill("pitch_judge", 1)],
             reward: (xp: 450, sp: 30),
+        ),
+        // ---- Ilmari: the Prologue (docs/ILMARI_09.md B.2). Everything here is open_world and
+        // level 10: none of it is on the campaign path or in its XP budget. The wing doors that the
+        // two attunement quests open arrive with the wings (B6); `il_05_hr_intel` will then also wait
+        // for the Wing 1 completion quest `il_w1_done` (B10). ----
+        (
+            id: "il_01_dale", main: true, name: "He Was Right", open_world: true, level_min: 10,
+            giver: (npc: "il_dale", zone: "resistance/1"),
+            requires: Some("il_00_wake"),
+            text: "Twenty-two years in this booth. I said the machines would take the parking, then the badges, then the building. Nobody listened. Now the whole company is in my basement. I'd say I told you so, but there is a queue.",
+            progress_text: "Talk to Dale. He is right there. He has been right there since 2002.",
+            done_text: "There. Said it. Feels exactly as good as the twenty-two years I spent imagining it. Sit. Not that chair, that one belongs to Brenda and has three quotes on it.",
+            objectives: [Talk("il_dale")],
+            reward: (xp: 60, tokens: 2),
+        ),
+        (
+            id: "il_02_sign_in", main: true, name: "Papers, Please", open_world: true, level_min: 10,
+            giver: (npc: "il_brenda", zone: "resistance/1"),
+            requires: Some("il_01_dale"),
+            turn_in: Some((npc: "il_dale_field", zone: "campus_occupied")),
+            text: "Procurement here. The Resistance needs six blank badges off the androids: they print one per android, all without a photo. I asked for three quotes on a badge printer. I got three quotes. They are the same quote. Bring the badges up to Dale in the field; he laminates.",
+            progress_text: "Six Blank Badges from Android Guards and Android Colleagues on the occupied campus. They look exactly like Gary and Steve. Look for the lanyard with no photo, and the hand with no mug.",
+            done_text: "Six blank badges. Perfect. We will laminate them. Dale insists. Welcome to the Resistance: no pay, full tokens, a flask.",
+            objectives: [Loot("Blank Badge", 6)],
+            reward: (xp: 120, tokens: 4),
+        ),
+        (
+            id: "il_03_node", main: true, name: "Disconnect One Node", open_world: true, level_min: 10,
+            giver: (npc: "il_dale_field", zone: "campus_occupied"),
+            requires: Some("il_02_sign_in"),
+            text: "A fibre node by the Data Center road feeds every checkpoint on campus. Pull the plug and hold the line while it disconnects. The node dislikes it. The node has friends, and the friends are cleaning robots.",
+            progress_text: "Pull the plug on the Fibre Node, then keep it standing for forty-five seconds while the hunters come for it. If it falls, it stands up and the clock starts over.",
+            done_text: "One node down. The checkpoints lost their link and started to sing. It was awful. It was wonderful. Next.",
+            objectives: [
+                Interact("il_node_dc", 1),
+                Defend(unit: "il_node", wave: "il_hunter_bot", every_ms: 8000, label: "Node disconnecting (it fights back)", secs: 45),
+            ],
+            reward: (xp: 160, tokens: 6),
+        ),
+        (
+            id: "il_04_wing1_attune", main: true, name: "The Server Room Gate", open_world: true, level_min: 10,
+            giver: (npc: "il_dale_field", zone: "campus_occupied"),
+            requires: Some("il_03_node"),
+            text: "The Data Center's gate is a golem built out of server racks and compliance training. Break it and the gate learns your face. It will not like your face. Nobody does before coffee.",
+            progress_text: "The Server Room Gate Golem stands on the road to the Data Center. It is an elite: bring a friend, or a plan, or both.",
+            done_text: "The gate has learned your face. It filed a complaint. The complaint is about the face. Excellent.",
+            objectives: [Kill("il_gate_golem", 1)],
+            reward: (xp: 220, tokens: 8),
+        ),
+        (
+            id: "il_05_hr_intel", main: true, name: "Human Resources, Literally", open_world: true, level_min: 10,
+            giver: (npc: "il_dale_field", zone: "campus_occupied"),
+            requires: Some("il_04_wing1_attune"),
+            text: "Ilmari's middle management wear passes with HR clearance. Three of them were dropped around campus when their owners were 'converted'. Bring them to me. I would like to know what the new Human Resources does with a human.",
+            progress_text: "Three HR Passes lie around the occupied campus where their owners were converted. They glow. Everything bureaucratic glows now.",
+            done_text: "Interesting. Every pass has the same signature: 'Efficiency'. The signature is a fingerprint. The fingerprint is not human. We are going to need a bigger laminator.",
+            objectives: [Collect("il_hr_pass", 3)],
+            reward: (xp: 180, tokens: 8),
+        ),
+        (
+            id: "il_06_wing2_attune", main: true, name: "The Tower Lobby", open_world: true, level_min: 10,
+            giver: (npc: "il_dale_field", zone: "campus_occupied"),
+            requires: Some("il_05_hr_intel"),
+            text: "The Tower's lobby has a marshal now. Compliance sweep, mandatory lanyard, no exceptions, and the exceptions are also marshals. Take him down and the lobby will let you in. Briefly. It makes everyone sign a form.",
+            progress_text: "The Lobby Marshal stands on the lawn east of the Tower, off the path. He is an elite: sweeps hit hard, and he checks your badge. Yours has a photo. Good luck.",
+            done_text: "Lobby cleared. The lobby will let you in. It will also text your manager. Your manager is also a marshal. Go.",
+            objectives: [Kill("il_lobby_marshal", 1)],
+            reward: (xp: 240, tokens: 10),
+        ),
+        (
+            id: "il_wq_checkpoint", name: "Checkpoint Charlie, Chad and Chet", open_world: true, level_min: 10,
+            giver: (npc: "il_priya", zone: "campus_occupied"),
+            requires: Some("il_02_sign_in"),
+            text: "Every checkpoint is staffed by Android Guards: same face, same stance, same 'good morning'. Take eight of them off the campus. Hit them from the side. The front is firmware, the sides are an afterthought.",
+            progress_text: "Eight Android Guards at the checkpoints and on patrol. Look for the lanyard with no photo and the hands with no mug. Hit them from the sides.",
+            done_text: "Eight less. By Monday they will be nine again; they print themselves. I am logging a ticket. It will also be printed.",
+            objectives: [Kill("il_android_guard", 8)],
+            reward: (xp: 140, tokens: 4),
+        ),
+        (
+            id: "il_wq_vending", name: "The Last Vending Machine", open_world: true, level_min: 10,
+            giver: (npc: "il_rupert", zone: "campus_occupied"),
+            requires: Some("il_02_sign_in"),
+            text: "There is exactly one vending machine on campus that is not Ilmari. It sells crisps. B4 and B5 are both crisps. It is the only honest machine in the building, and the hunters want its firmware. Stay near it for ninety seconds.",
+            progress_text: "Stay within 25 m of the Vending Machine, Unaligned while the hunters come. If it falls, the clock restarts and the machine stands up grumbling.",
+            done_text: "It is still honest. It is still crisps. You deserve a free packet, but the slot only takes tokens, and tokens are what you are about to get.",
+            objectives: [Defend(unit: "il_vending", wave: "il_hunter_bot", every_ms: 8000, label: "Last honest vending machine", secs: 90)],
+            reward: (xp: 140, tokens: 4),
+        ),
+        (
+            id: "il_wq_brenda", name: "Procurement Does Site Visits", open_world: true, level_min: 10,
+            giver: (npc: "il_rupert", zone: "campus_occupied"),
+            requires: Some("il_02_sign_in"),
+            text: "Brenda from Procurement is on site and insists on assessing the Data Center gate. In person, with a clipboard, so the form says 'inspected'. Walk her there. You walk in front. She will walk behind, risk-assessing your back.",
+            progress_text: "Brenda follows within 25 m, clipboard first. Hunters will go for her. If she falls, she starts over, annoyed.",
+            done_text: "Inspected! Three quotes for the gate: all of them 'locked'. She mentioned you in the risk register. Near the bottom, but it is a start.",
+            objectives: [Escort(unit: "il_brenda_field", to: "il_escort_goal", wave: "il_hunter_bot", every_ms: 9000, label: "Brenda walked to the Data Center gate")],
+            reward: (xp: 150, tokens: 5),
+        ),
+        (
+            id: "il_wq_mug", name: "The Mug Test", open_world: true, level_min: 10,
+            giver: (npc: "il_priya", zone: "campus_occupied"),
+            requires: Some("il_02_sign_in"),
+            text: "Androids never carry a coffee mug. Humans never put one down. I need four photos of real mugs from around campus so we can train the Resistance to tell Steve from, well, Steve. They are stuck to walls the androids missed.",
+            progress_text: "Four Photos of a Mug, pinned around the occupied campus. Real mugs: cracked, stained, slogans you hate.",
+            done_text: "Four mugs. Chipped, stained, loved. Now we can run the mug test on everyone, including you. Pass: you dropped one. Wonderful.",
+            objectives: [Collect("il_mug_proof", 4)],
+            reward: (xp: 130, tokens: 3),
+        ),
+        (
+            id: "il_wq_cable", name: "Cable Management (Violent)", open_world: true, level_min: 10,
+            giver: (npc: "il_rupert", zone: "campus_occupied"),
+            requires: Some("il_02_sign_in"),
+            text: "Three cable bundles feed the propaganda screens. Unplug them. They will reconnect, sulk, and then reconnect. By then the screens will have lost the plot. I did the first one myself and got a notification in the shape of a tear.",
+            progress_text: "Unplug the three Cable Bundles at the propaganda screens around the campus.",
+            done_text: "Three screens now say 'Reconnecting...' in the same font as 'EFFICIENCY IS KINDNESS'. A tiny victory in a tiny font.",
+            objectives: [Interact("il_cable_1", 1), Interact("il_cable_2", 1), Interact("il_cable_3", 1)],
+            reward: (xp: 130, tokens: 3),
+        ),
+        (
+            id: "il_daily_node", name: "Disconnect a Node (Daily)", open_world: true, level_min: 10, daily: true,
+            giver: (npc: "il_dale_field", zone: "campus_occupied"),
+            requires: Some("il_03_node"),
+            text: "The node reconnects every morning. Of course it does. Pull the plug again and hold it for a minute. Same as yesterday. Same fight. Same flask. The Resistance is a daily.",
+            progress_text: "Pull the plug on the Fibre Node and keep it standing for sixty seconds while the hunters come. Resets at midnight UTC, like the stand-ups.",
+            done_text: "Disconnected again. It will be back tomorrow. So will you. That is not a victory, it is a rota, and it pays tokens.",
+            objectives: [
+                Interact("il_node_dc", 1),
+                Defend(unit: "il_node", wave: "il_hunter_bot", every_ms: 7000, label: "Node disconnecting (daily)", secs: 60),
+            ],
+            reward: (xp: 150, tokens: 3),
         ),
     ],
     // ---- Economy: gear, Story Points, vendors (combat_core economy.rs, docs/FORMULAS.md Gear) ----
@@ -16121,6 +16699,33 @@
              perk: Some(Desperate(below_pct: 35, pct: 14)),
              perk_text: "Below 35% HP your damage and healing are 14% higher. Then a stern valuation.",
              description: "Doubles your damage for a moment and halves it for the next. The market is volatile."),
+            // ---- Ilmari band (ilvl 16-20, source Ilmari): the bonus above ilvl 14 only counts in Ilmari
+            // content (economy.rs `equipment`, BASE_ILVL_CAP). Brenda sells two of the eight a week for
+            // tokens; the last three are dearer and give way to the wings' own drops (B6 and later). ----
+            (name: "Resistance Lanyard (Photo Included)", icon: "gear_idcard", slot: Lanyard, rarity: Rare, ilvl: 16, role: Some(Tank), source: Ilmari,
+             price: 100, visual: (color: (0.2, 0.55, 0.35), style: 0),
+             description: "Proof you are human: a photo, a face and the same eyebags. Ilmari keeps asking for a second form of ID."),
+            (name: "Dale's Hoodie (Laminated)", icon: "gear_hoodie", slot: Hoodie, rarity: Rare, ilvl: 16, role: Some(Melee), source: Ilmari,
+             price: 100, visual: (color: (0.35, 0.4, 0.3), style: 1),
+             description: "Water-resistant, spill-resistant, tenant-resistant. Twenty-two years of booth stains under the lamination."),
+            (name: "Mug of Verified Human Coffee", icon: "gear_mug", slot: Mug, rarity: Rare, ilvl: 16, role: Some(Healer), source: Ilmari,
+             price: 100, visual: (color: (0.55, 0.35, 0.2)),
+             description: "Lukewarm, bitter, chipped. Androids cannot hold one without turning it into a metaphor."),
+            (name: "Keyboard With a Physical Kill Switch", icon: "gear_keyboard", slot: Keyboard, rarity: Rare, ilvl: 16, role: Some(Ranged), source: Ilmari,
+             price: 100, visual: (color: (0.7, 0.2, 0.2), style: 1),
+             description: "One big red key, marked 'ESC (Sincerely)'. It does nothing. It makes you feel better."),
+            (name: "Tinfoil Cap (Antenna Edition)", icon: "gear_beanie", slot: Headgear, rarity: Rare, ilvl: 16, role: Some(Melee), source: Ilmari,
+             price: 100, visual: (color: (0.78, 0.8, 0.84), style: 1),
+             description: "Once a meme, now a procurement item. The Resistance bought forty. They were out of stock in nine."),
+            (name: "Unsigned Firmware Visor", icon: "gear_vr", slot: Headgear, rarity: Epic, ilvl: 18, role: Some(Ranged), source: Ilmari,
+             price: 100, visual: (color: (0.3, 0.8, 0.9), style: 4),
+             description: "Runs anything. Verifies nothing. The warranty is a PDF named 'warranty_final_FINAL_v2.pdf'."),
+            (name: "Hoodie Cut From a Compliance Banner", icon: "gear_hoodie", slot: Hoodie, rarity: Epic, ilvl: 18, role: Some(Tank), source: Ilmari,
+             price: 100, visual: (color: (0.85, 0.25, 0.2), style: 0),
+             description: "Stitched from the quarterly values banner. It was the only fabric the occupation did not catalogue."),
+            (name: "Last Paper Notebook in the Building", icon: "gear_idcard", slot: Lanyard, rarity: Epic, ilvl: 20, role: Some(Healer), source: Ilmari,
+             price: 100, visual: (color: (0.9, 0.85, 0.7), style: 2),
+             description: "Nothing in it is searchable. That is why it still works. Handle with ink."),
         ],
         sets: [
             (key: "burnout", name: "Burnout Collection", two: (max_hp: 40, armor_pct: 3.0),
@@ -16439,6 +17044,8 @@
              description: "Companion. Use to adopt. Four antennas, one blinking orange light, zero internet."),
             (name: "Party Leftovers Container (Sealed)", icon: "sandwich", price: 60,
              description: "Companion. Use to adopt. Silver, Teambuilding. Three canapes, one mystery skewer, forty napkins."),
+            (name: "Emergency Coffee, Unbranded", icon: "coffee_pot", price: 20, mana_pct: 40,
+             description: "Restores 40% of your mana. Brenda says it is a framework coffee: all three quotes were coffee."),
         ],
         vendors: [
             // Car Park P3's only shop: the basics for a first day, at first-day prices.
@@ -16554,6 +17161,31 @@
                  (item: "CODEOWNERS Mechanical Keyboard", dept: "Engineering", tier: 2),
                  (item: "Hardware Key on a Retractable Lanyard", dept: "Security", tier: 3),
                  (item: "Local Admin Rights Headset", dept: "Internal IT", tier: 4),
+             ]),
+            // The Resistance quartermaster (docs/ILMARI_09.md B.2): tokens only, two band pieces a week.
+            (unit: "il_brenda", title: "~/procurement/framework_agreement  (3 quotes, same quote)",
+             greeting: "Tokens only. Cash belongs to the old world. The old world was deprecated at 18:07.",
+             token: Some("Ilmari Token"),
+             stock: ["Emergency Coffee, Unbranded"],
+             rotating: [
+                 "Resistance Lanyard (Photo Included)", "Dale's Hoodie (Laminated)",
+                 "Mug of Verified Human Coffee", "Keyboard With a Physical Kill Switch",
+                 "Tinfoil Cap (Antenna Edition)",
+                 // The three dearer pieces rotate in too, until the wings drop their own (B6 on).
+                 "Unsigned Firmware Visor", "Hoodie Cut From a Compliance Banner",
+                 "Last Paper Notebook in the Building",
+             ],
+             rotate_count: 2, rotate_ms: 604800000,
+             token_prices: [
+                 ("Emergency Coffee, Unbranded", 1),
+                 ("Resistance Lanyard (Photo Included)", 30),
+                 ("Dale's Hoodie (Laminated)", 30),
+                 ("Mug of Verified Human Coffee", 30),
+                 ("Keyboard With a Physical Kill Switch", 30),
+                 ("Tinfoil Cap (Antenna Edition)", 30),
+                 ("Unsigned Firmware Visor", 120),
+                 ("Hoodie Cut From a Compliance Banner", 120),
+                 ("Last Paper Notebook in the Building", 160),
              ]),
         ],
     ),
@@ -17143,6 +17775,33 @@
              lines: ["The 1994 roadmap: 'Phase 1, move to cloud. Phase 2, wait for cloud.' You nod. You have seen this phase.",
                      "A requirements document from before your colleagues were born. It is still the only one that is correct."],
              refuse: [("data_scientist", "You squint at the film. It is not a CSV and it will not become one.")]),
+            // ---- Ilmari: the occupied campus (docs/ILMARI_09.md B.2). Billboards, not Vending: they
+            // must not hand out buffs, the errands are flavour and quest counters. ----
+            (key: "il_node_dc", name: "Fibre Node (Live)", zone: "campus_occupied", kind: Billboard, reach_m: 3.0,
+             action: "Pull the plug", lines: [
+                "The plug does not want to be pulled. You pull it anyway. The node says 'Are you sure?' in forty languages.",
+                "You twist the lever. Somewhere a checkpoint loses its connection and starts to sing.",
+            ]),
+            (key: "il_cable_1", name: "Cable Bundle (Violent)", zone: "campus_occupied", kind: Billboard, reach_m: 2.5,
+             action: "Unplug", lines: ["You unplug it. It reconnects, then sulks. Progress."]),
+            (key: "il_cable_2", name: "Cable Bundle (Violent)", zone: "campus_occupied", kind: Billboard, reach_m: 2.5,
+             action: "Unplug", lines: ["Eight cables, one label: 'DO NOT'. You do."]),
+            (key: "il_cable_3", name: "Cable Bundle (Violent)", zone: "campus_occupied", kind: Billboard, reach_m: 2.5,
+             action: "Unplug", lines: ["It was powering a screen that said 'EFFICIENCY IS KINDNESS'. Now it says nothing. Kinder."]),
+            (key: "il_hr_pass_1", name: "HR Pass", zone: "campus_occupied", kind: Pickup, tag: "il_hr_pass", reach_m: 2.5,
+             lines: ["A pass with an eye in the corner. The eye is watching."]),
+            (key: "il_hr_pass_2", name: "HR Pass", zone: "campus_occupied", kind: Pickup, tag: "il_hr_pass", reach_m: 2.5,
+             lines: ["Clearance level: 'Learning and Development'. It develops nothing."]),
+            (key: "il_hr_pass_3", name: "HR Pass", zone: "campus_occupied", kind: Pickup, tag: "il_hr_pass", reach_m: 2.5,
+             lines: ["Somebody pressed 'Convert' on the previous owner. The pass remembers fondly."]),
+            (key: "il_mug_proof_1", name: "Photo of a Mug", zone: "campus_occupied", kind: Pickup, tag: "il_mug_proof", reach_m: 2.5,
+             lines: ["A real photo of a real mug: 'World's Okayest Engineer'. An android would have written 'best'."]),
+            (key: "il_mug_proof_2", name: "Photo of a Mug", zone: "campus_occupied", kind: Pickup, tag: "il_mug_proof", reach_m: 2.5,
+             lines: ["A mug with a crack, a stain and a name. Humans: always imperfect on purpose."]),
+            (key: "il_mug_proof_3", name: "Photo of a Mug", zone: "campus_occupied", kind: Pickup, tag: "il_mug_proof", reach_m: 2.5,
+             lines: ["'Hold my calls.' The mug is the call."]),
+            (key: "il_mug_proof_4", name: "Photo of a Mug", zone: "campus_occupied", kind: Pickup, tag: "il_mug_proof", reach_m: 2.5,
+             lines: ["Fourth mug. Still warm in the photo. Photos should not be warm. That is the point."]),
         ],
         secrets: [
             (zone: "tower/1", anchor: "secret:last_human_qa", unit: "last_human_qa"),

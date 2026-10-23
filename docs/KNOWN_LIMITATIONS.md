@@ -139,3 +139,21 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
   has the offset but no abbreviation, so it prints `UTC+hh:mm`. The date is always `D Month YYYY`, 24 h.
 - A player with the "Cough Drops" ticket still open when the Opening plays loses its giver (the queue
   Marie retires with the desk and bench); abandon and re-take is not possible, the ticket just stays open.
+
+## The Prologue (docs/ILMARI_09.md B.2-B.6)
+
+- The occupied campus is the campus geometry exported in full (`zone_geometry.ron`), not as the delta
+  B.2 sketched; the server needs no special loader and the file grows by one campus (about 700 lines).
+- The attunement chain ends at `il_06`; the wing doors it opens arrive with the wings (B6). Until then
+  `il_05_hr_intel` waits only for `il_04_wing1_attune`, not for the Wing 1 completion quest `il_w1_done`.
+- The three ilvl 18-20 band pieces are on Brenda's shelf (120 and 160 tokens) until the wings drop
+  their own; `GearSource::Ilmari` pieces have no perks yet, and a perk would be off outside Ilmari
+  content like the stats.
+- The weekly quartermaster rotation follows sim time (`rotate_ms` per window), not the calendar week;
+  the token allowance (200) follows the ISO week of the office clock.
+- Brenda sells no cosmetics or titles yet (no shop for them exists); consumables and band pieces only.
+- Ambient android extras are presentation only (`live/ambient.rs`): they pace fixed lines, do not
+  react, and have no sim unit. The "ILMARI" screens are baked textures on the landmarks; the Lab's
+  splash is on its east face because its neon takes the front.
+- The Prologue is offline only: online rooms never get the hatch (the Opening needs the offline
+  stamp), and the net client counts Ilmari pieces at the base cap.

@@ -513,7 +513,9 @@ fn music_file(track: Track, zone: &str, outdoor_night: bool) -> &'static str {
         Track::Explore if outdoor_night => "audio/music/night.ogg",
         Track::Explore => match zone {
             "campus" | "offsite/3" => "audio/music/campus.ogg",
-            "parking_p3" => "audio/music/parking_p3.ogg",
+            // The occupation reuses the Hall B drones; the Resistance hides under P3's own track.
+            "campus_occupied" => "audio/music/datacenter_hall_b.ogg",
+            "parking_p3" | "resistance/1" => "audio/music/parking_p3.ogg",
             "tower/1" | "client/1" | "openspace/1" => "audio/music/open_space.ogg",
             "tower/3" | "teambuilding/1" => "audio/music/sales_marketing.ogg",
             "tower/4" | "review/1" => "audio/music/pmo.ogg",

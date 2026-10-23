@@ -190,6 +190,8 @@ pub struct Viewer<'a> {
     pub role: Option<Role>,
     pub level: u8,
     pub kudos: u32,
+    /// Ilmari Tokens carried (the only currency besides Kudos).
+    pub tokens: u32,
     /// Hovered on a vendor's shelf: show the price and the level the vendor wants.
     pub buying: bool,
 }
@@ -374,7 +376,7 @@ pub fn tooltip(content: &Content, name: &str, v: &Viewer) -> Tip {
                 });
             }
             if v.buying {
-                let need = g.required_level();
+                let need = g.required_level().min(content.max_level());
                 let color = if v.level >= need {
                     DIM_TIP
                 } else {
@@ -403,17 +405,30 @@ pub fn tooltip(content: &Content, name: &str, v: &Viewer) -> Tip {
         None => {
             let mut out = vec![(name.to_string(), name_color(content, name))];
             if let Some(t) = content.item(name) {
-                out.push(("Trophy (permanent bonus, window B)".into(), DIM_TIP));
-                out.push((
-                    crate::copy::bonus_text(&t.bonus.totals(1)),
-                    crate::copy::BONUS_GREEN,
-                ));
+                if t.kind == combat_core::ItemKind::Token {
+                    out.push(("Token (no bonus, never worn)".into(), DIM_TIP));
+                } else {
+                    out.push(("Trophy (permanent bonus, window B)".into(), DIM_TIP));
+                    out.push((
+                        crate::copy::bonus_text(&t.bonus.totals(1)),
+                        crate::copy::BONUS_GREEN,
+                    ));
+                }
                 out.push((format!("\"{}\"", t.description), DIM_TIP));
             }
             out
         }
     };
     if v.buying
+        && let Some((token, cost)) = eco.token_price(name)
+    {
+        let color = if v.tokens >= cost {
+            SP_GOLD
+        } else {
+            DOWNGRADE_RED
+        };
+        out.push((format!("Price: {cost} {token}s"), color));
+    } else if v.buying
         && let Some(g) = eco.goods(name)
     {
         let p = g.price();
@@ -475,6 +490,7 @@ mod tests {
             role,
             level: 1,
             kudos: 0,
+            tokens: 0,
             buying: true,
         }
     }

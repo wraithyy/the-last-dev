@@ -245,6 +245,7 @@ impl Sim {
         st.dead_trash = dead;
         st.left_at = None;
         self.zone = Some(id.to_string());
+        self.sync_ilmari_gear();
         self.next_pack = pack_id;
         self.zone_packs = packs;
         for p in plan {

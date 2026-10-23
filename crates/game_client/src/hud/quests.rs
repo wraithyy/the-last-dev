@@ -731,6 +731,7 @@ fn reward(
                 role,
                 level: 1,
                 kudos: 0,
+                tokens: 0,
                 buying: false,
             };
             let lines = goods::tooltip(content, name, &viewer).main;

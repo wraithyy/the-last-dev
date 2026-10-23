@@ -18,6 +18,9 @@ pub const SLOTS: usize = 5;
 pub const GEAR_TEXT_MAX: usize = 160;
 /// Hard cap on the damage reduction gear can give, in tenths of a percent.
 pub const ARMOR_CAP_TENTHS: u32 = 250;
+/// Highest item level outside Ilmari content (Legacy tops here). An Ilmari piece worn anywhere
+/// else counts as this level (docs/ILMARI_09.md B.6).
+pub const BASE_ILVL_CAP: u8 = 14;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Slot {
@@ -241,6 +244,11 @@ pub enum GearSource {
     Raid,
     /// Only a minigame medal grants it (`minigame.rs`): cosmetic-first pieces.
     Minigame,
+    /// Ilmari vendors and bosses only (`ilmari.rs`). Its item level sits above `BASE_ILVL_CAP`
+    /// and the extra only counts in Ilmari content (`Economy::equipment`); never in a world,
+    /// Legacy or raid pool. Unlike `Legacy` this restricts where the bonus works, not just where
+    /// it drops.
+    Ilmari,
 }
 
 /// How the piece looks on the character: a tint and a model variant per slot.
@@ -391,6 +399,13 @@ pub struct ConsumableDef {
 pub struct VendorDef {
     /// Friendly unit key that runs the shop.
     pub unit: String,
+    /// Sells for this token item (a `Token` of `Content::items`) instead of Kudos: every price
+    /// is in `token_prices` and the shelf is all or nothing.
+    #[serde(default)]
+    pub token: Option<String>,
+    /// (goods, token price) for a token vendor.
+    #[serde(default)]
+    pub token_prices: Vec<(String, u32)>,
     /// Window title.
     pub title: String,
     pub greeting: String,
@@ -405,6 +420,17 @@ pub struct VendorDef {
     /// Always listed, sold only to players a department likes enough.
     #[serde(default)]
     pub rep: Vec<RepGoods>,
+}
+
+impl VendorDef {
+    /// Tokens `item` costs here; `None` on a Kudos shelf or for an item it does not price.
+    pub fn token_price(&self, item: &str) -> Option<u32> {
+        self.token.as_ref()?;
+        self.token_prices
+            .iter()
+            .find(|(n, _)| n == item)
+            .map(|(_, c)| *c)
+    }
 }
 
 /// A vendor item gated by department standing.
@@ -539,6 +565,13 @@ impl Economy {
         self.consumables.iter().find(|c| c.name == name)
     }
 
+    /// The token and price of `item` on the first token shelf that sells it (tooltips).
+    pub fn token_price(&self, item: &str) -> Option<(&str, u32)> {
+        self.vendors
+            .iter()
+            .find_map(|v| Some((v.token.as_deref()?, v.token_price(item)?)))
+    }
+
     pub fn vendor_for(&self, unit_key: &str) -> Option<&VendorDef> {
         self.vendors.iter().find(|v| v.unit == unit_key)
     }
@@ -584,12 +617,23 @@ impl Economy {
     }
 
     /// Stats of the worn pieces plus set bonuses, and the perks they grant (the client shows
-    /// the same numbers the sim uses).
-    pub fn equipment(&self, equipped: &[String]) -> (GearStats, Vec<ActivePerk>) {
+    /// the same numbers the sim uses). `in_ilmari`: the wearer is in Ilmari content. Outside it
+    /// an Ilmari piece counts as `BASE_ILVL_CAP` and gives no perk or set progress, decided here
+    /// after nothing else is summed so no path around it exists (guardrail 3).
+    pub fn equipment(&self, equipped: &[String], in_ilmari: bool) -> (GearStats, Vec<ActivePerk>) {
         let mut sum = GearStats::default();
         let mut perks = Vec::new();
         let mut sets: Vec<&str> = Vec::new();
+        let mut active: Vec<String> = Vec::new();
         for g in equipped.iter().filter_map(|n| self.gear(n)) {
+            let synced = g.source == GearSource::Ilmari && !in_ilmari;
+            if synced {
+                let mut capped = g.clone();
+                capped.ilvl = capped.ilvl.min(BASE_ILVL_CAP);
+                sum.add(&capped.stats());
+                continue;
+            }
+            active.push(g.name.clone());
             sum.add(&g.stats());
             if let Some(p) = &g.perk {
                 perks.push(ActivePerk {
@@ -605,7 +649,7 @@ impl Economy {
         }
         for key in sets {
             let Some(set) = self.set(key) else { continue };
-            let n = self.set_count(key, equipped);
+            let n = self.set_count(key, &active);
             if n >= 2 {
                 sum.totals.add(&set.two.totals(1));
             }
@@ -625,6 +669,7 @@ impl Economy {
         content: &crate::content::Content,
         trophies: &[(String, u32)],
         equipped: &[String],
+        in_ilmari: bool,
     ) -> ItemTotals {
         let mut t = ItemTotals::default();
         for (name, n) in trophies {
@@ -632,7 +677,7 @@ impl Economy {
                 t.add(&item.bonus.totals(*n));
             }
         }
-        let (gear, _) = self.equipment(equipped);
+        let (gear, _) = self.equipment(equipped, in_ilmari);
         t.add(&gear.totals);
         t.haste_pct += gear.haste_tenths / 10;
         t.armor_tenths = t.armor_tenths.min(ARMOR_CAP_TENTHS);
@@ -699,6 +744,13 @@ impl Economy {
             {
                 return bad(format!("gear {} drops from unknown unit {u}", g.name));
             }
+            // The sync only means something if Ilmari pieces are the only ones above the cap.
+            if (g.source == GearSource::Ilmari) != (g.ilvl > BASE_ILVL_CAP) {
+                return bad(format!(
+                    "gear {} item level {} must be above {BASE_ILVL_CAP} exactly when its source is Ilmari",
+                    g.name, g.ilvl
+                ));
+            }
         }
         for s in &self.sets {
             if !perk_ok(&s.four)
@@ -739,6 +791,20 @@ impl Economy {
                 .find(|n| !matches!(self.goods(n), Some(Goods::Gear(_) | Goods::Consumable(_))))
             {
                 return bad(format!("vendor {} sells unknown {n}", v.unit));
+            }
+            // A token shelf prices every line in tokens, and only in a real token.
+            let currency_ok = v.token.as_ref().is_none_or(|t| {
+                content
+                    .item(t)
+                    .is_some_and(|i| i.kind == crate::content::ItemKind::Token)
+                    && v.rep.is_empty()
+                    && v.stock
+                        .iter()
+                        .chain(&v.rotating)
+                        .all(|n| v.token_prices.iter().any(|(p, c)| p == n && *c > 0))
+            });
+            if !currency_ok || (v.token.is_none() && !v.token_prices.is_empty()) {
+                return bad(format!("vendor {} has a broken token shelf", v.unit));
             }
             for r in &v.rep {
                 let known = matches!(
@@ -868,7 +934,8 @@ impl Sim {
 
     /// Gear totals with set bonuses, and the perks they grant.
     pub(crate) fn gear_totals(&self, i: usize) -> (GearStats, Vec<ActivePerk>) {
-        self.economy().equipment(&self.units[i].state.equipped)
+        self.economy()
+            .equipment(&self.units[i].state.equipped, self.in_ilmari_content())
     }
 
     // ---- perk hooks (called from effects and casting) ----
@@ -1370,7 +1437,12 @@ impl Sim {
             return self.item_error(pid, ItemError::NotForSale);
         }
         let price = self.economy().goods(item).map_or(u32::MAX, |g| g.price());
-        let need = self.economy().gear(item).map_or(1, GearDef::required_level);
+        // Ilmari pieces list an item level above the cap; the vendor asks for the top level.
+        let need = self
+            .economy()
+            .gear(item)
+            .map_or(1, GearDef::required_level)
+            .min(self.content.max_level());
         if self.units[pi].state.level < need {
             return self.item_error(pid, ItemError::LevelTooLow);
         }
@@ -1380,15 +1452,34 @@ impl Sim {
                 return self.item_error(pid, ItemError::RepTooLow);
             }
         }
-        if self.units[pi].state.sp < price {
-            return self.item_error(pid, ItemError::NotEnoughSp);
+        // A token vendor takes its currency from the bag's stacks and never Kudos.
+        let tokens = v.token.clone().map(|t| {
+            let cost = v
+                .token_prices
+                .iter()
+                .find(|(n, _)| n == item)
+                .map_or(u32::MAX, |(_, c)| *c);
+            (t, cost)
+        });
+        match &tokens {
+            Some((t, cost)) => {
+                if self.token_count(pi, t) < *cost {
+                    return self.item_error(pid, ItemError::NotEnoughTokens);
+                }
+            }
+            None if self.units[pi].state.sp < price => {
+                return self.item_error(pid, ItemError::NotEnoughSp);
+            }
+            None => {}
         }
         if self.bag_full(pi) {
             return self.item_error(pid, ItemError::BagFull);
         }
-        let s = &mut self.units[pi].state;
-        s.sp -= price;
-        s.bag.push(item.to_string());
+        match tokens {
+            Some((t, cost)) => self.spend_tokens(pi, &t, cost),
+            None => self.units[pi].state.sp -= price,
+        }
+        self.units[pi].state.bag.push(item.to_string());
         self.bag_event(pi);
     }
 

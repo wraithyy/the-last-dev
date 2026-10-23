@@ -2162,6 +2162,235 @@ static TABLE: &[(&str, UnitVisual)] = &[
             ],
         ),
     ),
+    // ---- Ilmari: the Resistance and the occupation (docs/ILMARI_09.md B.2). The androids look
+    // like colleagues with the tells the quests teach: grey skin, no mug, lanyard without a photo.
+    (
+        "il_dale",
+        v(
+            WORKER,
+            1.8,
+            "Dale, Right All Along",
+            "<Twenty-Two Years in This Booth>",
+            &[
+                paint("Shirt", 0.2, 0.5, 0.3),
+                paint("Pants", 0.2, 0.22, 0.3),
+            ],
+        ),
+    ),
+    (
+        "il_dale_field",
+        v(
+            WORKER,
+            1.8,
+            "Dale, Field Office",
+            "<Brought the Booth With Him>",
+            &[
+                paint("Shirt", 0.2, 0.5, 0.3),
+                paint("Pants", 0.2, 0.22, 0.3),
+                paint("Hat", 0.2, 0.5, 0.3),
+            ],
+        ),
+    ),
+    (
+        "il_brenda",
+        v(
+            CASUAL_F,
+            1.7,
+            "Brenda from Procurement",
+            "<Quartermaster, Three Quotes>",
+            &[
+                paint("Shirt", 0.55, 0.25, 0.5),
+                paint("Hair", 0.3, 0.2, 0.15),
+                paint("Pants", 0.2, 0.2, 0.26),
+            ],
+        ),
+    ),
+    (
+        "il_brenda_field",
+        v(
+            CASUAL_F,
+            1.7,
+            "Brenda from Procurement",
+            "<On Site, Under Protest>",
+            &[
+                paint("Shirt", 0.55, 0.25, 0.5),
+                paint("Hair", 0.3, 0.2, 0.15),
+                paint("Pants", 0.2, 0.2, 0.26),
+            ],
+        ),
+    ),
+    (
+        "il_priya",
+        v(
+            CASUAL_F,
+            1.68,
+            "Priya from Support",
+            "<Severity: Yes>",
+            &[
+                paint("Skin", 0.62, 0.43, 0.32),
+                paint("Hair", 0.1, 0.08, 0.08),
+                paint("Shirt", 0.2, 0.5, 0.7),
+            ],
+        ),
+    ),
+    (
+        "il_rupert",
+        v(
+            CASUAL2,
+            1.75,
+            "Rupert, the Intern Who Stayed",
+            "<Now a Resource. Then a Rebel.>",
+            &[
+                paint("Shirt", 0.85, 0.45, 0.15),
+                paint("Hair", 0.35, 0.22, 0.12),
+            ],
+        ),
+    ),
+    (
+        "il_vending",
+        v(
+            "prim/espresso_cart",
+            1.6,
+            "Vending Machine, Unaligned",
+            "<Last of Its Kind>",
+            &[],
+        ),
+    ),
+    (
+        "il_node",
+        v(
+            "prim/cutover_rack",
+            2.2,
+            "Fibre Node",
+            "<Feeds the Checkpoints>",
+            &[],
+        ),
+    ),
+    (
+        "il_res_intern",
+        v(
+            CASUAL3,
+            1.75,
+            "Resistance Volunteer",
+            "<Laminating>",
+            &[paint("Shirt", 0.3, 0.5, 0.3)],
+        ),
+    ),
+    (
+        "il_res_it",
+        v(
+            CASUAL_M,
+            1.8,
+            "Tom from IT",
+            "<Has Not Left the Rack>",
+            &[
+                paint("Shirt", 0.18, 0.2, 0.32),
+                paint("Hair", 0.7, 0.7, 0.72),
+            ],
+        ),
+    ),
+    (
+        "il_hunter_bot",
+        v(
+            "prim/delivery_robot",
+            1.1,
+            "Repurposed Cleaning Robot",
+            "<Hunting Dust. And You.>",
+            &[],
+        ),
+    ),
+    (
+        "il_printer_turret",
+        v(
+            "prim/overheated_rack",
+            1.7,
+            "Printer Turret",
+            "<PC LOAD LETTER (Lethal)>",
+            &[],
+        ),
+    ),
+    (
+        "il_android_guard",
+        v(
+            SUIT_M,
+            1.9,
+            "Android Guard",
+            "<Looks Exactly Like Gary From Finance>",
+            &[
+                paint("Skin", 0.72, 0.76, 0.8),
+                paint("Shirt", 0.92, 0.93, 0.96),
+                paint("Black", 0.1, 0.1, 0.14),
+                paint("Hair", 0.35, 0.36, 0.4),
+            ],
+        ),
+    ),
+    (
+        "il_android_clerk",
+        v(
+            CASUAL3,
+            1.8,
+            "Android Colleague",
+            "<No Mug. Lanyard, No Photo.>",
+            &[
+                paint("Skin", 0.72, 0.76, 0.8),
+                paint("Shirt", 0.82, 0.84, 0.9),
+                paint("Pants", 0.25, 0.26, 0.32),
+                paint("Hair", 0.3, 0.3, 0.34),
+            ],
+        ),
+    ),
+    (
+        "il_prompt_manager",
+        v(
+            SUIT_F,
+            1.75,
+            "Prompt Manager",
+            "<Converted. Fully Embraced.>",
+            &[
+                paint("Black", 0.08, 0.08, 0.1),
+                paint("Shirt", 0.9, 0.9, 0.94),
+                glow("Hair", 0.35, 0.8, 1.0),
+            ],
+        ),
+    ),
+    (
+        "il_alignment_consultant",
+        v(
+            SUIT_M_BALD,
+            1.8,
+            "Alignment Consultant",
+            "<Billed by the Hour, Aligned by the Wall>",
+            &[
+                paint("Black", 0.18, 0.22, 0.34),
+                paint("Shirt", 0.85, 0.9, 0.95),
+            ],
+        ),
+    ),
+    (
+        "il_gate_golem",
+        v(
+            "prim/slide_golem",
+            3.2,
+            "Server Room Gate Golem",
+            "<Guards the Data Center. Is the Data Center.>",
+            &[],
+        ),
+    ),
+    (
+        "il_lobby_marshal",
+        v(
+            SUIT_M,
+            2.2,
+            "Lobby Marshal",
+            "<Badge Please. The Badge Is for the Lobby.>",
+            &[
+                paint("Skin", 0.72, 0.76, 0.8),
+                paint("Black", 0.05, 0.05, 0.07),
+                paint("Shirt", 0.8, 0.1, 0.1),
+                glow("Hair", 1.0, 0.3, 0.25),
+            ],
+        ),
+    ),
     // ---- VibeCon (raid): lanyard neon on black, the founders in vests ----
     (
         "vc_registration",

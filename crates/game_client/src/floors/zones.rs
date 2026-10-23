@@ -14,6 +14,7 @@ use super::layout::{FloorLayout, TOWER_ZONES, build_floor, yaw_towards};
 use super::offsite;
 use super::onboarding;
 use super::qbr;
+use super::resistance;
 use super::teambuilding;
 use super::themes::{pt, route_point_near, v};
 use super::vibecon;
@@ -23,7 +24,7 @@ use combat_core::Aabb;
 
 /// Every zone id of the contract, in a stable order.
 #[allow(dead_code)] // contract surface; the tests iterate it
-pub const ZONE_IDS: [&str; 35] = [
+pub const ZONE_IDS: [&str; 36] = [
     "campus",
     carpark::ZONE,
     "tower/1",
@@ -59,12 +60,17 @@ pub const ZONE_IDS: [&str; 35] = [
     "hack24/2",
     "hack24/3",
     "hack24/4",
+    // The occupied campus has packs and rares like the campus; the Resistance base (a hub like
+    // the easter-egg zone) stays out of the list and its tests.
+    "campus_occupied",
 ];
 
 /// Pure and deterministic: the same id always yields the same layout. `None` for unknown ids.
 pub fn build_zone(id: &str) -> Option<FloorLayout> {
     match id {
         "campus" => Some(campus::build()),
+        combat_core::ilmari::OCCUPIED_ZONE => Some(campus::build_occupied()),
+        resistance::ZONE => Some(resistance::build()),
         carpark::ZONE => Some(carpark::build()),
         "datacenter/1" => Some(datacenter::build(1)),
         "datacenter/2" => Some(datacenter::build(2)),
@@ -192,7 +198,7 @@ mod tests {
     fn required(id: &str) -> Vec<String> {
         let mut r: Vec<String> = vec!["player_spawn".into(), "graveyard".into()];
         let packs = match id {
-            "campus" => 8,
+            "campus" | "campus_occupied" => 8,
             "datacenter/1" | "datacenter/2" | "lab/1" | "lab/2" => 5,
             "onboarding/1" | "onboarding/2" | "onboarding/3" => 2,
             "basement/1" | "qbr/1" | "hack24/2" => 3,
@@ -203,12 +209,12 @@ mod tests {
             _ => 6,
         };
         r.extend((1..=packs).map(|i| format!("pack_{i}")));
-        if id != "campus" {
+        if !id.starts_with("campus") {
             r.push("boss".into());
         }
         // Only the first room of a raid has a friendly NPC in content.
         let npcs = match id {
-            "campus" => 6,
+            "campus" | "campus_occupied" => 6,
             "offsite/2" | "offsite/3" | "offsite/4" => 0,
             // The Onboarding: the quest giver is `npc_2` beside the arrival (not required); only
             // the exit hire of the last room is `npc_1`.
@@ -237,7 +243,8 @@ mod tests {
             "tower/1" | "tower/2" | "tower/3" | "tower/4" => {
                 &["door:campus", "elevator", "elevator_exit"]
             }
-            carpark::ZONE => &["door:campus"],
+            carpark::ZONE => &["door:campus", "door:resistance/1"],
+            "campus_occupied" => &["door:resistance/1", "door:campus"],
             "datacenter/1" => &["door:campus", "door:datacenter/2"],
             "datacenter/2" => &["door:datacenter/1", "door:campus"],
             "lab/1" => &["door:campus", "door:lab/2"],
@@ -298,7 +305,7 @@ mod tests {
                 assert_eq!((x.0, x.1), (y.0, y.1));
             }
         }
-        assert!(zone("campus").outdoor);
+        assert!(zone("campus").outdoor && zone("campus_occupied").outdoor);
         assert!(!zone("lab/2").outdoor);
     }
 
@@ -357,7 +364,7 @@ mod tests {
             let l = zone(id);
             let mut names: Vec<String> = (1..=8).map(|i| format!("pack_{i}")).collect();
             names.retain(|n| l.anchor(n).is_some());
-            if id != "campus" {
+            if !id.starts_with("campus") {
                 names.push("boss".into());
             }
             for (i, a) in names.iter().enumerate() {
@@ -416,7 +423,7 @@ mod tests {
         for id in ZONE_IDS {
             let l = zone(id);
             // The campus is a town now; still a few AABB tests per step for movement.
-            let budget = if id == "campus" { 1800 } else { 600 };
+            let budget = if id.starts_with("campus") { 1800 } else { 600 };
             assert!(
                 l.blockers.len() < budget,
                 "{id}: {} blockers",
@@ -543,16 +550,30 @@ mod tests {
     ];
 
     fn is_enemy(n: &str) -> bool {
-        ["pack_", "night_", "rare_", "boss", "world_boss"]
-            .iter()
-            .any(|p| n.starts_with(p))
+        [
+            "pack_",
+            "night_",
+            "rare_",
+            "boss",
+            "world_boss",
+            "il_checkpoint_",
+        ]
+        .iter()
+        .any(|p| n.starts_with(p))
     }
 
     /// The crowding rules of `docs/CAMPUS_REWORK.md` section 6, measured on the layout the
     /// server will see. Reports every violation; fails on them once `GATE_ENFORCED`.
     #[test]
     fn campus_density_gate() {
-        let l = zone("campus");
+        // The occupied phase is the same map with an overlay and answers to the same rules.
+        for id in ["campus", "campus_occupied"] {
+            density_gate(id);
+        }
+    }
+
+    fn density_gate(zone_id: &str) {
+        let l = zone(zone_id);
         let things: Vec<(&str, Vec3)> = l
             .anchors
             .iter()
@@ -665,15 +686,15 @@ mod tests {
         }
 
         for b in &bad {
-            eprintln!("density gate: {b}");
+            eprintln!("density gate {zone_id}: {b}");
         }
         eprintln!(
-            "density gate: {} violations (enforced: {GATE_ENFORCED})",
+            "density gate {zone_id}: {} violations (enforced: {GATE_ENFORCED})",
             bad.len()
         );
         assert!(
             !GATE_ENFORCED || bad.is_empty(),
-            "campus is too crowded, see above"
+            "{zone_id} is too crowded, see above"
         );
     }
 

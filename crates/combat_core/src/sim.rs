@@ -990,9 +990,15 @@ impl Sim {
     /// with the new maximum and never drop.
     pub(crate) fn add_trophies(&mut self, i: usize, items: &[String]) {
         for name in items {
+            let cap = match self.content.item(name) {
+                Some(it) if it.kind == crate::content::ItemKind::Token => {
+                    crate::content::TOKEN_STACK_CAP
+                }
+                _ => u32::MAX,
+            };
             let inv = &mut self.units[i].state.inventory;
             match inv.iter_mut().find(|(n, _)| n == name) {
-                Some((_, c)) => *c += 1,
+                Some((_, c)) => *c = (*c + 1).min(cap),
                 None => inv.push((name.clone(), 1)),
             }
         }
