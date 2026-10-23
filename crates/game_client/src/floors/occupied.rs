@@ -52,6 +52,7 @@ pub fn overlay(p: &mut Plan) {
     quest_spots(p);
     gate(p);
     lobby(p);
+    airlock(p);
 }
 
 /// "ILMARI" on the Tower, the Data Center and the Lab, and a closed sign at each door. Signs
@@ -100,6 +101,19 @@ fn lobby(p: &mut Plan) {
         }
     }
     signpost(p, 7.5, -19.5, true, 2.4, Sign::IlW2Door);
+}
+
+/// The Innovation Lab's airlock (docs/ILMARI_10.md C.2): the campus's own Lab entrance becomes the
+/// Wing 3 door, with a revolving-door log on a post beside it and the "training in progress" sign
+/// on the forecourt. The base campus keeps `door:lab/1`; this zone never linked it.
+fn airlock(p: &mut Plan) {
+    for a in &mut p.anchors {
+        if a.name == "door:lab/1" {
+            a.name = "door:ilmari3/1";
+        }
+    }
+    signpost(p, -62.0, -62.0, true, 2.4, Sign::IlW3Door);
+    signpost(p, -82.0, -62.0, true, 2.4, Sign::IlLabRevolve);
 }
 
 /// Dale's folding table, a laminated sign, crates and a sandbag wall: the Resistance's forward
@@ -203,6 +217,12 @@ fn quest_spots(p: &mut Plan) {
     let marshal = v(30.0, 0.0, -34.0);
     p.anchor("rare_lobby", marshal, yaw_towards(marshal, spawn));
     p.anchor("il_escort_goal", v(74.0, 0.0, -72.0), 0.0);
+    // The airlock scraper (il_08) on the Lab's forecourt, and the whiteboard the drones want (the
+    // world quest `il_wq_scrape`) a safe distance west of it.
+    let scraper = v(-76.0, 0.0, -44.0);
+    p.anchor("rare_airlock", scraper, yaw_towards(scraper, spawn));
+    let board = v(-96.0, 0.0, -57.0);
+    p.anchor("il_board_spot", board, yaw_towards(board, spawn));
     // Cable bundles behind three propaganda screens, and a few more that only talk.
     screen(p, 40.0, 60.0, 0.0, Sign::IlScreenA, Some("prop:il_cable_1"));
     screen(p, -50.0, 40.0, PI, Sign::IlScreenB, Some("prop:il_cable_2"));
@@ -216,11 +236,20 @@ fn quest_spots(p: &mut Plan) {
     );
     screen(p, 20.0, 30.0, PI, Sign::IlScreenA, None);
     screen(p, 100.0, 30.0, FRAC_PI_2, Sign::IlScreenB, None);
+    // The Data Center's east dock: three status monitors, all green (`il_wq_status`).
+    for (k, z) in [-64.0, -96.0, -104.0].into_iter().enumerate() {
+        let key = ["prop:il_status_1", "prop:il_status_2", "prop:il_status_3"][k];
+        screen(p, 116.0, z, FRAC_PI_2, Sign::IlStatusGreen, Some(key));
+    }
     // HR passes and mug photos: glowing pickups (the office module draws them).
     for (key, x, z) in [
         ("prop:il_hr_pass_1", -40.0, -35.0),
         ("prop:il_hr_pass_2", 40.0, -30.0),
         ("prop:il_hr_pass_3", 100.0, 0.0),
+        // Staff passes dropped on the Innovation Lab's forecourt (il_07).
+        ("prop:il_lab_pass_1", -84.0, -52.0),
+        ("prop:il_lab_pass_2", -60.0, -50.0),
+        ("prop:il_lab_pass_3", -72.0, -46.0),
         ("prop:il_mug_proof_1", -100.0, 70.0),
         ("prop:il_mug_proof_2", -20.0, 70.0),
         ("prop:il_mug_proof_3", 110.0, -50.0),

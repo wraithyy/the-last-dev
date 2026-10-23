@@ -1,6 +1,6 @@
 # Ilmari 0.10: implementation spec
 
-Status: engine pieces C1-C3 built (swarm, illusions, recorder) with the client drone pool, protocol 38; Wing 3-4 content (C4 onward), boss splitting and platforms (C9-C10) not built. Written 2026-10-23, statuses updated the same day. Companion to `docs/ILMARI_RAID.md` (campaign
+Status: engine pieces C1-C3 built (swarm, illusions, recorder) with the client drone pool, protocol 38; Wing 3 (C4-C8) built on top of them, protocol 39; Wing 4 content (C11 onward), boss splitting and platforms (C9-C10) not built. Written 2026-10-23, statuses updated the same day. Companion to `docs/ILMARI_RAID.md` (campaign
 design and guardrails, which still win in any conflict), `docs/ILMARI_09.md` (the format this spec
 mirrors, and the "as built" notes for Wings 1-2 and the B15 companions) and `docs/DUNGEONS.md` (the
 engine vocabulary this spec reuses). Campus coordinates follow `docs/CAMPUS_REWORK.md`.
@@ -624,9 +624,10 @@ muted (`WOW_MUTE=1`). Every task that changes player-visible behaviour adds one 
 | C1 swarm | done | `swarm.rs`; no `swarm_count` snapshot field: the count is `SwarmDef::count(hp)`, derived from the replicated HP and the content both sides already hold, so the unit snapshot is unchanged. `Sim::add_draft` and `spawn_swarm` are the content hooks until the Scrape Pit exists |
 | C2 illusions | done | `illusion.rs`, `Event::IllusionCycle { cycle, salt, arena }` (protocol 38), late-joiner catch-up, cosmetic-proof test; server room test in `ilmari_tests.rs`. The Ground Truth utility and the board prop wait for the Wing 3 content |
 | C3 recorder | done | `echo.rs`, `Event::Echoed` (protocol 38) |
-| C4-C14 | not built | zones, quests, bosses, split, bill, platforms (protocol 39 is unused) |
-| C15 client | drone pool only | `swarm_fx.rs`, `WOW_SWARM=<clusters>` QA hook and `WOW_BENCH=swarm` (numbers in `docs/PERF.md`); illusion overlay, shimmer, echo ghosts, platforms and bill HUD wait for their bosses |
-| C16 server | partly | co-op illusion test; the wing clears and the platform/bill catch-up come with their content |
+| C4-C8 Wing 3 | done | Training Data: `door:ilmari3/1` behind `il_08_wing3_attune`; Scraper Queen, Hallucination, Model Collapse; Story solo clears for all 8 classes x seeds 7/42/1234 with and without companions, a Full trio clears, Full solo does not (`tests/playthrough.rs`, `tests/ilmari_wing3.rs`, server `ilmari_tests.rs`). As built: protocol 39 (`Event::Drafts`, `CastError::NotHere`); no `swarm_count` on the wire; new effects `SwarmWave`, `Confabulate`, `Blink`, `Footnotes`; `UnitDef.encounter` (`Drafts`, `Illusion`, `Echo`); `PropKind::Draft` / `Truth`; `ClassDef.utility` and `SpellDef.ilmari_only` (Ground Truth, key Comma); Wing 3 swarm unit is `il_scraper_cluster` (10 HP/drone), the engine's `il_scraper_swarm` is unchanged; echo Strike damage is `strike_pct` (30) of the recorded cast; loot ilvl 16-18 (tier levels are even; 20 stays reserved). Story keeps the engine's 3x3 grid and 3 circles (no 2x2 reduction); the Queen's phase-2 march is a column wave. Deferred: class props (robots.txt, Rate Limit, dashboard) and the Brenda vendor page |
+| C9-C14 | not built | split, bill, platforms |
+| C15 client | Wing 3 parts done | `swarm_fx.rs`, `wing3_fx.rs` (illusion overlay with per-viewer fakes and Story shimmer, Ground Truth view, echo ghosts, draft meters, HUD line), `WOW_SWARM`, `WOW_WING3_STAGE=halluc|collapse`, `WOW_VIEWER_OFFSET`, benches `swarm` (real Scrape Pit), `ilmari3_halluc`, `ilmari3_collapse` (`docs/PERF.md`); platforms and bill HUD wait for Wing 4 |
+| C16 server | Wing 3 done | co-op tests: drafts reach members and a late joiner, one salt per cycle, loot band; platform/bill catch-up come with Wing 4 |
 | C17 docs | engine parts | `COMBAT_API.md`, `FORMULAS.md`, `PERF.md`, `KNOWN_LIMITATIONS.md` cover C1-C3 |
 
 Each task is independently verifiable; C1-C3 and C9-C10 are pure engine and can land with no content

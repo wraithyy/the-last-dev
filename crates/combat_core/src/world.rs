@@ -88,6 +88,12 @@ pub enum PropKind {
     Ballot,
     /// The HR Portal: an appeal that takes the auras listed in `PropDef::auras` off the user.
     Portal,
+    /// A draft on a desk in the Scrape Pit (`EncounterDef::Drafts`): a use marks it Confidential,
+    /// so the swarm skips it for a while (any class, nothing else needed).
+    Draft,
+    /// A Ground Truth board in the Validation Wing: a use shows the user which hazards are real
+    /// for a few seconds (`PropDef::auras`, the `il_grounded` aura the client reads).
+    Truth,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -572,6 +578,12 @@ impl Sim {
         }
         if def.kind == PropKind::Portal {
             return self.use_portal_prop(pi, k);
+        }
+        if def.kind == PropKind::Draft {
+            return self.use_draft_prop(pi, k);
+        }
+        if def.kind == PropKind::Truth {
+            return self.use_truth_prop(pi, k);
         }
         // Mirrored controls in a fight would be a griefing tool, not a joke; a shuttle would be
         // a free escape.

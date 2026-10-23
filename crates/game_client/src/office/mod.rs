@@ -190,6 +190,8 @@ fn hover_radius(kind: PropKind) -> f32 {
         | PropKind::Label
         | PropKind::Ballot
         | PropKind::Portal
+        | PropKind::Draft
+        | PropKind::Truth
         | PropKind::Device => 0.9,
         PropKind::Pickup => 0.6,
         PropKind::QuietRoom => 1.2,
@@ -214,6 +216,7 @@ fn pickup_look(tag: &str) -> (&'static str, Color) {
         "basement_tag" => ("junk_ticket", Color::srgb(0.35, 0.9, 1.0)),
         "il_hr_pass" => ("access_badge", Color::srgb(1.0, 0.4, 0.45)),
         "il_mug_proof" => ("gear_mug", Color::srgb(1.0, 0.85, 0.5)),
+        "il_lab_pass" => ("access_badge", Color::srgb(0.4, 1.0, 0.7)),
         _ => ("box", Color::srgb(1.0, 0.8, 0.25)),
     }
 }

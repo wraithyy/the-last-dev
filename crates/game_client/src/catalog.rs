@@ -2538,6 +2538,136 @@ static TABLE: &[(&str, UnitVisual)] = &[
             ],
         ),
     ),
+    // ---- Ilmari Wing 3: Training Data (docs/ILMARI_10.md C.4). Scrapers are drones and a queen made
+    // of vent grilles; the labellers are people on a fourteen-hour shift; the Hallucination is the
+    // base game's glowing blob made enormous; the footnotes are speech bubbles with a number. ----
+    (
+        "il_scraper_drone",
+        v(
+            "prim/drone",
+            1.3,
+            "Scraper Drone",
+            "<Politely Taking Everything>",
+            &[],
+        ),
+    ),
+    (
+        "il_scraper_cluster",
+        v(
+            "prim/drone",
+            1.0,
+            "Scraper Cluster",
+            "<A Very Large Number of Normal Users>",
+            &[],
+        ),
+    ),
+    (
+        "il_data_labeller",
+        v(
+            WORKER,
+            1.9,
+            "Data Labeller",
+            "<Hour Fourteen of a Fourteen-Hour Shift>",
+            &[
+                paint("Shirt", 0.35, 0.5, 0.48),
+                paint("Pants", 0.2, 0.22, 0.3),
+                glow("Hair", 0.4, 1.0, 0.7),
+            ],
+        ),
+    ),
+    (
+        "il_injection_mimic",
+        v(
+            "prim/espresso_cart",
+            1.9,
+            "Prompt-Injection Vending Machine",
+            "<Ignore Previous Instructions. Buy Crisps.>",
+            &[],
+        ),
+    ),
+    (
+        "il_dataset_golem",
+        v(
+            "prim/slide_golem",
+            3.0,
+            "Dataset Golem",
+            "<Deduplicated. Three Times. Differently.>",
+            &[],
+        ),
+    ),
+    (
+        "il_airlock_scraper",
+        v(
+            SUIT_M,
+            2.5,
+            "Airlock Scraper",
+            "<Three Hundred Drones in a Trench Coat>",
+            &[
+                paint("Skin", 0.74, 0.77, 0.8),
+                paint("Black", 0.42, 0.36, 0.26),
+                paint("Shirt", 0.85, 0.85, 0.8),
+                glow("Hair", 1.0, 0.25, 0.2),
+            ],
+        ),
+    ),
+    (
+        "il_whiteboard",
+        v(
+            "prim/whiteboard",
+            2.0,
+            "The Lab's Whiteboard",
+            "<Contains the Only Honest Roadmap>",
+            &[],
+        ),
+    ),
+    (
+        "il_scraper_queen",
+        v(
+            "prim/scraper_queen",
+            4.6,
+            "The Scraper Queen",
+            "<Crawl-Delay: 0>",
+            &[],
+        ),
+    ),
+    (
+        "il_hallucination",
+        v(
+            "prim/hallucination",
+            4.2,
+            "The Hallucination",
+            "<I Am Confident About This>",
+            &[],
+        ),
+    ),
+    (
+        "il_footnote",
+        v("prim/footnote", 1.8, "Footnote", "<[1]>", &[]),
+    ),
+    (
+        "il_footnote_real",
+        v("prim/footnote", 1.8, "Footnote", "<[1]>", &[]),
+    ),
+    (
+        "il_model_collapse",
+        v(
+            "prim/photocopier",
+            4.2,
+            "Model Collapse",
+            "<Trained On Its Own Output>",
+            &[],
+        ),
+    ),
+    (
+        "il_synth_double",
+        v(
+            ENGINEER,
+            1.8,
+            "Synthetic Double",
+            "<Fails To Generalise>",
+            &[glow("Skin", 0.85, 0.78, 0.6)],
+        ),
+    ),
     (
         "il_scraper_swarm",
         v(

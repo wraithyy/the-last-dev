@@ -39,6 +39,8 @@ pub enum CastError {
     NoScooters,
     /// A stealth opener pressed outside stealth.
     NeedsStealth,
+    /// A spell that only works inside an Ilmari wing.
+    NotHere,
 }
 
 impl CastError {
@@ -67,6 +69,7 @@ impl CastError {
             CastError::TargetNotDead => "Your target is not dead. Yet.",
             CastError::NoScooters => "No scooters in the office. (Facilities)",
             CastError::NeedsStealth => "You must be in stealth. Try Tailgating.",
+            CastError::NotHere => "There is nothing to fact-check here. Try somewhere confident.",
         }
     }
 }
@@ -801,6 +804,13 @@ pub enum Event {
         cycle: u32,
         salt: u64,
         arena: crate::illusion::IllusionArena,
+    },
+    /// The Scrape Pit's drafts, in the order of the boss's `EncounterDef::Drafts::props`: each
+    /// one's integrity (0..=1000, 0 is gone) and whether a Mark Confidential protects it now.
+    /// Sent about once a second while any of it changed, and to a joiner.
+    Drafts {
+        integrity: Vec<u16>,
+        marked: Vec<bool>,
     },
     /// The boss will replay a recorded cast of `as_player` in `at_ms` at `at_cm` (x, z in
     /// centimetres): the ghost plays the animation and a telegraph marks the spot.

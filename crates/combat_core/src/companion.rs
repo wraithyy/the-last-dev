@@ -315,6 +315,9 @@ impl Sim {
                     let u = &self.units[o];
                     dist_xz(u.state.pos, at) <= ENGAGE_M
                         && (target == Some(Self::id_of(o))
+                            // A swarm cluster has no threat table until somebody hits it: it
+                            // is a foe by walking at the drafts.
+                            || self.content.units[u.def].swarm.is_some()
                             || u.threat.contains_key(&owner)
                             || self
                                 .companions
@@ -398,6 +401,13 @@ impl Sim {
                 }
             }
         }
+        // A cluster on its way to a draft comes before everything else: the one nearest a draft
+        // that still stands (drafts are the owner's to mark, the fight for them is shared).
+        if let Some(c) = self.companion_swarm_pick(&foes)
+            && self.companion_attack(ci, c, def)
+        {
+            return;
+        }
         // Adds die first; then the owner's target; then whatever is nearest.
         let adds: Vec<usize> = foes
             .iter()
@@ -414,18 +424,48 @@ impl Sim {
             })
             .or_else(|| self.companion_nearest(ci, &foes));
         let Some(t) = t else { return };
+        self.companion_attack(ci, t, def);
+    }
+
+    /// Casts the main attack at `t`, or walks to the stand-off distance. False when it did
+    /// neither (nothing usable and already standing there).
+    fn companion_attack(&mut self, ci: usize, t: usize, def: &CompanionDef) -> bool {
         self.face(ci, t);
-        if !self.companion_cast(ci, def.main, Self::id_of(t)) {
-            let range = self.content.spell(def.main).map_or(0.0, |s| s.range_m);
-            let stand = RANGED_STAND_M.min(range - 2.0).max(MELEE_STAND_M);
-            let blocked = dist_xz(self.units[ci].state.pos, self.units[t].state.pos) <= stand;
-            // Within the stand-off but still blocked means no line of sight: get closer.
-            self.companion_walk(
-                ci,
-                self.units[t].state.pos,
-                if blocked { 1.0 } else { stand },
-            );
+        if self.companion_cast(ci, def.main, Self::id_of(t)) {
+            return true;
         }
+        let range = self.content.spell(def.main).map_or(0.0, |s| s.range_m);
+        let stand = RANGED_STAND_M.min(range - 2.0).max(MELEE_STAND_M);
+        let blocked = dist_xz(self.units[ci].state.pos, self.units[t].state.pos) <= stand;
+        // Within the stand-off but still blocked means no line of sight: get closer.
+        self.companion_walk(
+            ci,
+            self.units[t].state.pos,
+            if blocked { 1.0 } else { stand },
+        );
+        true
+    }
+
+    /// The swarm cluster closest to a draft that still stands (lowest id on a tie).
+    fn companion_swarm_pick(&self, foes: &[usize]) -> Option<usize> {
+        let live: Vec<Vec3> = self
+            .drafts()
+            .iter()
+            .filter(|d| d.integrity > 0)
+            .map(|d| d.pos)
+            .collect();
+        if live.is_empty() {
+            return None;
+        }
+        let near = |o: usize| {
+            live.iter()
+                .map(|d| dist_xz(*d, self.units[o].state.pos))
+                .fold(f32::MAX, f32::min)
+        };
+        foes.iter()
+            .copied()
+            .filter(|&o| self.content.units[self.units[o].def].swarm.is_some())
+            .min_by(|&a, &b| near(a).total_cmp(&near(b)).then(a.cmp(&b)))
     }
 
     /// Heals the most hurt of the owner's side below the threshold; false when nobody needs it.
@@ -492,8 +532,13 @@ impl Sim {
         };
         let step = RUN_MPS / TICK_HZ as f32;
         self.units[ci].state.yaw = crate::ai::yaw_toward(me, wp);
-        self.units[ci].state.pos =
-            crate::ai::step_toward(me, wp, step, if last { stop } else { 0.0 });
+        let next = crate::ai::step_toward(me, wp, step, if last { stop } else { 0.0 });
+        // A safe companion never walks back into a pending hazard it just left (it would be
+        // standing in it when the warning ends); the dodge itself only steps to safe spots.
+        if self.telegraph_danger(next) && !self.telegraph_danger(me) {
+            return;
+        }
+        self.units[ci].state.pos = next;
         self.units[ci].moving = true;
     }
 
@@ -505,15 +550,20 @@ impl Sim {
                 && !t.split
                 && t.shape.contains(t.pos, t.facing, p)
                 && !t.cover.iter().any(|c| dist_xz(*c, p) <= t.cover_radius_m)
-        })
+        }) || self
+            .illusion_pending()
+            .is_some_and(|(real, arena)| real.hits(&arena, p.x, p.z, 0.0))
+            // The Hallucination's fakes are cosmetic and never reach the sim: a companion only
+            // ever sees the truth. The recorder's ghosts count like telegraphs.
+            || self
+                .echo_ghosts()
+                .iter()
+                .any(|(at, r)| dist_xz(*at, p) <= *r)
     }
 
     /// Steps out of a ground telegraph toward the nearest safe spot (a metre of margin, a clear
     /// walk). True while it is dodging, which takes priority over everything else.
     fn companion_dodge(&mut self, ci: usize) -> bool {
-        if self.telegraphs.is_empty() {
-            return false;
-        }
         let me = self.units[ci].state.pos;
         if !self.telegraph_danger(me) {
             return false;

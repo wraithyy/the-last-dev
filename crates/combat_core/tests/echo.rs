@@ -55,6 +55,7 @@ fn story_fight(seed: u64) -> (Sim, EntityId, Vec<EntityId>, Vec<(u64, Event)>) {
         center_z_cm: -1000,
         story: true,
         add_unit: None,
+        strike_pct: 100,
     });
     let comps = sim.companions_of(p);
     let mut log = Vec::new();

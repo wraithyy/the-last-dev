@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 38;
+pub const PROTOCOL_VERSION: u16 = 39;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -974,6 +974,10 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
             names(std::slice::from_ref(&view.zone))
         }
         Event::Review { grades, .. } => list(grades.len()),
+        Event::Drafts { integrity, marked } => {
+            list(integrity.len())?;
+            list(marked.len())
+        }
         Event::Ladder { view } => {
             list(view.entries.len())?;
             for e in &view.entries {
@@ -1986,6 +1990,10 @@ mod tests {
                 grades: vec![(1, 100); MAX_LIST_LEN + 1],
                 worst: None,
                 best: None,
+            },
+            Event::Drafts {
+                integrity: vec![1000; MAX_LIST_LEN + 1],
+                marked: Vec::new(),
             },
             Event::Ladder { view: crowd },
             Event::Ladder { view: long_name },

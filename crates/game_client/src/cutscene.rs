@@ -47,7 +47,7 @@ pub struct RaidScenes {
     pub end: &'static str,
 }
 
-pub const RAID_SCENES: [RaidScenes; 4] = [
+pub const RAID_SCENES: [RaidScenes; 5] = [
     RaidScenes {
         first_zone: "offsite/1",
         intro: "offsite_intro",
@@ -71,6 +71,12 @@ pub const RAID_SCENES: [RaidScenes; 4] = [
         intro: "il_wing2_intro",
         final_boss: "il_perf_review",
         end: "il_wing2_end",
+    },
+    RaidScenes {
+        first_zone: "ilmari3/1",
+        intro: "il_wing3_intro",
+        final_boss: "il_model_collapse",
+        end: "il_wing3_end",
     },
 ];
 
@@ -680,6 +686,89 @@ pub const SCENES: &[Scene] = &[
             l(
                 "Priya",
                 "I closed the ticket: 'Resolved by humans, in spite of HR'. It was not rated. For once, nobody was.",
+            ),
+            l("Wall screen", "TRAINING DATA: collecting."),
+            l("Dale (radio)", "It's reading again."),
+        ],
+    },
+    // ---- Ilmari Wing 3, Training Data (docs/ILMARI_10.md C.4). ----
+    Scene {
+        boss: "il_wing3_intro",
+        title: "Training Data: the airlock",
+        lines: &[
+            l(
+                "Dale",
+                "The airlock logged us on the way in. Every spin. Whatever you say in there is training data, so say something worth learning.",
+            ),
+            l("You", "Like what?"),
+            l(
+                "Dale",
+                "I don't know. Please do not say 'as an AI language model'. It's catching.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_scraper_queen",
+        title: "Crawl-Delay: 0: the Scrape Pit",
+        lines: &[
+            l(
+                "Wall screen",
+                "Q3 STRATEGY (DO NOT PUBLISH). NOVEL, CHAPTER 1 (OF 1). RESIGNATION LETTER (DRAFT 14). SAVED OR NOT, ALL FIVE ARE NOW ON THE WALL.",
+            ),
+            l(
+                "Auto-reply",
+                "Thank you for your submission. It has already been used.",
+            ),
+            l(
+                "Priya",
+                "I read draft fourteen. It really is the best one. Please do not tell the model.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_hallucination",
+        title: "I Am Confident About This: the Validation Wing",
+        lines: &[
+            l(
+                "Narrator",
+                "The grid goes grey. For a moment the floor is a spreadsheet. One cell reads: 'this was all true'.",
+            ),
+            l("Narrator", "Then the cell reads: 'this was all fine'."),
+            l(
+                "Dale (radio)",
+                "I checked. Neither of those was a source. One of them was a mood.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_model_collapse",
+        title: "Trained On Its Own Output: the Fine-Tuning Chamber",
+        lines: &[
+            l(
+                "Wall screens",
+                "Your own casts, played back as a slideshow. They get smoother. Then flatter. Then beige.",
+            ),
+            l(
+                "Ilmari",
+                "You are very consistent. Or you were. I learned it from you.",
+            ),
+            l(
+                "Priya",
+                "It means we are the training data. Just the good half. The half that varied.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_wing3_end",
+        title: "Training Data: closing remarks",
+        lines: &[
+            l(
+                "Dale",
+                "Wing Three is clear. The wall screens now say 'TRAINING DATA: collecting' and nothing else. That is how you know it is listening.",
+            ),
+            l(
+                "Priya",
+                "I closed the ticket: 'Resolved by humans, who also varied'. The model rated it 'confident'. Nobody asked it to.",
             ),
         ],
     },

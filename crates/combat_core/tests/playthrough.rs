@@ -119,6 +119,7 @@ const CLASSES: [&str; 8] = [
 ];
 /// Shields of linked raid bosses: the open member is the only one worth hitting.
 const HUMAN: &str = "il_candidate_human";
+const SWARM: &str = "il_scraper_cluster";
 const CABLE: &str = "il_cable";
 const LINK_SHIELDS: [&str; 3] = ["synergy_shield", "panel_muted", "committee_quorum"];
 
@@ -142,6 +143,20 @@ fn anchor(name: &str) -> Option<(Vec3, f32)> {
     // The campus onboarding corner (named, not numbered), far out of every pull.
     if name.starts_with("npc_") {
         return Some((Vec3::new(-400.0, 0.0, 400.0), 0.0));
+    }
+    // Wing 3: the drafts and the Ground Truth boards stand in the boss's room, as in the real one.
+    if let Some(n) = name
+        .strip_prefix("prop:il_draft_")
+        .and_then(|n| n.parse::<f32>().ok())
+    {
+        let a = n * std::f32::consts::TAU / 5.0;
+        return Some((
+            Vec3::new(9.0 * a.cos(), 0.0, -PACK_SPACING * 7.0 + 9.0 * a.sin()),
+            0.0,
+        ));
+    }
+    if name.starts_with("prop:il_truth_board_") {
+        return Some((Vec3::new(10.0, 0.0, -PACK_SPACING * 7.0 + 10.0), 0.0));
     }
     // Quest props share one quiet corner next to it; the bot walks there to use them.
     if name.starts_with("prop:") {
@@ -201,6 +216,10 @@ struct Bot {
     appeals: u32,
     appeal_next: u64,
     lobby_next: u64,
+    /// Wing 3: the earliest tick of the next Mark Confidential try.
+    draft_next: u64,
+    /// Model Collapse's repeater: casts only this spell (the test of "repeat yourself and lose").
+    repeater: Option<SpellId>,
 }
 
 fn yaw_to(from: Vec3, to: Vec3) -> f32 {
@@ -260,6 +279,8 @@ impl Bot {
             appeals: 0,
             appeal_next: 0,
             lobby_next: 0,
+            draft_next: 0,
+            repeater: None,
         }
     }
 
@@ -413,6 +434,37 @@ impl Bot {
                 return Some(id);
             }
         }
+        // Wing 3: the swarm walks to the drafts without ever being "in combat", so it is picked
+        // by what it threatens: the cluster nearest a draft that still stands.
+        let drafts = self.sim.drafts();
+        let live: Vec<Vec3> = drafts
+            .iter()
+            .filter(|d| d.integrity > 0)
+            .map(|d| d.pos)
+            .collect();
+        if !live.is_empty() {
+            let near = |u: &combat_core::UnitState| {
+                live.iter()
+                    .map(|d| combat_core::distance(*d, u.pos))
+                    .fold(f32::MAX, f32::min)
+            };
+            if let Some(c) = self
+                .sim
+                .units()
+                .filter(|u| u.key == SWARM && u.alive)
+                .min_by(|a, b| near(a).total_cmp(&near(b)).then(a.id.cmp(&b.id)))
+            {
+                return Some(c.id);
+            }
+        }
+        // The real footnote first: the board says which it is, and the fakes retract on the room.
+        if let Some(u) = self
+            .sim
+            .units()
+            .find(|u| u.key == "il_footnote_real" && u.alive && u.in_combat)
+        {
+            return Some(u.id);
+        }
         let shielded = |u: &combat_core::UnitState| {
             u.auras
                 .iter()
@@ -462,7 +514,20 @@ impl Bot {
             .into_iter()
             .filter(|t| !t.split)
             .collect();
-        let unsafe_at = |p: Vec3| tgs.iter().any(|t| t.hits(p));
+        // Wing 3: the real hazards of the Hallucination (the truth, which a bot reads from the sim
+        // where a player reads a board) count like telegraphs while they are still coming.
+        let truth = self.sim.illusion_pending();
+        // Model Collapse's ghosts (what the party did a minute ago) are announced like telegraphs.
+        let ghosts = self.sim.echo_ghosts();
+        let unsafe_at = |p: Vec3| {
+            tgs.iter().any(|t| t.hits(p))
+                || ghosts
+                    .iter()
+                    .any(|(at, r)| combat_core::distance(*at, p) <= r + 1.0)
+                || truth
+                    .as_ref()
+                    .is_some_and(|(real, arena)| real.hits(arena, p.x, p.z, 1.0))
+        };
         if !unsafe_at(self.pos) {
             self.dodge_goal = None;
             return false;
@@ -675,10 +740,52 @@ impl Bot {
         self.sim.apply_as(self.player, Command::Interact { prop });
     }
 
+    /// Wing 3's Scraper Queen: Mark Confidential on the draft with a cluster at it, every draft once
+    /// its 40 s are up (the Interact rides in a tick with a move to the desk, like the ballots).
+    fn defend_drafts(&mut self) {
+        let now = self.sim.now().0;
+        if self.draft_next > now || !self.me().alive || self.me().stunned {
+            return;
+        }
+        let clusters: Vec<Vec3> = self
+            .sim
+            .units()
+            .filter(|u| u.key == SWARM && u.alive)
+            .map(|u| u.pos)
+            .collect();
+        let pick = self
+            .sim
+            .drafts()
+            .iter()
+            .enumerate()
+            .filter(|(_, d)| d.integrity > 0)
+            .filter(|(_, d)| {
+                clusters
+                    .iter()
+                    .any(|c| combat_core::distance(*c, d.pos) < 6.0)
+            })
+            .map(|(k, _)| k)
+            .next();
+        let Some(k) = pick else { return };
+        self.draft_next = now + ms_to_ticks(1600);
+        self.use_prop_remotely(format!("il_draft_{}", k + 1));
+    }
+
     fn act(&mut self) {
         self.label_cables();
         self.appeal();
         self.lobby();
+        self.defend_drafts();
+        if let Some(spell) = self.repeater {
+            // The repeater: one button, nothing else, aimed at whatever it should fight.
+            if let Some(t) = self.pick_target() {
+                self.set_target(t);
+            }
+            if self.me().alive && !self.me().stunned && !self.dodge() && self.ready(spell) {
+                self.cast(spell);
+            }
+            return;
+        }
         if self.me().alive && !self.me().stunned && self.tether() {
             return;
         }
@@ -2664,6 +2771,7 @@ fn every_class_clears_async_attendance_solo() {
 
 const WING1: [&str; 3] = ["ilmari1/1", "ilmari1/2", "ilmari1/3"];
 const WING2: [&str; 3] = ["ilmari2/1", "ilmari2/2", "ilmari2/3"];
+const WING3: [&str; 3] = ["ilmari3/1", "ilmari3/2", "ilmari3/3"];
 
 fn boss_of(sim: &Sim, zone: &str) -> String {
     sim.content()
@@ -3067,7 +3175,7 @@ fn story_with_two_companions_clears_each_wing_and_is_not_much_easier() {
         ("devops", [DALE, RUPERT]),
         ("fullstack", [DALE, PRIYA]),
     ] {
-        for (name, zones) in [("Wing 1", &WING1), ("Wing 2", &WING2)] {
+        for (name, zones) in [("Wing 1", &WING1), ("Wing 2", &WING2), ("Wing 3", &WING3)] {
             for seed in [7, 42, 1234] {
                 let solo = companion_wing(class, zones, seed, &[]);
                 let with = companion_wing(class, zones, seed, &picks);
@@ -3091,4 +3199,149 @@ fn story_with_two_companions_clears_each_wing_and_is_not_much_easier() {
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+// ---- Ilmari Wing 3, Training Data (docs/ILMARI_10.md C.4): Story solo, Full as a group.
+
+/// Story is the solo difficulty: every class clears the Scraper Queen (a swarm to defend the drafts
+/// from), the Hallucination (hazards the bot reads off the sim, where a player reads a board) and
+/// Model Collapse (an echo of its own rotation) on three seeds.
+#[test]
+fn every_class_clears_wing_three_on_story_solo() {
+    let mut failures = Vec::new();
+    for class in CLASSES {
+        for seed in [7, 42, 1234] {
+            let mut b = Bot::new_as(class, "campus", 10, seed);
+            b.wear_legacy_gear();
+            b.rest_alert = true;
+            let (bosses, secs, low, _) = b.wing(&WING3, true);
+            println!(
+                "{class:14} Wing 3 Story seed {seed:4}: {bosses}/3 bosses in {secs} s, low {low}%"
+            );
+            if bosses < 3 {
+                failures.push(format!("{class} seed {seed}: {bosses}/3 bosses"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Full is the group difficulty: a tank and two damage dealers clear it on three seeds; the
+/// same wing alone is meant to fail.
+#[test]
+fn a_trio_clears_wing_three_on_full_and_a_lone_player_does_not() {
+    let mut failures = Vec::new();
+    for seed in [7, 42, 1234] {
+        let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
+        let (bosses, secs, deaths) = g.wing(&WING3);
+        println!(
+            "trio Wing 3 Full seed {seed:4}: {bosses}/3 bosses in {secs} s, {deaths} dead, boss fights {:?} s",
+            g.boss_secs
+        );
+        if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+            let _ = std::fs::write(
+                PathBuf::from(dir).join(format!("trio3_{seed}.log")),
+                &g.bots[0].log,
+            );
+        }
+        if bosses < 3 {
+            failures.push(format!("trio seed {seed}: {bosses}/3 bosses"));
+        }
+    }
+    for class in CLASSES {
+        let mut b = Bot::new_as(class, "campus", 10, 7);
+        b.wear_legacy_gear();
+        b.rest_alert = true;
+        let (bosses, secs, low, _) = b.wing(&WING3, false);
+        println!("{class:14} Wing 3 Full alone: {bosses}/3 bosses in {secs} s, low {low}%");
+        if bosses >= 3 {
+            failures.push(format!("{class} cleared Full alone"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Model Collapse taxes repetition: on Story both bots still win (it is the gentle difficulty), but
+/// holding one button starves the Underfit bonus and feeds the echo, so it takes clearly longer.
+#[test]
+fn model_collapse_slows_the_one_button_bot_down() {
+    for class in ["backend", "fullstack"] {
+        let build = |repeat: bool| {
+            let mut b = Bot::new_as(class, "campus", 10, 7);
+            b.wear_legacy_gear();
+            b.rest_alert = true;
+            if repeat {
+                let c = b
+                    .sim
+                    .content()
+                    .classes
+                    .iter()
+                    .find(|k| k.key == class)
+                    .cloned();
+                b.repeater = c.and_then(|k| k.action_bar.first().copied());
+            }
+            b
+        };
+        let (varied, vs, vlow, _) = build(false).wing(&WING3[2..3], true);
+        let (repeated, rs, rlow, _) = build(true).wing(&WING3[2..3], true);
+        println!(
+            "{class}: varied {varied}/1 {vs} s low {vlow}%, repeater {repeated}/1 {rs} s low {rlow}%"
+        );
+        assert_eq!(
+            (varied, repeated),
+            (1, 1),
+            "{class}: Story clears either way"
+        );
+        assert!(
+            rs * 100 >= vs * 115,
+            "{class}: repeating took {rs} s against {vs} s varied"
+        );
+    }
+}
+
+/// QA probe for balance work: `W3_CLASS`, `W3_SEED` and `W3_STORY` pick one run of Wing 3 and
+/// `W3_ROOM` (1..3) the room, with a log dump in `WOW_BOT_DUMP`. Not part of the gates.
+#[test]
+#[ignore = "balance probe: W3_CLASS=<class> W3_SEED=<n> W3_STORY=1 W3_ROOM=1"]
+fn wing_three_probe() {
+    let class = std::env::var("W3_CLASS").unwrap_or_else(|_| "fullstack".into());
+    let class: &'static str = CLASSES
+        .iter()
+        .find(|c| **c == class)
+        .copied()
+        .unwrap_or("fullstack");
+    let seed = std::env::var("W3_SEED")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(7);
+    let story = std::env::var("W3_STORY").is_ok_and(|s| s == "1");
+    let room: usize = std::env::var("W3_ROOM")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(1);
+    let zones = &WING3[room - 1..room];
+    if std::env::var("W3_TRIO").is_ok() {
+        let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
+        let (bosses, secs, deaths) = g.wing(zones);
+        println!(
+            "probe trio room {room} Full seed {seed}: {bosses}/1 in {secs} s, {deaths} dead, fights {:?}",
+            g.boss_secs
+        );
+        if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+            let _ = std::fs::write(PathBuf::from(dir).join("probe3.log"), &g.bots[0].log);
+        }
+        return;
+    }
+    let mut b = Bot::new_as(class, "campus", 10, seed);
+    b.wear_legacy_gear();
+    b.rest_alert = true;
+    let (bosses, secs, low, _) = b.wing(zones, story);
+    println!(
+        "probe {class} room {room} {} seed {seed}: {bosses}/1 in {secs} s, low {low}%, died {}",
+        if story { "Story" } else { "Full" },
+        b.report.died
+    );
+    if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+        let _ = std::fs::write(PathBuf::from(dir).join("probe3.log"), &b.log);
+    }
 }

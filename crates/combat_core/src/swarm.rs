@@ -44,6 +44,12 @@ struct Draft {
     milli: u32,
     /// Remainder of the per-tick split of the per-second bite (0..TICK_HZ).
     acc: u32,
+    /// Mark Confidential: no bites until this tick.
+    shield_until: u64,
+    /// The next tick a Mark Confidential may be put on it (shared by every player).
+    mark_ready: u64,
+    /// Counted as lost once (the encounter reads it).
+    lost: bool,
 }
 
 /// A draft as the client and tests read it.
@@ -67,8 +73,61 @@ impl Sim {
             pos,
             milli: DRAFT_FULL_MILLI,
             acc: 0,
+            shield_until: 0,
+            mark_ready: 0,
+            lost: false,
         });
         self.swarm.drafts.len() - 1
+    }
+
+    /// Debug/test: draft `k` at `integrity` points (0..=1000). False when there is no such draft.
+    pub fn debug_set_draft(&mut self, k: usize, integrity: u32) -> bool {
+        let Some(d) = self.swarm.drafts.get_mut(k) else {
+            return false;
+        };
+        d.milli = integrity.min(1000) * 1000;
+        true
+    }
+
+    /// Forgets every draft (the encounter ended or reset).
+    pub(crate) fn drafts_clear(&mut self) {
+        self.swarm.drafts.clear();
+    }
+
+    /// Marks draft `k` Confidential: it takes no bites for `ms`, then waits `cooldown_ms` before
+    /// anyone may do it again. False while it cannot (gone, or still cooling down).
+    pub(crate) fn draft_mark(&mut self, k: usize, ms: u32, cooldown_ms: u32) -> bool {
+        let now = self.now;
+        let Some(d) = self.swarm.drafts.get_mut(k) else {
+            return false;
+        };
+        if d.milli == 0 || now < d.mark_ready {
+            return false;
+        }
+        d.shield_until = now + crate::content::ticks(ms);
+        d.mark_ready = now + crate::content::ticks(cooldown_ms);
+        true
+    }
+
+    /// Drafts newly at zero since the last call, as indices (each is reported once).
+    pub(crate) fn drafts_newly_lost(&mut self) -> Vec<usize> {
+        let mut out = Vec::new();
+        for (k, d) in self.swarm.drafts.iter_mut().enumerate() {
+            if d.milli == 0 && !d.lost {
+                d.lost = true;
+                out.push(k);
+            }
+        }
+        out
+    }
+
+    /// Per draft: integrity 0..=1000 and whether a Mark Confidential is on it now.
+    pub(crate) fn draft_status(&self) -> Vec<(u16, bool)> {
+        self.swarm
+            .drafts
+            .iter()
+            .map(|d| ((d.milli / 1000) as u16, self.now < d.shield_until))
+            .collect()
     }
 
     pub fn drafts(&self) -> Vec<DraftView> {
@@ -310,7 +369,11 @@ impl Sim {
         }
         self.units[i].moving = false;
         let count = u64::from(sw.count(self.units[i].state.hp));
+        let now = self.now;
         let d = &mut self.swarm.drafts[di];
+        if now < d.shield_until {
+            return;
+        }
         let total = count * u64::from(sw.eat_per_drone_per_s) + u64::from(d.acc);
         let tick_hz = u64::from(TICK_HZ);
         d.acc = (total % tick_hz) as u32;

@@ -194,3 +194,11 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - Drones are pooled entities, not sim units: the sim never sees a drone position, and a drone killed by a hit is not individually animated. The drawn count is capped per quality preset, so a Low-quality player sees a smaller cloud than the HP pool claims.
 - The `swarm` bench stages the clusters in Car Park P3 as a stand-in for the Scrape Pit; compare its numbers with `carpark`.
 - Ground Truth stays Ilmari-only, ilvl 20 stays reserved for the 1.0 core.
+
+## Wing 3: Training Data (docs/ILMARI_10.md C.4)
+
+- Bots read hazards off the sim where a player reads the boards, so the Hallucination is balanced for reading, not for guessing; a player who ignores the boards and the shimmer takes real damage.
+- Story keeps the engine's 3 x 3 grid and three circles; the spec's smaller Story grid is not built.
+- Ground Truth sits on the Comma key because every letter is bound; rebind it under Controls.
+- The Brenda vendor page and the class props (robots.txt, Rate Limit, dashboard) are not built.
+- Companions hold position instead of re-entering a pending hazard, so melee companions lose some uptime while the Hallucination's warning runs.

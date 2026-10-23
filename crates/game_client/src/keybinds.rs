@@ -34,6 +34,8 @@ pub enum Action {
     AutoAttack,
     Coffee,
     Resurrect,
+    /// The class's off-bar utility (the Data Scientist's `Ground Truth`).
+    Utility,
     Interact,
     QuestLog,
     Map,
@@ -109,7 +111,7 @@ impl Action {
             TargetNext,
         ];
         v.extend((0..5).map(Party));
-        v.extend([AutoAttack, Coffee, Resurrect, Interact]);
+        v.extend([AutoAttack, Coffee, Resurrect, Utility, Interact]);
         v.extend([
             QuestLog,
             Map,
@@ -155,6 +157,7 @@ impl Action {
             AutoAttack => "auto_attack".into(),
             Coffee => "coffee".into(),
             Resurrect => "resurrect".into(),
+            Utility => "utility".into(),
             Interact => "interact".into(),
             QuestLog => "quest_log".into(),
             Map => "map".into(),
@@ -197,6 +200,7 @@ impl Action {
             AutoAttack => "auto attack".into(),
             Coffee => "coffee break".into(),
             Resurrect => "resurrect (reboot)".into(),
+            Utility => "class utility (Ground Truth)".into(),
             Interact => "talk / loot".into(),
             QuestLog => "~/jira quest log".into(),
             Map => "map".into(),
@@ -225,7 +229,7 @@ impl Action {
             Forward | Backward | TurnLeft | TurnRight | StrafeLeft | StrafeRight | Jump
             | Sprint | Scooter => Group::Movement,
             TargetNext | Party(_) => Group::Targeting,
-            AutoAttack | Coffee | Resurrect | Interact | Gadget(_) => Group::Combat,
+            AutoAttack | Coffee | Resurrect | Utility | Interact | Gadget(_) => Group::Combat,
             Slot(_) => Group::Bar,
             NumSlot(_) => Group::Numpad,
             QuestLog | Map | Trophies | CharacterSheet | Career | Pets | Endgame | Calendar
@@ -259,6 +263,8 @@ impl Action {
             AutoAttack => KeyCode::KeyT,
             Coffee => KeyCode::KeyC,
             Resurrect => KeyCode::KeyV,
+            // Every letter is taken; the comma sits beside the calendar's period.
+            Utility => KeyCode::Comma,
             Interact => KeyCode::KeyF,
             QuestLog => KeyCode::KeyJ,
             Map => KeyCode::KeyN,

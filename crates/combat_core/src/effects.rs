@@ -438,6 +438,29 @@ impl Sim {
                 _,
             ) => self.summon_mirror(ci, [tank, healer, damage], aura, *life_ms),
             (
+                Effect::SwarmWave {
+                    unit,
+                    clusters,
+                    drones,
+                    ring_m,
+                    column,
+                    max_alive,
+                },
+                _,
+            ) => self.swarm_wave(ci, unit, *clusters, *drones, *ring_m, *column, *max_alive),
+            (
+                Effect::Confabulate {
+                    tile_m,
+                    damage,
+                    warn_ms,
+                },
+                _,
+            ) => self.confabulate(ci, *tile_m, *damage, *warn_ms),
+            (Effect::Blink { spots }, _) => self.blink(ci, spots),
+            (Effect::Footnotes { fake, real, count }, _) => {
+                self.footnotes(ci, fake, real, *count);
+            }
+            (
                 Effect::Review {
                     worst,
                     worst_ms,

@@ -465,6 +465,41 @@ pub enum Effect {
         /// Per role: the points a competent player scores in one window.
         baselines: Vec<(Role, u32)>,
     },
+    /// Caster-centric raid mechanic (the Scraper Queen's waves, `wing3.rs`): `clusters` swarm
+    /// clusters of `drones` each come out of the vents on a ring `ring_m` from the caster's spawn
+    /// point (or, with `column`, down one vent in a line). Past `max_alive` living clusters the
+    /// wave is skipped, so a Crawl Budget cast cannot pile up (0: no bound beyond the unit's own).
+    SwarmWave {
+        unit: String,
+        clusters: u8,
+        drones: u16,
+        ring_m: f32,
+        #[serde(default)]
+        column: bool,
+        #[serde(default)]
+        max_alive: u8,
+    },
+    /// Caster-centric raid mechanic (The Hallucination, `illusion.rs`): starts a hazard cycle on
+    /// the 3 x 3 grid of `tile_m` tiles centred on the caster's spawn point. One seeded draw picks
+    /// the real hazards, which land `warn_ms` later for `damage`; what each player's screen shows
+    /// on top is cosmetic.
+    Confabulate {
+        tile_m: f32,
+        damage: u32,
+        warn_ms: u32,
+    },
+    /// Caster-centric: the caster jumps to one of these (right, forward) offsets from its spawn
+    /// point, picked by the rng (the Queen's Rotating Proxies).
+    Blink {
+        spots: Vec<(f32, f32)>,
+    },
+    /// Caster-centric: `count` footnotes beside the caster, exactly one of them the real citation
+    /// (`real`), picked by the rng; the rest are `fake`.
+    Footnotes {
+        fake: String,
+        real: String,
+        count: u8,
+    },
     Nothing,
 }
 
@@ -479,6 +514,10 @@ impl Effect {
                 | Effect::Detonate { .. }
                 | Effect::SummonMirror { .. }
                 | Effect::Review { .. }
+                | Effect::SwarmWave { .. }
+                | Effect::Confabulate { .. }
+                | Effect::Blink { .. }
+                | Effect::Footnotes { .. }
         )
     }
 
@@ -599,6 +638,10 @@ pub struct SpellDef {
     /// Castable only from stealth.
     #[serde(default)]
     pub stealth_only: bool,
+    /// Castable only inside an Ilmari wing (guardrail 3 of `ILMARI_RAID.md`: nothing of the
+    /// campaign changes outside it).
+    #[serde(default)]
+    pub ilmari_only: bool,
 }
 
 /// Extra direct damage, in percent: from stealth, and when the caster stands behind the target
@@ -1065,6 +1108,44 @@ pub struct UnitDef {
     /// A swarm cluster: one unit that stands for a crowd of drones (`swarm.rs`).
     #[serde(default)]
     pub swarm: Option<SwarmDef>,
+    /// A Wing 3 boss's encounter machinery, armed while it fights (`wing3.rs`).
+    #[serde(default)]
+    pub encounter: Option<EncounterDef>,
+}
+
+/// What an Ilmari Wing 3 boss arms when it is pulled (and disarms when it resets or dies). The
+/// mechanics themselves are spells (`Effect::SwarmWave`, `Confabulate`, ...); this is the state
+/// that has to outlive a cast.
+#[derive(Clone, Debug, Deserialize)]
+pub enum EncounterDef {
+    /// The Scraper Queen: the swarm eats the drafts standing at these props; when `fail_lost`
+    /// (`story_fail_lost` on Story) of them are gone the room wipes. Each lost draft heals the
+    /// boss `heal_pct` percent and adds a stack of `lost_aura` to it.
+    Drafts {
+        props: Vec<String>,
+        fail_lost: u8,
+        story_fail_lost: u8,
+        heal_pct: u32,
+        #[serde(default)]
+        lost_aura: Option<String>,
+        /// What a Mark Confidential on a draft does to the draft: it takes no bites for this long.
+        mark_ms: u32,
+        /// Shared by every player, per draft.
+        mark_cooldown_ms: u32,
+        lost_yells: Vec<String>,
+        saved_yells: Vec<String>,
+        fail_yells: Vec<String>,
+    },
+    /// The Hallucination: nothing to arm, but the hazard cycle is wiped with the fight.
+    Illusion,
+    /// Model Collapse: the action recorder replays what the group cast; `Call` echoes spawn
+    /// `add_unit`.
+    Echo {
+        #[serde(default)]
+        add_unit: Option<String>,
+        /// Percent of a recorded cast's power a `Strike` echo deals (see `EchoCfg::strike_pct`).
+        strike_pct: u32,
+    },
 }
 
 /// A cluster of drones simulated as one unit (docs/ILMARI_10.md C.3.1). The HP pool is
@@ -1427,6 +1508,9 @@ pub struct ClassDef {
     pub action_bar: Vec<SpellId>,
     /// The class's `DeadAlly` spell, off the bar like Coffee Break.
     pub resurrect: SpellId,
+    /// An off-bar utility spell on its own key (the Data Scientist's `Ground Truth`).
+    #[serde(default)]
+    pub utility: Option<SpellId>,
 }
 
 impl ClassDef {
@@ -1434,6 +1518,7 @@ impl ClassDef {
     pub fn knows(&self, content: &Content, spell: SpellId) -> bool {
         self.action_bar.contains(&spell)
             || self.resurrect == spell
+            || self.utility == Some(spell)
             || content.channel_spell().is_some_and(|c| c.id == spell)
             || content.world.spells.contains(&spell)
     }
@@ -1694,6 +1779,45 @@ impl Content {
                 {
                     return bad(format!("spell {} summons unknown unit {unit}", s.name));
                 }
+                if let Effect::SwarmWave {
+                    unit,
+                    clusters,
+                    drones,
+                    ring_m,
+                    ..
+                } = e
+                    && (*clusters == 0
+                        || *drones == 0
+                        || !(ring_m.is_finite() && *ring_m >= 0.0)
+                        || self.unit_def(unit).is_none_or(|u| u.swarm.is_none()))
+                {
+                    return bad(format!(
+                        "spell {} sends a wave that is empty or not a swarm unit",
+                        s.name
+                    ));
+                }
+                if let Effect::Confabulate {
+                    tile_m, warn_ms, ..
+                } = e
+                    && (!(tile_m.is_finite() && *tile_m > 0.0) || *warn_ms == 0)
+                {
+                    return bad(format!(
+                        "spell {} confabulates with no grid or time",
+                        s.name
+                    ));
+                }
+                if let Effect::Blink { spots } = e
+                    && spots.is_empty()
+                {
+                    return bad(format!("spell {} blinks nowhere", s.name));
+                }
+                if let Effect::Footnotes { fake, real, count } = e
+                    && (*count == 0
+                        || self.unit_def(fake).is_none()
+                        || self.unit_def(real).is_none())
+                {
+                    return bad(format!("spell {} footnotes unknown units", s.name));
+                }
                 if let Effect::SummonMirror {
                     tank,
                     healer,
@@ -1827,6 +1951,37 @@ impl Content {
                     "unit {} drops item {} with no items entry",
                     u.key, l.item
                 ));
+            }
+            match &u.encounter {
+                Some(EncounterDef::Drafts {
+                    props,
+                    fail_lost,
+                    story_fail_lost,
+                    lost_aura,
+                    ..
+                }) if props.is_empty()
+                    || *fail_lost == 0
+                    || *story_fail_lost == 0
+                    || props.iter().any(|k| {
+                        !self
+                            .world
+                            .props
+                            .iter()
+                            .any(|p| p.key == *k && p.kind == crate::world::PropKind::Draft)
+                    })
+                    || lost_aura.as_ref().is_some_and(|a| self.aura(a).is_none()) =>
+                {
+                    return bad(format!(
+                        "unit {} encounter needs draft props, a fail count and known auras",
+                        u.key
+                    ));
+                }
+                Some(EncounterDef::Echo {
+                    add_unit: Some(a), ..
+                }) if self.unit_def(a).is_none() => {
+                    return bad(format!("unit {} echo add {a} unknown", u.key));
+                }
+                _ => {}
             }
             if let Some(d) = &u.death_spawn
                 && (self.unit_def(&d.unit).is_none() || d.count == 0 || d.max_alive == 0)

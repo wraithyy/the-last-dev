@@ -270,6 +270,12 @@ the same rule as every other room unlock.
   Ballot terminals, HR Portals and label printers are `Interact` commands: the prop key is length-capped
   on the wire, the sim checks the sender's own position and cooldown, and the actor is always the
   sender.
+- **Wing 3 (protocol 39).** `Event::Drafts { integrity, marked }` (the Scrape Pit's drafts, about once a
+  second on change and to a joiner) and `CastError::NotHere` (Ground Truth outside a wing) are the new wire
+  types; `check_event` bounds the draft lists. Draft and board use is the same `Interact` path as the
+  ballots (sim-side position, cooldown and sender checks). The Hallucination's fakes never travel: every
+  client derives its own from the public salt and its own id, and the sim only ever holds the real set.
+  The recorder logs players, never companions, and replays in the sim, so a room sees one set of echoes.
 - **Companions online** (B15): the sign-up sheet is plain `Talk`, so the room's sim is the validator and
   there is no new command or message. Companions belong to the player who picked them, a room holds at
   most two (`MAX_PER_ROOM`, join order), they exist only in a wing on Story and a leaving owner takes

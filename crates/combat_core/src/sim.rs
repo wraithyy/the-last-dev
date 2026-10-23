@@ -241,6 +241,8 @@ pub struct Sim {
     pub(crate) illusion: crate::illusion::IllusionState,
     /// The action recorder of an armed encounter (`echo.rs`).
     pub(crate) echo: crate::echo::EchoState,
+    /// Wing 3's armed encounter and its draft bookkeeping (`wing3.rs`).
+    pub(crate) wing3: crate::wing3::Wing3State,
     /// True while an area spell resolves its effects: swarm clusters take a bigger share.
     pub(crate) area_hit: bool,
     /// Ground of the loaded zone, and of every zone a loader registered (`terrain.rs`).
@@ -288,6 +290,7 @@ impl Sim {
             ilmari: Default::default(),
             companions: Default::default(),
             swarm: Default::default(),
+            wing3: Default::default(),
             illusion: Default::default(),
             echo: Default::default(),
             area_hit: false,
@@ -1217,6 +1220,9 @@ impl Sim {
         }
         if spell.stealth_only && !self.is_stealthed(ci) {
             return Err(CastError::NeedsStealth);
+        }
+        if spell.ilmari_only && !self.cur_raid_is_ilmari() {
+            return Err(CastError::NotHere);
         }
         if self.now < u.lockout_until[spell.school.index()] {
             return Err(CastError::SchoolLocked);

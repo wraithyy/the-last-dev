@@ -42,6 +42,7 @@ pub mod terrain;
 pub mod time;
 pub mod types;
 mod wander;
+mod wing3;
 pub mod world;
 pub mod world_events;
 mod zones;
@@ -53,11 +54,12 @@ pub use calendar::{
 pub use content::{
     AiAbility, AiDef, AiTarget, ApplyAura, Area, AuraDef, AutoAttackDef, CcCat, ClassDef,
     CompanionDef, CompanionRole, Config, ConsumeAura, Content, ContentError, DispelType, Effect,
-    EnrageDef, Execute, FleeDef, FrontalShield, ITEM_DESC_MAX, ITEM_STACK_CAP, IdlePose, ItemBonus,
-    ItemDef, ItemKind, ItemTotals, LevelDef, LootEntry, MAX_ACTION_BAR, MobScaling, Objective,
-    OpenerDef, PackDef, PeriodicDef, PhaseDef, QuestDef, QuestGiver, QuestReward, Role, School,
-    SpellDef, SpellId, SpellTarget, SwarmDef, TOKEN_STACK_CAP, TelegraphAt, TelegraphDef, UnitDef,
-    Unlock, XpRules, YellDef, ZoneDef, ZoneKind, ZoneLink, ZoneSpawn,
+    EncounterDef, EnrageDef, Execute, FleeDef, FrontalShield, ITEM_DESC_MAX, ITEM_STACK_CAP,
+    IdlePose, ItemBonus, ItemDef, ItemKind, ItemTotals, LevelDef, LootEntry, MAX_ACTION_BAR,
+    MobScaling, Objective, OpenerDef, PackDef, PeriodicDef, PhaseDef, QuestDef, QuestGiver,
+    QuestReward, Role, School, SpellDef, SpellId, SpellTarget, SwarmDef, TOKEN_STACK_CAP,
+    TelegraphAt, TelegraphDef, UnitDef, Unlock, XpRules, YellDef, ZoneDef, ZoneKind, ZoneLink,
+    ZoneSpawn,
 };
 pub use dailies::{BoardView, GoalSpec, GoalView, SavedTask, TaskState, TaskView};
 pub use duel::{DuelError, DuelOutcome};

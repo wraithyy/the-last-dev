@@ -760,6 +760,36 @@ pub enum Sign {
     // Faces drawn on the rigs of Wing 1 and Wing 2 bosses (`rigs.rs`, `rig_screen`).
     IlFacePatch,
     IlFaceReview,
+    // Ilmari Wing 3, Training Data (`ilmari3.rs`): the scraped warehouse, the floor that is different for
+    // each of you and the model that learns from its own output.
+    IlW3Door,
+    IlW3Back,
+    IlW3ToValidation,
+    IlW3ToTuning,
+    IlW3Out,
+    IlRobots,
+    IlOptOut,
+    IlTos,
+    IlPieceRate,
+    IlLabelThis,
+    IlCorpus,
+    IlDraftTag,
+    IlBreak,
+    IlConfident,
+    IlImpossible,
+    IlTruth,
+    IlCitation,
+    IlFloor404,
+    IlStairs,
+    IlGen1,
+    IlGen2,
+    IlGen3,
+    IlBeige,
+    IlTrainingLoss,
+    IlFineTune,
+    IlEpoch,
+    IlLabRevolve,
+    IlStatusGreen,
 }
 
 #[derive(Clone, Debug)]
@@ -1441,6 +1471,24 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
         Sign::IlW2Door | Sign::IlCulture1 | Sign::IlCulture2 | Sign::IlCulture3 => (256, 96),
         Sign::IlWellbeing | Sign::IlOkr | Sign::IlVoteBoard | Sign::IlGradeBoard => (256, 128),
         Sign::IlNineBox | Sign::IlFaceReview => (192, 192),
+        Sign::IlW3Door
+        | Sign::IlW3Back
+        | Sign::IlW3ToValidation
+        | Sign::IlW3ToTuning
+        | Sign::IlW3Out
+        | Sign::IlOptOut
+        | Sign::IlTos
+        | Sign::IlPieceRate
+        | Sign::IlCorpus
+        | Sign::IlConfident
+        | Sign::IlImpossible
+        | Sign::IlFineTune
+        | Sign::IlBeige => (256, 96),
+        Sign::IlLabelThis
+        | Sign::IlRobots
+        | Sign::IlTruth
+        | Sign::IlTrainingLoss
+        | Sign::IlStatusGreen => (256, 128),
         Sign::IlFacePatch => (256, 192),
         Sign::IlPatchIdle
         | Sign::IlPatchDone

@@ -92,6 +92,26 @@ pub struct RealSet {
     pub circles: [Circle; CIRCLES],
 }
 
+impl RealSet {
+    /// Whether a ground position (metres) is in a real hazard, `margin_m` outwards included:
+    /// what the sim's resolve checks, for bots and companions that stay out of the truth.
+    pub fn hits(&self, arena: &IllusionArena, x: f32, z: f32, margin_m: f32) -> bool {
+        let m = margin_m.max(0.0);
+        [(0.0, 0.0), (m, 0.0), (-m, 0.0), (0.0, m), (0.0, -m)]
+            .iter()
+            .any(|&(dx, dz)| {
+                let p = (
+                    ((x + dx) * 100.0).round() as i64,
+                    ((z + dz) * 100.0).round() as i64,
+                );
+                arena
+                    .tile_at(p.0, p.1)
+                    .is_some_and(|k| self.overflow >> k & 1 == 1)
+                    || self.circles.iter().any(|c| c.covers(p))
+            })
+    }
+}
+
 /// What one player sees on top of the truth: as many fake circles as there are real ones, and
 /// the tiles they believe are safe.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -283,6 +303,14 @@ impl Sim {
     }
 
     /// The truth of the current cycle.
+    /// The real hazards while they are still on their way (warning running): what a bot or a
+    /// companion steps out of. `None` once they landed, so nobody flees a harmless floor.
+    pub fn illusion_pending(&self) -> Option<(RealSet, IllusionArena)> {
+        self.illusion.resolve?;
+        let (salt, arena) = self.illusion.cur?;
+        Some((real_set(salt, &arena), arena))
+    }
+
     pub fn illusion_real(&self) -> Option<RealSet> {
         self.illusion
             .cur

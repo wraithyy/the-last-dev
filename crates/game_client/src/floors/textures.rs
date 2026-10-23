@@ -245,6 +245,10 @@ fn unlit(tex: Tex) -> bool {
                 | Sign::IlPortal
                 | Sign::IlFacePatch
                 | Sign::IlFaceReview
+                | Sign::IlTruth
+                | Sign::IlTrainingLoss
+                | Sign::IlStatusGreen
+                | Sign::IlCitation
                 | Sign::IlScreenA
                 | Sign::IlScreenB
                 | Sign::IlScreenC
@@ -2847,6 +2851,204 @@ fn sign_spec(s: Sign) -> SignSpec {
             [10, 14, 34],
             [120, 220, 255],
             [255, 200, 70],
+        ),
+        // Ilmari Wing 3: Training Data. The lab reads everything and has opinions about all of it.
+        Sign::IlW3Door => sp(
+            &[
+                "INNOVATION LAB",
+                "TRAINING IN PROGRESS",
+                "WING 3 - STORY OR FULL",
+            ],
+            [20, 26, 34],
+            [225, 240, 235],
+            [120, 255, 190],
+        ),
+        Sign::IlW3Back => sp(
+            &["BACK TO THE FORECOURT", "(OCCUPIED)"],
+            [20, 26, 34],
+            [225, 240, 235],
+            [120, 255, 190],
+        ),
+        Sign::IlW3ToValidation => sp(
+            &[
+                "TO THE VALIDATION WING",
+                "EVERYTHING HERE IS TRUE",
+                "(PER THE MODEL)",
+            ],
+            [20, 26, 34],
+            [225, 240, 235],
+            [120, 255, 190],
+        ),
+        Sign::IlW3ToTuning => sp(
+            &["TO FINE-TUNING", "PLEASE BE CONSISTENT", "(IT IS WATCHING)"],
+            [20, 26, 34],
+            [225, 240, 235],
+            [120, 255, 190],
+        ),
+        Sign::IlW3Out => sp(
+            &[
+                "EXIT TO THE FORECOURT",
+                "YOUR EXIT HAS BEEN",
+                "USED AS TRAINING DATA",
+            ],
+            [20, 26, 34],
+            [225, 240, 235],
+            [120, 255, 190],
+        ),
+        Sign::IlRobots => sp(
+            &[
+                "ROBOTS.TXT",
+                "USER-AGENT: *",
+                "DISALLOW: /",
+                "(EVERYONE IGNORES THIS)",
+            ],
+            [240, 238, 226],
+            [30, 30, 34],
+            [200, 50, 50],
+        ),
+        Sign::IlOptOut => sp(
+            &["OPT-OUT", "SETTINGS > ADVANCED >", "PRIVACY > MORE > NEVER"],
+            [236, 230, 250],
+            [40, 30, 90],
+            [200, 60, 60],
+        ),
+        Sign::IlTos => sp(
+            &[
+                "TERMS UPDATED. AGAIN.",
+                "BY WALKING IN HERE",
+                "YOU HAVE AGREED",
+            ],
+            [30, 18, 14],
+            [250, 236, 226],
+            [255, 200, 70],
+        ),
+        Sign::IlPieceRate => sp(
+            &["PIECE RATE:", "ONE CENT PER LABEL", "(BREAKS ARE A LABEL)"],
+            [250, 240, 200],
+            [70, 40, 10],
+            [200, 60, 60],
+        ),
+        Sign::IlLabelThis => sp(
+            &[
+                "IS THIS A BICYCLE?",
+                "[YES]   [NO]",
+                "UNSURE IS NOT AN OPTION",
+            ],
+            [14, 24, 34],
+            [225, 245, 255],
+            [120, 255, 190],
+        ),
+        Sign::IlCorpus => sp(
+            &["THE CORPUS", "EVERYTHING EVER WRITTEN", "SOURCED FROM YOU"],
+            [20, 30, 28],
+            [225, 245, 235],
+            [255, 200, 70],
+        ),
+        Sign::IlDraftTag => sp(
+            &["UNPUBLISHED", "DO NOT SCRAPE", "(THEY WILL)"],
+            [250, 230, 200],
+            [90, 30, 20],
+            [200, 50, 50],
+        ),
+        Sign::IlBreak => sp(
+            &["BREAK ROOM", "FOUR MINUTES", "(TIMED)"],
+            [220, 236, 226],
+            [20, 70, 50],
+            [200, 60, 60],
+        ),
+        Sign::IlConfident => sp(
+            &["100% SURE", "SOURCE: ME", "(PEER REVIEWED BY ME)"],
+            [250, 236, 250],
+            [70, 20, 90],
+            [200, 60, 60],
+        ),
+        Sign::IlImpossible => sp(
+            &["FLOOR 3", "BETWEEN FLOOR 2 AND 2", "(THE STAIRS AGREE)"],
+            [30, 30, 46],
+            [236, 236, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlTruth => sp(
+            &["GROUND TRUTH", "CHECK BEFORE STANDING", "MOSTLY RIGHT"],
+            [10, 34, 24],
+            [150, 255, 200],
+            [255, 220, 90],
+        ),
+        Sign::IlCitation => sp(
+            &["[CITATION NEEDED]", "[1] [2] [3]", "[SEE: ME]"],
+            [236, 236, 236],
+            [20, 20, 60],
+            [200, 50, 50],
+        ),
+        Sign::IlFloor404 => sp(
+            &["FLOOR NOT FOUND", "(CONFIDENTLY)"],
+            [40, 14, 22],
+            [250, 236, 236],
+            [255, 200, 70],
+        ),
+        Sign::IlStairs => sp(
+            &["STAIRS", "(TO NOWHERE)", "WELL SIGNED THOUGH"],
+            [30, 30, 46],
+            [236, 236, 255],
+            [255, 200, 70],
+        ),
+        Sign::IlGen1 => sp(
+            &["GENERATION 1", "A PERSON", "(ORIGINAL)"],
+            [250, 244, 226],
+            [60, 50, 30],
+            [200, 60, 60],
+        ),
+        Sign::IlGen2 => sp(
+            &["GENERATION 2", "A COPY OF A PERSON", "(CLOSE ENOUGH)"],
+            [232, 224, 206],
+            [70, 60, 44],
+            [200, 60, 60],
+        ),
+        Sign::IlGen3 => sp(
+            &["GENERATION 3", "A COPY OF A COPY", "(SOMEONE, PROBABLY)"],
+            [214, 204, 186],
+            [84, 74, 58],
+            [190, 80, 70],
+        ),
+        Sign::IlBeige => sp(
+            &[
+                "EVERYTHING IS BEIGE",
+                "THE MODEL SAID SO",
+                "(IT TRAINED ON ITSELF)",
+            ],
+            [222, 208, 184],
+            [90, 76, 56],
+            [160, 90, 70],
+        ),
+        Sign::IlTrainingLoss => sp(
+            &["TRAINING LOSS", "0.003", "(SUSPICIOUSLY LOW)"],
+            [20, 24, 20],
+            [220, 230, 210],
+            [255, 200, 70],
+        ),
+        Sign::IlFineTune => sp(
+            &["FINE-TUNING", "IN PROGRESS SINCE 2019", "(ETA: SOON)"],
+            [226, 214, 190],
+            [80, 66, 46],
+            [180, 70, 60],
+        ),
+        Sign::IlEpoch => sp(
+            &["EPOCH 1 OF 1 OF 1", "ALL DATA SEEN", "BY ITSELF"],
+            [226, 214, 190],
+            [80, 66, 46],
+            [180, 70, 60],
+        ),
+        Sign::IlLabRevolve => sp(
+            &["REVOLVING DOOR", "SPINS LOGGED: 40,211", "(ONE WAS YOURS)"],
+            [20, 26, 34],
+            [225, 240, 235],
+            [120, 255, 190],
+        ),
+        Sign::IlStatusGreen => sp(
+            &["ALL SYSTEMS", "OPERATIONAL", "(HOSTED IN THE BUILDING)"],
+            [10, 60, 30],
+            [210, 255, 220],
+            [255, 255, 120],
         ),
         Sign::IlNineBox => sp(&["9-BOX"], [236, 232, 220], [40, 40, 70], [200, 60, 60]),
         Sign::IlFacePatch => sp(&["UPDATE"], [0, 70, 170], [255, 255, 255], [255, 220, 90]),

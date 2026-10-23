@@ -21,6 +21,7 @@ mod frontier;
 mod hack24;
 mod ilmari1;
 mod ilmari2;
+mod ilmari3;
 mod kit;
 pub use kit::Sign;
 mod lab;

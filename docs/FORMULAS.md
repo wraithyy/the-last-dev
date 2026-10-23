@@ -621,6 +621,12 @@ Illusions (`illusion.rs`): one rng draw per cycle (the salt); the real set (thre
 
 Recorder (`echo.rs`): entropy `H = 1000 * (n ln n - sum c ln c) / (n ln K)` per mille over the last 32 casts inside the window (Full 30 s, Story 45 s), from a fixed `c ln c` table in millionths (below 6 casts `H` reads 1000; `K` is the group's distinct recordable spells, clamped 2..=8). `E = 1000 - H`; `E >= 500` empowers the echoes (`Overfitting`, +15% per step); `H >= 800` (Story 650) for 12 s starves the boss (`Underfit`, 10 s). Replay delay Full 60 s / Story 45 s, ghost telegraph 3 s / 5 s, at most 12 echoes per second; a `Strike` and a `Hush` are 3 m circles, a `Mend` heals 1% and a `Ward` absorbs 2% of the boss's max HP. The log is 512 entries, 64 per player per 30 s.
 
+## Ilmari Wing 3: Training Data
+
+- Scraper Queen: `Crawl-Delay` wave Full 8 clusters x 125 drones (ring 18 m), Story 6 x 55; `Crawl Budget` adds 1 x 125 up to 12 alive. Cluster: 10 HP per drone, eats 0.07 integrity per drone per second of a draft's 1000, speed 2.4. Mark Confidential shields a draft 12 s, 40 s shared cooldown. A lost draft heals the Queen 5% and adds one Well Trained (+8% damage, 10 stacks); 3 lost wipe on Full, 5 on Story.
+- Hallucination: `Confabulate` every 20 s (Full, warning 5 s) or 24 s (Story, 7 s), 3 x 3 grid of 8 m tiles, damage 320 power. Ground Truth: 8 s aura, 25 s board cooldown (starts only on a real answer), Data Scientist spell 20 m radius, 20 s cooldown. Footnotes: 3 per Source Needed, exactly one real (Verified gives the boss Cited, +20% damage taken, 3 stacks); a fake retracts for 150 in 5 m.
+- Model Collapse: echo delay 60 s Full / 45 s Story with a 3 s / 5 s ghost warning; Strike echo damage = recorded power x entropy x `strike_pct` (30%). Synthetic Double: 650 HP, melee 12, 22 s.
+
 ## Weekly Sprint ladder
 
 ```

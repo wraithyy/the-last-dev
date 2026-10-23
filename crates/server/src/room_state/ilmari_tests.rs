@@ -624,3 +624,156 @@ async fn illusions_are_cosmetic_in_a_room_and_a_joiner_learns_the_running_cycle(
         "the joiner never saw the cycle"
     );
 }
+
+// ---- Wing 3, Training Data (docs/ILMARI_10.md C.4): the room's sim owns the truth.
+
+/// Two members in `zone` at level 10 on Story (Full needs three), pulled onto its boss; returns the boss id.
+fn pull_wing3(s: &mut RoomState, zone: &str, boss_key: &str) -> EntityId {
+    for p in [0, 1] {
+        let e = eid_of(s, p);
+        s.sim.set_level_of(e, 10);
+    }
+    s.sim.debug_force_raid_async(Some(true));
+    s.world.load(&mut s.sim, zone, None).unwrap();
+    for m in s.members.values_mut() {
+        if let Some(u) = s.sim.unit(m.eid) {
+            m.resync(u.pos);
+        }
+    }
+    let (a, b) = (eid_of(s, 0), eid_of(s, 1));
+    let boss = s.sim.units().find(|u| u.key == boss_key).unwrap().id;
+    let bp = s.sim.unit(boss).unwrap().pos;
+    for e in [a, b] {
+        move_sim(s, e, Vec3::new(bp.x, bp.y, bp.z + 8.0));
+    }
+    s.sim.apply_as(
+        a,
+        Command::SetTarget {
+            unit: a,
+            target: Some(boss),
+        },
+    );
+    s.sim.apply_as(
+        a,
+        Command::Cast {
+            caster: a,
+            spell: SpellId(1),
+        },
+    );
+    boss
+}
+
+fn keep_alive(s: &mut RoomState, boss: EntityId) {
+    s.sim.debug_set_hp(boss, 10_000_000);
+    for p in [0, 1] {
+        let e = eid_of(s, p);
+        s.sim.debug_set_hp(e, 10_000_000);
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_scraper_queens_drafts_reach_every_member_and_a_late_joiner() {
+    let mut s = room();
+    s.on_join(0, "Lead", "backend");
+    s.on_join(1, "Dps", "fullstack");
+    s.tick();
+    let boss = pull_wing3(&mut s, "ilmari3/1", "il_scraper_queen");
+    let mut out = Vec::new();
+    for _ in 0..300 {
+        out.extend(s.tick());
+        keep_alive(&mut s, boss);
+    }
+    for p in [0, 1] {
+        let sent = events(&out, p)
+            .into_iter()
+            .filter_map(|e| match e {
+                Event::Drafts { integrity, marked } => Some((integrity.len(), marked.len())),
+                _ => None,
+            })
+            .next_back();
+        assert_eq!(sent, Some((5, 5)), "member {p} sees five drafts");
+    }
+    assert_eq!(s.sim.drafts().len(), 5);
+    assert!(
+        !s.sim.swarm_clusters().is_empty(),
+        "the swarm is in the room"
+    );
+    // A third player walking in mid-fight is told about the drafts without waiting for a change.
+    s.on_join(2, "Late", "devops");
+    let mut late = Vec::new();
+    for _ in 0..60 {
+        late.extend(s.tick());
+        keep_alive(&mut s, boss);
+    }
+    assert!(
+        events(&late, 2)
+            .iter()
+            .any(|e| matches!(e, Event::Drafts { integrity, .. } if integrity.len() == 5)),
+        "the joiner got the drafts"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_hallucinations_cycle_gives_everyone_one_salt_and_nobody_the_fakes() {
+    let mut s = room();
+    s.on_join(0, "Lead", "backend");
+    s.on_join(1, "Dps", "fullstack");
+    s.tick();
+    let boss = pull_wing3(&mut s, "ilmari3/2", "il_hallucination");
+    let mut out = Vec::new();
+    for _ in 0..30 * 12 {
+        out.extend(s.tick());
+        keep_alive(&mut s, boss);
+    }
+    let cycle_of = |p: PlayerId| {
+        events(&out, p).into_iter().find_map(|e| match e {
+            Event::IllusionCycle { cycle, salt, arena } => Some((cycle, salt, arena)),
+            _ => None,
+        })
+    };
+    let (a, b) = (cycle_of(0), cycle_of(1));
+    assert!(a.is_some(), "a cycle opened within 12 s");
+    assert_eq!(
+        a, b,
+        "one cycle, one salt: the fakes are derived per player on the client"
+    );
+    let (cycle, salt, arena) = a.unwrap();
+    let (ea, eb) = (eid_of(&s, 0), eid_of(&s, 1));
+    assert_ne!(
+        combat_core::illusion::layout(salt, ea, cycle, &arena),
+        combat_core::illusion::layout(salt, eb, cycle, &arena)
+    );
+    // The wire never carries a fake: the only illusion event is the cycle itself.
+    assert!(
+        events(&out, 0)
+            .iter()
+            .all(|e| !format!("{e:?}").contains("fake")),
+        "no fake on the wire"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn wing_three_loot_stays_in_the_ilmari_band_of_the_wings_before_it() {
+    let s = room();
+    let content = s.sim.content();
+    let top = |zone: &str| {
+        let bosses = content
+            .raid_of(zone)
+            .map(|r| r.bosses(content))
+            .unwrap_or_default();
+        content
+            .economy
+            .gear
+            .iter()
+            .filter(|g| {
+                g.source == combat_core::GearSource::Ilmari
+                    && g.drops_from
+                        .as_deref()
+                        .is_some_and(|b| bosses.iter().any(|k| k == b))
+            })
+            .map(|g| g.ilvl)
+            .max()
+            .unwrap_or(0)
+    };
+    assert!(top("ilmari3/1") > 0 && top("ilmari3/1") <= top("ilmari2/1"));
+}

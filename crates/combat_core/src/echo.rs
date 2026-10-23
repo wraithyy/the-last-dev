@@ -152,6 +152,9 @@ pub struct EchoCfg {
     pub story: bool,
     /// Unit an `EchoKind::Call` spawns; `None` skips those echoes.
     pub add_unit: Option<String>,
+    /// What share of a recorded cast's power a `Strike` echo deals before the empowerment
+    /// bonuses, percent (the content's balance knob; 100 replays the cast as it was).
+    pub strike_pct: u32,
 }
 
 /// What the HUD ("Training loss") and the bot tests read.
@@ -260,6 +263,32 @@ impl Sim {
     /// While true the boss may not start a new echo wave (content gate for the Starved window).
     pub fn echo_underfit(&self) -> bool {
         self.echo.cfg.is_some() && self.now < self.echo.underfit_until
+    }
+
+    /// Where announced `Strike` and `Hush` echoes are about to land (centre in metres, radius):
+    /// what the ghost telegraph shows a player, for the bots and companions that step out of it.
+    pub fn echo_ghosts(&self) -> Vec<(Vec3, f32)> {
+        let Some(cfg) = self.echo.cfg.as_ref() else {
+            return Vec::new();
+        };
+        self.echo
+            .pending
+            .iter()
+            .filter(|p| p.announced)
+            .filter_map(|p| {
+                let r = match p.entry.kind {
+                    EchoKind::Strike => ECHO_RADIUS_M,
+                    EchoKind::Hush => ECHO_RADIUS_M * 2.0,
+                    _ => return None,
+                };
+                let at = Vec3::new(
+                    (cfg.center_x_cm + p.entry.rel_x_cm) as f32 / 100.0,
+                    0.0,
+                    (cfg.center_z_cm + p.entry.rel_z_cm) as f32 / 100.0,
+                );
+                Some((at, r))
+            })
+            .collect()
     }
 
     /// Echoes waiting to land (staged ones included).
@@ -468,7 +497,8 @@ impl Sim {
                     let overfit = (1000 + OVERFIT_STEP_PM * seen.saturating_sub(1)).min(cap);
                     pm = pm * overfit / 1000;
                 }
-                let amount = (u64::from(e.power) * pm / 1000).min(u64::from(u32::MAX)) as u32;
+                let amount = (u64::from(e.power) * pm / 1000 * u64::from(cfg.strike_pct) / 100)
+                    .min(u64::from(u32::MAX)) as u32;
                 for i in self.echo_friendlies(at, ECHO_RADIUS_M) {
                     self.deal_damage(
                         cfg.boss,
@@ -566,6 +596,7 @@ mod tests {
             center_z_cm: 0,
             story,
             add_unit: None,
+            strike_pct: 100,
         });
         s.echo.kit = 6;
         (s, p, boss)

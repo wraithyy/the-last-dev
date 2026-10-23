@@ -19,7 +19,7 @@
 //! - `WOW_BOSS_PCT=<pct>@<secs>`: the zone boss drops to that HP percent at that time (phase shots).
 //! - `WOW_FPS=1`: log average frame time and drawn mesh count every 3 s (vsync caps the rate, so read the ms).
 //!   `WOW_SHOW_FPS=1` turns the on-screen FPS readout on for the run (settings.rs).
-//! - `WOW_BENCH=lake|plaza|campus|campus_occupied|carpark|raid|swarm|tower1`: perf benchmark (see `docs/PERF.md`). Starts in
+//! - `WOW_BENCH=lake|plaza|campus|campus_occupied|carpark|raid|swarm|ilmari3_halluc|ilmari3_collapse|tower1`: perf benchmark (see `docs/PERF.md`). Starts in
 //!   that scenario's zone/spot, orbits the camera, warms up `WOW_BENCH_WARMUP` s (default 5, after
 //!   the first frame), records `WOW_BENCH_FRAMES` frames (default 600), logs one `BENCH ...` line, exits.
 //!   Native: uncapped present mode and update loop, 1600x900 window (`WOW_BENCH_SCALE=2` emulates retina). Web: `?bench=<name>` (line goes to the console).
@@ -698,7 +698,7 @@ pub struct BenchSpec {
     pub height: f32,
 }
 
-const BENCHES: [BenchSpec; 8] = [
+const BENCHES: [BenchSpec; 10] = [
     // Wellness Park: lake at (-150, -5), water radius ~20.
     BenchSpec {
         name: "lake",
@@ -750,15 +750,32 @@ const BENCHES: [BenchSpec; 8] = [
         radius: 12.0,
         height: 4.0,
     },
-    // 32 swarm clusters of 75 drones around the player (`swarm_fx::stage_swarm`); the zone is a
-    // stand-in until the Scrape Pit exists.
+    // 32 swarm clusters of 75 drones around the player (`swarm_fx::stage_swarm`) in the Scrape Pit.
     BenchSpec {
         name: "swarm",
-        zone: "parking_p3",
+        zone: "ilmari3/1",
         player_at: None,
         target: None,
         radius: 22.0,
         height: 9.0,
+    },
+    // The Hallucination's room with a hazard cycle running (`wing3_fx::stage_qa`).
+    BenchSpec {
+        name: "ilmari3_halluc",
+        zone: "ilmari3/2",
+        player_at: None,
+        target: None,
+        radius: 18.0,
+        height: 8.0,
+    },
+    // Model Collapse's hall with echo ghosts announced every few seconds.
+    BenchSpec {
+        name: "ilmari3_collapse",
+        zone: "ilmari3/3",
+        player_at: None,
+        target: None,
+        radius: 18.0,
+        height: 8.0,
     },
     BenchSpec {
         name: "tower1",

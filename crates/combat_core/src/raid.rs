@@ -445,6 +445,7 @@ impl Sim {
             self.emit_to(player, Event::Raid { view });
         }
         self.illusion_on_join(player);
+        self.wing3_on_join(player);
     }
 
     /// The door from outside into a raid opens only with everyone at the level cap (a dungeon:
@@ -840,6 +841,7 @@ impl Sim {
         self.update_tethers();
         self.update_twins();
         self.update_hr();
+        self.update_wing3();
     }
 
     // ---- kills, loot, lockout ----

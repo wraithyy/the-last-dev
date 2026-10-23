@@ -157,6 +157,10 @@ fn parts(kind: &str) -> Vec<Part> {
         "patch_tuesday" => patch_tuesday(),
         "perf_review" => perf_review(),
         "hr_bot" => hr_bot(),
+        "scraper_queen" => scraper_queen(),
+        "photocopier" => photocopier(),
+        "footnote" => footnote(),
+        "whiteboard" => whiteboard(),
         "stakeholder" => stakeholder(),
         "cable_hydra" => cable_hydra(),
         "cable_head" => cable_head(),
@@ -391,6 +395,190 @@ fn perf_review() -> Vec<Part> {
             .spin(Vec3::Y, 0.6),
     );
     v
+}
+
+/// Boss of the Scrape Pit: a vent-grille spider of a queen. A flat black thorax with a lit
+/// crawler-eye array, eight bent legs of conduit, a crown of antennas that receive everything, a
+/// swollen abdomen full of folders with a green status light that never goes red, and four
+/// drones that orbit her like a very polite retinue.
+fn scraper_queen() -> Vec<Part> {
+    const SHELL: [f32; 3] = [0.16, 0.18, 0.2];
+    const GRILLE: [f32; 3] = [0.3, 0.34, 0.36];
+    const GREEN: [f32; 3] = [0.3, 1.0, 0.55];
+    let mut v = vec![
+        // Thorax and head.
+        Part::cube([0.0, 1.0, 0.0], [1.3, 0.7, 1.5], SHELL),
+        Part::cube([0.0, 1.0, -0.82], [0.9, 0.55, 0.4], GRILLE),
+        // Eyes: a bar of green crawler lights across the face.
+        Part::cube([0.0, 1.1, -1.05], [0.8, 0.1, 0.04], GREEN).glow(3.5),
+        Part::cube([-0.25, 0.92, -1.05], [0.14, 0.14, 0.04], GREEN).glow(3.0),
+        Part::cube([0.25, 0.92, -1.05], [0.14, 0.14, 0.04], GREEN).glow(3.0),
+        // The abdomen: a big pale sac of folders, a lit status strip along it.
+        Part::ball([0.0, 1.05, 1.35], 1.6, [0.82, 0.8, 0.72]),
+        Part::cube([0.0, 1.9, 1.25], [0.12, 0.05, 1.2], GREEN).glow(2.5),
+        Part::cube([0.0, 1.55, 1.9], [1.1, 0.1, 0.6], [0.95, 0.93, 0.85]).rot([-18.0, 0.0, 0.0]),
+        Part::cube([0.0, 1.35, 2.0], [1.0, 0.1, 0.6], [0.9, 0.9, 0.8]).rot([-24.0, 0.0, 4.0]),
+        // Crown of antennas.
+        Part::cyl([0.0, 1.9, -0.6], 0.04, 1.0, [0.6, 0.62, 0.66]),
+        Part::cyl([-0.3, 1.8, -0.55], 0.04, 0.8, [0.6, 0.62, 0.66]).rot([0.0, 0.0, 14.0]),
+        Part::cyl([0.3, 1.8, -0.55], 0.04, 0.8, [0.6, 0.62, 0.66]).rot([0.0, 0.0, -14.0]),
+        Part::ball([0.0, 2.45, -0.6], 0.12, GREEN)
+            .glow(4.0)
+            .bob(0.04, 5.0),
+    ];
+    // Eight conduit legs: a thigh up and out, a shin down to the floor.
+    for side in [-1.0_f32, 1.0] {
+        for k in 0..4 {
+            let z = -0.55 + k as f32 * 0.5;
+            let spread = 0.35 + 0.06 * k as f32;
+            v.push(
+                Part::cyl([side * (0.95 + spread), 1.45, z], 0.14, 1.1, SHELL).rot([
+                    0.0,
+                    0.0,
+                    -side * 62.0,
+                ]),
+            );
+            v.push(
+                Part::cyl([side * (1.9 + spread), 0.75, z], 0.1, 1.55, GRILLE).rot([
+                    0.0,
+                    0.0,
+                    side * 14.0,
+                ]),
+            );
+            v.push(Part::ball(
+                [side * (2.1 + spread), 0.05, z],
+                0.18,
+                [0.9, 0.92, 0.95],
+            ));
+        }
+    }
+    // The retinue: four drones that circle her.
+    let mut orbit = Vec::new();
+    for k in 0..4 {
+        let a = k as f32 * TAU / 4.0;
+        orbit.push(
+            Part::cube(
+                [a.cos() * 2.4, 0.0, a.sin() * 2.4],
+                [0.4, 0.1, 0.4],
+                [0.92, 0.92, 0.9],
+            )
+            .rot([0.0, -a.to_degrees(), 0.0])
+            .bob(0.1, 3.0),
+        );
+        orbit.push(
+            Part::ball([a.cos() * 2.4, -0.05, a.sin() * 2.4], 0.1, [1.0, 0.1, 0.1]).glow(3.0),
+        );
+    }
+    v.push(
+        Part::cube([0.0, 2.2, 0.0], [0.0, 0.0, 0.0], SHELL)
+            .with(orbit)
+            .spin(Vec3::Y, 0.9),
+    );
+    v
+}
+
+/// Boss of the Fine-Tuning Chamber: a photocopier on its last leg, copied from a copier. The lid is
+/// up and the glass shows a smudge of a face (generation upon generation), a ream of beige
+/// output hangs from the tray, a status panel reads "TRAINING LOSS 0.003" and two smaller
+/// photocopiers, each a blurrier copy of the first, orbit it.
+fn photocopier() -> Vec<Part> {
+    const CASE: [f32; 3] = [0.78, 0.72, 0.6];
+    const BEIGE: [f32; 3] = [0.7, 0.64, 0.52];
+    const PAPER: [f32; 3] = [0.92, 0.9, 0.82];
+    let mut v = vec![
+        // The body, the lid and the glass.
+        Part::cube([0.0, 0.9, 0.0], [2.2, 1.8, 1.3], CASE),
+        Part::cube([0.0, 1.95, 0.1], [2.2, 0.18, 1.2], BEIGE).rot([-14.0, 0.0, 0.0]),
+        Part::cube([0.0, 1.82, -0.05], [1.9, 0.04, 1.0], [0.3, 0.45, 0.5]).glow(0.8),
+        // The smudge on the glass: a face that has been copied too often.
+        Part::ball([0.0, 1.87, -0.1], 0.5, [0.74, 0.68, 0.58]),
+        Part::ball([-0.12, 1.9, -0.25], 0.07, [0.5, 0.45, 0.38]),
+        Part::ball([0.12, 1.9, -0.25], 0.07, [0.5, 0.45, 0.38]),
+        // Control panel: lit.
+        Part::cube([0.0, 1.35, -0.67], [1.1, 0.4, 0.04], [0.08, 0.1, 0.08]),
+        Part::cube([-0.1, 1.4, -0.7], [0.8, 0.12, 0.02], [0.3, 1.0, 0.5]).glow(2.5),
+        Part::cube([0.0, 1.25, -0.7], [0.5, 0.05, 0.02], [1.0, 0.8, 0.2]).glow(2.0),
+        // The tray and its output: a ream of beige that keeps on coming.
+        Part::cube([0.0, 0.55, -0.95], [1.5, 0.08, 0.7], BEIGE),
+        Part::cube([0.0, 0.64, -0.95], [1.2, 0.1, 0.55], PAPER),
+        Part::cube([0.0, 0.8, -0.97], [1.1, 0.1, 0.5], [0.88, 0.84, 0.76]),
+        Part::cube([0.0, 0.94, -0.99], [1.0, 0.1, 0.45], [0.84, 0.8, 0.7]),
+        Part::cube([0.0, 1.07, -1.01], [0.9, 0.1, 0.4], [0.8, 0.76, 0.66]),
+        // Feet.
+        Part::cube([-0.9, 0.06, 0.4], [0.3, 0.12, 0.3], [0.2, 0.2, 0.2]),
+        Part::cube([0.9, 0.06, 0.4], [0.3, 0.12, 0.3], [0.2, 0.2, 0.2]),
+        Part::cube([-0.9, 0.06, -0.4], [0.3, 0.12, 0.3], [0.2, 0.2, 0.2]),
+        Part::cube([0.9, 0.06, -0.4], [0.3, 0.12, 0.3], [0.2, 0.2, 0.2]),
+        // A sticker: "OUT OF TONER" has been out of toner since generation 2.
+        Part::cube([0.9, 1.3, -0.67], [0.3, 0.2, 0.02], [1.0, 0.85, 0.1]),
+    ];
+    // Two generations of copy circling the original, each a bit duller and a bit smaller.
+    let mut orbit = Vec::new();
+    for (k, (size, tint)) in [(0.8_f32, 0.9_f32), (0.6, 0.78)].into_iter().enumerate() {
+        let a = k as f32 * TAU / 2.0;
+        let c = [CASE[0] * tint, CASE[1] * tint, CASE[2] * tint];
+        orbit.push(Part::cube(
+            [a.cos() * 2.8, 0.0, a.sin() * 2.8],
+            [size, size * 0.8, size * 0.6],
+            c,
+        ));
+        orbit.push(
+            Part::cube(
+                [a.cos() * 2.8, size * 0.45, a.sin() * 2.8],
+                [size * 0.8, 0.06, size * 0.5],
+                [PAPER[0] * tint, PAPER[1] * tint, PAPER[2] * tint],
+            )
+            .bob(0.05, 2.0),
+        );
+    }
+    v.push(
+        Part::cube([0.0, 1.0, 0.0], [0.0, 0.0, 0.0], CASE)
+            .with(orbit)
+            .spin(Vec3::Y, 0.5),
+    );
+    v
+}
+
+/// A footnote: a speech-bubble page with a superscript number, a little halo of "[citation needed]"
+/// bars and a tail. Stands, glares, bobs.
+fn footnote() -> Vec<Part> {
+    const PAGE: [f32; 3] = [0.96, 0.95, 0.9];
+    const INK: [f32; 3] = [0.15, 0.2, 0.5];
+    vec![
+        Part::cube([0.0, 1.0, 0.0], [0.9, 1.2, 0.08], PAGE).bob(0.06, 2.4),
+        Part::cube([0.0, 1.0, -0.05], [0.7, 0.05, 0.02], INK).bob(0.06, 2.4),
+        Part::cube([0.0, 0.85, -0.05], [0.7, 0.05, 0.02], INK).bob(0.06, 2.4),
+        Part::cube([0.0, 0.7, -0.05], [0.5, 0.05, 0.02], INK).bob(0.06, 2.4),
+        // The superscript: a bright "1" at the top corner.
+        Part::cube([0.28, 1.45, -0.05], [0.08, 0.26, 0.03], [0.9, 0.2, 0.2])
+            .glow(2.5)
+            .bob(0.06, 2.4),
+        Part::cube([0.22, 1.35, -0.05], [0.12, 0.05, 0.03], [0.9, 0.2, 0.2])
+            .glow(2.5)
+            .bob(0.06, 2.4),
+        // Eyes: two cold dots, quite sure.
+        Part::ball([-0.14, 1.22, -0.06], 0.12, [0.1, 0.1, 0.12]).bob(0.06, 2.4),
+        Part::ball([0.14, 1.22, -0.06], 0.12, [0.1, 0.1, 0.12]).bob(0.06, 2.4),
+        Part::cube([0.0, 0.25, 0.0], [0.12, 0.3, 0.12], PAGE).rot([0.0, 0.0, 20.0]),
+    ]
+}
+
+/// The Lab's whiteboard: a board on an easel with three phases on it, one of them a question mark.
+fn whiteboard() -> Vec<Part> {
+    const BOARD: [f32; 3] = [0.97, 0.97, 0.96];
+    const INK: [f32; 3] = [0.15, 0.2, 0.55];
+    vec![
+        Part::cube([0.0, 1.3, 0.0], [1.9, 1.2, 0.06], BOARD),
+        Part::cube([0.0, 1.3, 0.04], [2.0, 1.3, 0.04], [0.6, 0.6, 0.62]),
+        Part::cube([-0.6, 1.5, -0.04], [0.5, 0.05, 0.02], INK),
+        Part::cube([-0.6, 1.3, -0.04], [0.5, 0.05, 0.02], INK),
+        Part::cube([0.1, 1.5, -0.04], [0.7, 0.05, 0.02], INK),
+        Part::cube([0.5, 1.1, -0.04], [0.2, 0.2, 0.02], [0.8, 0.15, 0.15]),
+        Part::cyl([-0.7, 0.6, 0.1], 0.06, 1.2, [0.5, 0.5, 0.52]).rot([14.0, 0.0, 0.0]),
+        Part::cyl([0.7, 0.6, 0.1], 0.06, 1.2, [0.5, 0.5, 0.52]).rot([14.0, 0.0, 0.0]),
+        Part::cyl([0.0, 0.6, 0.45], 0.06, 1.2, [0.5, 0.5, 0.52]).rot([-26.0, 0.0, 0.0]),
+        Part::cube([0.0, 0.72, -0.12], [1.6, 0.05, 0.1], [0.6, 0.6, 0.62]),
+    ]
 }
 
 /// An HR bot: a white egg of a body, a lanyard, a glowing smile and one arm that holds a form.

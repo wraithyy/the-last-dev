@@ -14,7 +14,11 @@ pub const RPR: SpellId = SpellId(4);
 pub const BLAST: SpellId = SpellId(5);
 
 pub fn content() -> Content {
-    match Content::from_ron(SRC) {
+    // QA: WOW_CONTENT=<file> balances against an edited game.ron without a rebuild.
+    let edited = std::env::var("WOW_CONTENT")
+        .ok()
+        .and_then(|p| std::fs::read_to_string(p).ok());
+    match Content::from_ron(edited.as_deref().unwrap_or(SRC)) {
         Ok(c) => c,
         Err(e) => panic!("shipped content invalid: {e}"),
     }
@@ -541,6 +545,7 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             at_ms,
             ..
         } => format!("echo of {} ({kind:?}) in {at_ms} ms", t(*as_player)),
+        Event::Drafts { integrity, marked } => format!("drafts {integrity:?} marked {marked:?}"),
     };
     format!("[{tick:05}] {body}")
 }

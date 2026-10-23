@@ -271,6 +271,7 @@ impl Plugin for CombatPlugin {
                     auto_attack_key,
                     coffee_key,
                     resurrect_key,
+                    utility_key,
                     interact_input,
                 )
                     .in_set(SimReady),
@@ -755,6 +756,34 @@ fn resurrect_key(
         && can_act(&*sim, &flow, player.0)
     {
         cast_resurrect(&*sim, &mut pending, player.0);
+    }
+}
+
+/// The class's off-bar utility on its own key (the Data Scientist's `Ground Truth`). The sim
+/// refuses it outside an Ilmari wing, so pressing it elsewhere is a polite error line.
+fn utility_key(
+    keys: Res<ButtonInput<KeyCode>>,
+    binds: Res<crate::keybinds::Keybinds>,
+    paused: Res<Paused>,
+    flow: Res<GameFlow>,
+    sim: SimView,
+    mut pending: ResMut<PendingCommands>,
+    player: Single<&SimUnit, With<Player>>,
+) {
+    if paused.0
+        || !binds.just(&keys, crate::keybinds::Action::Utility)
+        || !can_act(&*sim, &flow, player.0)
+    {
+        return;
+    }
+    let class = sim
+        .content()
+        .class_of_unit(sim.unit(player.0).map_or("", |u| u.key.as_str()));
+    if let Some(spell) = class.and_then(|c| c.utility) {
+        pending.0.push(Command::Cast {
+            caster: player.0,
+            spell,
+        });
     }
 }
 

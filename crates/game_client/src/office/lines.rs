@@ -363,6 +363,18 @@ pub fn mine(
     if def.kind == PropKind::Portal && outcome == 0 {
         return Some("No case to appeal. You have not been managed out. Yet.".to_string());
     }
+    if def.kind == PropKind::Draft && outcome == 0 {
+        return Some(
+            "Nothing is eating this one right now, or it is already marked. The crawler only respects a sign once in a while."
+                .to_string(),
+        );
+    }
+    if def.kind == PropKind::Truth && outcome == 0 {
+        return Some(
+            "The board has nothing to check yet. It is waiting for the model to say something. It will."
+                .to_string(),
+        );
+    }
     let n = outcome;
     let own_lines = !def.lines.is_empty()
         && !matches!(
@@ -453,7 +465,12 @@ pub fn mine(
             def.name
         ),
         // Answered at the top of the function.
-        PropKind::Class | PropKind::Label | PropKind::Ballot | PropKind::Portal => String::new(),
+        PropKind::Class
+        | PropKind::Label
+        | PropKind::Ballot
+        | PropKind::Portal
+        | PropKind::Draft
+        | PropKind::Truth => String::new(),
     })
 }
 
@@ -518,6 +535,8 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::Label => "Print a label for the targeted cable",
         PropKind::Ballot => "Cast a vote (the slot with the most votes wins)",
         PropKind::Portal => "File an appeal against being managed out",
+        PropKind::Draft => "Mark Confidential (the swarm skips it for 12 s)",
+        PropKind::Truth => "Check the real hazards (8 s, 25 s cooldown)",
     };
     let extra = match def.kind {
         PropKind::FireAlarm => "WARNING: every enemy on this floor will come for you.".to_string(),
