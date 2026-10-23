@@ -8,22 +8,25 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-23
+
 ### Added
 
 - Ill Marie turns up in more places, and she has two errands for you. Bring tissues.
 - Something happens after the credits, and there is plenty to do about it: new places, quests, a daily and some gear that is only as good as the place it is worn.
-- The server room behind the occupied campus's west gate is open: Datacenter Uprising, three rooms and three bosses who read their own release notes. Pick Story (one colleague can see it all) or Full (bring friends) at the gate; Story clears pay half the tokens and lock out separately.
-- The post-credits world, Datacenter Uprising and Human Resources now also work in a co-op room: the room opens it together, and each player earns their own tokens.
-- Three Resistance volunteers, Dale, Priya and Rupert, will fight beside you in the Story wings: sign up for two of them at the sheet in the base. Full is still a real group fight, so nobody gets lent out there.
-- The Tower's lobby leads to Human Resources: three more rooms, three more bosses and a reorganisation nobody asked for, with its own gear, titles and a closing chapter. Same Story and Full choice at the door, same weekly lockouts.
+- Datacenter Uprising, behind the occupied campus's west gate: three rooms and three bosses who read their own release notes.
+- Human Resources, through the Tower's lobby: three more rooms, three more bosses and a reorganisation nobody asked for, with its own gear, titles and a closing chapter.
+- Both wings offer Story (one colleague can see it all) or Full (bring friends) at the door, with separate weekly lockouts; Story pays half the tokens.
+- Three Resistance volunteers, Dale, Priya and Rupert, fight beside you on Story: sign up for two of them at the sheet in the base. Full stays a real group fight.
+- The post-credits world and both wings work in a co-op room too: the room opens it together and each player earns their own tokens.
 
 ### Changed
 
-- Patch Tuesday, the first boss of Datacenter Uprising, now looks like what it is: a server cabinet in the middle of an update, with a screen, a progress bar and a warning.
+- Co-op needs this version on both sides (protocol 37).
 
 ### Fixed
 
-- Signs and posters no longer flicker against the board or wall behind them, and read the right way round from behind (the graveyard sign included); rugs, road markings, lamp light and other flat details no longer shimmer against the ground or each other from a distance.
+- Signs and posters no longer flicker against the board or wall behind them and read the right way round from behind (the graveyard sign included); rugs, road markings, lamp light and other flat details no longer shimmer from a distance.
 
 ## [0.8.0] - 2026-10-22
 
@@ -187,7 +190,8 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - Download progress for the wasm in the loader.
 - Combat, a classic MMO HUD and animated models.
 
-[Unreleased]: https://github.com/wraithyy/the-last-dev/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/wraithyy/the-last-dev/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/wraithyy/the-last-dev/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/wraithyy/the-last-dev/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/wraithyy/the-last-dev/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/wraithyy/the-last-dev/compare/v0.5.1...v0.6.0
