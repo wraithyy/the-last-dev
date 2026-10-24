@@ -982,6 +982,14 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
             list(marked.len())
         }
         Event::PlatformWarn { order, .. } => list(order.len()),
+        Event::CoreLog { lines } => {
+            list(lines.len())?;
+            if lines.iter().all(|l| l.len() <= MAX_TEXT_BYTES) {
+                Ok(())
+            } else {
+                Err(ProtoError::TooMany)
+            }
+        }
         Event::CloudBill { bill, .. } if *bill > 1000 => Err(ProtoError::BadNumber),
         Event::Ladder { view } => {
             list(view.entries.len())?;
@@ -1943,6 +1951,54 @@ mod tests {
             }],
         };
         assert_eq!(roundtrip(&bad), Err(ProtoError::BadNumber));
+    }
+
+    #[test]
+    fn wing_five_six_and_core_events_cross_the_wire() {
+        let msg = ServerMsg::Events {
+            tick: 60,
+            events: vec![
+                Event::Exercise {
+                    standby: true,
+                    sensors: 2,
+                    merged: false,
+                },
+                Event::Boardroom {
+                    desks: 3,
+                    inbox_ms: 4_000,
+                    severance_ms: 0,
+                    tiles: 0b101,
+                },
+                Event::Core {
+                    phase: 4,
+                    live: 2,
+                    swap_s: 0,
+                    remix: 0,
+                    round: 0,
+                    round_s: 0,
+                    tally: [0; 4],
+                    remember: false,
+                    stance: 0,
+                    plan_s: 0,
+                    arms: 0,
+                    stage: 2,
+                    clock_s: 90,
+                    ward_pct: 55,
+                    wrong: 1,
+                },
+                Event::CoreLog {
+                    lines: vec!["[1] abc1234 fix: thing".into()],
+                },
+            ],
+        };
+        assert_eq!(roundtrip(&msg), Ok(msg.clone()));
+        let bad = ServerMsg::Events {
+            tick: 60,
+            events: vec![Event::CoreLog {
+                lines: vec!["x".repeat(MAX_TEXT_BYTES + 1)],
+            }],
+        };
+        assert_eq!(roundtrip(&bad), Err(ProtoError::TooMany));
     }
 
     #[test]

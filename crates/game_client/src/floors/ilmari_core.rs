@@ -19,7 +19,7 @@ use bevy::prelude::*;
 use std::f32::consts::{FRAC_PI_2, PI, TAU};
 
 /// The core: round enough for six monitors on the wall and four phases of floor.
-const POD: (f32, f32, f32) = (46.0, 26.0, 24.0);
+pub const POD: (f32, f32, f32) = (46.0, 26.0, 24.0);
 /// The ring of screens: the radius of the seats around the middle of the pod (`ring_m` in `game.ron`).
 const RING: f32 = 17.0;
 

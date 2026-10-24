@@ -19,6 +19,7 @@ mod game;
 mod gear;
 mod hair;
 mod hud;
+mod ilmari_fx;
 mod ilmari_open;
 mod ilmari_wing;
 mod ilmari_world;
@@ -117,7 +118,7 @@ fn main() {
             }),
     )
     .add_systems(Update, scale_ui)
-    .insert_resource(Time::<Fixed>::from_hz(f64::from(TICK_HZ)))
+    .insert_resource(Time::<Fixed>::from_hz(f64::from(TICK_HZ) * qa_sim_speed()))
     .add_plugins((
         arena::ArenaPlugin,
         floors::FloorsPlugin,
@@ -168,6 +169,7 @@ fn main() {
         swarm_fx::SwarmFxPlugin,
         wing3_fx::Wing3FxPlugin,
         wing4_fx::Wing4FxPlugin,
+        ilmari_fx::IlmariFxPlugin,
     ))
     .add_plugins(social::SocialPlugin)
     .add_plugins(roasts::RoastPlugin)
@@ -213,4 +215,14 @@ fn scale_ui(
     if (ui_scale.0 - scale).abs() > 0.01 {
         ui_scale.0 = scale;
     }
+}
+
+/// QA only (offline): `WOW_SIM_SPEED=<n>` runs the sim n times faster, so a screenshot can reach
+/// the late phases of a long fight. Never set online (the server's clock does not follow).
+fn qa_sim_speed() -> f64 {
+    std::env::var("WOW_SIM_SPEED")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|n| (1.0..=16.0).contains(n))
+        .unwrap_or(1.0)
 }

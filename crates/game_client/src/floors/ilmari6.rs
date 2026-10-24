@@ -25,7 +25,7 @@ use std::f32::consts::{FRAC_PI_2, PI};
 const POD1: (f32, f32, f32) = (46.0, 18.0, 16.0);
 const POD2: (f32, f32, f32) = (46.0, 20.0, 18.0);
 /// The Boardroom: room for the table, five desks and a fight with a CIO.
-const POD3: (f32, f32, f32) = (46.0, 24.0, 21.0);
+pub const POD3: (f32, f32, f32) = (46.0, 24.0, 21.0);
 /// The five desks of the Boardroom, offsets from the pod centre (the CIO's `Earnings Call` cover, D9).
 pub const DESKS: [(f32, f32); 5] = [
     (-14.0, -15.0),

@@ -19,10 +19,12 @@
 //! - `WOW_BOSS_PCT=<pct>@<secs>`: the zone boss drops to that HP percent at that time (phase shots).
 //! - `WOW_FPS=1`: log average frame time and drawn mesh count every 3 s (vsync caps the rate, so read the ms).
 //!   `WOW_SHOW_FPS=1` turns the on-screen FPS readout on for the run (settings.rs).
-//! - `WOW_BENCH=lake|plaza|campus|campus_occupied|carpark|raid|swarm|ilmari3_halluc|ilmari3_collapse|ilmari4_autoscaler|ilmari4_outage|tower1`: perf benchmark (see `docs/PERF.md`). Starts in
+//! - `WOW_BENCH=lake|plaza|campus|campus_occupied|carpark|raid|swarm|ilmari3_halluc|ilmari3_collapse|ilmari4_autoscaler|ilmari4_outage|ilmari5_exercise|ilmari6_boardroom|ilmari_core|tower1`: perf benchmark (see `docs/PERF.md`). Starts in
 //!   that scenario's zone/spot, orbits the camera, warms up `WOW_BENCH_WARMUP` s (default 5, after
 //!   the first frame), records `WOW_BENCH_FRAMES` frames (default 600), logs one `BENCH ...` line, exits.
 //!   Native: uncapped present mode and update loop, 1600x900 window (`WOW_BENCH_SCALE=2` emulates retina). Web: `?bench=<name>` (line goes to the console).
+//! - `WOW_SIM_SPEED=<1-16>`: run the offline sim that many times faster (long fights in a screenshot).
+//! - `WOW_ILMARI_STAGE=<boss key>` / `WOW_ILMARI_PCT=<pct>`: pull an Ilmari boss and hold it at or below that HP percent (`ilmari_fx.rs`).
 //! - `WOW_HOVER_SLOT=<0-9>`: show that action slot's tooltip without a pointer.
 //!
 //! Floor, level and start-position hooks live in `game.rs`, the autofight bot in `combat.rs`.
@@ -698,7 +700,7 @@ pub struct BenchSpec {
     pub height: f32,
 }
 
-const BENCHES: [BenchSpec; 12] = [
+const BENCHES: [BenchSpec; 15] = [
     // Wellness Park: lake at (-150, -5), water radius ~20.
     BenchSpec {
         name: "lake",
@@ -794,6 +796,33 @@ const BENCHES: [BenchSpec; 12] = [
         target: Some(Vec3::new(46.0, 0.0, 0.0)),
         radius: 30.0,
         height: 18.0,
+    },
+    // Wing 5's range with the sensors' cones out (`ilmari_fx::stage_qa`).
+    BenchSpec {
+        name: "ilmari5_exercise",
+        zone: "ilmari5/3",
+        player_at: None,
+        target: None,
+        radius: 18.0,
+        height: 9.0,
+    },
+    // The Boardroom with the CIO pulled: desks, inbox and tiles.
+    BenchSpec {
+        name: "ilmari6_boardroom",
+        zone: "ilmari6/3",
+        player_at: None,
+        target: None,
+        radius: 20.0,
+        height: 9.0,
+    },
+    // The core with the six screens, the wall display and the log wall.
+    BenchSpec {
+        name: "ilmari_core",
+        zone: "ilmari_core/1",
+        player_at: None,
+        target: None,
+        radius: 20.0,
+        height: 9.0,
     },
     BenchSpec {
         name: "tower1",

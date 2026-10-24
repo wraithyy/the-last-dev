@@ -5,7 +5,7 @@ to the tables below; always re-run with the same commands.
 
 ## Method
 
-Hook: `WOW_BENCH=<lake|plaza|campus|campus_occupied|carpark|raid|swarm|ilmari3_halluc|ilmari3_collapse|ilmari4_autoscaler|ilmari4_outage|tower1>` (`crates/game_client/src/debug.rs`).
+Hook: `WOW_BENCH=<lake|plaza|campus|campus_occupied|carpark|raid|swarm|ilmari3_halluc|ilmari3_collapse|ilmari4_autoscaler|ilmari4_outage|ilmari5_exercise|ilmari6_boardroom|ilmari_core|tower1>` (`crates/game_client/src/debug.rs`).
 It starts in the scenario's zone and spot, orbits the camera around a fixed centre (one turn per
 40 s), waits `WOW_BENCH_WARMUP` s (default 5), records `WOW_BENCH_FRAMES` frames (default 600) of
 `Time::delta`, logs one `BENCH ...` line and exits. Native runs use `PresentMode::Immediate`, a
@@ -141,3 +141,15 @@ only 2,400 are claimed. The web (WebGPU) number is not measured yet.
 | ilmari4_outage | 4.28 | 4.72 | 5.06 | 5.85 | 4,231 | 751 |
 
 Both sit within 1 ms of the Ilmari Wing 3 scenarios above (4.06-4.38 ms avg) and well inside the budgets (avg <= 8 ms, p99 <= 16.7 ms, entities <= 8,000). The web (WebGPU) number is not measured yet.
+
+## Ilmari 1.0 finale client (2026-10-24, docs/ILMARI_1_0.md D17)
+
+`WOW_BENCH=ilmari5_exercise` (the Red-Blue Range with the squads out, the sensors' cones on the floor and the standby banner; `ilmari_fx::stage_qa` pulls the boss), `ilmari6_boardroom` (the CIO pulled: desks, tile covers, envelopes, HUD) and `ilmari_core` (six monitor glows, the wall panel, Ill Marie, the fight in P1). Native release, M2 Pro, High, one run each, 1600x900 @1x, 600 frames. The D.13 rows `ilmari5_rotunda` / `ilmari5_range` are covered by `ilmari5_exercise` (the rotunda is Wing 5's room 2, not benched on its own); `ilmari_core_p3` / `_p4`, `credits` are not benched yet (P3 and P4 need the fight to run for minutes; `WOW_SIM_SPEED` and `WOW_ILMARI_PCT` exist for it).
+
+| scenario | avg ms | p95 | p99 | max | entities | meshes visible |
+|---|---|---|---|---|---|---|
+| ilmari5_exercise | 4.60 | 5.53 | 6.12 | 7.70 | 4,809 | 65 |
+| ilmari6_boardroom | 4.71 | 5.77 | 6.51 | 6.96 | 3,984 | 70 |
+| ilmari_core | 4.44 | 5.39 | 6.19 | 8.30 | 4,522 | 80 |
+
+All three are inside the D.13 budgets (avg <= 8 ms, p99 <= 16.7 ms) and within 1 ms of the Wing 4 scenarios; no point lights. The `ilmari5_exercise` entity count is above the doc's 4,000 for the core rows because the room's racks and sensors are baked pieces; the web (WebGPU) number is not measured yet.

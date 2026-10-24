@@ -911,3 +911,48 @@ async fn wing_four_loot_stays_in_the_ilmari_band_and_below_the_reserved_level() 
         "ilvl 20 is reserved for 1.0"
     );
 }
+
+// ---- Wing 5, Wing 6 and the core (docs/ILMARI_1_0.md D17): a joiner learns each wall as it stands.
+
+async fn a_joiner_learns_the_wall_of(zone: &str, boss: &str, want: fn(&Event) -> bool) {
+    let mut s = room();
+    s.on_join(0, "Lead", "backend");
+    s.on_join(1, "Dps", "fullstack");
+    s.tick();
+    let boss = pull_wing3(&mut s, zone, boss);
+    let mut out = Vec::new();
+    for _ in 0..90 {
+        out.extend(s.tick());
+        keep_alive(&mut s, boss);
+    }
+    assert!(
+        events(&out, 0).iter().any(want),
+        "{zone}: the first member saw the wall"
+    );
+    s.on_join(2, "Late", "devops");
+    let mut late = Vec::new();
+    for _ in 0..60 {
+        late.extend(s.tick());
+        keep_alive(&mut s, boss);
+    }
+    assert!(
+        events(&late, 2).iter().any(want),
+        "{zone}: the joiner got the wall without waiting for a change"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_joiner_learns_the_exercise_the_boardroom_and_the_core_wall() {
+    a_joiner_learns_the_wall_of("ilmari5/3", "il_red_team", |e| {
+        matches!(e, Event::Exercise { .. })
+    })
+    .await;
+    a_joiner_learns_the_wall_of("ilmari6/3", "il_cio", |e| {
+        matches!(e, Event::Boardroom { .. })
+    })
+    .await;
+    a_joiner_learns_the_wall_of("ilmari_core/1", "il_ilmari", |e| {
+        matches!(e, Event::Core { .. })
+    })
+    .await;
+}
