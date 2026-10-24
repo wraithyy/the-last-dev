@@ -109,6 +109,7 @@ impl Sim {
             || self.is_player(u.state.id)
             || self.companion_owner(u.state.id).is_some()
             || self.is_watcher(i)
+            || self.is_patroller(i)
             || self.content.units[u.def].swarm.is_some()
             || self.escorted(i)
             || self.has_aura_flag(i, |a| a.stun)

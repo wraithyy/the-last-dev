@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 40;
+pub const PROTOCOL_VERSION: u16 = 41;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -673,7 +673,7 @@ pub fn is_player_command(cmd: &Command) -> bool {
         Command::SummonPet { pet } => pet.len() <= combat_core::world::WORLD_KEY_MAX,
         Command::DuelRequest { .. } | Command::DuelRespond { .. } => true,
         Command::SetLegacy { .. } | Command::StartWeeklySprint => true,
-        Command::SetIlmariStory { .. } => true,
+        Command::SetIlmariStory { .. } | Command::SetIlmariMode(_) => true,
         Command::StartMinigame { key } => key.len() <= combat_core::minigame::MINIGAME_KEY_MAX,
         Command::LeaveMinigame | Command::MinigamePick { .. } => true,
         // The stamp is a line of text for the Opening; the room's own sim decides whether the
@@ -970,6 +970,7 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
             names(&view.vote)?;
             list(view.tethers.len())?;
             list(view.ballots.len())?;
+            list(view.spent.len())?;
             names(std::slice::from_ref(&view.passed))?;
             names(std::slice::from_ref(&view.zone))
         }
@@ -1976,6 +1977,9 @@ mod tests {
             async_mode: true,
             story: true,
             story_next: false,
+            mode: Default::default(),
+            mode_next: Default::default(),
+            spent: vec![2],
             week: 2_960,
             locked: vec!["async:icebreaker_facilitator".into()],
             tethers: vec![(4, 7), (9, 12)],
@@ -2262,6 +2266,42 @@ mod tests {
             };
             assert_eq!(roundtrip(&bad), Err(ProtoError::TooMany));
         }
+    }
+
+    #[test]
+    fn judgment_day_crosses_the_wire_and_is_capped() {
+        use combat_core::ilmari::IlmariMode;
+        use combat_core::judgment::IlmariModeError;
+        let view = combat_core::RaidView {
+            zone: "ilmari5/2".into(),
+            mode: IlmariMode::Judgment,
+            mode_next: IlmariMode::Judgment,
+            spent: vec![1, 3],
+            locked: vec!["jd:il_align_consultant".into()],
+            ..Default::default()
+        };
+        let msg = ServerMsg::Events {
+            tick: 41,
+            events: vec![
+                Event::Raid { view: view.clone() },
+                Event::IlmariRefused {
+                    reason: IlmariModeError::Quorum,
+                },
+                Event::Incident { player: 1, by: 77 },
+            ],
+        };
+        assert_eq!(roundtrip(&msg), Ok(msg.clone()));
+        for mode in [IlmariMode::Story, IlmariMode::Full, IlmariMode::Judgment] {
+            let cmd = ClientMsg::Cmd(Command::SetIlmariMode(mode));
+            assert_eq!(roundtrip(&cmd), Ok(cmd.clone()));
+        }
+        let mut many = view;
+        many.spent = vec![1; MAX_LIST_LEN + 1];
+        let bad = ServerMsg::Events {
+            tick: 41,
+            events: vec![Event::Raid { view: many }],
+        };
+        assert_eq!(roundtrip(&bad), Err(ProtoError::TooMany));
     }
 
     #[test]

@@ -97,6 +97,9 @@ pub enum PropKind {
     /// A Reserved Instance rack in the Autoscale Floor (`EncounterDef::Cloud`): a use halves the
     /// cloud bill's rate for a while (any class, a cooldown per player).
     Rack,
+    /// An Opt-Out Kiosk in the Alignment Lab (`Effect::Offer`): a use cancels your own pending
+    /// offers (any class, a cooldown per player).
+    OptOut,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -587,6 +590,9 @@ impl Sim {
         }
         if def.kind == PropKind::Truth {
             return self.use_truth_prop(pi, k);
+        }
+        if def.kind == PropKind::OptOut {
+            return self.use_optout_prop(pi, k);
         }
         if def.kind == PropKind::Rack {
             return self.use_rack_prop(pi, k);

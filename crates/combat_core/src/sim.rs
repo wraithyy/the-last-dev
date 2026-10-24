@@ -241,6 +241,10 @@ pub struct Sim {
     pub(crate) illusion: crate::illusion::IllusionState,
     /// The action recorder of an armed encounter (`echo.rs`).
     pub(crate) echo: crate::echo::EchoState,
+    /// Hostile sight cones, suspicion and the summoned squads (`sight.rs`).
+    pub(crate) sight: crate::sight::SightState,
+    /// The Alignment Consultant's pending offers and worn guardrails (`alignment.rs`).
+    pub(crate) offers: crate::alignment::OfferState,
     /// Wing 3's armed encounter and its draft bookkeeping (`wing3.rs`).
     pub(crate) wing3: crate::wing3::Wing3State,
     /// The Autoscaler's split family and cloud bill, the Region Outage's platforms (`wing4.rs`).
@@ -296,6 +300,8 @@ impl Sim {
             wing4: Default::default(),
             illusion: Default::default(),
             echo: Default::default(),
+            sight: Default::default(),
+            offers: Default::default(),
             area_hit: false,
             terrain: Default::default(),
             zone_terrains: BTreeMap::new(),
@@ -626,6 +632,7 @@ impl Sim {
             | Command::StampIlmari { .. }
             | Command::IlmariReveal
             | Command::SetIlmariStory { .. }
+            | Command::SetIlmariMode(_)
             | Command::MinigamePick { .. } => {}
         }
         self.pending.push((Some(player), cmd));
@@ -749,6 +756,8 @@ impl Sim {
         self.update_swarms();
         self.update_illusion();
         self.update_echo();
+        self.update_sight();
+        self.update_offers();
         self.update_telegraphs();
         self.update_wander();
         self.update_escorts();
@@ -862,7 +871,15 @@ impl Sim {
                     self.reveal_ilmari();
                 }
             }
-            Command::SetIlmariStory { story } => self.set_ilmari_story(actor, story),
+            Command::SetIlmariStory { story } => {
+                let mode = if story {
+                    crate::ilmari::IlmariMode::Story
+                } else {
+                    crate::ilmari::IlmariMode::Full
+                };
+                self.set_ilmari_mode(actor, mode);
+            }
+            Command::SetIlmariMode(mode) => self.set_ilmari_mode(actor, mode),
             other => self.apply_named(other),
         }
     }
@@ -925,6 +942,7 @@ impl Sim {
             | Command::StampIlmari { .. }
             | Command::IlmariReveal
             | Command::SetIlmariStory { .. }
+            | Command::SetIlmariMode(_)
             | Command::MinigamePick { .. } => {}
         }
     }
@@ -1180,7 +1198,7 @@ impl Sim {
         let Some(i) = self.index(player) else {
             return;
         };
-        if self.units[i].state.alive {
+        if self.units[i].state.alive || !self.jd_revive_ok(player) {
             return;
         }
         self.set_auto_attack(i, false);

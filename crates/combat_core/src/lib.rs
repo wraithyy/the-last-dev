@@ -4,6 +4,7 @@
 //! server, and deliberately has no engine (Bevy) dependency.
 
 mod ai;
+pub mod alignment;
 mod auto_attack;
 pub mod burnout;
 pub mod calendar;
@@ -21,6 +22,7 @@ pub mod geom;
 mod hr;
 pub mod illusion;
 pub mod ilmari;
+pub mod judgment;
 pub mod legacy;
 pub mod live;
 pub mod minigame;
@@ -29,8 +31,10 @@ pub mod pets;
 mod progression;
 mod quests;
 pub mod raid;
+pub mod rewards;
 mod rng;
 mod save;
+pub mod sight;
 mod sim;
 pub mod sprint;
 pub mod swarm;

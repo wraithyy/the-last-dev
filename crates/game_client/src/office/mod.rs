@@ -193,6 +193,7 @@ fn hover_radius(kind: PropKind) -> f32 {
         | PropKind::Draft
         | PropKind::Truth
         | PropKind::Rack
+        | PropKind::OptOut
         | PropKind::Device => 0.9,
         PropKind::Pickup => 0.6,
         PropKind::QuietRoom => 1.2,

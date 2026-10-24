@@ -1,6 +1,6 @@
 # Ilmari 1.0: implementation spec
 
-Status: planned, nothing built. Written 2026-10-23 while Wing 4 (C9-C17 of `docs/ILMARI_10.md`) is still being built.
+Status: D1-D4 (the engine pieces and the item band) built as data and rules with no content behind them; D5 onwards planned. Written 2026-10-23 while Wing 4 (C9-C17 of `docs/ILMARI_10.md`) was still being built; the as-built notes are in D.14.1.
 Companion to `docs/ILMARI_RAID.md` (campaign design and guardrails, which win in any conflict),
 `docs/ILMARI_09.md` and `docs/ILMARI_10.md` (the format this spec mirrors, plus their "as built" notes) and
 `docs/DUNGEONS.md` (engine vocabulary). Campus coordinates follow `docs/CAMPUS_REWORK.md`.
@@ -32,8 +32,10 @@ Facts this spec builds on, from the code and docs as built (Wing 4 is assumed fi
   units (`UnitDef::companion`), never in `Sim::players`, 30 % of a member in the scalings, wings and Story only,
   at most two per player and per room.
 - **Item band.** `GearSource::Ilmari`, ilvl 16-20, bonuses only inside Ilmari content (`economy.rs::gear_totals`,
-  outside it a piece counts as ilvl 14). Wing 3 tops at 18-19, Wing 4 at 19. **ilvl 20 is reserved for this
-  spec**: Wing 5 bosses drop ilvl 19 loose pieces, everything ilvl 20 comes from Wing 6 and the core.
+  outside it a piece counts as ilvl 14). Wings 3 and 4 top at 18 (tier levels are even; there is no 19). **ilvl 20 is
+  reserved for this spec**: Wing 5 bosses drop ilvl 18 loose pieces, everything ilvl 20 comes from the sets and Legendaries
+  of D.7. Two older pieces already sit at 20 and stay (Wing 2's "Exceeds Expectations Hoodie" and the vendor's "Last Paper
+  Notebook in the Building"); `tests/ilmari_band.rs` names them.
 - **Protocol.** `PROTOCOL_VERSION` is whatever Wing 4 shipped (39 today, expected 40). 1.0 bumps it in each
   commit that changes a frame (D-tasks flag them), never in a docs commit. The final number is recorded in
   `WORLD_AND_MULTIPLAYER.md` in D22.
@@ -641,7 +643,7 @@ existing rarity caps. All of it works only in Ilmari content (guardrail 3).
 
 | Source | Piece (tier slot 1-4 as the raid tier) | Item band note |
 |---|---|---|
-| Alignment Consultant | the legs | ilvl 20 (loose Wing 5 pieces ilvl 19) |
+| Alignment Consultant | the legs | ilvl 20 (loose Wing 5 pieces ilvl 18) |
 | Red Team Blue Team | the feet or hands (the slot the raid tier gives to its second boss) | ilvl 20 |
 | Chief Ilmari Officer | the hands or shoulders | ilvl 20 |
 | Ilmari | the head and the chest (two pieces in one drop on Full) | ilvl 20 |
@@ -912,9 +914,11 @@ Additions to `WORLD_AND_MULTIPLAYER.md`, "Trust model: Ilmari".
 - **Per room:** lockouts (`jd:` prefix, plus Story and Full keys), mode, ladder boards, the Directive. The
   lead's mode pick passes with the lead role, as Story's does.
 - **Protocol bumps** (each in the commit that changes the frame; N = the value Wing 4 shipped):
-  - **N+1 (Wing 5):** `Event::Detected`, `Event::Offer`, `PropKind` for kiosks, honeypots, cones.
-  - **N+2 (Wing 6 and core):** `Command::SetIlmariMode` replacing `SetIlmariStory`, `Event::Raid` mode,
-    `Event::Stance`, `Event::CommitLog`, `Event::DeathPact`.
+  - **N+1 (Wing 5):** `Event::Detected`, `Event::Offer`, `PropKind` for kiosks, honeypots, cones. Built early as
+    protocol 41 with D1-D4, together with the N+2 mode pieces: `Command::SetIlmariMode` (the old command stays an
+    alias), `Event::IlmariRefused`, `Event::Incident` (the plan's `Detected`) and `RaidView.mode`; no wire event for
+    offers (they are auras).
+  - **N+2 (Wing 6 and core):** `Event::Stance`, `Event::CommitLog`, `Event::DeathPact`.
   - **N+3 (ending and ladder):** `Command::StampIlmariEnd`, `Event::IlmariEnd`, `Event::Ladder.board`.
   - The offline build needs no wire change.
 
@@ -975,6 +979,18 @@ order puts engine pieces first, then Wing 5, Wing 6, the core, then ladder and e
 | D22 | Docs and release prep: `COMBAT_API.md`, `FORMULAS.md`, `KNOWN_LIMITATIONS.md`, `WORLD_AND_MULTIPLAYER.md`, the final protocol number, CHANGELOG, README, landing page, credits, PWA; the `1.0.0` bump only when the user asks | all | docs match the code; full golden replay pass byte-identical; the checklist in D.17 is green |
 
 Each task is independently verifiable; D1-D4 land with no content behind them (new fields default off).
+
+### D.14.1 Status and as built (kept current, one row per finished task)
+
+| # | Status | As built |
+|---|---|---|
+| D1 | done | `IlmariMode { Story, Full, Judgment }` (`ilmari.rs`; `IlmariDifficulty` stays as an alias), `JudgmentDef` in the new `ilmari:` content block (`judgment.rs`: `hp_pct` 130, `damage_pct` 125, `enrage_pct` 80, `min_humans` 3, `boss_items` 3, `fragment_mult` 2, `riders: [(boss, aura, on)]`). `Command::SetIlmariMode(IlmariMode)`; `SetIlmariStory` is its alias. Refusals are `Event::IlmariRefused { reason }` (`NotLeader`, `Quorum`, `NotCleared`, `WrongZone`, `InPull`, `Redundancy`) routed to the asker. A pick that stops holding at load (quorum lost, a Wing 1-4 zone) loads as Full. Lockout key `jd:`; achievements `raid:judgment:<boss>`. "Ilmari killed on Full" is `IlmariState.core_full`, saved in the second field of `ilmari_flags` (old saves read as not cleared, no `SAVE_VERSION` bump); the core calls `Sim::mark_core_full_clear()` (D13), QA uses `debug_ilmari_core_cleared`. Revives: during a boss pull each player gets one (resurrect spell or graveyard release), the rest stay down until the pull ends; `RaidView.spent` carries who. Riders are auras on the boss re-applied every tick (evade strips them). Companions never load (they are Story's). Not wired yet: the UI row at the Resistance base, fragments paid per clear, the "Zero Downtime" achievements |
+| D2 | done | `UnitDef.sight: Option<SightDef { range_m, half_angle_deg, notice_ms, patrol, patrol_mps, pause_ms, detected_aura, detected_ms, noisy_mps, noise_m, sneak_mps }>` (`sight.rs`), the Teambuilding `sees()` per player (companions are not `Sim::players`), `Event::Incident { player, by }`, `Sim::sight_suspicion(player)` for the client's meter. Patrols are `Patrol` loops as offsets from the spawn point, a pure function of the clock, walked only while idle (`wander` skips patrollers). `Effect::SummonSquad { per_role: (tank, healer, melee, ranged), filler, side: Red \| Blue, min_bodies }`; `squad_size`, `Sim::squad_side`, `squad_units`. Not built: the phase-2 "scan x1.4", honeypots (`PropKind` for them comes with D7), kill-a-sensor-silently openers (they are content on the existing stealth openers) |
+| D3 | done | `Effect::Offer(OfferDef { ok_aura, bad_aura, accept_ms, bad_ms, aligned_aura, pushback_aura, stagger_aura, stagger_ms })` (`alignment.rs`), `PropKind::OptOut` (the kiosk: cancels the user's own pending offers, per-player cooldown, reports 0 when there is nothing to cancel). Engine auras `il_detected`, `il_aligned_stack` (+8% per stack, 10), `il_pushback` (+6% taken, 5), `il_stagger` (stun) in `game.ron`; the Consultant's own guardrails and the Aligned heal come with D6. Story feeds no `Aligned`. Not built: Vanish clearing pending offers (a content effect for D6) |
+| D4 | done | `ilmari.rewards` content block (`rewards.rs`): `top_ilvl` 20, 16 tier-set pieces in four role sets (`hard_constraints`, `human_in_the_loop`, `red_team_exercise`, `context_window`; slots Lanyard / Mug / Hoodie / Headgear for the Consultant / Red-Blue / CIO / Ilmari, all Epic, no `drops_from` until their bosses exist), 8 Legendary Keyboards (effects as text only), `Legendary Fragment` (5 to forge; Story 0, Full 1, Judgment 2), 13 titles (wire-safe forms), 4 token cosmetics, the Roomba mount (`roomba_mk9`, the scooter's speed, 8 `Roomba Part (Salvaged)`), the "Clean Slate" pet. Titles, mount and pet live in the block, not in `achievements` / `pets`, so no base-game journal lists them before the credits. Set bonuses are existing perks (`DamageTaken`, `Triage`, `Execute`, `SpellDamage`), not the D.7 boss-mechanic texts. `tests/ilmari_band.rs` is the band test |
+| | | **Protocol.** 40 -> **41** in the D1-D4 batch (`Command::SetIlmariMode`, `Event::IlmariRefused`, `Event::Incident`, `RaidView.{mode, mode_next, spent}`). The N+1/N+2 plan of D.12 is therefore folded: the actual numbers are 41 after D4; D.12's N+3 (ending and ladder) is still one more bump at D16. Running tally: 40 (Wing 4) -> 41 (D1-D4) |
+
+Deviations from the text above: Wing 5's loose pieces are ilvl 18, not 19 (odd item levels do not exist); the 16 pieces are four per set mapped onto the five existing slots (no legs, feet or hands), so the Ilmari drop is the head and the chest is dropped; Wing 2's hoodie and the vendor's notebook were already ilvl 20.
 Wing 5 (D5-D8) can ship as a playable 0.11 if the user wants an interim release; the core is the one piece that
 should not ship half (a fight whose last phase is missing is worse than none).
 

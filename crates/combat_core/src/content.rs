@@ -446,6 +446,18 @@ pub enum Effect {
         aura: String,
         life_ms: u32,
     },
+    /// Caster-centric raid mechanic (Red Team Blue Team, `sight.rs`): one unit per role present
+    /// among the living humans (`per_role`), `filler` units up to `min_bodies`, standing on the
+    /// caster's right (Red) or left (Blue). Companions are never counted.
+    SummonSquad {
+        per_role: crate::sight::SquadRoles,
+        filler: String,
+        side: crate::sight::SquadSide,
+        min_bodies: u8,
+    },
+    /// Caster-centric raid mechanic (the Alignment Consultant, `alignment.rs`): every living
+    /// player in range gets a pending aura that turns into a real one unless they opt out.
+    Offer(crate::alignment::OfferDef),
     /// Caster-centric raid mechanic (Performance Review): grades every living player on what
     /// they did since the previous review (see `hr.rs` and docs/FORMULAS.md): the lowest grade
     /// below `fine_pct` of baseline gets `worst`, the highest at or above 100 gets `best`.
@@ -518,6 +530,8 @@ impl Effect {
                 | Effect::PairUp { .. }
                 | Effect::Detonate { .. }
                 | Effect::SummonMirror { .. }
+                | Effect::SummonSquad { .. }
+                | Effect::Offer(_)
                 | Effect::Review { .. }
                 | Effect::SwarmWave { .. }
                 | Effect::Confabulate { .. }
@@ -549,6 +563,7 @@ impl Effect {
                 .collect(),
             Effect::RandomAura { auras, .. } => auras.iter().map(String::as_str).collect(),
             Effect::Detonate { boost_aura } => boost_aura.iter().map(String::as_str).collect(),
+            Effect::Offer(def) => def.auras(),
             _ => vec![],
         }
     }
@@ -1131,6 +1146,9 @@ pub struct UnitDef {
     /// A boss that replicates when hit hard (`wing4.rs`, docs/ILMARI_10.md C.3.4).
     #[serde(default)]
     pub split: Option<SplitDef>,
+    /// Hostile units: a vision cone and a patrol (`sight.rs`).
+    #[serde(default)]
+    pub sight: Option<crate::sight::SightDef>,
 }
 
 /// Rolling-window splitting: more than `threshold_pct` of the unit's max HP in player damage inside
@@ -1734,6 +1752,10 @@ pub struct Content {
     /// The Company Calendar's listing (`calendar.rs`).
     #[serde(default)]
     pub calendar: crate::calendar::CalendarDef,
+    /// Ilmari 1.0: Judgment Day's numbers and the reward data (`ilmari.rs`); absent in minimal
+    /// test content.
+    #[serde(default)]
+    pub ilmari: crate::ilmari::IlmariDef,
 }
 
 impl Content {
@@ -2012,6 +2034,21 @@ impl Content {
                         s.name
                     ));
                 }
+                if let Effect::SummonSquad {
+                    per_role,
+                    filler,
+                    min_bodies,
+                    ..
+                } = e
+                {
+                    if *min_bodies == 0 {
+                        return bad(format!("spell {} summons an empty squad", s.name));
+                    }
+                    per_role.validate(self, filler, &s.name)?;
+                }
+                if let Effect::Offer(def) = e {
+                    def.validate(self, &s.name)?;
+                }
                 if let Effect::RandomAura { auras, .. } = e
                     && auras.is_empty()
                 {
@@ -2269,6 +2306,19 @@ impl Content {
         crate::raid::validate_all(self)?;
         crate::minigame::validate(self)?;
         self.calendar.validate(self)?;
+        for u in &self.units {
+            if let Some(sight) = &u.sight {
+                if !u.hostile {
+                    return Err(ContentError::Invalid(format!(
+                        "unit {} has sight but is not hostile",
+                        u.key
+                    )));
+                }
+                sight.validate(self, &u.key)?;
+            }
+        }
+        self.ilmari.judgment.validate(self)?;
+        self.ilmari.rewards.validate(self)?;
         Ok(())
     }
 }

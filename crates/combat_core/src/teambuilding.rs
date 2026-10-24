@@ -23,8 +23,8 @@ use std::collections::VecDeque;
 
 /// Eye height of a watcher and chest height of the player for the sight line, so low props
 /// (tables, hedges up to the waist) do not hide anyone but tall ones do.
-const EYE_Y: f32 = 1.55;
-const CHEST_Y: f32 = 1.1;
+pub(crate) const EYE_Y: f32 = 1.55;
+pub(crate) const CHEST_Y: f32 = 1.1;
 /// Speed is measured over this many ticks (half a second), smoothing network batching.
 const TRAIL_TICKS: usize = 15;
 /// A step longer than this between ticks is a teleport, not running.

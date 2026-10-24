@@ -267,10 +267,15 @@ pub enum Command {
     /// post-credits Marie beats and completes the opening quest.
     IlmariReveal,
     /// Group lead: Story (true) or Full (false) for the next Ilmari wing loads (`raid.rs`).
-    /// Without a pick a group of three or more gets Full, a smaller one Story.
+    /// Without a pick a group of three or more gets Full, a smaller one Story. Kept as an alias
+    /// of `SetIlmariMode` (Story / Full) until a protocol bump removes it.
     SetIlmariStory {
         story: bool,
     },
+    /// Group lead: the difficulty of the next Ilmari wing loads, Judgment Day included
+    /// (`judgment.rs`). Judgment is refused with `Event::IlmariRefused` unless the room has the
+    /// quorum, has cleared Ilmari on Full and stands outside Wings 1-4.
+    SetIlmariMode(crate::ilmari::IlmariMode),
 }
 
 /// Why an item command did nothing; routed to the player.
@@ -674,6 +679,17 @@ pub enum Event {
     /// `SetLegacy` was refused (routed to the asker).
     LegacyRefused {
         reason: crate::legacy::LegacyError,
+    },
+    /// `SetIlmariMode` was refused, or Judgment Day's "Redundancy" blocked a second revive
+    /// (routed to the asker, or to the player who stays down).
+    IlmariRefused {
+        reason: crate::judgment::IlmariModeError,
+    },
+    /// A hostile sight cone filled `player`'s suspicion meter: the `Detected` aura went on and
+    /// the sensor `by` raised an incident (`sight.rs`).
+    Incident {
+        player: EntityId,
+        by: EntityId,
     },
     /// The world clock: unix seconds at this tick (`Sim::set_clock`; sent to a joiner too).
     /// Day/night and the task reset timers follow from it.

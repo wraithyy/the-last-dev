@@ -635,6 +635,18 @@ Recorder (`echo.rs`): entropy `H = 1000 * (n ln n - sum c ln c) / (n ln K)` per 
 - Failover: off every non-Dark platform (1.5 m margin) for the 1 s grace costs 10% of max HP (Story 5%), clamped to leave 1 HP, and teleports the player to the nearest Live non-bridge platform. Players far from the hub (the corridor and the lobby) are exempt; Restoring counts as safe.
 - Enrage (`EnrageDef`): Full group 150 s, a lone player on Full 75 s (`solo_after_ms`), Story 540 s (`story_after_ms`). The aura `il_rate_limited` doubles the boss's damage and takes 92% off damage dealt to it.
 
+## Ilmari 1.0 engine pieces
+
+Judgment Day (`judgment.rs`, content block `ilmari.judgment`): enemy HP x 130 %, damage x 125 % (replacing the Async figures, on top of Full: the group scaling still applies on top), a boss's enrage timer x 80 % of what Full has, 3 pieces per member per boss (Full: the wing's 2), Legendary Fragments x 2 of Full's 1. Quorum: at least 3 connected humans. Revive: one per player per boss pull (a pull is any hostile boss in combat); the next stays down until no boss fights. Lockout `jd:<boss>`, weekly like the others.
+
+Sight (`sight.rs`, integer ticks of the 30 Hz sim, floats for the cone): per player and tick the suspicion `s` changes by `rate / 30`. Seen (inside range and half angle, a clear line from eye 1.55 m to chest 1.1 m over the blockers): `rate = (1000 / notice_ms) * (1 + 2 * (1 - d / range))`, halved at a pace of `sneak_mps` or less (default 3 m/s, speed measured over half a second). Not seen but running (`speed > noisy_mps`, default 5) within `noise_m` (default 7) with a clear line: `0.8 * 1000 / notice_ms`. The best eye wins. Nobody looking: `s` falls by 0.5 per second. A player in stealth (`stealth_aggro_pct > 0`) and a stunned eye contribute nothing. At `s >= 1`: `Detected` for `detected_ms`, `s = 0`. A patrol is `Patrol::pose(ms of sim time)` over the spawn point plus the offsets, speed `patrol_mps` (default 1.6 m/s), `pause_ms` at each corner.
+
+Squads: `bodies = max(distinct roles among the living humans, min_bodies)`; one unit per role present in the order tank, healer, melee, ranged, then `filler`. Solo Story with companions: still the player's one role (companions are not counted) plus two fillers.
+
+Offers (`alignment.rs`): a wave puts `ok_aura` on every living human within the spell's range for `accept_ms` (Full 6 s). At the end of the window the guardrail lands for `bad_ms` and the boss gains one `Aligned` stack (+8 % damage each, 10 at most; none on Story). A refusal removes the player's own pending offers, stacks `Pushback` (+6 % damage taken, 5 at most) per cancelled offer and, for the first of the wave, staggers (stun) the boss for `stagger_ms` (3 s). A dispelled guardrail removes one `Aligned` stack.
+
+Item band at ilvl 20 (`budget = rarity quality * (70 + 3 * ilvl) % * slot %`): 130 % of the rarity at ilvl 20 against 112 % at ilvl 14 and 124 % at 18. Epic tier piece 169 (Epic 130), Legendary Keyboard 260 (160 * 1.30 * 1.25). Outside Ilmari content every Ilmari piece is summed as ilvl 14 with no perk and no set progress (`Economy::equipment`). Wings 1-4 as authored: drops 16-18 (Wing 2 also holds the ilvl 20 "Exceeds Expectations Hoodie", the vendor the 20 "Last Paper Notebook in the Building"); the 24 pieces of 1.0 are exactly 20 and are not dropped yet (`tests/ilmari_band.rs`). Fragments: 5 forge a Legendary, a Full core clear pays 1, Judgment 2, Story 0.
+
 ## Weekly Sprint ladder
 
 ```

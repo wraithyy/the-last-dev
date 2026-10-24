@@ -502,6 +502,8 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             view.on, view.zone, view.week, view.locked
         ),
         Event::LegacyRefused { reason } => format!("legacy refused: {}", reason.message()),
+        Event::IlmariRefused { reason } => format!("ilmari refused: {}", reason.message()),
+        Event::Incident { player, by } => format!("incident: {player} seen by {by}"),
         Event::Raid { view } => format!(
             "raid {:?} async {} week {} locked {:?} tethers {:?}",
             view.zone, view.async_mode, view.week, view.locked, view.tethers

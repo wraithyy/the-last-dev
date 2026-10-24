@@ -20,6 +20,8 @@ use serde::{Deserialize, Serialize};
 pub const ASYNC_PREFIX: &str = "async:";
 /// The same for Story difficulty in an Ilmari wing, which keeps its own weekly lockout.
 pub const STORY_PREFIX: &str = "story:";
+/// And for Judgment Day (`judgment.rs`), the third Ilmari difficulty.
+pub const JUDGMENT_PREFIX: &str = "jd:";
 /// Key prefix of a dungeon's daily clear counter, kept in the same daily lockout as its bosses.
 const CLEAR_PREFIX: &str = "clear:";
 /// Tethers check their range this often.
@@ -239,6 +241,12 @@ pub struct RaidView {
     pub story: bool,
     /// The difficulty the next wing door opens on (`true`: Story), for the switch at the door.
     pub story_next: bool,
+    /// The loaded wing's difficulty (`Full` outside one); `story` stays for 0.9 readers.
+    pub mode: crate::ilmari::IlmariMode,
+    /// The difficulty the next wing door opens on, Judgment Day included.
+    pub mode_next: crate::ilmari::IlmariMode,
+    /// Judgment Day: players whose one revive of the running pull is spent.
+    pub spent: Vec<EntityId>,
     pub week: u32,
     /// Encounters (zone boss keys, `async:`-prefixed for Async Attendance) killed this week.
     pub locked: Vec<String>,
@@ -258,6 +266,8 @@ impl RaidView {
     pub fn key(&self, boss: &str) -> String {
         if self.story {
             format!("{STORY_PREFIX}{boss}")
+        } else if self.mode == crate::ilmari::IlmariMode::Judgment {
+            format!("{JUDGMENT_PREFIX}{boss}")
         } else {
             lock_key(boss, self.async_mode)
         }
@@ -301,10 +311,12 @@ struct Tether {
 pub(crate) struct RaidState {
     async_mode: bool,
     /// QA/tests: the difficulty regardless of group size.
-    force: Option<bool>,
-    /// An Ilmari wing's difficulty as the group lead picked it (`true`: Story); `None` follows
-    /// the group size (solo and pairs get Story, three or more Full).
-    pick: Option<bool>,
+    pub(crate) force: Option<bool>,
+    /// An Ilmari wing's difficulty as the group lead picked it; `None` follows the group size
+    /// (solo and pairs get Story, three or more Full).
+    pub(crate) pick: Option<crate::ilmari::IlmariMode>,
+    /// The loaded wing's difficulty (`Full` outside an Ilmari wing).
+    pub(crate) mode: crate::ilmari::IlmariMode,
     /// The loaded wing runs on Story. Implies `async_mode`, which carries the scaling and loot.
     pub(crate) story: bool,
     lock: Lockout,
@@ -373,6 +385,13 @@ impl Sim {
             async_mode: self.raid.async_mode,
             story: self.raid.story,
             story_next: self.content.raids.iter().any(|r| r.ilmari) && self.wing_story(),
+            mode: self.raid.mode,
+            mode_next: if self.content.raids.iter().any(|r| r.ilmari) {
+                self.wing_mode(None)
+            } else {
+                Default::default()
+            },
+            spent: self.jd_spent(),
             week,
             // Dungeon and raid locks share one list; boss keys are unique across both.
             locked: {
@@ -400,7 +419,17 @@ impl Sim {
 
     /// The lockout key of `boss` on a difficulty: in an Ilmari wing the reduced one is Story.
     fn key_of(&self, boss: &str, async_mode: bool) -> String {
-        if async_mode && self.raid_def_of_boss(boss).is_some_and(|r| r.ilmari) {
+        let ilmari = self.raid_def_of_boss(boss).filter(|r| r.ilmari);
+        if self.raid.mode == crate::ilmari::IlmariMode::Judgment
+            && !async_mode
+            && ilmari.is_some_and(|r| {
+                r.zones
+                    .first()
+                    .is_some_and(|z| crate::judgment::is_judgment_zone(z))
+            })
+        {
+            format!("{JUDGMENT_PREFIX}{boss}")
+        } else if async_mode && ilmari.is_some() {
             format!("{STORY_PREFIX}{boss}")
         } else {
             lock_key(boss, async_mode)
@@ -410,24 +439,7 @@ impl Sim {
     /// Whether the next Ilmari wing loads on Story: QA force, else the lead's pick, else by group
     /// size (the wings' `normal_min_players`).
     pub(crate) fn wing_story(&self) -> bool {
-        let min = self
-            .content
-            .raids
-            .iter()
-            .find(|r| r.ilmari)
-            .map_or(3, |r| usize::from(r.normal_min_players));
-        self.raid
-            .force
-            .or(self.raid.pick)
-            .unwrap_or(self.players.len() < min)
-    }
-
-    /// `Command::SetIlmariStory`: the group lead picks the wings' difficulty.
-    pub(crate) fn set_ilmari_story(&mut self, actor: EntityId, story: bool) {
-        if self.players.first() == Some(&actor) && self.raid.pick != Some(story) {
-            self.raid.pick = Some(story);
-            self.raid_broadcast();
-        }
+        self.wing_mode(None) == crate::ilmari::IlmariMode::Story
     }
 
     pub(crate) fn raid_broadcast(&mut self) {
@@ -440,6 +452,7 @@ impl Sim {
         // The wing switch alone is not news to a player outside every raid.
         let quiet = RaidView {
             story_next: false,
+            mode_next: Default::default(),
             ..view.clone()
         };
         if quiet != RaidView::default() {
@@ -476,18 +489,26 @@ impl Sim {
         match def {
             // A wing's difficulty is a choice; Story is the Async scaling under its own name.
             Some((_, true)) => {
-                self.raid.story = self.wing_story();
+                self.raid.mode = self.wing_mode(Some(id));
+                self.raid.story = self.raid.mode == crate::ilmari::IlmariMode::Story;
                 self.raid.async_mode = self.raid.story;
             }
             Some((min, false)) => {
+                self.raid.mode = crate::ilmari::IlmariMode::Full;
                 self.raid.story = false;
                 self.raid.async_mode = self
                     .raid
                     .force
                     .unwrap_or(self.players.len() < usize::from(min));
             }
-            None => self.raid.story = false,
+            None => {
+                self.raid.mode = crate::ilmari::IlmariMode::Full;
+                self.raid.story = false;
+            }
         }
+        self.ilmari.jd_spent.clear();
+        self.sight_on_load();
+        self.offers_on_load();
         self.raid.announce = min.is_some() || was;
     }
 
@@ -561,6 +582,10 @@ impl Sim {
     /// Async Attendance enemy (HP %, damage %) in a raid; 100/100 elsewhere.
     pub(crate) fn raid_mob_pct(&self) -> (u32, u32) {
         match self.cur_raid() {
+            Some(_) if self.raid.mode == crate::ilmari::IlmariMode::Judgment => {
+                let jd = &self.content.ilmari.judgment;
+                (jd.hp_pct, jd.damage_pct)
+            }
             Some(r) if self.raid.async_mode => (r.async_hp_pct, r.async_damage_pct),
             _ => (100, 100),
         }
@@ -845,6 +870,7 @@ impl Sim {
         self.update_hr();
         self.update_wing3();
         self.update_wing4();
+        self.update_judgment();
     }
 
     // ---- kills, loot, lockout ----
@@ -882,6 +908,7 @@ impl Sim {
         self.raid.tethers.clear();
         self.raid_pay_tokens(self.raid.story);
         let mode = match (async_mode, self.raid.story) {
+            _ if self.raid.mode == crate::ilmari::IlmariMode::Judgment => "judgment",
             (_, true) => "story",
             (true, _) => "async",
             _ => "normal",
@@ -975,6 +1002,11 @@ impl Sim {
         let locked = r.is_dungeon() && self.raid_locked(&u.state.key, self.raid.async_mode);
         Some(match (u.floor_boss, self.raid.async_mode) {
             _ if locked => (0, 0, 0),
+            (true, false) if self.raid.mode == crate::ilmari::IlmariMode::Judgment => (
+                self.content.ilmari.judgment.boss_items.max(1),
+                100,
+                legendary,
+            ),
             (true, false) => (r.boss_items.max(1), 100, legendary),
             (true, true) => (1, r.async_item_pct, legendary / 2),
             (false, _) => (0, 0, 0),
@@ -1018,6 +1050,7 @@ impl Sim {
                     || bosses.iter().any(|b| {
                         k.strip_prefix(ASYNC_PREFIX)
                             .or_else(|| k.strip_prefix(STORY_PREFIX))
+                            .or_else(|| k.strip_prefix(JUDGMENT_PREFIX))
                             .unwrap_or(k)
                             == b
                     })

@@ -438,6 +438,16 @@ impl Sim {
                 _,
             ) => self.summon_mirror(ci, [tank, healer, damage], aura, *life_ms),
             (
+                Effect::SummonSquad {
+                    per_role,
+                    filler,
+                    side,
+                    min_bodies,
+                },
+                _,
+            ) => self.summon_squad(ci, per_role, filler, *side, *min_bodies),
+            (Effect::Offer(def), _) => self.offer_wave(ci, spell.range_m, def),
+            (
                 Effect::SwarmWave {
                     unit,
                     clusters,
@@ -613,7 +623,7 @@ impl Sim {
     /// Revives a dead player where it fell, keeping its cooldowns (unlike a graveyard release).
     fn resurrect(&mut self, ti: usize, by: EntityId, hp_pct: u32, mana_pct: u32) {
         let unit = Self::id_of(ti);
-        if self.units[ti].state.alive || !self.is_player(unit) {
+        if self.units[ti].state.alive || !self.is_player(unit) || !self.jd_revive_ok(unit) {
             return;
         }
         let regen_next = self.now + ticks(self.content.config.regen.interval_ms);
@@ -847,6 +857,7 @@ impl Sim {
         self.units[ti].auras.retain(|a| a.key != key);
         let removed = self.units[ti].auras.len() != before;
         if removed {
+            self.offers_on_removed(ti, key, reason);
             self.events.push(Event::AuraRemoved {
                 target: Self::id_of(ti),
                 key: key.to_string(),

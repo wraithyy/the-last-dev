@@ -90,6 +90,9 @@ pub struct SaveData {
     /// played (`ilmari_flags`); optional keys, old saves load as locked.
     pub ilmari_stamp: Option<crate::ilmari::IlmariStamp>,
     pub ilmari_revealed: bool,
+    /// Ilmari killed on Full at least once: the key to Judgment Day (second field of
+    /// `ilmari_flags`); optional, old saves load as not cleared.
+    pub ilmari_core_full: bool,
     /// Ilmari Tokens earned this ISO week (`ilmari_tok`: week, count); optional key.
     pub ilmari_tokens: (u32, u32),
     /// The companion loadout (`companions`, unit keys); optional key, none by default.
@@ -228,10 +231,11 @@ impl SaveData {
                 "ilmari_at={},{},{}\n",
                 st.unix_secs, st.utc_offset_min, st.tz
             ));
-            // revealed, phase, attunement bits: the last two belong to later Ilmari builds.
+            // revealed, core cleared on Full, attunement bits (the last belongs to a later build).
             out.push_str(&format!(
-                "ilmari_flags={},0,0\n",
-                u8::from(self.ilmari_revealed)
+                "ilmari_flags={},{},0\n",
+                u8::from(self.ilmari_revealed),
+                u8::from(self.ilmari_core_full)
             ));
         }
         if self.ilmari_tokens.1 > 0 {
@@ -374,7 +378,9 @@ impl SaveData {
                         .collect();
                 }
                 "ilmari_flags" => {
-                    s.ilmari_revealed = v.split(',').next().is_some_and(|r| r.trim() == "1");
+                    let mut f = v.split(',').map(str::trim);
+                    s.ilmari_revealed = f.next() == Some("1");
+                    s.ilmari_core_full = f.next() == Some("1");
                 }
                 "minigames" => {
                     s.minigames = list(v)
@@ -567,6 +573,7 @@ impl Sim {
             marie_met: self.marie_met(player),
             ilmari_stamp: self.ilmari.stamp.clone(),
             ilmari_revealed: self.ilmari.revealed,
+            ilmari_core_full: self.ilmari.core_full,
             ilmari_tokens: self.ilmari.tokens.get(&player).copied().unwrap_or_default(),
             companions: self.companion_picks(player),
             quest_days: self
@@ -694,7 +701,11 @@ impl Sim {
         self.set_minigame_bests(player, &save.minigames);
         self.restore_taken_props(player, &save.taken_props);
         self.restore_marie_met(player, save.marie_met);
-        self.restore_ilmari(save.ilmari_stamp.clone(), save.ilmari_revealed);
+        self.restore_ilmari(
+            save.ilmari_stamp.clone(),
+            save.ilmari_revealed,
+            save.ilmari_core_full,
+        );
         self.restore_ilmari_tokens(player, save.ilmari_tokens.0, save.ilmari_tokens.1);
         self.set_companion_picks(player, &save.companions);
         let class = self.class_at(i).map(|c| c.key.clone()).unwrap_or_default();

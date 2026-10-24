@@ -179,6 +179,17 @@ fn every_item_is_reachable_from_some_source() {
         })
         .collect();
     let top = eco.campaign_top_tier();
+    // Ilmari 1.0's sets, Legendaries, fragments and Roomba parts are data until D6-D13 attach their
+    // bosses (docs/ILMARI_1_0.md D4); `tests/ilmari_band.rs` guards them instead.
+    let r = &c.ilmari.rewards;
+    let pending: Vec<&str> = r
+        .tier_sets
+        .iter()
+        .flat_map(|s| s.pieces.iter().map(|p| p.gear.as_str()))
+        .chain(r.legendaries.iter().map(|l| l.gear.as_str()))
+        .chain([r.fragment.as_str()])
+        .chain(r.mount.iter().map(|m| m.part_item.as_str()))
+        .collect();
     let mut bad = Vec::new();
     for g in &eco.gear {
         let ok = match &g.source {
@@ -196,7 +207,9 @@ fn every_item_is_reachable_from_some_source() {
             // Brenda's shelf until the wings drop their own: above the cap, sold for tokens.
             GearSource::Ilmari => {
                 g.ilvl > combat_core::BASE_ILVL_CAP
-                    && (shelves.contains(&&g.name) || g.drops_from.is_some())
+                    && (shelves.contains(&&g.name)
+                        || g.drops_from.is_some()
+                        || pending.contains(&g.name.as_str()))
             }
             // Medal rewards only: some medal must hand it out, and no vendor sells it.
             GearSource::Minigame => {
@@ -232,7 +245,8 @@ fn every_item_is_reachable_from_some_source() {
     let paid = c.quests.iter().any(|q| q.reward.tokens > 0);
     for t in &c.items {
         let token_paid = paid && t.name == combat_core::ilmari::TOKEN;
-        if !trophy_sources.contains(&&t.name) && !token_paid {
+        if !trophy_sources.contains(&&t.name) && !token_paid && !pending.contains(&t.name.as_str())
+        {
             bad.push(format!("trophy {}", t.name));
         }
     }

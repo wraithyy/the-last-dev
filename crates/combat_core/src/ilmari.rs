@@ -11,6 +11,7 @@ use crate::economy::GearSource;
 use crate::live::week_index;
 use crate::sim::Sim;
 use crate::targeting::EntityId;
+use serde::{Deserialize, Serialize};
 
 /// The quest the Opening completes; its giver is the reveal Marie.
 pub const OPENING_QUEST: &str = "il_00_wake";
@@ -34,30 +35,53 @@ pub const OCCUPIED_ZONE: &str = "campus_occupied";
 pub const BASE_ZONE: &str = "resistance/1";
 
 /// How hard an Ilmari encounter bites. Story is always on offer, any group size, solo included;
-/// Full is the authored unit at the Ilmari item band (docs/ILMARI_09.md B.3). The wings read this
-/// to scale their units and key their lockouts; the open-world phase has a single difficulty.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum IlmariDifficulty {
+/// Full is the authored unit at the Ilmari item band (docs/ILMARI_09.md B.3); Judgment Day is
+/// Full plus the `JudgmentDef` numbers and riders for a quorum of humans (docs/ILMARI_1_0.md D.1).
+/// The wings read this to scale their units and key their lockouts; the open-world phase has a
+/// single difficulty.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IlmariMode {
     Story,
+    #[default]
     Full,
+    Judgment,
 }
 
-impl IlmariDifficulty {
-    /// (HP %, damage %) of the authored unit: Story reuses the raid's Async figures.
-    pub fn scale(self, raid: &crate::raid::RaidDef) -> (u32, u32) {
+/// The name 0.9 and 0.10 gave the Story / Full pair.
+pub type IlmariDifficulty = IlmariMode;
+
+impl IlmariMode {
+    /// (HP %, damage %) of the authored unit: Story reuses the raid's Async figures, Judgment
+    /// sits on top of Full.
+    pub fn scale(
+        self,
+        raid: &crate::raid::RaidDef,
+        jd: &crate::judgment::JudgmentDef,
+    ) -> (u32, u32) {
         match self {
-            IlmariDifficulty::Story => (raid.async_hp_pct, raid.async_damage_pct),
-            IlmariDifficulty::Full => (100, 100),
+            IlmariMode::Story => (raid.async_hp_pct, raid.async_damage_pct),
+            IlmariMode::Full => (100, 100),
+            IlmariMode::Judgment => (jd.hp_pct, jd.damage_pct),
         }
     }
 
-    /// Prefix of the weekly lockout key (Story and Full lock separately).
+    /// Prefix of the weekly lockout key (every mode locks separately).
     pub fn lock_prefix(self) -> &'static str {
         match self {
-            IlmariDifficulty::Story => "story:",
-            IlmariDifficulty::Full => "",
+            IlmariMode::Story => crate::raid::STORY_PREFIX,
+            IlmariMode::Full => "",
+            IlmariMode::Judgment => crate::raid::JUDGMENT_PREFIX,
         }
     }
+}
+
+/// Everything Ilmari 1.0 adds to the content (all optional: minimal test content has none).
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct IlmariDef {
+    #[serde(default)]
+    pub judgment: crate::judgment::JudgmentDef,
+    #[serde(default)]
+    pub rewards: crate::rewards::RewardsDef,
 }
 
 /// Whether `zone` is Ilmari content: Ilmari gear bonuses work here and nowhere else.
@@ -87,6 +111,11 @@ pub(crate) struct IlmariState {
     /// Tick of the first stamp or reveal from a non-lead member; after `LEAD_GRACE_MS` any
     /// member may finish the Opening, so an AFK lead cannot block the room.
     pub(crate) asked_at: Option<u64>,
+    /// The room's sim has killed Ilmari on Full at least once: the key to Judgment Day. The core
+    /// sets it (`mark_core_full_clear`); a save carries it, online it is the room's own progress.
+    pub(crate) core_full: bool,
+    /// Judgment Day: players who spent their one revive in the pull that is running.
+    pub(crate) jd_spent: std::collections::BTreeSet<EntityId>,
 }
 
 /// How long the room waits for its lead to stamp and reveal before any member may.
@@ -386,8 +415,14 @@ impl Sim {
 
     /// Restores the saved stamp and flag (`ilmari_at`, `ilmari_flags`). A flag without a stamp
     /// (hand-edited save) is dropped so the Opening can stamp again.
-    pub(crate) fn restore_ilmari(&mut self, stamp: Option<IlmariStamp>, revealed: bool) {
+    pub(crate) fn restore_ilmari(
+        &mut self,
+        stamp: Option<IlmariStamp>,
+        revealed: bool,
+        core_full: bool,
+    ) {
         self.ilmari.revealed = revealed && stamp.is_some();
+        self.ilmari.core_full = core_full && stamp.is_some();
         self.ilmari.stamp = stamp;
     }
 }
@@ -397,18 +432,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn story_reuses_the_async_figures_and_full_is_the_authored_unit() {
+    fn story_reuses_the_async_figures_full_is_authored_and_judgment_sits_on_full() {
         let raid = crate::raid::RaidDef {
             async_hp_pct: 40,
             async_damage_pct: 50,
             ..Default::default()
         };
-        assert_eq!(IlmariDifficulty::Story.scale(&raid), (40, 50));
-        assert_eq!(IlmariDifficulty::Full.scale(&raid), (100, 100));
-        assert_ne!(
-            IlmariDifficulty::Story.lock_prefix(),
-            IlmariDifficulty::Full.lock_prefix()
-        );
+        let jd = crate::judgment::JudgmentDef::default();
+        assert_eq!(IlmariMode::Story.scale(&raid, &jd), (40, 50));
+        assert_eq!(IlmariMode::Full.scale(&raid, &jd), (100, 100));
+        assert_eq!(IlmariMode::Judgment.scale(&raid, &jd), (130, 125));
+        let prefixes = [
+            IlmariMode::Story.lock_prefix(),
+            IlmariMode::Full.lock_prefix(),
+            IlmariMode::Judgment.lock_prefix(),
+        ];
+        assert_eq!(prefixes, ["story:", "", "jd:"]);
     }
 
     #[test]
