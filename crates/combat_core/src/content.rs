@@ -740,6 +740,17 @@ pub struct TelegraphDef {
     /// copy `k` lands `(k + 1) * step_m` ahead, `k * step_ms` after the first (a creeping trail).
     #[serde(default)]
     pub march: bool,
+    /// The shape fires this many more times, `repeat_ms` after each landing, in the same place
+    /// (Circle Back; the Roadmap's lines that stay on the floor). A repeat is painted the moment
+    /// the previous one lands, so the floor shows where the next one will come.
+    #[serde(default)]
+    pub repeat: u8,
+    #[serde(default)]
+    pub repeat_ms: u32,
+    /// Paints at this (right, forward) offset from the caster's spawn point in its spawn facing,
+    /// wherever the caster stands: the Boardroom's floor tiles.
+    #[serde(default)]
+    pub anchor: Option<(f32, f32)>,
     /// Floor text of the decal ("Meeting room booked").
     pub label: String,
 }
@@ -1284,6 +1295,9 @@ pub enum EncounterDef {
     Outage(OutageDef),
     /// Red Team Blue Team: the exercise is on standby until somebody is seen (docs/ILMARI_1_0.md D.3).
     Squads(crate::wing5::SquadsDef),
+    /// The Chief Ilmari Officer: desks, the inbox, the two-kick landing and the severance meter
+    /// (docs/ILMARI_1_0.md D.4).
+    Boardroom(Box<crate::wing6::BoardroomDef>),
 }
 
 /// The cloud bill: a meter of 0..=1000 points that grows with the living replicas.
@@ -2119,6 +2133,7 @@ impl Content {
                     || t.count == 0
                     || t.label.is_empty()
                     || !cover_ok
+                    || (t.repeat > 0) != (t.repeat_ms > 0)
                 {
                     return bad(format!(
                         "spell {} telegraph needs a positive shape, delay, count, a label and a cover radius with cover",
@@ -2235,6 +2250,12 @@ impl Content {
                 Some(EncounterDef::Squads(q)) if !q.validate(self, &u.key) || !u.boss => {
                     return bad(format!(
                         "unit {} squads encounter needs known auras, a merge phase, times and a boss",
+                        u.key
+                    ));
+                }
+                Some(EncounterDef::Boardroom(b)) if !b.validate(self, &u.key) || !u.boss => {
+                    return bad(format!(
+                        "unit {} boardroom encounter needs known spells, auras and units, and a boss",
                         u.key
                     ));
                 }

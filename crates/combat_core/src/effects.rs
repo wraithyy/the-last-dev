@@ -324,7 +324,10 @@ impl Sim {
                 );
             }
             (Effect::Interrupt { lockout_ms }, Some(ti)) => {
-                self.cancel_cast(ti, Some(caster), *lockout_ms);
+                // The Chief Ilmari Officer's landing needs a second kicker (`wing6.rs`).
+                if !self.wing6_hold_interrupt(ti, caster) {
+                    self.cancel_cast(ti, Some(caster), *lockout_ms);
+                }
             }
             (
                 Effect::Heal {

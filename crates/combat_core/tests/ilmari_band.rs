@@ -14,8 +14,8 @@ use common::content;
 const TOP: u8 = 20;
 /// Pieces that were at ilvl 20 before 1.0 and stay there: the Wing 2 review hoodie (a boss drop)
 /// and the Resistance notebook (a vendor piece). Everything else at 20 is a D4 piece.
-/// The bosses whose tier pieces drop so far (D6, D7); the Chief Ilmari Officer's and Ilmari's wait for D9-D13.
-const DROPPING: [&str; 2] = ["il_align_consultant", "il_red_team"];
+/// The bosses whose tier pieces drop so far (D6, D7, D9); Ilmari's waits for D13.
+const DROPPING: [&str; 3] = ["il_align_consultant", "il_red_team", "il_cio"];
 const GRANDFATHERED: [&str; 2] = [
     "Exceeds Expectations Hoodie",
     "Last Paper Notebook in the Building",

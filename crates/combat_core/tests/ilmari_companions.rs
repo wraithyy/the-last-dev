@@ -523,3 +523,42 @@ fn a_wing_five_replay_with_companions_is_bit_identical() {
         assert_eq!(fingerprint(zone, boss), fingerprint(zone, boss), "{boss}");
     }
 }
+
+/// Wing 6 (D9): the inbox and the Notified debuff read people, not companions, and the fight
+/// with company replays bit for bit, desks, tiles and parachute included.
+#[test]
+fn companions_are_never_notified_and_a_wing_six_replay_is_bit_identical() {
+    let fingerprint = |boss_hp_pct: u32| {
+        let (mut sim, ids) = room(1, true, 23);
+        let p = ids[0];
+        sim.set_companion_picks(p, &keys(&[DALE, RUPERT]));
+        load(&mut sim, "ilmari6/3");
+        let boss = unit_of(&sim, "il_cio").expect("boss");
+        open_on(&mut sim, p, boss);
+        let mut log = Vec::new();
+        for k in 0..70 * SECOND {
+            log.extend(sim.tick());
+            if k == 10 * SECOND {
+                let max = sim.unit(boss).expect("boss").max_hp;
+                sim.debug_set_hp(boss, max * boss_hp_pct / 100);
+            }
+        }
+        let mine = sim.companions_of(p);
+        assert_eq!(mine.len(), 2, "company came");
+        assert!(
+            !log.iter().any(|e| matches!(
+                e,
+                Event::AuraApplied { target, key } if mine.contains(target) && key == "il_notified"
+            )),
+            "a companion was notified"
+        );
+        let pos: Vec<Vec3> = mine
+            .iter()
+            .map(|c| sim.unit(*c).expect("unit").pos)
+            .collect();
+        format!("{log:?}{pos:?}")
+    };
+    for pct in [50, 20] {
+        assert_eq!(fingerprint(pct), fingerprint(pct), "at {pct}%");
+    }
+}

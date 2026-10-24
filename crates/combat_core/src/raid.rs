@@ -462,6 +462,7 @@ impl Sim {
         self.wing3_on_join(player);
         self.wing4_on_join(player);
         self.wing5_on_join(player);
+        self.wing6_on_join(player);
     }
 
     /// The door from outside into a raid opens only with everyone at the level cap (a dungeon:
@@ -872,6 +873,7 @@ impl Sim {
         self.update_wing3();
         self.update_wing4();
         self.update_wing5();
+        self.update_wing6();
         self.update_judgment();
     }
 

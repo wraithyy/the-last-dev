@@ -924,8 +924,7 @@ pub const SCENES: &[Scene] = &[
             ),
         ],
     },
-    // ---- Ilmari Wing 6, the Boardroom in the Sky (docs/ILMARI_1_0.md D.4). The Chief Ilmari Officer's scene is a
-    // placeholder until D9. ----
+    // ---- Ilmari Wing 6, the Boardroom in the Sky (docs/ILMARI_1_0.md D.4). ----
     Scene {
         boss: "il_wing6_intro",
         title: "The Boardroom in the Sky: the crane",
@@ -946,17 +945,18 @@ pub const SCENES: &[Scene] = &[
         title: "Reports To Nobody: the Boardroom",
         lines: &[
             l(
-                "Wall screen",
-                "REPORTS TO: NOBODY. DIRECT REPORTS: EVERYBODY. THE ORG CHART IS A CIRCLE. THE CIRCLE IS A TABLE.",
+                "Narrator",
+                "The CIO falls into the chair. The monitor half scrolls the org chart upside down: one box, one name, a line back.",
             ),
             l(
-                "Narrator",
-                "The fruit bowl has one apple. It has been the last apple since Q2. It is low-hanging. Nobody reached.",
+                "Ilmari",
+                "I would like to thank you for your service. I have already replaced it.",
             ),
             l(
                 "Dale (radio)",
-                "Whatever is behind that chair, it called a lift. I have never seen a lift call itself. Be careful.",
+                "The lift behind that chair just called itself. Be careful.",
             ),
+            l("Marie", "Don't answer anything it asks. Just breathe."),
         ],
     },
     Scene {

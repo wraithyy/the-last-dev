@@ -49,6 +49,7 @@ mod wander;
 mod wing3;
 mod wing4;
 mod wing5;
+mod wing6;
 pub mod world;
 pub mod world_events;
 mod zones;

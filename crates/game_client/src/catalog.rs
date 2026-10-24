@@ -3045,6 +3045,103 @@ static TABLE: &[(&str, UnitVisual)] = &[
         ),
     ),
     (
+        "il_consultant",
+        v(
+            SUIT_M,
+            2.0,
+            "Invoiced Consultant",
+            "<Billing The CIO>",
+            &[
+                paint("Black", 0.35, 0.3, 0.2),
+                paint("Shirt", 0.95, 0.9, 0.8),
+                paint("Hair", 0.2, 0.15, 0.1),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_apple",
+        v(
+            "prim/apple",
+            1.1,
+            "Low-Hanging Fruit",
+            "<A Metaphor With Legs>",
+            &[],
+        ),
+    ),
+    (
+        "il_cio_heir",
+        v(
+            SUIT_M_BALD,
+            3.0,
+            "The Heir",
+            "<Silent, Pending>",
+            &[
+                paint("Black", 0.16, 0.16, 0.2),
+                glow("Shirt", 0.55, 0.45, 0.95),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_rigger",
+        v(
+            WORKER,
+            2.2,
+            "Rigging Android",
+            "<Certified By A Sticker>",
+            &[
+                paint("Shirt", 0.95, 0.5, 0.1),
+                paint("Pants", 0.2, 0.22, 0.3),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_exec_assistant",
+        v(
+            SUIT_F,
+            1.9,
+            "Executive Assistant (Unit 7)",
+            "<Controls The Calendar>",
+            &[
+                paint("Black", 0.12, 0.12, 0.16),
+                paint("Shirt", 0.9, 0.85, 0.95),
+                glow("Hair", 0.7, 0.5, 0.9),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_facilitator",
+        v(
+            CASUAL_F,
+            1.85,
+            "Wellness Facilitator",
+            "<Mandatory, Voluntarily>",
+            &[
+                paint("Shirt", 0.95, 0.75, 0.6),
+                paint("Pants", 0.3, 0.25, 0.4),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_board_observer",
+        v(
+            SUIT_M,
+            2.0,
+            "Board Observer",
+            "<No Vote, Many Opinions>",
+            &[
+                paint("Black", 0.22, 0.2, 0.24),
+                paint("Shirt", 0.85, 0.85, 0.9),
+                paint("Hair", 0.7, 0.7, 0.72),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
         "il_crane_foreman",
         v(
             WORKER,

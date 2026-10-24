@@ -5,8 +5,8 @@
 //! a pigeon with a lanyard), ilmari6/2 the Executive Floor (open plan for ten, eleven people, a
 //! masseuse chair, a "wellness" room used for one-to-ones with a closed door) and ilmari6/3 the
 //! Boardroom (a table the length of a runway, eight chairs, a fruit bowl, a glass wall with the
-//! whole campus on it, five desks round the edge and the private lift behind the chair). The
-//! Chief Ilmari Officer's table is a placeholder until D9. No point lights (the 0.9 rule).
+//! whole campus on it, five desks round the edge, four inbox terminals, the floor grid of
+//! Right-Sizing and the private lift behind the chair). No point lights (the 0.9 rule).
 
 use super::datacenter::dress::*;
 use super::ilmari3::{arrival_kit, casing};
@@ -33,6 +33,14 @@ pub const DESKS: [(f32, f32); 5] = [
     (2.0, -17.5),
     (2.0, 17.5),
     (-20.0, 0.0),
+];
+/// The four inbox terminals of the Boardroom, offsets from the pod centre and the way each faces
+/// (the sign of its side, as the Lab's kiosks: -1 on the north wall, its screen looks toward +Z). The CIO's `New Message` is cleared at any one of them.
+pub const INBOXES: [(f32, f32, f32); 4] = [
+    (-20.0, -19.2, -1.0),
+    (-20.0, 19.2, 1.0),
+    (20.0, 19.2, 1.0),
+    (20.0, -19.2, -1.0),
 ];
 /// The Penthouse Lift: offset from the pod centre.
 pub const LIFT: (f32, f32) = (21.0, -3.0);
@@ -133,6 +141,58 @@ fn hat_rack(p: &mut Plan, x: f32, z: f32, face: Face, n: usize) {
             hard_hat(p, (k as f32 - (n as f32 - 1.0) / 2.0) * 0.5, 1.55, 0.25);
         }
     });
+}
+
+/// An inbox terminal: a lectern with a screen that never reaches zero, a glowing envelope and the
+/// sign. Any class may use it (`PropKind::Inbox`).
+fn inbox_terminal(p: &mut Plan, key: &'static str, x: f32, z: f32, face: f32) {
+    p.boxed(v(x, 0.55, z), v(1.2, 1.1, 0.7), Mat::Dark, true);
+    p.boxed(
+        v(x, 1.3, z - face * 0.2),
+        v(1.0, 0.6, 0.05),
+        Mat::ScreenGlow,
+        false,
+    );
+    // The envelope: a flat slab with a red flap, hovering over the lectern.
+    p.boxed(
+        v(x, 1.95, z - face * 0.1),
+        v(0.5, 0.32, 0.04),
+        Mat::Gold,
+        false,
+    );
+    p.boxed(
+        v(x, 2.04, z - face * 0.12),
+        v(0.5, 0.05, 0.05),
+        Mat::LedRed,
+        false,
+    );
+    p.boxed(v(x, 2.8, z), v(0.14, 1.6, 0.14), Mat::Metal, false);
+    p.sign(
+        v(x, 3.3, z - face * 0.1),
+        if face > 0.0 { PI } else { 0.0 },
+        2.2,
+        Sign::IlInbox,
+    );
+    p.interactable(key, v(x, 1.2, z), v(x, 0.0, z - face * 2.2));
+}
+
+/// The nine tiles of Right-Sizing, drawn as thin lines on the floor under the CIO: the floor plan
+/// the CIO is about to optimise. Tiles are 6.5 m, centred on the boss.
+fn tile_grid(p: &mut Plan, cx: f32, cz: f32) {
+    for k in [-9.75_f32, -3.25, 3.25, 9.75] {
+        p.boxed(
+            v(cx + k, 0.05, cz),
+            v(0.08, 0.04, 19.5),
+            Mat::NeonYellow,
+            false,
+        );
+        p.boxed(
+            v(cx, 0.055, cz + k),
+            v(19.5, 0.04, 0.08),
+            Mat::NeonYellow,
+            false,
+        );
+    }
 }
 
 /// A length of crane lattice standing up the wall: two legs, braces, a warning light on top.
@@ -392,6 +452,38 @@ fn fruit_bowl(p: &mut Plan, x: f32, z: f32) {
     }
 }
 
+/// The contents of cleared desks: boxes with a plant and an apple on top, standing on the tiles
+/// Right-Sizing takes first, and a fruit bowl at every desk (the last apple has opinions).
+fn cleared_desks(p: &mut Plan, cx: f32, cz: f32) {
+    for (k, (dx, dz)) in [
+        (-9.0_f32, -9.0_f32),
+        (9.0, 9.0),
+        (-9.0, 9.0),
+        (9.0, -9.0),
+        (0.0, -9.0),
+        (0.0, 9.0),
+        (-9.0, 0.0),
+        (9.0, 0.0),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (x, z) = (cx + dx, cz + dz);
+        models::put(p, &BOX_LARGE, v(x, 0.0, z), k as f32 * 0.7, 1.1, false);
+        models::put(p, &APPLE, v(x + 0.1, 0.62, z), k as f32, 0.5, false);
+        if k % 2 == 0 {
+            models::put(
+                p,
+                &BOX_LARGE,
+                v(x + 1.1, 0.0, z + 0.4),
+                1.2 + k as f32,
+                0.8,
+                false,
+            );
+        }
+    }
+}
+
 fn boardroom(p: &mut Plan) -> Theme {
     casing6(p, POD3, Mat::NeonYellow);
     windows(p, -10.9, &[-30.0, -20.0, -10.0, 0.0, 10.0]);
@@ -505,6 +597,17 @@ fn boardroom(p: &mut Plan) -> Theme {
     );
     floor_ring(p, cx, cz, 6.0, 28, Mat::NeonYellow, 0.12);
     floor_ring(p, cx, cz, 14.0, 48, Mat::Gold, 0.1);
+    tile_grid(p, cx, cz);
+    cleared_desks(p, cx, cz);
+    for (k, (dx, dz, face)) in INBOXES.into_iter().enumerate() {
+        let key = [
+            "prop:il_inbox_1",
+            "prop:il_inbox_2",
+            "prop:il_inbox_3",
+            "prop:il_inbox_4",
+        ][k];
+        inbox_terminal(p, key, cx + dx, cz + dz, face);
+    }
     p.sign(v(cx - 23.7, 3.4, 0.0), FRAC_PI_2, 4.6, Sign::IlRunway);
     p.sign(v(cx + 23.7, 3.4, 6.0), -FRAC_PI_2, 3.2, Sign::IlRoadmapWall);
     p.sign(v(cx + 23.7, 3.4, 12.0), -FRAC_PI_2, 3.2, Sign::IlFruitBowl);

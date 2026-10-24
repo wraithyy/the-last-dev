@@ -1,0 +1,3126 @@
+# campus playthrough, seed 11, start level 10
+[00001] zone campus loaded
+[00001] Backend Engineer wears ["CRT Monitor Helm (15 Inch, Degaussing)", "", "", "", ""]
+[00001] Backend Engineer bag: 0 items, 0 SP
+[00001] Backend Engineer wears ["CRT Monitor Helm (15 Inch, Degaussing)", "Hoodie of the Last Flash Developer", "", "", ""]
+[00001] Backend Engineer bag: 0 items, 0 SP
+[00001] Backend Engineer wears ["CRT Monitor Helm (15 Inch, Degaussing)", "Hoodie of the Last Flash Developer", "The Mainframe's Own Keyboard (Do Not Reboot)", "", ""]
+[00001] Backend Engineer bag: 0 items, 0 SP
+[00001] Backend Engineer wears ["CRT Monitor Helm (15 Inch, Degaussing)", "Hoodie of the Last Flash Developer", "The Mainframe's Own Keyboard (Do Not Reboot)", "SOAP Envelope Mug (Overly Verbose)", ""]
+[00001] Backend Engineer bag: 0 items, 0 SP
+[00001] Backend Engineer wears ["CRT Monitor Helm (15 Inch, Degaussing)", "Hoodie of the Last Flash Developer", "The Mainframe's Own Keyboard (Do Not Reboot)", "SOAP Envelope Mug (Overly Verbose)", "Lanyard of Root Access (Shared Since 1998)"]
+[00001] Backend Engineer bag: 0 items, 0 SP
+[00001] Fullstack Engineer wears ["Crown of the COBOL Elder", "", "", "", ""]
+[00001] Fullstack Engineer bag: 0 items, 0 SP
+[00001] Fullstack Engineer wears ["Crown of the COBOL Elder", "Enterprise JavaBean Bag Hoodie", "", "", ""]
+[00001] Fullstack Engineer bag: 0 items, 0 SP
+[00001] Fullstack Engineer wears ["Crown of the COBOL Elder", "Enterprise JavaBean Bag Hoodie", "The Mainframe's Own Keyboard (Do Not Reboot)", "", ""]
+[00001] Fullstack Engineer bag: 0 items, 0 SP
+[00001] Fullstack Engineer wears ["Crown of the COBOL Elder", "Enterprise JavaBean Bag Hoodie", "The Mainframe's Own Keyboard (Do Not Reboot)", "ColdFusion Mug (Lukewarm Since 2001)", ""]
+[00001] Fullstack Engineer bag: 0 items, 0 SP
+[00001] Fullstack Engineer wears ["Crown of the COBOL Elder", "Enterprise JavaBean Bag Hoodie", "The Mainframe's Own Keyboard (Do Not Reboot)", "ColdFusion Mug (Lukewarm Since 2001)", "COBOL Punch-Card Lanyard"]
+[00001] Fullstack Engineer bag: 0 items, 0 SP
+[00001] Frontend Developer wears ["Crown of the COBOL Elder", "", "", "", ""]
+[00001] Frontend Developer bag: 0 items, 0 SP
+[00001] Frontend Developer wears ["Crown of the COBOL Elder", "Hoodie of the Last Flash Developer", "", "", ""]
+[00001] Frontend Developer bag: 0 items, 0 SP
+[00001] Frontend Developer wears ["Crown of the COBOL Elder", "Hoodie of the Last Flash Developer", "IBM 3270 Keyboard of Green Screens", "", ""]
+[00001] Frontend Developer bag: 0 items, 0 SP
+[00001] Frontend Developer wears ["Crown of the COBOL Elder", "Hoodie of the Last Flash Developer", "IBM 3270 Keyboard of Green Screens", "Mug Still Running Windows XP Embedded", ""]
+[00001] Frontend Developer bag: 0 items, 0 SP
+[00001] Frontend Developer wears ["Crown of the COBOL Elder", "Hoodie of the Last Flash Developer", "IBM 3270 Keyboard of Green Screens", "Mug Still Running Windows XP Embedded", "Floppy Disk Badge (backup_FINAL_v2)"]
+[00001] Frontend Developer bag: 0 items, 0 SP
+[00002] #2 despawns
+[00002] #3 despawns
+[00002] #4 despawns
+[00002] #5 despawns
+[00002] #6 despawns
+[00002] #7 despawns
+[00002] #8 despawns
+[00002] #9 despawns
+[00002] #10 despawns
+[00002] #11 despawns
+[00002] #12 despawns
+[00002] #13 despawns
+[00002] #14 despawns
+[00002] #15 despawns
+[00002] #16 despawns
+[00002] #17 despawns
+[00002] #18 despawns
+[00002] #19 despawns
+[00002] #20 despawns
+[00002] #21 despawns
+[00002] #22 despawns
+[00002] #23 despawns
+[00002] #24 despawns
+[00002] #25 despawns
+[00002] #26 despawns
+[00002] #27 despawns
+[00002] #28 despawns
+[00002] #29 despawns
+[00002] #30 despawns
+[00002] #31 despawns
+[00002] #32 despawns
+[00002] #33 despawns
+[00002] #34 despawns
+[00002] #35 despawns
+[00002] #36 despawns
+[00002] #37 despawns
+[00002] #38 despawns
+[00002] #39 despawns
+[00002] #40 despawns
+[00002] #41 despawns
+[00002] #42 despawns
+[00002] #43 despawns
+[00002] #44 despawns
+[00002] #45 despawns
+[00002] #46 despawns
+[00002] #47 despawns
+[00002] #48 despawns
+[00002] #49 despawns
+[00002] #50 despawns
+[00002] #51 despawns
+[00002] #52 despawns
+[00002] #53 despawns
+[00002] #54 despawns
+[00002] #57 despawns
+[00002] #58 despawns
+[00002] #59 despawns
+[00002] #60 despawns
+[00002] #61 despawns
+[00002] #62 despawns
+[00002] #63 despawns
+[00002] #64 despawns
+[00002] raid "ilmari6/3" async false week 0 locked [] tethers []
+[00002] zone ilmari6/3 loaded
+[00003] Board Observer ai Chase
+[00003] Board Observer ai Chase
+[00003] Wellness Facilitator ai Chase
+[00003] Board Observer ai Chase
+[00003] Backend Engineer enters combat
+[00003] Board Observer enters combat
+[00003] Wellness Facilitator enters combat
+[00003] Board Observer enters combat
+[00003] Board Observer enters combat
+[00003] Board Observer yells: I am an observer. I observe that you are dying.
+[00004] Backend Engineer auto attack on
+[00004] Fullstack Engineer auto attack on
+[00004] Frontend Developer auto attack on
+[00004] Fullstack Engineer swings at Board Observer
+[00004] Fullstack Engineer hits Board Observer with melee for 13 (absorbed 0)
+[00004] Fullstack Engineer enters combat
+[00005] Fullstack Engineer auto attack off
+[00005] Fullstack Engineer auto attack on
+[00005] Fullstack Engineer casts git blame
+[00005] Fullstack Engineer yells: git blame says it was me. Three years ago. Under protest.
+[00005] Board Observer gains git_blame
+[00005] Board Observer ai Attack
+[00005] Board Observer swings at Backend Engineer
+[00005] Board Observer hits Backend Engineer with melee for 7 (absorbed 0)
+[00005] Board Observer ai Attack
+[00005] Board Observer swings at Backend Engineer
+[00005] Board Observer hits Backend Engineer with melee for 7 (absorbed 0)
+[00006] Backend Engineer auto attack off
+[00006] Backend Engineer auto attack on
+[00006] Backend Engineer casts Connection Pool
+[00006] Backend Engineer yells: Pool size twenty. You're all checked out.
+[00006] Backend Engineer hits Board Observer with Connection Pool for 64 (absorbed 0)
+[00006] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[00006] Backend Engineer hits Wellness Facilitator with Connection Pool for 64 (absorbed 0)
+[00006] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[00006] Backend Engineer hits Board Observer with Connection Pool for 64 (absorbed 0)
+[00006] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[00006] Backend Engineer hits Board Observer with Connection Pool for 64 (absorbed 0)
+[00006] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[00006] Frontend Developer auto attack off
+[00006] Frontend Developer auto attack on
+[00006] Frontend Developer casts Responsive Layout
+[00006] Frontend Developer yells: Mobile, tablet, desktop, smart fridge. All of you.
+[00006] Frontend Developer hits Board Observer with Responsive Layout for 205 (absorbed 0) CRIT
+[00006] Frontend Developer hits Wellness Facilitator with Responsive Layout for 137 (absorbed 0)
+[00006] Frontend Developer hits Board Observer with Responsive Layout for 137 (absorbed 0)
+[00006] Frontend Developer hits Board Observer with Responsive Layout for 205 (absorbed 0) CRIT
+[00006] Backend Engineer swings at Board Observer
+[00006] Backend Engineer hits Board Observer with melee for 18 (absorbed 0)
+[00006] Frontend Developer swings at Board Observer
+[00006] Frontend Developer hits Board Observer with melee for 15 (absorbed 0)
+[00006] Frontend Developer enters combat
+[00015] Board Observer ai Attack
+[00015] Board Observer swings at Backend Engineer
+[00015] Board Observer hits Backend Engineer with melee for 7 (absorbed 0)
+[00020] Wellness Facilitator ai Attack
+[00020] Wellness Facilitator swings at Backend Engineer
+[00020] Wellness Facilitator hits Backend Engineer with melee for 25 (absorbed 0)
+[00048] Fullstack Engineer begins Write It By Hand (3733 ms)
+[00050] Frontend Developer casts Rewrite It in a New Framework
+[00050] Frontend Developer hits Board Observer with Rewrite It in a New Framework for 759 (absorbed 0) CRIT
+[00050] Board Observer ai Chase
+[00051] Board Observer ai Attack
+[00052] Backend Engineer casts DROP TABLE
+[00052] Backend Engineer hits Board Observer with DROP TABLE for 535 (absorbed 0) CRIT
+[00052] Backend Engineer heals Backend Engineer with DROP TABLE for 32
+[00054] Frontend Developer swings at Board Observer
+[00054] Frontend Developer hits Board Observer with melee for 15 (absorbed 0)
+[00066] Backend Engineer swings at Board Observer
+[00066] Backend Engineer hits Board Observer with melee for 20 (absorbed 0)
+[00085] Board Observer casts Abstain
+[00085] Board Observer hits Backend Engineer with Abstain for 95 (absorbed 0)
+[00085] Board Observer yells: I abstain. I abstain loudly.
+[00092] Wellness Facilitator swings at Backend Engineer
+[00092] Wellness Facilitator hits Backend Engineer with melee for 25 (absorbed 0)
+[00094] Frontend Developer casts Infinite Scroll
+[00094] Board Observer gains infinite_scroll
+[00095] Board Observer swings at Backend Engineer
+[00095] Board Observer hits Backend Engineer with melee for 7 (absorbed 0)
+[00095] Board Observer swings at Frontend Developer
+[00095] Board Observer hits Frontend Developer with melee for 13 (absorbed 0)
+[00095] Fullstack Engineer hits Board Observer with git blame for 52 (absorbed 0)
+[00098] Backend Engineer casts Cache Invalidation
+[00098] Backend Engineer hits Board Observer with Cache Invalidation for 192 (absorbed 0)
+[00098] Backend Engineer heals Backend Engineer with Cache Invalidation for 11
+[00102] Frontend Developer swings at Board Observer
+[00102] Frontend Developer hits Board Observer with melee for 16 (absorbed 0)
+[00105] Board Observer swings at Backend Engineer
+[00105] Board Observer hits Backend Engineer with melee for 7 (absorbed 0)
+[00110] Board Observer casts Abstain
+[00110] Board Observer hits Frontend Developer with Abstain for 150 (absorbed 0)
+[00111] Frontend Developer casts Dark Mode
+[00111] Frontend Developer gains dark_mode
+[00111] Frontend Developer heals Frontend Developer with Dark Mode for 163
+[00113] Board Observer casts Abstain
+[00113] Board Observer hits Backend Engineer with Abstain for 95 (absorbed 0)
+[00126] Backend Engineer swings at Board Observer
+[00126] Backend Engineer hits Board Observer with melee for 16 (absorbed 0)
+[00137] Wellness Facilitator begins Mandatory Wellness Check (2000 ms)
+[00137] Wellness Facilitator ai Casting
+[00138] Backend Engineer auto attack off
+[00138] Backend Engineer auto attack on
+[00138] Fullstack Engineer auto attack off
+[00138] Fullstack Engineer auto attack on
+[00138] Frontend Developer auto attack off
+[00138] Frontend Developer auto attack on
+[00138] Frontend Developer casts Center the Div
+[00138] Wellness Facilitator gains centered
+[00138] Wellness Facilitator Mandatory Wellness Check interrupted by Frontend Developer (lockout 0 ms)
+[00139] Backend Engineer auto attack off
+[00139] Backend Engineer auto attack on
+[00139] Fullstack Engineer auto attack off
+[00139] Fullstack Engineer auto attack on
+[00139] Frontend Developer auto attack off
+[00139] Frontend Developer auto attack on
+[00144] Backend Engineer casts Rate Limiter
+[00144] Backend Engineer gains rate_limiter
+[00150] Frontend Developer swings at Board Observer
+[00150] Frontend Developer hits Board Observer with melee for 21 (absorbed 0)
+[00154] Frontend Developer hits Board Observer with Infinite Scroll for 52 (absorbed 0)
+[00160] Fullstack Engineer casts Write It By Hand
+[00160] Fullstack Engineer hits Board Observer with Write It By Hand for 701 (absorbed 0)
+[00160] Wellness Facilitator gains git_blame
+[00160] Board Observer loses git_blame (Death)
+[00160] Board Observer loses infinite_scroll (Death)
+[00160] Fullstack Engineer auto attack off
+[00160] Frontend Developer auto attack off
+[00160] Board Observer dies (killer Fullstack Engineer)
+[00160] Board Observer ai Dead
+[00160] Backend Engineer rank 0, 216 XP to the next
+[00160] Fullstack Engineer rank 0, 216 XP to the next
+[00160] Frontend Developer rank 0, 216 XP to the next
+[00160] Board Observer drops ["AI-Generated Motivational Quote"] and 33 SP
+[00160] Board Observer drops [] and 33 SP
+[00160] Board Observer drops [] and 17 SP
+[00160] Board Observer leaves combat
+[00160] Board Observer yells: Recorded... as... absent...
+[00161] Fullstack Engineer auto attack on
+[00161] Frontend Developer auto attack on
+[00161] Fullstack Engineer swings at Board Observer
+[00161] Fullstack Engineer hits Board Observer with melee for 10 (absorbed 0)
+[00162] Fullstack Engineer casts git blame
+[00162] Board Observer gains git_blame
+[00182] Frontend Developer casts Infinite Scroll
+[00182] Board Observer gains infinite_scroll
+[00185] Board Observer swings at Backend Engineer
+[00185] Board Observer hits Backend Engineer with melee for 0 (absorbed 5)
+[00186] Backend Engineer swings at Board Observer
+[00186] Backend Engineer hits Board Observer with melee for 21 (absorbed 0)
+[00190] Backend Engineer casts Connection Pool
+[00190] Backend Engineer hits Board Observer with Connection Pool for 64 (absorbed 0)
+[00190] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[00190] Backend Engineer hits Wellness Facilitator with Connection Pool for 64 (absorbed 0)
+[00190] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[00190] Backend Engineer hits Board Observer with Connection Pool for 64 (absorbed 0)
+[00190] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[00195] Board Observer swings at Backend Engineer
+[00195] Board Observer hits Backend Engineer with melee for 0 (absorbed 5)
+[00195] Board Observer casts Note For The Minutes
+[00195] Board Observer hits Fullstack Engineer with Note For The Minutes for 44 (absorbed 0)
+[00195] Fullstack Engineer gains il_flagged
+[00198] Frontend Developer swings at Board Observer
+[00198] Frontend Developer hits Board Observer with melee for 17 (absorbed 0)
+[00205] Fullstack Engineer begins Code Review (1866 ms)
+[00223] Board Observer casts Note For The Minutes
+[00223] Board Observer hits Backend Engineer with Note For The Minutes for 0 (absorbed 20)
+[00223] Backend Engineer gains il_flagged
+[00226] Frontend Developer casts CSS Combo
+[00226] Frontend Developer hits Board Observer with CSS Combo for 174 (absorbed 0)
+[00226] Board Observer gains specificity
+[00226] Board Observer gains specificity
+[00228] Wellness Facilitator loses centered (Expired)
+[00229] Wellness Facilitator ai Attack
+[00229] Wellness Facilitator swings at Backend Engineer
+[00229] Wellness Facilitator hits Backend Engineer with melee for 0 (absorbed 20)
+[00230] Wellness Facilitator casts One-To-One
+[00230] Wellness Facilitator hits Fullstack Engineer with One-To-One for 65 (absorbed 0)
+[00230] Fullstack Engineer gains wellness_survey
+[00230] Fullstack Engineer burnout 20 (Meeting)
+[00230] Fullstack Engineer Code Review interrupted by Wellness Facilitator (lockout 0 ms)
+[00231] Fullstack Engineer swings at Board Observer
+[00231] Fullstack Engineer hits Board Observer with melee for 13 (absorbed 0)
+[00236] Backend Engineer casts Blocking Call
+[00236] Backend Engineer hits Board Observer with Blocking Call for 84 (absorbed 0)
+[00236] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[00242] Frontend Developer hits Board Observer with Infinite Scroll for 52 (absorbed 0)
+[00246] Backend Engineer swings at Board Observer
+[00246] Backend Engineer hits Board Observer with melee for 21 (absorbed 0)
+[00246] Frontend Developer swings at Board Observer
+[00246] Frontend Developer hits Board Observer with melee for 18 (absorbed 0)
+[00250] Fullstack Engineer hits Wellness Facilitator with git blame for 52 (absorbed 0)
+[00252] Fullstack Engineer hits Board Observer with git blame for 52 (absorbed 0)
+[00270] Frontend Developer casts Responsive Layout
+[00270] Frontend Developer hits Board Observer with Responsive Layout for 205 (absorbed 0) CRIT
+[00270] Frontend Developer hits Wellness Facilitator with Responsive Layout for 137 (absorbed 0)
+[00270] Frontend Developer hits Board Observer with Responsive Layout for 205 (absorbed 0) CRIT
+[00275] Board Observer swings at Backend Engineer
+[00275] Board Observer hits Backend Engineer with melee for 0 (absorbed 6)
+[00276] Board Observer casts Abstain
+[00276] Board Observer hits Backend Engineer with Abstain for 13 (absorbed 64)
+[00276] Backend Engineer loses rate_limiter (Depleted)
+[00276] Board Observer yells: A question, not a vote. It is a very sharp question.
+[00282] Backend Engineer casts Blocking Call
+[00282] Backend Engineer hits Board Observer with Blocking Call for 84 (absorbed 0)
+[00282] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[00285] Fullstack Engineer swings at Board Observer
+[00285] Fullstack Engineer hits Board Observer with melee for 11 (absorbed 0)
+[00285] Board Observer swings at Backend Engineer
+[00285] Board Observer hits Backend Engineer with melee for 8 (absorbed 0)
+[00291] Frontend Developer loses dark_mode (Expired)
+[00294] Frontend Developer swings at Board Observer
+[00294] Frontend Developer hits Board Observer with melee for 20 (absorbed 0)
+[00300] Backend Engineer burnout 15 (Combat)
+[00300] Fullstack Engineer burnout 35 (Combat)
+[00300] Frontend Developer burnout 15 (Combat)
+[00301] Wellness Facilitator swings at Backend Engineer
+[00301] Wellness Facilitator hits Backend Engineer with melee for 28 (absorbed 0)
+[00302] Frontend Developer hits Board Observer with Infinite Scroll for 52 (absorbed 0)
+[00306] Backend Engineer swings at Board Observer
+[00306] Backend Engineer hits Board Observer with melee for 19 (absorbed 0)
+[00310] Board Observer casts Abstain
+[00310] Board Observer hits Backend Engineer with Abstain for 106 (absorbed 0)
+[00314] Frontend Developer casts Pixel Push
+[00314] Frontend Developer hits Board Observer with Pixel Push for 137 (absorbed 0)
+[00314] Board Observer gains specificity
+[00314] Board Observer ai Chase
+[00320] Fullstack Engineer loses wellness_survey (Expired)
+[00321] Fullstack Engineer begins Code Review (1866 ms)
+[00321] Board Observer ai Attack
+[00328] Backend Engineer casts Blocking Call
+[00328] Backend Engineer hits Board Observer with Blocking Call for 84 (absorbed 0)
+[00328] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[00340] Fullstack Engineer hits Wellness Facilitator with git blame for 52 (absorbed 0)
+[00342] Frontend Developer swings at Board Observer
+[00342] Frontend Developer hits Board Observer with melee for 18 (absorbed 0)
+[00342] Fullstack Engineer hits Board Observer with git blame for 52 (absorbed 0)
+[00358] Frontend Developer casts Pixel Push
+[00358] Frontend Developer hits Board Observer with Pixel Push for 137 (absorbed 0)
+[00358] Board Observer gains specificity
+[00362] Frontend Developer hits Board Observer with Infinite Scroll for 52 (absorbed 0)
+[00365] Board Observer swings at Backend Engineer
+[00365] Board Observer hits Backend Engineer with melee for 8 (absorbed 0)
+[00366] Backend Engineer swings at Board Observer
+[00366] Backend Engineer misses Board Observer with melee
+[00373] Wellness Facilitator swings at Backend Engineer
+[00373] Wellness Facilitator hits Backend Engineer with melee for 28 (absorbed 0)
+[00374] Backend Engineer casts Connection Pool
+[00374] Backend Engineer hits Board Observer with Connection Pool for 64 (absorbed 0)
+[00374] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[00374] Backend Engineer hits Wellness Facilitator with Connection Pool for 64 (absorbed 0)
+[00374] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[00374] Backend Engineer hits Board Observer with Connection Pool for 64 (absorbed 0)
+[00374] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[00374] Board Observer ai Chase
+[00375] Board Observer ai Attack
+[00375] Board Observer swings at Backend Engineer
+[00375] Board Observer misses Backend Engineer with melee
+[00375] Fullstack Engineer loses il_flagged (Expired)
+[00377] Fullstack Engineer casts Code Review
+[00377] Fullstack Engineer hits Board Observer with Code Review for 226 (absorbed 0)
+[00377] Board Observer gains code_smell
+[00377] Fullstack Engineer swings at Board Observer
+[00377] Fullstack Engineer hits Board Observer with melee for 10 (absorbed 0)
+[00378] Fullstack Engineer casts Postmortem
+[00378] Fullstack Engineer hits Board Observer with Postmortem for 837 (absorbed 0) CRIT
+[00378] Board Observer gains git_blame
+[00378] Board Observer loses git_blame (Death)
+[00378] Board Observer loses infinite_scroll (Death)
+[00378] Board Observer loses specificity (Death)
+[00378] Board Observer loses code_smell (Death)
+[00378] Fullstack Engineer auto attack off
+[00378] Frontend Developer auto attack off
+[00378] Board Observer dies (killer Fullstack Engineer)
+[00378] Board Observer ai Dead
+[00378] Backend Engineer rank 0, 432 XP to the next
+[00378] Fullstack Engineer rank 0, 432 XP to the next
+[00378] Frontend Developer rank 0, 432 XP to the next
+[00378] Board Observer drops ["Enterprise Service Bus Pass", "Lanyard From a Company That No Longer Exists"] and 31 SP
+[00378] Board Observer drops ["Mug Labelled 'TODO: Remove Before 2014'", "NDA for a Cancelled Product"] and 24 SP
+[00378] Board Observer drops [] and 19 SP
+[00378] Board Observer leaves combat
+[00378] Board Observer yells: Recorded... as... absent...
+[00379] Fullstack Engineer auto attack on
+[00379] Frontend Developer auto attack on
+[00402] Frontend Developer casts Pixel Push
+[00402] Frontend Developer hits Board Observer with Pixel Push for 156 (absorbed 0)
+[00402] Board Observer loses git_blame (Death)
+[00402] Backend Engineer auto attack off
+[00402] Fullstack Engineer auto attack off
+[00402] Frontend Developer auto attack off
+[00402] Board Observer dies (killer Frontend Developer)
+[00402] Board Observer ai Dead
+[00402] Backend Engineer rank 0, 648 XP to the next
+[00402] Fullstack Engineer rank 0, 648 XP to the next
+[00402] Frontend Developer rank 0, 648 XP to the next
+[00402] Board Observer drops [] and 24 SP
+[00402] Board Observer drops [] and 28 SP
+[00402] Board Observer drops [] and 20 SP
+[00402] Board Observer leaves combat
+[00403] Backend Engineer auto attack on
+[00403] Fullstack Engineer auto attack on
+[00403] Frontend Developer auto attack on
+[00403] Frontend Developer swings at Wellness Facilitator
+[00403] Frontend Developer hits Wellness Facilitator with melee for 18 (absorbed 0)
+[00403] Backend Engineer loses il_flagged (Expired)
+[00420] Backend Engineer casts Cache Invalidation
+[00420] Backend Engineer hits Wellness Facilitator with Cache Invalidation for 192 (absorbed 0)
+[00420] Backend Engineer heals Backend Engineer with Cache Invalidation for 11
+[00421] Fullstack Engineer begins Code Review (1866 ms)
+[00426] Backend Engineer swings at Wellness Facilitator
+[00426] Backend Engineer hits Wellness Facilitator with melee for 22 (absorbed 0)
+[00430] Fullstack Engineer hits Wellness Facilitator with git blame for 52 (absorbed 0)
+[00445] Wellness Facilitator swings at Backend Engineer
+[00445] Wellness Facilitator hits Backend Engineer with melee for 25 (absorbed 0)
+[00446] Frontend Developer casts Infinite Scroll
+[00446] Wellness Facilitator gains infinite_scroll
+[00451] Frontend Developer swings at Wellness Facilitator
+[00451] Frontend Developer hits Wellness Facilitator with melee for 16 (absorbed 0)
+[00466] Backend Engineer casts Blocking Call
+[00466] Backend Engineer hits Wellness Facilitator with Blocking Call for 84 (absorbed 0)
+[00466] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[00477] Fullstack Engineer casts Code Review
+[00477] Fullstack Engineer hits Wellness Facilitator with Code Review for 226 (absorbed 0)
+[00477] Wellness Facilitator gains code_smell
+[00477] Fullstack Engineer swings at Wellness Facilitator
+[00477] Fullstack Engineer hits Wellness Facilitator with melee for 9 (absorbed 0)
+[00478] Fullstack Engineer begins Refactor (2333 ms)
+[00486] Backend Engineer swings at Wellness Facilitator
+[00486] Backend Engineer hits Wellness Facilitator with melee for 19 (absorbed 0)
+[00490] Frontend Developer casts CSS Combo
+[00490] Frontend Developer hits Wellness Facilitator with CSS Combo for 174 (absorbed 0)
+[00490] Wellness Facilitator gains specificity
+[00490] Wellness Facilitator gains specificity
+[00499] Frontend Developer swings at Wellness Facilitator
+[00499] Frontend Developer hits Wellness Facilitator with melee for 18 (absorbed 0)
+[00506] Frontend Developer hits Wellness Facilitator with Infinite Scroll for 52 (absorbed 0)
+[00512] Backend Engineer casts Blocking Call
+[00512] Backend Engineer hits Wellness Facilitator with Blocking Call for 84 (absorbed 0)
+[00512] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[00517] Wellness Facilitator swings at Backend Engineer
+[00517] Wellness Facilitator hits Backend Engineer with melee for 25 (absorbed 0)
+[00520] Fullstack Engineer hits Wellness Facilitator with git blame for 52 (absorbed 0)
+[00534] Frontend Developer casts Pixel Push
+[00534] Frontend Developer hits Wellness Facilitator with Pixel Push for 137 (absorbed 0)
+[00534] Wellness Facilitator gains specificity
+[00546] Backend Engineer swings at Wellness Facilitator
+[00546] Backend Engineer hits Wellness Facilitator with melee for 20 (absorbed 0)
+[00547] Frontend Developer swings at Wellness Facilitator
+[00547] Frontend Developer hits Wellness Facilitator with melee for 24 (absorbed 0) CRIT
+[00548] Fullstack Engineer casts Refactor
+[00548] Wellness Facilitator loses code_smell (Consumed)
+[00548] Fullstack Engineer hits Wellness Facilitator with Refactor for 603 (absorbed 0) CRIT COMBO
+[00548] Wellness Facilitator loses git_blame (Death)
+[00548] Wellness Facilitator loses infinite_scroll (Death)
+[00548] Wellness Facilitator loses specificity (Death)
+[00548] Backend Engineer auto attack off
+[00548] Fullstack Engineer auto attack off
+[00548] Frontend Developer auto attack off
+[00548] Wellness Facilitator dies (killer Fullstack Engineer)
+[00548] Wellness Facilitator ai Dead
+[00548] Backend Engineer rank 0, 882 XP to the next
+[00548] Fullstack Engineer rank 0, 882 XP to the next
+[00548] Frontend Developer rank 0, 882 XP to the next
+[00548] Wellness Facilitator drops [] and 32 SP
+[00548] Wellness Facilitator drops [] and 21 SP
+[00548] Wellness Facilitator drops [] and 24 SP
+[00548] Backend Engineer leaves combat
+[00548] Fullstack Engineer leaves combat
+[00548] Frontend Developer leaves combat
+[00548] Wellness Facilitator leaves combat
+[00548] Wellness Facilitator yells: I... am... here... for... you... (the form)...
+[00969] Executive Assistant (Unit 7) ai Chase
+[00969] Board Observer ai Chase
+[00969] Board Observer ai Chase
+[00969] Executive Assistant (Unit 7) ai Chase
+[00969] Backend Engineer enters combat
+[00969] Executive Assistant (Unit 7) enters combat
+[00969] Board Observer enters combat
+[00969] Board Observer enters combat
+[00969] Executive Assistant (Unit 7) enters combat
+[00969] Executive Assistant (Unit 7) yells: The CIO is unavailable. He is available for me. I am his calendar.
+[00970] Backend Engineer auto attack on
+[00970] Fullstack Engineer auto attack on
+[00970] Frontend Developer auto attack on
+[00970] Fullstack Engineer swings at Board Observer
+[00970] Fullstack Engineer hits Board Observer with melee for 10 (absorbed 0)
+[00970] Frontend Developer swings at Board Observer
+[00970] Frontend Developer hits Board Observer with melee for 15 (absorbed 0)
+[00970] Fullstack Engineer enters combat
+[00970] Frontend Developer enters combat
+[00971] Fullstack Engineer auto attack off
+[00971] Fullstack Engineer auto attack on
+[00971] Fullstack Engineer casts git blame
+[00971] Fullstack Engineer yells: Written by the AI, committed by the intern, approved by... oh no.
+[00971] Board Observer gains git_blame
+[00971] Frontend Developer casts Responsive Layout
+[00971] Frontend Developer yells: Media query: everyone within six metres.
+[00971] Frontend Developer hits Executive Assistant (Unit 7) with Responsive Layout for 137 (absorbed 0)
+[00971] Frontend Developer hits Board Observer with Responsive Layout for 137 (absorbed 0)
+[00971] Frontend Developer hits Board Observer with Responsive Layout for 137 (absorbed 0)
+[00971] Frontend Developer hits Executive Assistant (Unit 7) with Responsive Layout for 205 (absorbed 0) CRIT
+[00971] Board Observer ai Attack
+[00971] Board Observer swings at Frontend Developer
+[00971] Board Observer hits Frontend Developer with melee for 13 (absorbed 0)
+[00973] Executive Assistant (Unit 7) ai Attack
+[00973] Executive Assistant (Unit 7) swings at Frontend Developer
+[00973] Executive Assistant (Unit 7) hits Frontend Developer with melee for 18 (absorbed 0)
+[00974] Backend Engineer auto attack off
+[00974] Backend Engineer auto attack on
+[00974] Backend Engineer casts Who Touched Prod?
+[00974] Backend Engineer yells: WHO TOUCHED PROD?
+[00974] Backend Engineer casts Connection Pool
+[00974] Backend Engineer hits Executive Assistant (Unit 7) with Connection Pool for 64 (absorbed 0)
+[00974] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[00974] Backend Engineer hits Board Observer with Connection Pool for 64 (absorbed 0)
+[00974] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[00974] Backend Engineer hits Board Observer with Connection Pool for 64 (absorbed 0)
+[00974] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[00974] Backend Engineer hits Executive Assistant (Unit 7) with Connection Pool for 64 (absorbed 0)
+[00974] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[00974] Backend Engineer swings at Board Observer
+[00974] Backend Engineer hits Board Observer with melee for 20 (absorbed 0)
+[00974] Board Observer ai Chase
+[00974] Board Observer ai Attack
+[00974] Board Observer swings at Backend Engineer
+[00974] Board Observer hits Backend Engineer with melee for 7 (absorbed 0)
+[00978] Fullstack Engineer auto attack off
+[00978] Fullstack Engineer auto attack on
+[00979] Executive Assistant (Unit 7) ai Attack
+[00979] Executive Assistant (Unit 7) swings at Backend Engineer
+[00979] Executive Assistant (Unit 7) hits Backend Engineer with melee for 11 (absorbed 0)
+[00985] Board Observer ai Attack
+[01014] Fullstack Engineer casts git blame
+[01014] Board Observer gains git_blame
+[01015] Frontend Developer casts Rewrite It in a New Framework
+[01015] Frontend Developer hits Board Observer with Rewrite It in a New Framework for 506 (absorbed 0)
+[01018] Frontend Developer swings at Board Observer
+[01018] Frontend Developer hits Board Observer with melee for 27 (absorbed 0) CRIT
+[01020] Backend Engineer casts DROP TABLE
+[01020] Backend Engineer misses Board Observer with DROP TABLE
+[01024] Fullstack Engineer swings at Board Observer
+[01024] Fullstack Engineer hits Board Observer with melee for 13 (absorbed 0)
+[01034] Backend Engineer swings at Board Observer
+[01034] Backend Engineer hits Board Observer with melee for 20 (absorbed 0)
+[01057] Fullstack Engineer begins Code Review (1866 ms)
+[01057] Executive Assistant (Unit 7) swings at Backend Engineer
+[01057] Executive Assistant (Unit 7) hits Backend Engineer with melee for 11 (absorbed 0)
+[01059] Frontend Developer casts Infinite Scroll
+[01059] Board Observer gains infinite_scroll
+[01060] Executive Assistant (Unit 7) casts Double Booking
+[01060] Executive Assistant (Unit 7) telegraphs Double Booking #1 Circle { radius_m: 3.6 } at (4.3, -137.7) in 2000 ms
+[01060] Executive Assistant (Unit 7) telegraphs Double Booking #2 Circle { radius_m: 3.6 } at (0.7, -134.3) in 2500 ms
+[01060] Executive Assistant (Unit 7) yells: I have double-booked you. You were already double-booked. This is triple.
+[01061] Executive Assistant (Unit 7) ai Chase
+[01061] Board Observer swings at Frontend Developer
+[01061] Board Observer hits Frontend Developer with melee for 13 (absorbed 0)
+[01061] Fullstack Engineer hits Board Observer with git blame for 52 (absorbed 0)
+[01064] Board Observer ai Chase
+[01064] Executive Assistant (Unit 7) ai Chase
+[01066] Backend Engineer casts Cache Invalidation
+[01066] Backend Engineer hits Board Observer with Cache Invalidation for 192 (absorbed 0)
+[01066] Backend Engineer heals Backend Engineer with Cache Invalidation for 11
+[01066] Frontend Developer swings at Board Observer
+[01066] Frontend Developer hits Board Observer with melee for 18 (absorbed 0)
+[01066] Board Observer ai Attack
+[01066] Board Observer swings at Backend Engineer
+[01066] Board Observer hits Backend Engineer with melee for 7 (absorbed 0)
+[01067] Executive Assistant (Unit 7) ai Attack
+[01069] Executive Assistant (Unit 7) ai Attack
+[01069] Executive Assistant (Unit 7) swings at Backend Engineer
+[01069] Executive Assistant (Unit 7) hits Backend Engineer with melee for 11 (absorbed 0)
+[01074] Executive Assistant (Unit 7) casts Double Booking
+[01074] Executive Assistant (Unit 7) telegraphs Double Booking #3 Circle { radius_m: 3.6 } at (2.5, -120.1) in 2000 ms
+[01074] Executive Assistant (Unit 7) telegraphs Double Booking #4 Circle { radius_m: 3.6 } at (-2.5, -119.9) in 2500 ms
+[01075] Fullstack Engineer Code Review interrupted by movement/cancel (lockout 0 ms)
+[01076] Board Observer casts Abstain
+[01076] Board Observer hits Frontend Developer with Abstain for 150 (absorbed 0)
+[01077] Frontend Developer casts Dark Mode
+[01077] Frontend Developer gains dark_mode
+[01077] Frontend Developer heals Frontend Developer with Dark Mode for 194
+[01078] Fullstack Engineer swings at Board Observer
+[01078] Fullstack Engineer hits Board Observer with melee for 10 (absorbed 0)
+[01082] Board Observer casts Abstain
+[01082] Board Observer hits Backend Engineer with Abstain for 95 (absorbed 0)
+[01094] Backend Engineer swings at Board Observer
+[01094] Backend Engineer hits Board Observer with melee for 17 (absorbed 0)
+[01100] Fullstack Engineer begins Write It By Hand (3733 ms)
+[01103] Frontend Developer casts CSS Combo
+[01103] Frontend Developer hits Board Observer with CSS Combo for 174 (absorbed 0)
+[01103] Board Observer gains specificity
+[01103] Board Observer gains specificity
+[01104] Fullstack Engineer hits Board Observer with git blame for 52 (absorbed 0)
+[01112] Backend Engineer casts Rate Limiter
+[01112] Backend Engineer gains rate_limiter
+[01114] Frontend Developer swings at Board Observer
+[01114] Frontend Developer hits Board Observer with melee for 18 (absorbed 0)
+[01119] Frontend Developer hits Board Observer with Infinite Scroll for 52 (absorbed 0)
+[01120] telegraph #1 lands
+[01123] Executive Assistant (Unit 7) casts Reschedule
+[01123] Executive Assistant (Unit 7) hits Backend Engineer with Reschedule for 0 (absorbed 34)
+[01123] Backend Engineer gains il_throttled
+[01134] telegraph #3 lands
+[01135] telegraph #2 lands
+[01141] Executive Assistant (Unit 7) swings at Backend Engineer
+[01141] Executive Assistant (Unit 7) hits Backend Engineer with melee for 0 (absorbed 8)
+[01145] Executive Assistant (Unit 7) casts Reschedule
+[01145] Executive Assistant (Unit 7) hits Backend Engineer with Reschedule for 0 (absorbed 34)
+[01145] Backend Engineer gains il_throttled
+[01145] Executive Assistant (Unit 7) yells: Rescheduling you to a time that does not exist.
+[01147] Frontend Developer casts Pixel Push
+[01147] Frontend Developer hits Board Observer with Pixel Push for 137 (absorbed 0)
+[01147] Board Observer gains specificity
+[01149] telegraph #4 lands
+[01151] Board Observer swings at Frontend Developer
+[01151] Board Observer hits Frontend Developer with melee for 6 (absorbed 0)
+[01151] Fullstack Engineer hits Board Observer with git blame for 52 (absorbed 0)
+[01153] Executive Assistant (Unit 7) swings at Backend Engineer
+[01153] Executive Assistant (Unit 7) hits Backend Engineer with melee for 0 (absorbed 8)
+[01154] Backend Engineer swings at Board Observer
+[01154] Backend Engineer hits Board Observer with melee for 17 (absorbed 0)
+[01156] Board Observer swings at Backend Engineer
+[01156] Board Observer hits Backend Engineer with melee for 0 (absorbed 5)
+[01158] Backend Engineer casts Connection Pool
+[01158] Backend Engineer hits Executive Assistant (Unit 7) with Connection Pool for 64 (absorbed 0)
+[01158] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[01158] Backend Engineer hits Board Observer with Connection Pool for 64 (absorbed 0)
+[01158] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[01158] Backend Engineer hits Board Observer with Connection Pool for 64 (absorbed 0)
+[01158] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[01158] Backend Engineer hits Executive Assistant (Unit 7) with Connection Pool for 64 (absorbed 0)
+[01158] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[01162] Frontend Developer swings at Board Observer
+[01162] Frontend Developer hits Board Observer with melee for 18 (absorbed 0)
+[01179] Frontend Developer hits Board Observer with Infinite Scroll for 52 (absorbed 0)
+[01191] Frontend Developer casts Pixel Push
+[01191] Frontend Developer hits Board Observer with Pixel Push for 156 (absorbed 0)
+[01191] Board Observer gains specificity
+[01194] Fullstack Engineer hits Board Observer with git blame for 52 (absorbed 0)
+[01200] Board Observer casts Note For The Minutes
+[01200] Board Observer hits Frontend Developer with Note For The Minutes for 20 (absorbed 0)
+[01200] Frontend Developer gains il_flagged
+[01200] Backend Engineer burnout 30 (Combat)
+[01200] Fullstack Engineer burnout 50 (Combat)
+[01200] Frontend Developer burnout 30 (Combat)
+[01203] Board Observer casts Note For The Minutes
+[01203] Board Observer hits Backend Engineer with Note For The Minutes for 0 (absorbed 20)
+[01203] Backend Engineer gains il_flagged
+[01204] Backend Engineer casts Blocking Call
+[01204] Backend Engineer hits Board Observer with Blocking Call for 84 (absorbed 0)
+[01204] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[01210] Frontend Developer swings at Board Observer
+[01210] Frontend Developer hits Board Observer with melee for 21 (absorbed 0)
+[01212] Fullstack Engineer casts Write It By Hand
+[01212] Fullstack Engineer hits Board Observer with Write It By Hand for 1051 (absorbed 0) CRIT
+[01212] Executive Assistant (Unit 7) gains git_blame
+[01212] Board Observer loses git_blame (Death)
+[01212] Board Observer loses infinite_scroll (Death)
+[01212] Board Observer loses specificity (Death)
+[01212] Fullstack Engineer auto attack off
+[01212] Frontend Developer auto attack off
+[01212] Board Observer dies (killer Fullstack Engineer)
+[01212] Board Observer ai Dead
+[01212] Backend Engineer rank 0, 1098 XP to the next
+[01212] Fullstack Engineer rank 0, 1098 XP to the next
+[01212] Frontend Developer rank 0, 1098 XP to the next
+[01212] Board Observer drops [] and 33 SP
+[01212] Board Observer drops [] and 23 SP
+[01212] Board Observer drops [] and 34 SP
+[01212] Board Observer leaves combat
+[01213] Fullstack Engineer auto attack on
+[01213] Frontend Developer auto attack on
+[01213] Fullstack Engineer swings at Board Observer
+[01213] Fullstack Engineer hits Board Observer with melee for 10 (absorbed 0)
+[01214] Fullstack Engineer begins Code Review (1866 ms)
+[01214] Backend Engineer swings at Board Observer
+[01214] Backend Engineer hits Board Observer with melee for 17 (absorbed 0)
+[01225] Executive Assistant (Unit 7) swings at Backend Engineer
+[01225] Executive Assistant (Unit 7) hits Backend Engineer with melee for 0 (absorbed 9)
+[01235] Frontend Developer casts Responsive Layout
+[01235] Frontend Developer hits Executive Assistant (Unit 7) with Responsive Layout for 137 (absorbed 0)
+[01235] Frontend Developer hits Board Observer with Responsive Layout for 137 (absorbed 0)
+[01235] Frontend Developer hits Executive Assistant (Unit 7) with Responsive Layout for 137 (absorbed 0)
+[01237] Executive Assistant (Unit 7) swings at Backend Engineer
+[01237] Executive Assistant (Unit 7) hits Backend Engineer with melee for 7 (absorbed 2)
+[01237] Backend Engineer loses rate_limiter (Depleted)
+[01241] Fullstack Engineer hits Board Observer with git blame for 52 (absorbed 0)
+[01246] Board Observer swings at Backend Engineer
+[01246] Board Observer hits Backend Engineer with melee for 8 (absorbed 0)
+[01250] Backend Engineer casts Blocking Call
+[01250] Backend Engineer hits Board Observer with Blocking Call for 84 (absorbed 0)
+[01250] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[01257] Frontend Developer loses dark_mode (Expired)
+[01258] Frontend Developer swings at Board Observer
+[01258] Frontend Developer hits Board Observer with melee for 15 (absorbed 0)
+[01265] Backend Engineer loses il_throttled (Expired)
+[01269] Board Observer casts Abstain
+[01269] Board Observer hits Backend Engineer with Abstain for 106 (absorbed 0)
+[01269] Board Observer yells: A question, not a vote. It is a very sharp question.
+[01270] Fullstack Engineer casts Code Review
+[01270] Fullstack Engineer hits Board Observer with Code Review for 226 (absorbed 0)
+[01270] Board Observer gains code_smell
+[01270] Fullstack Engineer swings at Board Observer
+[01270] Fullstack Engineer misses Board Observer with melee
+[01271] Fullstack Engineer begins Refactor (2333 ms)
+[01274] Backend Engineer swings at Board Observer
+[01274] Backend Engineer hits Board Observer with melee for 22 (absorbed 0)
+[01279] Frontend Developer casts Infinite Scroll
+[01279] Board Observer gains infinite_scroll
+[01296] Backend Engineer casts Blocking Call
+[01296] Backend Engineer hits Board Observer with Blocking Call for 84 (absorbed 0)
+[01296] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[01302] Fullstack Engineer hits Executive Assistant (Unit 7) with git blame for 52 (absorbed 0)
+[01306] Frontend Developer swings at Board Observer
+[01306] Frontend Developer hits Board Observer with melee for 20 (absorbed 0)
+[01309] Executive Assistant (Unit 7) swings at Backend Engineer
+[01309] Executive Assistant (Unit 7) hits Backend Engineer with melee for 13 (absorbed 0)
+[01321] Executive Assistant (Unit 7) swings at Backend Engineer
+[01321] Executive Assistant (Unit 7) hits Backend Engineer with melee for 13 (absorbed 0)
+[01323] Frontend Developer casts CSS Combo
+[01323] Frontend Developer hits Board Observer with CSS Combo for 198 (absorbed 0)
+[01323] Board Observer gains specificity
+[01323] Board Observer gains specificity
+[01331] Fullstack Engineer hits Board Observer with git blame for 52 (absorbed 0)
+[01334] Backend Engineer swings at Board Observer
+[01334] Backend Engineer hits Board Observer with melee for 21 (absorbed 0)
+[01336] Board Observer swings at Backend Engineer
+[01336] Board Observer hits Backend Engineer with melee for 8 (absorbed 0)
+[01339] Frontend Developer hits Board Observer with Infinite Scroll for 52 (absorbed 0)
+[01341] Fullstack Engineer casts Refactor
+[01341] Board Observer loses code_smell (Consumed)
+[01341] Fullstack Engineer hits Board Observer with Refactor for 402 (absorbed 0) COMBO
+[01341] Executive Assistant (Unit 7) gains git_blame
+[01341] Board Observer loses git_blame (Death)
+[01341] Board Observer loses infinite_scroll (Death)
+[01341] Board Observer loses specificity (Death)
+[01341] Backend Engineer auto attack off
+[01341] Fullstack Engineer auto attack off
+[01341] Frontend Developer auto attack off
+[01341] Board Observer dies (killer Fullstack Engineer)
+[01341] Board Observer ai Dead
+[01341] Backend Engineer rank 0, 1314 XP to the next
+[01341] Fullstack Engineer rank 0, 1314 XP to the next
+[01341] Frontend Developer rank 0, 1314 XP to the next
+[01341] Board Observer drops [] and 26 SP
+[01341] Board Observer drops [] and 20 SP
+[01341] Board Observer drops [] and 28 SP
+[01341] Board Observer leaves combat
+[01342] Backend Engineer auto attack on
+[01342] Backend Engineer casts Connection Pool
+[01342] Backend Engineer hits Executive Assistant (Unit 7) with Connection Pool for 64 (absorbed 0)
+[01342] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[01342] Backend Engineer hits Executive Assistant (Unit 7) with Connection Pool for 64 (absorbed 0)
+[01342] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[01342] Fullstack Engineer auto attack on
+[01342] Frontend Developer auto attack on
+[01342] Fullstack Engineer swings at Executive Assistant (Unit 7)
+[01342] Fullstack Engineer hits Executive Assistant (Unit 7) with melee for 9 (absorbed 0)
+[01343] Fullstack Engineer begins Code Review (1866 ms)
+[01354] Frontend Developer swings at Executive Assistant (Unit 7)
+[01354] Frontend Developer hits Executive Assistant (Unit 7) with melee for 20 (absorbed 0)
+[01362] Executive Assistant (Unit 7) casts Double Booking
+[01362] Executive Assistant (Unit 7) telegraphs Double Booking #5 Circle { radius_m: 3.6 } at (-1.2, -133.6) in 2000 ms
+[01362] Executive Assistant (Unit 7) telegraphs Double Booking #6 Circle { radius_m: 3.6 } at (-4.2, -137.6) in 2500 ms
+[01362] Executive Assistant (Unit 7) yells: Your slot is gone. Your slot was mine.
+[01363] Executive Assistant (Unit 7) ai Chase
+[01363] Executive Assistant (Unit 7) ai Chase
+[01367] Frontend Developer casts Infinite Scroll
+[01367] Executive Assistant (Unit 7) gains infinite_scroll
+[01373] Executive Assistant (Unit 7) casts Double Booking
+[01373] Executive Assistant (Unit 7) telegraphs Double Booking #7 Circle { radius_m: 3.6 } at (-0.6, -140.2) in 2000 ms
+[01373] Executive Assistant (Unit 7) telegraphs Double Booking #8 Circle { radius_m: 3.6 } at (1.7, -135.8) in 2500 ms
+[01380] Frontend Developer loses il_flagged (Expired)
+[01382] Executive Assistant (Unit 7) ai Attack
+[01383] Backend Engineer auto attack off
+[01383] Backend Engineer auto attack on
+[01383] Executive Assistant (Unit 7) ai Attack
+[01383] Backend Engineer loses il_flagged (Expired)
+[01388] Backend Engineer casts Cache Invalidation
+[01388] Backend Engineer hits Executive Assistant (Unit 7) with Cache Invalidation for 192 (absorbed 0)
+[01388] Backend Engineer heals Backend Engineer with Cache Invalidation for 11
+[01392] Fullstack Engineer hits Executive Assistant (Unit 7) with git blame for 52 (absorbed 0)
+[01393] Executive Assistant (Unit 7) swings at Backend Engineer
+[01393] Executive Assistant (Unit 7) hits Backend Engineer with melee for 11 (absorbed 0)
+[01394] Backend Engineer swings at Executive Assistant (Unit 7)
+[01394] Backend Engineer hits Executive Assistant (Unit 7) with melee for 18 (absorbed 0)
+[01399] Fullstack Engineer casts Code Review
+[01399] Fullstack Engineer hits Executive Assistant (Unit 7) with Code Review for 226 (absorbed 0)
+[01399] Executive Assistant (Unit 7) gains code_smell
+[01399] Fullstack Engineer swings at Executive Assistant (Unit 7)
+[01399] Fullstack Engineer hits Executive Assistant (Unit 7) with melee for 11 (absorbed 0)
+[01400] Fullstack Engineer begins Refactor (2333 ms)
+[01405] Executive Assistant (Unit 7) swings at Backend Engineer
+[01405] Executive Assistant (Unit 7) hits Backend Engineer with melee for 11 (absorbed 0)
+[01422] telegraph #5 lands
+[01427] Frontend Developer hits Executive Assistant (Unit 7) with Infinite Scroll for 52 (absorbed 0)
+[01431] Fullstack Engineer hits Executive Assistant (Unit 7) with git blame for 52 (absorbed 0)
+[01433] telegraph #7 lands
+[01433] Executive Assistant (Unit 7) hits Frontend Developer with Double Booking for 189 (absorbed 0)
+[01434] Backend Engineer casts Blocking Call
+[01434] Backend Engineer hits Executive Assistant (Unit 7) with Blocking Call for 84 (absorbed 0)
+[01434] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[01437] telegraph #6 lands
+[01448] telegraph #8 lands
+[01451] Frontend Developer auto attack off
+[01451] Frontend Developer auto attack on
+[01451] Frontend Developer casts Infinite Scroll
+[01451] Executive Assistant (Unit 7) gains infinite_scroll
+[01454] Backend Engineer swings at Executive Assistant (Unit 7)
+[01454] Backend Engineer hits Executive Assistant (Unit 7) with melee for 16 (absorbed 0)
+[01470] Fullstack Engineer casts Refactor
+[01470] Executive Assistant (Unit 7) loses code_smell (Consumed)
+[01470] Fullstack Engineer hits Executive Assistant (Unit 7) with Refactor for 402 (absorbed 0) COMBO
+[01470] Fullstack Engineer swings at Executive Assistant (Unit 7)
+[01470] Fullstack Engineer hits Executive Assistant (Unit 7) with melee for 13 (absorbed 0)
+[01471] Fullstack Engineer casts Postmortem
+[01471] Fullstack Engineer hits Executive Assistant (Unit 7) with Postmortem for 558 (absorbed 0)
+[01471] Executive Assistant (Unit 7) loses git_blame (Death)
+[01471] Executive Assistant (Unit 7) loses infinite_scroll (Death)
+[01471] Backend Engineer auto attack off
+[01471] Fullstack Engineer auto attack off
+[01471] Executive Assistant (Unit 7) dies (killer Fullstack Engineer)
+[01471] Executive Assistant (Unit 7) ai Dead
+[01471] Backend Engineer rank 0, 1539 XP to the next
+[01471] Fullstack Engineer rank 0, 1539 XP to the next
+[01471] Frontend Developer rank 0, 1539 XP to the next
+[01471] Executive Assistant (Unit 7) drops [] and 25 SP
+[01471] Executive Assistant (Unit 7) drops [] and 21 SP
+[01471] Executive Assistant (Unit 7) drops ["Hoodie From the SOAP Conference (2004)"] and 31 SP
+[01471] Executive Assistant (Unit 7) leaves combat
+[01471] Executive Assistant (Unit 7) yells: Invite... declined... permanently...
+[01472] Backend Engineer auto attack on
+[01472] Fullstack Engineer auto attack on
+[01480] Backend Engineer casts Blocking Call
+[01480] Backend Engineer hits Executive Assistant (Unit 7) with Blocking Call for 84 (absorbed 0)
+[01480] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[01489] Executive Assistant (Unit 7) swings at Backend Engineer
+[01489] Executive Assistant (Unit 7) hits Backend Engineer with melee for 11 (absorbed 0)
+[01495] Frontend Developer casts Pixel Push
+[01495] Frontend Developer hits Executive Assistant (Unit 7) with Pixel Push for 205 (absorbed 0) CRIT
+[01495] Executive Assistant (Unit 7) gains specificity
+[01500] Backend Engineer burnout 45 (Combat)
+[01500] Fullstack Engineer burnout 65 (Combat)
+[01500] Frontend Developer burnout 45 (Combat)
+[01501] Executive Assistant (Unit 7) casts Reschedule
+[01501] Executive Assistant (Unit 7) misses Backend Engineer with Reschedule
+[01511] Frontend Developer hits Executive Assistant (Unit 7) with Infinite Scroll for 52 (absorbed 0)
+[01514] Fullstack Engineer begins Code Review (1866 ms)
+[01514] Backend Engineer swings at Executive Assistant (Unit 7)
+[01514] Backend Engineer hits Executive Assistant (Unit 7) with melee for 20 (absorbed 0)
+[01521] Fullstack Engineer hits Executive Assistant (Unit 7) with git blame for 52 (absorbed 0)
+[01526] Backend Engineer casts Blocking Call
+[01526] Backend Engineer hits Executive Assistant (Unit 7) with Blocking Call for 84 (absorbed 0)
+[01526] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[01539] Frontend Developer casts CSS Combo
+[01539] Frontend Developer hits Executive Assistant (Unit 7) with CSS Combo for 174 (absorbed 0)
+[01539] Executive Assistant (Unit 7) gains specificity
+[01539] Executive Assistant (Unit 7) gains specificity
+[01570] Fullstack Engineer casts Code Review
+[01570] Fullstack Engineer misses Executive Assistant (Unit 7) with Code Review
+[01570] Fullstack Engineer swings at Executive Assistant (Unit 7)
+[01570] Fullstack Engineer hits Executive Assistant (Unit 7) with melee for 10 (absorbed 0)
+[01571] Fullstack Engineer begins Code Review (1866 ms)
+[01571] Frontend Developer hits Executive Assistant (Unit 7) with Infinite Scroll for 52 (absorbed 0)
+[01572] Backend Engineer casts Blocking Call
+[01572] Backend Engineer hits Executive Assistant (Unit 7) with Blocking Call for 84 (absorbed 0)
+[01572] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[01573] Executive Assistant (Unit 7) swings at Backend Engineer
+[01573] Executive Assistant (Unit 7) hits Backend Engineer with melee for 11 (absorbed 0)
+[01574] Backend Engineer swings at Executive Assistant (Unit 7)
+[01574] Backend Engineer hits Executive Assistant (Unit 7) with melee for 17 (absorbed 0)
+[01583] Frontend Developer casts Pixel Push
+[01583] Frontend Developer yells: One pixel. The designer will notice. The AI never does.
+[01583] Frontend Developer hits Executive Assistant (Unit 7) with Pixel Push for 137 (absorbed 0)
+[01583] Executive Assistant (Unit 7) gains specificity
+[01611] Fullstack Engineer hits Executive Assistant (Unit 7) with git blame for 52 (absorbed 0)
+[01618] Backend Engineer casts Blocking Call
+[01618] Backend Engineer yells: Nothing proceeds until I return. I may not return.
+[01618] Backend Engineer hits Executive Assistant (Unit 7) with Blocking Call for 84 (absorbed 0)
+[01618] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[01627] Frontend Developer casts !important
+[01627] Executive Assistant (Unit 7) loses specificity (Consumed)
+[01627] Frontend Developer hits Executive Assistant (Unit 7) with !important for 544 (absorbed 0) COMBO
+[01627] Executive Assistant (Unit 7) loses git_blame (Death)
+[01627] Executive Assistant (Unit 7) loses infinite_scroll (Death)
+[01627] Backend Engineer auto attack off
+[01627] Fullstack Engineer auto attack off
+[01627] Frontend Developer auto attack off
+[01627] Executive Assistant (Unit 7) dies (killer Frontend Developer)
+[01627] Executive Assistant (Unit 7) ai Dead
+[01627] Backend Engineer rank 0, 1764 XP to the next
+[01627] Fullstack Engineer rank 0, 1764 XP to the next
+[01627] Frontend Developer rank 0, 1764 XP to the next
+[01627] Executive Assistant (Unit 7) drops [] and 36 SP
+[01627] Executive Assistant (Unit 7) drops ["Low-Battery Fidget Spinner"] and 27 SP
+[01627] Executive Assistant (Unit 7) drops [] and 29 SP
+[01627] Fullstack Engineer failed Code Review: Target is dead.
+[01627] Backend Engineer leaves combat
+[01627] Fullstack Engineer leaves combat
+[01627] Frontend Developer leaves combat
+[01627] Executive Assistant (Unit 7) leaves combat
+[01627] Executive Assistant (Unit 7) yells: Invite... declined... permanently...
+[01988] Site Foreman Android ai Chase
+[01988] Executive Assistant (Unit 7) ai Chase
+[01988] Board Observer ai Chase
+[01988] Site Foreman Android ai Chase
+[01988] Backend Engineer enters combat
+[01988] Site Foreman Android enters combat
+[01988] Board Observer enters combat
+[01988] Executive Assistant (Unit 7) enters combat
+[01988] Site Foreman Android enters combat
+[01988] Site Foreman Android yells: The crane is on schedule. The schedule is a drawing.
+[01989] Backend Engineer auto attack on
+[01989] Fullstack Engineer auto attack on
+[01989] Frontend Developer auto attack on
+[01989] Fullstack Engineer swings at Board Observer
+[01989] Fullstack Engineer hits Board Observer with melee for 9 (absorbed 0)
+[01989] Frontend Developer swings at Board Observer
+[01989] Frontend Developer hits Board Observer with melee for 21 (absorbed 0)
+[01989] Fullstack Engineer enters combat
+[01989] Frontend Developer enters combat
+[01990] Fullstack Engineer casts git blame
+[01990] Fullstack Engineer yells: Every line has an author. Most of them regret it.
+[01990] Board Observer gains git_blame
+[01990] Frontend Developer casts Responsive Layout
+[01990] Frontend Developer hits Site Foreman Android with Responsive Layout for 205 (absorbed 0) CRIT
+[01990] Frontend Developer hits Board Observer with Responsive Layout for 137 (absorbed 0)
+[01990] Frontend Developer misses Executive Assistant (Unit 7) with Responsive Layout
+[01990] Frontend Developer hits Site Foreman Android with Responsive Layout for 137 (absorbed 0)
+[01990] Board Observer ai Attack
+[01990] Board Observer swings at Frontend Developer
+[01990] Board Observer hits Frontend Developer with melee for 13 (absorbed 0)
+[01990] Executive Assistant (Unit 7) ai Attack
+[01990] Executive Assistant (Unit 7) swings at Backend Engineer
+[01990] Executive Assistant (Unit 7) hits Backend Engineer with melee for 11 (absorbed 0)
+[01993] Backend Engineer casts Who Touched Prod?
+[01993] Backend Engineer casts Connection Pool
+[01993] Backend Engineer hits Site Foreman Android with Connection Pool for 64 (absorbed 0)
+[01993] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[01993] Backend Engineer hits Board Observer with Connection Pool for 64 (absorbed 0)
+[01993] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[01993] Backend Engineer hits Executive Assistant (Unit 7) with Connection Pool for 64 (absorbed 0)
+[01993] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[01993] Backend Engineer hits Site Foreman Android with Connection Pool for 64 (absorbed 0)
+[01993] Backend Engineer heals Backend Engineer with Connection Pool for 2
+[01993] Board Observer ai Chase
+[01993] Site Foreman Android ai Attack
+[01993] Site Foreman Android swings at Backend Engineer
+[01993] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[01996] Backend Engineer swings at Board Observer
+[01996] Backend Engineer hits Board Observer with melee for 18 (absorbed 0)
+[02001] Site Foreman Android ai Attack
+[02001] Site Foreman Android swings at Backend Engineer
+[02001] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[02004] Board Observer ai Attack
+[02033] Fullstack Engineer begins Code Review (1866 ms)
+[02034] Frontend Developer casts Rewrite It in a New Framework
+[02034] Frontend Developer hits Board Observer with Rewrite It in a New Framework for 506 (absorbed 0)
+[02037] Frontend Developer swings at Board Observer
+[02037] Frontend Developer hits Board Observer with melee for 16 (absorbed 0)
+[02039] Backend Engineer casts DROP TABLE
+[02039] Backend Engineer hits Board Observer with DROP TABLE for 357 (absorbed 0)
+[02039] Backend Engineer heals Backend Engineer with DROP TABLE for 21
+[02056] Backend Engineer swings at Board Observer
+[02056] Backend Engineer hits Board Observer with melee for 17 (absorbed 0)
+[02059] Site Foreman Android swings at Backend Engineer
+[02059] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[02067] Site Foreman Android swings at Backend Engineer
+[02067] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[02074] Executive Assistant (Unit 7) swings at Backend Engineer
+[02074] Executive Assistant (Unit 7) hits Backend Engineer with melee for 11 (absorbed 0)
+[02078] Frontend Developer casts Infinite Scroll
+[02078] Board Observer gains infinite_scroll
+[02080] Board Observer swings at Backend Engineer
+[02080] Board Observer hits Backend Engineer with melee for 7 (absorbed 0)
+[02080] Fullstack Engineer hits Board Observer with git blame for 52 (absorbed 0)
+[02085] Backend Engineer casts Rate Limiter
+[02085] Backend Engineer gains rate_limiter
+[02085] Frontend Developer swings at Board Observer
+[02085] Frontend Developer hits Board Observer with melee for 18 (absorbed 0)
+[02089] Fullstack Engineer casts Code Review
+[02089] Fullstack Engineer hits Board Observer with Code Review for 226 (absorbed 0)
+[02089] Board Observer gains code_smell
+[02089] Fullstack Engineer swings at Board Observer
+[02089] Fullstack Engineer hits Board Observer with melee for 11 (absorbed 0)
+[02090] Fullstack Engineer casts Postmortem
+[02090] Fullstack Engineer hits Board Observer with Postmortem for 558 (absorbed 0)
+[02090] Site Foreman Android gains git_blame
+[02090] Board Observer loses git_blame (Death)
+[02090] Board Observer loses infinite_scroll (Death)
+[02090] Board Observer loses code_smell (Death)
+[02090] Backend Engineer auto attack off
+[02090] Fullstack Engineer auto attack off
+[02090] Frontend Developer auto attack off
+[02090] Board Observer dies (killer Fullstack Engineer)
+[02090] Board Observer ai Dead
+[02090] Backend Engineer rank 0, 1980 XP to the next
+[02090] Fullstack Engineer rank 0, 1980 XP to the next
+[02090] Frontend Developer rank 0, 1980 XP to the next
+[02090] Board Observer drops ["Half a Stress Ball"] and 24 SP
+[02090] Board Observer drops [] and 25 SP
+[02090] Board Observer drops [] and 21 SP
+[02090] Board Observer leaves combat
+[02090] Board Observer yells: Recorded... as... absent...
+[02091] Backend Engineer auto attack on
+[02091] Fullstack Engineer auto attack on
+[02091] Frontend Developer auto attack on
+[02091] Executive Assistant (Unit 7) casts Double Booking
+[02091] Executive Assistant (Unit 7) telegraphs Double Booking #9 Circle { radius_m: 3.6 } at (2.5, -190.2) in 2000 ms
+[02091] Executive Assistant (Unit 7) telegraphs Double Booking #10 Circle { radius_m: 3.6 } at (-2.5, -189.8) in 2500 ms
+[02100] Backend Engineer burnout 60 (Combat)
+[02100] Fullstack Engineer burnout 80 (Combat)
+[02100] Frontend Developer burnout 60 (Combat)
+[02107] Site Foreman Android casts Hard Hat Required
+[02107] Site Foreman Android telegraphs Hard Hat Required #11 Circle { radius_m: 3.8 } at (1.9, -206.4) in 1900 ms
+[02112] Site Foreman Android casts Hard Hat Required
+[02112] Site Foreman Android telegraphs Hard Hat Required #12 Circle { radius_m: 3.8 } at (1.1, -207.2) in 1900 ms
+[02113] Site Foreman Android ai Chase
+[02114] Site Foreman Android ai Chase
+[02116] Backend Engineer swings at Executive Assistant (Unit 7)
+[02116] Backend Engineer hits Executive Assistant (Unit 7) with melee for 16 (absorbed 0)
+[02116] Executive Assistant (Unit 7) ai Chase
+[02117] Executive Assistant (Unit 7) ai Attack
+[02119] Site Foreman Android ai Attack
+[02119] Site Foreman Android ai Attack
+[02125] Site Foreman Android swings at Backend Engineer
+[02125] Site Foreman Android hits Backend Engineer with melee for 0 (absorbed 30)
+[02130] Frontend Developer casts Infinite Scroll
+[02130] Executive Assistant (Unit 7) gains infinite_scroll
+[02131] Backend Engineer casts Cache Invalidation
+[02131] Backend Engineer misses Executive Assistant (Unit 7) with Cache Invalidation
+[02133] Fullstack Engineer casts git blame
+[02133] Executive Assistant (Unit 7) gains git_blame
+[02133] Frontend Developer swings at Executive Assistant (Unit 7)
+[02133] Frontend Developer hits Executive Assistant (Unit 7) with melee for 21 (absorbed 0)
+[02133] Site Foreman Android swings at Backend Engineer
+[02133] Site Foreman Android hits Backend Engineer with melee for 0 (absorbed 30)
+[02143] Fullstack Engineer swings at Executive Assistant (Unit 7)
+[02143] Fullstack Engineer hits Executive Assistant (Unit 7) with melee for 13 (absorbed 0)
+[02151] telegraph #9 lands
+[02158] Executive Assistant (Unit 7) swings at Backend Engineer
+[02158] Executive Assistant (Unit 7) hits Backend Engineer with melee for 0 (absorbed 8)
+[02164] telegraph #11 lands
+[02166] telegraph #10 lands
+[02169] telegraph #12 lands
+[02173] Executive Assistant (Unit 7) casts Reschedule
+[02173] Executive Assistant (Unit 7) hits Backend Engineer with Reschedule for 0 (absorbed 34)
+[02173] Backend Engineer gains il_throttled
+[02173] Executive Assistant (Unit 7) yells: Rescheduling you to a time that does not exist.
+[02174] Frontend Developer casts CSS Combo
+[02174] Frontend Developer hits Executive Assistant (Unit 7) with CSS Combo for 174 (absorbed 0)
+[02174] Executive Assistant (Unit 7) gains specificity
+[02174] Executive Assistant (Unit 7) gains specificity
+[02176] Fullstack Engineer begins Write It By Hand (3733 ms)
+[02176] Backend Engineer swings at Executive Assistant (Unit 7)
+[02176] Backend Engineer hits Executive Assistant (Unit 7) with melee for 19 (absorbed 0)
+[02177] Backend Engineer casts Connection Pool
+[02177] Backend Engineer hits Site Foreman Android with Connection Pool for 64 (absorbed 0)
+[02177] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[02177] Backend Engineer hits Executive Assistant (Unit 7) with Connection Pool for 64 (absorbed 0)
+[02177] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[02177] Backend Engineer hits Site Foreman Android with Connection Pool for 64 (absorbed 0)
+[02177] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[02180] Fullstack Engineer hits Site Foreman Android with git blame for 52 (absorbed 0)
+[02181] Frontend Developer swings at Executive Assistant (Unit 7)
+[02181] Frontend Developer hits Executive Assistant (Unit 7) with melee for 15 (absorbed 0)
+[02190] Frontend Developer hits Executive Assistant (Unit 7) with Infinite Scroll for 52 (absorbed 0)
+[02191] Site Foreman Android swings at Backend Engineer
+[02191] Site Foreman Android hits Backend Engineer with melee for 12 (absorbed 18)
+[02191] Backend Engineer loses rate_limiter (Depleted)
+[02199] Site Foreman Android swings at Backend Engineer
+[02199] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[02218] Frontend Developer casts Pixel Push
+[02218] Frontend Developer yells: Moving it left. No, the other left. Shipping it.
+[02218] Frontend Developer hits Executive Assistant (Unit 7) with Pixel Push for 137 (absorbed 0)
+[02218] Executive Assistant (Unit 7) gains specificity
+[02223] Backend Engineer casts Blocking Call
+[02223] Backend Engineer yells: await you. Forever.
+[02223] Backend Engineer hits Executive Assistant (Unit 7) with Blocking Call for 84 (absorbed 0)
+[02223] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[02223] Fullstack Engineer hits Executive Assistant (Unit 7) with git blame for 52 (absorbed 0)
+[02229] Frontend Developer swings at Executive Assistant (Unit 7)
+[02229] Frontend Developer hits Executive Assistant (Unit 7) with melee for 20 (absorbed 0)
+[02236] Backend Engineer swings at Executive Assistant (Unit 7)
+[02236] Backend Engineer hits Executive Assistant (Unit 7) with melee for 17 (absorbed 0)
+[02242] Executive Assistant (Unit 7) swings at Backend Engineer
+[02242] Executive Assistant (Unit 7) misses Backend Engineer with melee
+[02250] Frontend Developer hits Executive Assistant (Unit 7) with Infinite Scroll for 52 (absorbed 0)
+[02257] Site Foreman Android swings at Backend Engineer
+[02257] Site Foreman Android misses Backend Engineer with melee
+[02262] Frontend Developer casts Responsive Layout
+[02262] Frontend Developer hits Site Foreman Android with Responsive Layout for 205 (absorbed 0) CRIT
+[02262] Frontend Developer hits Executive Assistant (Unit 7) with Responsive Layout for 137 (absorbed 0)
+[02262] Frontend Developer hits Site Foreman Android with Responsive Layout for 137 (absorbed 0)
+[02265] Site Foreman Android swings at Backend Engineer
+[02265] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[02269] Backend Engineer casts Blocking Call
+[02269] Backend Engineer hits Executive Assistant (Unit 7) with Blocking Call for 84 (absorbed 0)
+[02269] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[02270] Fullstack Engineer hits Site Foreman Android with git blame for 52 (absorbed 0)
+[02277] Frontend Developer swings at Executive Assistant (Unit 7)
+[02277] Frontend Developer hits Executive Assistant (Unit 7) with melee for 16 (absorbed 0)
+[02288] Fullstack Engineer casts Write It By Hand
+[02288] Fullstack Engineer hits Executive Assistant (Unit 7) with Write It By Hand for 701 (absorbed 0)
+[02288] Fullstack Engineer swings at Executive Assistant (Unit 7)
+[02288] Fullstack Engineer hits Executive Assistant (Unit 7) with melee for 9 (absorbed 0)
+[02289] Fullstack Engineer begins Code Review (1866 ms)
+[02293] Backend Engineer loses il_throttled (Expired)
+[02296] Backend Engineer swings at Executive Assistant (Unit 7)
+[02296] Backend Engineer hits Executive Assistant (Unit 7) with melee for 19 (absorbed 0)
+[02297] Site Foreman Android begins Toolbox Talk (2400 ms)
+[02297] Site Foreman Android ai Casting
+[02297] Site Foreman Android yells: Toolbox talk! Everybody stop everything! This is the thing you stopped for!
+[02298] Backend Engineer auto attack off
+[02298] Backend Engineer auto attack on
+[02298] Fullstack Engineer auto attack off
+[02298] Fullstack Engineer auto attack on
+[02298] Frontend Developer auto attack off
+[02298] Frontend Developer auto attack on
+[02299] Backend Engineer casts Kill Query
+[02299] Site Foreman Android Toolbox Talk interrupted by Backend Engineer (lockout 4000 ms)
+[02299] Fullstack Engineer failed Reject PR: Nothing to interrupt.
+[02299] Frontend Developer failed Lighthouse Audit: Nothing to interrupt.
+[02299] Site Foreman Android ai Attack
+[02300] Backend Engineer auto attack off
+[02300] Backend Engineer auto attack on
+[02300] Fullstack Engineer auto attack off
+[02300] Fullstack Engineer auto attack on
+[02300] Frontend Developer auto attack off
+[02300] Frontend Developer auto attack on
+[02306] Frontend Developer casts !important
+[02306] Frontend Developer misses Executive Assistant (Unit 7) with !important
+[02310] Frontend Developer hits Executive Assistant (Unit 7) with Infinite Scroll for 52 (absorbed 0)
+[02313] Fullstack Engineer hits Executive Assistant (Unit 7) with git blame for 52 (absorbed 0)
+[02315] Backend Engineer casts Blocking Call
+[02315] Backend Engineer hits Executive Assistant (Unit 7) with Blocking Call for 84 (absorbed 0)
+[02315] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[02323] Site Foreman Android begins Toolbox Talk (2400 ms)
+[02323] Site Foreman Android ai Casting
+[02324] Backend Engineer auto attack off
+[02324] Backend Engineer auto attack on
+[02324] Fullstack Engineer auto attack off
+[02324] Fullstack Engineer auto attack on
+[02324] Frontend Developer auto attack off
+[02324] Frontend Developer auto attack on
+[02325] Fullstack Engineer casts Reject PR
+[02325] Site Foreman Android Toolbox Talk interrupted by Fullstack Engineer (lockout 4000 ms)
+[02325] Frontend Developer failed Lighthouse Audit: Nothing to interrupt.
+[02325] Frontend Developer swings at Site Foreman Android
+[02325] Frontend Developer hits Site Foreman Android with melee for 25 (absorbed 0) CRIT
+[02325] Site Foreman Android ai Attack
+[02325] Site Foreman Android swings at Backend Engineer
+[02325] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[02326] Backend Engineer auto attack off
+[02326] Backend Engineer auto attack on
+[02326] Fullstack Engineer auto attack off
+[02326] Fullstack Engineer auto attack on
+[02326] Frontend Developer auto attack off
+[02326] Frontend Developer auto attack on
+[02326] Executive Assistant (Unit 7) swings at Backend Engineer
+[02326] Executive Assistant (Unit 7) hits Backend Engineer with melee for 11 (absorbed 0)
+[02331] Site Foreman Android swings at Backend Engineer
+[02331] Site Foreman Android misses Backend Engineer with melee
+[02345] Fullstack Engineer casts Code Review
+[02345] Fullstack Engineer hits Executive Assistant (Unit 7) with Code Review for 226 (absorbed 0)
+[02345] Site Foreman Android gains git_blame
+[02345] Executive Assistant (Unit 7) loses infinite_scroll (Death)
+[02345] Executive Assistant (Unit 7) loses git_blame (Death)
+[02345] Executive Assistant (Unit 7) loses specificity (Death)
+[02345] Backend Engineer auto attack off
+[02345] Fullstack Engineer auto attack off
+[02345] Frontend Developer auto attack off
+[02345] Executive Assistant (Unit 7) dies (killer Fullstack Engineer)
+[02345] Executive Assistant (Unit 7) ai Dead
+[02345] Backend Engineer rank 0, 2205 XP to the next
+[02345] Fullstack Engineer rank 0, 2205 XP to the next
+[02345] Frontend Developer rank 0, 2205 XP to the next
+[02345] Executive Assistant (Unit 7) drops ["USB Stick Labelled 'DO NOT OPEN'"] and 27 SP
+[02345] Executive Assistant (Unit 7) drops [] and 24 SP
+[02345] Executive Assistant (Unit 7) drops ["Printed-Out Chat Thread"] and 27 SP
+[02345] Executive Assistant (Unit 7) leaves combat
+[02346] Backend Engineer auto attack on
+[02346] Fullstack Engineer auto attack on
+[02346] Frontend Developer auto attack on
+[02346] Fullstack Engineer swings at Site Foreman Android
+[02346] Fullstack Engineer hits Site Foreman Android with melee for 12 (absorbed 0)
+[02347] Fullstack Engineer begins Code Review (1866 ms)
+[02350] Frontend Developer casts Infinite Scroll
+[02350] Site Foreman Android gains infinite_scroll
+[02356] Backend Engineer swings at Site Foreman Android
+[02356] Backend Engineer hits Site Foreman Android with melee for 21 (absorbed 0)
+[02360] Fullstack Engineer hits Site Foreman Android with git blame for 52 (absorbed 0)
+[02361] Backend Engineer casts Connection Pool
+[02361] Backend Engineer misses Site Foreman Android with Connection Pool
+[02361] Backend Engineer hits Site Foreman Android with Connection Pool for 96 (absorbed 0) CRIT
+[02361] Backend Engineer heals Backend Engineer with Connection Pool for 5
+[02373] Frontend Developer swings at Site Foreman Android
+[02373] Frontend Developer hits Site Foreman Android with melee for 20 (absorbed 0)
+[02391] Site Foreman Android swings at Backend Engineer
+[02391] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[02394] Frontend Developer casts CSS Combo
+[02394] Frontend Developer hits Site Foreman Android with CSS Combo for 174 (absorbed 0)
+[02394] Site Foreman Android gains specificity
+[02394] Site Foreman Android gains specificity
+[02397] Site Foreman Android swings at Backend Engineer
+[02397] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[02400] Backend Engineer burnout 75 (Combat)
+[02400] Fullstack Engineer burnout 95 (Combat)
+[02400] Frontend Developer burnout 75 (Combat)
+[02403] Fullstack Engineer casts Code Review
+[02403] Fullstack Engineer misses Site Foreman Android with Code Review
+[02403] Fullstack Engineer swings at Site Foreman Android
+[02403] Fullstack Engineer hits Site Foreman Android with melee for 9 (absorbed 0)
+[02404] Fullstack Engineer begins Code Review (1866 ms)
+[02407] Backend Engineer casts Cache Invalidation
+[02407] Backend Engineer hits Site Foreman Android with Cache Invalidation for 192 (absorbed 0)
+[02407] Backend Engineer heals Backend Engineer with Cache Invalidation for 11
+[02410] Frontend Developer hits Site Foreman Android with Infinite Scroll for 52 (absorbed 0)
+[02416] Backend Engineer swings at Site Foreman Android
+[02416] Backend Engineer hits Site Foreman Android with melee for 18 (absorbed 0)
+[02419] Site Foreman Android casts Hard Hat Required
+[02419] Site Foreman Android telegraphs Hard Hat Required #13 Circle { radius_m: 3.8 } at (-1.7, -210.0) in 1900 ms
+[02419] Site Foreman Android yells: Safety first. Second: schedule. Third: you.
+[02421] Frontend Developer swings at Site Foreman Android
+[02421] Frontend Developer hits Site Foreman Android with melee for 17 (absorbed 0)
+[02435] Fullstack Engineer hits Site Foreman Android with git blame for 52 (absorbed 0)
+[02445] Site Foreman Android casts Hard Hat Required
+[02445] Site Foreman Android telegraphs Hard Hat Required #14 Circle { radius_m: 3.8 } at (-2.6, -205.7) in 1900 ms
+[02446] Site Foreman Android ai Chase
+[02446] Site Foreman Android ai Chase
+[02450] Fullstack Engineer hits Site Foreman Android with git blame for 52 (absorbed 0)
+[02460] Fullstack Engineer casts Code Review
+[02460] Fullstack Engineer hits Site Foreman Android with Code Review for 226 (absorbed 0)
+[02460] Site Foreman Android gains code_smell
+[02460] Fullstack Engineer swings at Site Foreman Android
+[02460] Fullstack Engineer misses Site Foreman Android with melee
+[02461] Fullstack Engineer begins Refactor (2333 ms)
+[02463] Backend Engineer auto attack off
+[02463] Backend Engineer auto attack on
+[02463] Backend Engineer casts Blocking Call
+[02463] Backend Engineer hits Site Foreman Android with Blocking Call for 84 (absorbed 0)
+[02463] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[02470] Frontend Developer hits Site Foreman Android with Infinite Scroll for 52 (absorbed 0)
+[02472] Site Foreman Android ai Attack
+[02472] Site Foreman Android swings at Backend Engineer
+[02472] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[02472] Site Foreman Android ai Attack
+[02472] Site Foreman Android swings at Backend Engineer
+[02472] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[02473] Frontend Developer casts Pixel Push
+[02473] Frontend Developer hits Site Foreman Android with Pixel Push for 137 (absorbed 0)
+[02473] Site Foreman Android gains specificity
+[02476] Backend Engineer swings at Site Foreman Android
+[02476] Backend Engineer hits Site Foreman Android with melee for 16 (absorbed 0)
+[02476] telegraph #13 lands
+[02502] telegraph #14 lands
+[02509] Backend Engineer casts Blocking Call
+[02509] Backend Engineer hits Site Foreman Android with Blocking Call for 84 (absorbed 0)
+[02509] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[02517] Frontend Developer casts Pixel Push
+[02517] Frontend Developer hits Site Foreman Android with Pixel Push for 137 (absorbed 0)
+[02517] Site Foreman Android gains specificity
+[02525] Fullstack Engineer hits Site Foreman Android with git blame for 52 (absorbed 0)
+[02530] Frontend Developer hits Site Foreman Android with Infinite Scroll for 52 (absorbed 0)
+[02531] Fullstack Engineer casts Refactor
+[02531] Site Foreman Android loses code_smell (Consumed)
+[02531] Fullstack Engineer hits Site Foreman Android with Refactor for 402 (absorbed 0) COMBO
+[02531] Fullstack Engineer swings at Site Foreman Android
+[02531] Fullstack Engineer hits Site Foreman Android with melee for 9 (absorbed 0)
+[02532] Fullstack Engineer begins Code Review (1866 ms)
+[02536] Backend Engineer swings at Site Foreman Android
+[02536] Backend Engineer hits Site Foreman Android with melee for 17 (absorbed 0)
+[02538] Site Foreman Android swings at Backend Engineer
+[02538] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[02538] Site Foreman Android swings at Backend Engineer
+[02538] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[02540] Fullstack Engineer hits Site Foreman Android with git blame for 52 (absorbed 0)
+[02555] Backend Engineer casts Retry With Exponential Backoff
+[02555] Backend Engineer gains retry_backoff
+[02561] Frontend Developer casts !important
+[02561] Site Foreman Android loses specificity (Consumed)
+[02561] Frontend Developer hits Site Foreman Android with !important for 718 (absorbed 0) CRIT COMBO
+[02588] Fullstack Engineer casts Code Review
+[02588] Fullstack Engineer hits Site Foreman Android with Code Review for 226 (absorbed 0)
+[02588] Site Foreman Android gains code_smell
+[02588] Fullstack Engineer swings at Site Foreman Android
+[02588] Fullstack Engineer hits Site Foreman Android with melee for 10 (absorbed 0)
+[02589] Fullstack Engineer begins Refactor (2333 ms)
+[02590] Frontend Developer hits Site Foreman Android with Infinite Scroll for 52 (absorbed 0)
+[02596] Backend Engineer swings at Site Foreman Android
+[02596] Backend Engineer hits Site Foreman Android with melee for 19 (absorbed 0)
+[02601] Backend Engineer casts Connection Pool
+[02601] Backend Engineer hits Site Foreman Android with Connection Pool for 64 (absorbed 0)
+[02601] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[02601] Backend Engineer hits Site Foreman Android with Connection Pool for 64 (absorbed 0)
+[02601] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[02604] Site Foreman Android swings at Backend Engineer
+[02604] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[02604] Site Foreman Android swings at Backend Engineer
+[02604] Site Foreman Android misses Backend Engineer with melee
+[02605] Frontend Developer casts CSS Combo
+[02605] Frontend Developer hits Site Foreman Android with CSS Combo for 198 (absorbed 0)
+[02605] Site Foreman Android gains specificity
+[02605] Site Foreman Android gains specificity
+[02615] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[02615] Fullstack Engineer hits Site Foreman Android with git blame for 52 (absorbed 0)
+[02630] Fullstack Engineer hits Site Foreman Android with git blame for 52 (absorbed 0)
+[02630] Site Foreman Android loses git_blame (Expired)
+[02647] Backend Engineer casts Blocking Call
+[02647] Backend Engineer hits Site Foreman Android with Blocking Call for 84 (absorbed 0)
+[02647] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[02649] Frontend Developer casts !important
+[02649] Site Foreman Android loses specificity (Consumed)
+[02649] Frontend Developer hits Site Foreman Android with !important for 352 (absorbed 0) COMBO
+[02650] Frontend Developer hits Site Foreman Android with Infinite Scroll for 52 (absorbed 0)
+[02656] Backend Engineer swings at Site Foreman Android
+[02656] Backend Engineer hits Site Foreman Android with melee for 17 (absorbed 0)
+[02659] Fullstack Engineer casts Refactor
+[02659] Fullstack Engineer yells: Rewriting this before it becomes load-bearing.
+[02659] Site Foreman Android loses code_smell (Consumed)
+[02659] Fullstack Engineer hits Site Foreman Android with Refactor for 402 (absorbed 0) COMBO
+[02659] Fullstack Engineer swings at Site Foreman Android
+[02659] Fullstack Engineer hits Site Foreman Android with melee for 14 (absorbed 0)
+[02660] Fullstack Engineer casts Postmortem
+[02660] Fullstack Engineer hits Site Foreman Android with Postmortem for 558 (absorbed 0)
+[02660] Backend Engineer auto attack off
+[02660] Fullstack Engineer auto attack off
+[02660] Site Foreman Android dies (killer Fullstack Engineer)
+[02660] Site Foreman Android ai Dead
+[02660] Backend Engineer rank 0, 2465 XP to the next
+[02660] Fullstack Engineer rank 0, 2465 XP to the next
+[02660] Frontend Developer rank 0, 2465 XP to the next
+[02660] Site Foreman Android drops [] and 27 SP
+[02660] Site Foreman Android drops ["Lanyard Clip (No Lanyard)"] and 18 SP
+[02660] Site Foreman Android drops [] and 30 SP
+[02660] Site Foreman Android leaves combat
+[02660] Site Foreman Android yells: Handover... pending... since... 2019...
+[02661] Backend Engineer auto attack on
+[02661] Fullstack Engineer auto attack on
+[02670] Site Foreman Android swings at Backend Engineer
+[02670] Site Foreman Android hits Backend Engineer with melee for 43 (absorbed 0)
+[02675] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[02693] Backend Engineer casts Rate Limiter
+[02693] Backend Engineer gains rate_limiter
+[02693] Frontend Developer casts Pixel Push
+[02693] Frontend Developer hits Site Foreman Android with Pixel Push for 156 (absorbed 0)
+[02693] Site Foreman Android loses git_blame (Death)
+[02693] Site Foreman Android loses infinite_scroll (Death)
+[02693] Backend Engineer auto attack off
+[02693] Fullstack Engineer auto attack off
+[02693] Frontend Developer auto attack off
+[02693] Site Foreman Android dies (killer Frontend Developer)
+[02693] Site Foreman Android ai Dead
+[02693] Backend Engineer rank 0, 2725 XP to the next
+[02693] Fullstack Engineer rank 0, 2725 XP to the next
+[02693] Frontend Developer rank 0, 2725 XP to the next
+[02693] Site Foreman Android drops [] and 24 SP
+[02693] Site Foreman Android drops [] and 18 SP
+[02693] Site Foreman Android drops ["Low-Battery Fidget Spinner"] and 27 SP
+[02693] Backend Engineer leaves combat
+[02693] Fullstack Engineer leaves combat
+[02693] Frontend Developer leaves combat
+[02693] Site Foreman Android leaves combat
+[02735] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[02795] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[02855] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[02915] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[02915] Backend Engineer loses retry_backoff (Expired)
+[02993] Backend Engineer loses rate_limiter (Expired)
+[03114] Chief Ilmari Officer ai Chase
+[03114] Backend Engineer enters combat
+[03114] Chief Ilmari Officer enters combat
+[03114] boardroom 5 desks, inbox 0 ms, severance 0 ms, tiles 0b0
+[03114] Chief Ilmari Officer yells: I report to nobody. It is a very short org chart.
+[03115] Backend Engineer auto attack on
+[03115] Fullstack Engineer auto attack on
+[03115] Frontend Developer auto attack on
+[03115] Fullstack Engineer swings at Chief Ilmari Officer
+[03115] Fullstack Engineer hits Chief Ilmari Officer with melee for 11 (absorbed 0)
+[03115] Fullstack Engineer enters combat
+[03116] Fullstack Engineer casts On-Call Caffeine
+[03116] Fullstack Engineer gains caffeine
+[03117] Backend Engineer casts Who Touched Prod?
+[03117] Backend Engineer yells: Somebody deployed on a Friday. Look at me.
+[03117] Backend Engineer casts DROP TABLE
+[03117] Backend Engineer hits Chief Ilmari Officer with DROP TABLE for 357 (absorbed 0)
+[03117] Backend Engineer heals Backend Engineer with DROP TABLE for 0
+[03117] Fullstack Engineer casts git blame
+[03117] Chief Ilmari Officer gains git_blame
+[03117] Frontend Developer casts Rewrite It in a New Framework
+[03117] Frontend Developer yells: This framework came out today. It's already legacy.
+[03117] Frontend Developer hits Chief Ilmari Officer with Rewrite It in a New Framework for 506 (absorbed 0)
+[03117] Frontend Developer enters combat
+[03120] Backend Engineer swings at Chief Ilmari Officer
+[03120] Backend Engineer hits Chief Ilmari Officer with melee for 20 (absorbed 0)
+[03125] Chief Ilmari Officer ai Attack
+[03125] Chief Ilmari Officer swings at Backend Engineer
+[03125] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[03151] Fullstack Engineer begins Code Review (1466 ms)
+[03161] Frontend Developer casts Infinite Scroll
+[03161] Chief Ilmari Officer gains infinite_scroll
+[03163] Backend Engineer casts Cache Invalidation
+[03163] Backend Engineer hits Chief Ilmari Officer with Cache Invalidation for 192 (absorbed 0)
+[03163] Backend Engineer heals Backend Engineer with Cache Invalidation for 11
+[03180] Backend Engineer swings at Chief Ilmari Officer
+[03180] Backend Engineer hits Chief Ilmari Officer with melee for 20 (absorbed 0)
+[03194] Chief Ilmari Officer swings at Backend Engineer
+[03194] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[03195] Fullstack Engineer casts Code Review
+[03195] Fullstack Engineer hits Chief Ilmari Officer with Code Review for 226 (absorbed 0)
+[03195] Chief Ilmari Officer gains code_smell
+[03195] Fullstack Engineer swings at Chief Ilmari Officer
+[03195] Fullstack Engineer hits Chief Ilmari Officer with melee for 12 (absorbed 0)
+[03196] Fullstack Engineer begins Write It By Hand (2900 ms)
+[03205] Frontend Developer casts CSS Combo
+[03205] Frontend Developer hits Chief Ilmari Officer with CSS Combo for 261 (absorbed 0) CRIT
+[03205] Chief Ilmari Officer gains specificity
+[03205] Chief Ilmari Officer gains specificity
+[03207] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[03209] Backend Engineer casts Blocking Call
+[03209] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 84 (absorbed 0)
+[03209] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[03221] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[03240] Backend Engineer swings at Chief Ilmari Officer
+[03240] Backend Engineer hits Chief Ilmari Officer with melee for 20 (absorbed 0)
+[03249] Frontend Developer casts Pixel Push
+[03249] Frontend Developer hits Chief Ilmari Officer with Pixel Push for 137 (absorbed 0)
+[03249] Chief Ilmari Officer gains specificity
+[03255] Backend Engineer casts Blocking Call
+[03255] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 84 (absorbed 0)
+[03255] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[03263] Chief Ilmari Officer swings at Backend Engineer
+[03263] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[03281] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[03283] Fullstack Engineer casts Write It By Hand
+[03283] Fullstack Engineer yells: No autocomplete. No agent. Just me and a mechanical keyboard.
+[03283] Fullstack Engineer hits Chief Ilmari Officer with Write It By Hand for 701 (absorbed 0)
+[03283] Fullstack Engineer swings at Chief Ilmari Officer
+[03283] Fullstack Engineer hits Chief Ilmari Officer with melee for 10 (absorbed 0)
+[03284] Fullstack Engineer begins Refactor (1833 ms)
+[03285] Chief Ilmari Officer casts Roadmap
+[03285] Chief Ilmari Officer telegraphs Roadmap #15 Line { length_m: 34.0, width_m: 3.5 } at (5.1, -494.7) in 1800 ms
+[03285] Chief Ilmari Officer telegraphs Roadmap #16 Line { length_m: 34.0, width_m: 3.5 } at (-0.5, -489.0) in 2500 ms
+[03285] Chief Ilmari Officer telegraphs Roadmap #17 Line { length_m: 34.0, width_m: 3.5 } at (-6.1, -483.3) in 3200 ms
+[03285] Chief Ilmari Officer yells: Let me share my vision. It is a vision. I share it. It is shared.
+[03294] Frontend Developer casts Pixel Push
+[03294] Frontend Developer hits Chief Ilmari Officer with Pixel Push for 137 (absorbed 0)
+[03294] Chief Ilmari Officer gains specificity
+[03297] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[03300] Backend Engineer swings at Chief Ilmari Officer
+[03300] Backend Engineer hits Chief Ilmari Officer with melee for 18 (absorbed 0)
+[03300] Backend Engineer burnout 90 (Combat)
+[03300] Fullstack Engineer burnout 110 (Combat)
+[03300] Frontend Developer burnout 90 (Combat)
+[03301] Backend Engineer casts Blocking Call
+[03301] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 84 (absorbed 0)
+[03301] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[03332] Chief Ilmari Officer swings at Backend Engineer
+[03332] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[03338] Frontend Developer casts !important
+[03338] Chief Ilmari Officer loses specificity (Consumed)
+[03338] Frontend Developer hits Chief Ilmari Officer with !important for 479 (absorbed 0) COMBO
+[03339] Fullstack Engineer casts Refactor
+[03339] Chief Ilmari Officer loses code_smell (Consumed)
+[03339] Fullstack Engineer hits Chief Ilmari Officer with Refactor for 603 (absorbed 0) CRIT COMBO
+[03339] Fullstack Engineer swings at Chief Ilmari Officer
+[03339] Fullstack Engineer hits Chief Ilmari Officer with melee for 14 (absorbed 0)
+[03339] telegraph #15 lands
+[03339] Chief Ilmari Officer telegraphs Roadmap #18 Line { length_m: 34.0, width_m: 3.5 } at (5.1, -494.7) in 2200 ms
+[03340] Fullstack Engineer begins Code Review (1466 ms)
+[03341] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[03347] Backend Engineer casts Rate Limiter
+[03347] Backend Engineer gains rate_limiter
+[03360] Backend Engineer swings at Chief Ilmari Officer
+[03360] Backend Engineer hits Chief Ilmari Officer with melee for 19 (absorbed 0)
+[03360] Chief Ilmari Officer casts Circle Back
+[03360] Chief Ilmari Officer telegraphs Circle Back #19 Circle { radius_m: 4.6 } at (-2.4, -486.2) in 2600 ms
+[03360] telegraph #16 lands
+[03360] Chief Ilmari Officer telegraphs Roadmap #20 Line { length_m: 34.0, width_m: 3.5 } at (-0.5, -489.0) in 2200 ms
+[03360] Chief Ilmari Officer yells: Circling back to the thing that already hit you. Circling back again.
+[03377] Chief Ilmari Officer ai Chase
+[03381] telegraph #17 lands
+[03381] Chief Ilmari Officer telegraphs Roadmap #21 Line { length_m: 34.0, width_m: 3.5 } at (-6.1, -483.3) in 2200 ms
+[03382] Chief Ilmari Officer ai Attack
+[03384] Fullstack Engineer casts Code Review
+[03384] Fullstack Engineer hits Chief Ilmari Officer with Code Review for 226 (absorbed 0)
+[03384] Chief Ilmari Officer gains code_smell
+[03385] Fullstack Engineer begins Refactor (1833 ms)
+[03387] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[03393] Backend Engineer casts Blocking Call
+[03393] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 84 (absorbed 0)
+[03393] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[03401] Chief Ilmari Officer swings at Backend Engineer
+[03401] Chief Ilmari Officer hits Backend Engineer with melee for 0 (absorbed 31)
+[03401] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[03405] telegraph #18 lands
+[03405] Chief Ilmari Officer telegraphs Roadmap #22 Line { length_m: 34.0, width_m: 3.5 } at (5.1, -494.7) in 2200 ms
+[03420] Backend Engineer swings at Chief Ilmari Officer
+[03420] Backend Engineer hits Chief Ilmari Officer with melee for 25 (absorbed 0) CRIT
+[03426] telegraph #20 lands
+[03426] Chief Ilmari Officer telegraphs Roadmap #23 Line { length_m: 34.0, width_m: 3.5 } at (-0.5, -489.0) in 2200 ms
+[03438] telegraph #19 lands
+[03438] Chief Ilmari Officer hits Frontend Developer with Circle Back for 135 (absorbed 0)
+[03438] Chief Ilmari Officer telegraphs Circle Back #24 Circle { radius_m: 4.6 } at (-2.4, -486.2) in 6000 ms
+[03439] Backend Engineer casts Cache Invalidation
+[03439] Backend Engineer misses Chief Ilmari Officer with Cache Invalidation
+[03440] Fullstack Engineer casts Refactor
+[03440] Chief Ilmari Officer loses code_smell (Consumed)
+[03440] Fullstack Engineer hits Chief Ilmari Officer with Refactor for 402 (absorbed 0) COMBO
+[03440] Fullstack Engineer swings at Chief Ilmari Officer
+[03440] Fullstack Engineer misses Chief Ilmari Officer with melee
+[03441] Fullstack Engineer begins Code Review (1466 ms)
+[03447] telegraph #21 lands
+[03447] Chief Ilmari Officer telegraphs Roadmap #25 Line { length_m: 34.0, width_m: 3.5 } at (-6.1, -483.3) in 2200 ms
+[03461] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[03470] Chief Ilmari Officer swings at Backend Engineer
+[03470] Chief Ilmari Officer hits Backend Engineer with melee for 0 (absorbed 31)
+[03471] telegraph #22 lands
+[03471] Chief Ilmari Officer telegraphs Roadmap #26 Line { length_m: 34.0, width_m: 3.5 } at (5.1, -494.7) in 2200 ms
+[03473] Chief Ilmari Officer begins Synergy Link (1500 ms)
+[03473] Chief Ilmari Officer ai Casting
+[03473] Chief Ilmari Officer yells: Synergy link: you are now partners. The partnership is a leash. Please do not drift. Drift is a metric.
+[03477] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[03480] Backend Engineer swings at Chief Ilmari Officer
+[03480] Backend Engineer hits Chief Ilmari Officer with melee for 21 (absorbed 0)
+[03485] Backend Engineer casts Blocking Call
+[03485] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 84 (absorbed 0)
+[03485] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[03485] Fullstack Engineer casts Code Review
+[03485] Fullstack Engineer hits Chief Ilmari Officer with Code Review for 226 (absorbed 0)
+[03485] Chief Ilmari Officer gains code_smell
+[03486] Fullstack Engineer begins Refactor (1833 ms)
+[03492] telegraph #23 lands
+[03492] Chief Ilmari Officer telegraphs Roadmap #27 Line { length_m: 34.0, width_m: 3.5 } at (-0.5, -489.0) in 2200 ms
+[03513] telegraph #25 lands
+[03513] Chief Ilmari Officer telegraphs Roadmap #28 Line { length_m: 34.0, width_m: 3.5 } at (-6.1, -483.3) in 2200 ms
+[03518] Chief Ilmari Officer casts Synergy Link
+[03518] Backend Engineer gains il_synergy_link
+[03518] Fullstack Engineer gains il_synergy_link
+[03518] Frontend Developer gains il_synergy_link
+[03518] raid "ilmari6/3" async false week 0 locked [] tethers [(1, 55), (56, 74)]
+[03518] Chief Ilmari Officer begins Hallucination Blast (2500 ms)
+[03519] Fullstack Engineer Refactor interrupted by movement/cancel (lockout 0 ms)
+[03519] Fullstack Engineer swings at Chief Ilmari Officer
+[03519] Fullstack Engineer misses Chief Ilmari Officer with melee
+[03521] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[03521] Chief Ilmari Officer loses infinite_scroll (Expired)
+[03537] telegraph #26 lands
+[03540] Fullstack Engineer begins Refactor (1833 ms)
+[03540] Backend Engineer swings at Chief Ilmari Officer
+[03540] Backend Engineer hits Chief Ilmari Officer with melee for 31 (absorbed 0) CRIT
+[03542] Fullstack Engineer Refactor interrupted by movement/cancel (lockout 0 ms)
+[03558] telegraph #27 lands
+[03566] Fullstack Engineer loses caffeine (Expired)
+[03567] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[03573] Fullstack Engineer swings at Chief Ilmari Officer
+[03573] Fullstack Engineer hits Chief Ilmari Officer with melee for 12 (absorbed 0)
+[03575] Fullstack Engineer begins Refactor (2333 ms)
+[03576] Fullstack Engineer Refactor interrupted by movement/cancel (lockout 0 ms)
+[03579] telegraph #28 lands
+[03579] Chief Ilmari Officer hits Fullstack Engineer with Roadmap for 77 (absorbed 0)
+[03591] Frontend Developer casts Infinite Scroll
+[03591] Chief Ilmari Officer gains infinite_scroll
+[03593] Chief Ilmari Officer casts Hallucination Blast
+[03593] Chief Ilmari Officer hits Backend Engineer with Hallucination Blast for 9 (absorbed 58)
+[03593] Backend Engineer loses rate_limiter (Depleted)
+[03593] Chief Ilmari Officer ai Chase
+[03600] Backend Engineer casts Blocking Call
+[03600] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 84 (absorbed 0)
+[03600] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[03600] Backend Engineer burnout 105 (Combat)
+[03600] Fullstack Engineer burnout 125 (Combat)
+[03600] Frontend Developer burnout 105 (Combat)
+[03605] Backend Engineer swings at Chief Ilmari Officer
+[03605] Backend Engineer hits Chief Ilmari Officer with melee for 20 (absorbed 0)
+[03610] Chief Ilmari Officer ai Attack
+[03610] Chief Ilmari Officer swings at Backend Engineer
+[03610] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[03618] Fullstack Engineer begins Refactor (2333 ms)
+[03618] telegraph #24 lands
+[03618] Chief Ilmari Officer hits Frontend Developer with Circle Back for 135 (absorbed 0)
+[03635] Frontend Developer casts CSS Combo
+[03635] Frontend Developer hits Chief Ilmari Officer with CSS Combo for 261 (absorbed 0) CRIT
+[03635] Chief Ilmari Officer gains specificity
+[03635] Chief Ilmari Officer gains specificity
+[03646] Backend Engineer casts Blocking Call
+[03646] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 84 (absorbed 0)
+[03646] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[03651] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[03657] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[03657] Chief Ilmari Officer loses git_blame (Expired)
+[03665] Backend Engineer swings at Chief Ilmari Officer
+[03665] Backend Engineer hits Chief Ilmari Officer with melee for 17 (absorbed 0)
+[03679] Frontend Developer casts Pixel Push
+[03679] Frontend Developer misses Chief Ilmari Officer with Pixel Push
+[03679] Chief Ilmari Officer swings at Backend Engineer
+[03679] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[03688] Fullstack Engineer casts Refactor
+[03688] Chief Ilmari Officer loses code_smell (Consumed)
+[03688] Fullstack Engineer hits Chief Ilmari Officer with Refactor for 402 (absorbed 0) COMBO
+[03688] Fullstack Engineer swings at Chief Ilmari Officer
+[03688] Fullstack Engineer hits Chief Ilmari Officer with melee for 9 (absorbed 0)
+[03689] Fullstack Engineer casts git blame
+[03689] Chief Ilmari Officer gains git_blame
+[03690] Chief Ilmari Officer begins Pivot to Ilmari (4000 ms)
+[03690] Chief Ilmari Officer ai Casting
+[03690] Chief Ilmari Officer yells: We are pivoting to Ilmari. Effective this sentence. Your roles are now prompts.
+[03691] Backend Engineer casts Kill Query
+[03691] Chief Ilmari Officer Pivot to Ilmari interrupted by Backend Engineer (lockout 4000 ms)
+[03691] Fullstack Engineer failed Reject PR: Nothing to interrupt.
+[03691] Frontend Developer failed Lighthouse Audit: Nothing to interrupt.
+[03691] Chief Ilmari Officer ai Attack
+[03692] Backend Engineer casts Cache Invalidation
+[03692] Backend Engineer hits Chief Ilmari Officer with Cache Invalidation for 192 (absorbed 0)
+[03692] Backend Engineer heals Backend Engineer with Cache Invalidation for 11
+[03711] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[03723] Frontend Developer casts Pixel Push
+[03723] Frontend Developer yells: It looked fine in the Figma.
+[03723] Frontend Developer hits Chief Ilmari Officer with Pixel Push for 205 (absorbed 0) CRIT
+[03723] Chief Ilmari Officer gains specificity
+[03725] Backend Engineer swings at Chief Ilmari Officer
+[03725] Backend Engineer hits Chief Ilmari Officer with melee for 21 (absorbed 0)
+[03732] Fullstack Engineer begins Code Review (1866 ms)
+[03738] Backend Engineer casts Blocking Call
+[03738] Backend Engineer yells: This call blocks. So do I.
+[03738] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 84 (absorbed 0)
+[03738] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[03748] Chief Ilmari Officer swings at Backend Engineer
+[03748] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[03767] Frontend Developer casts Pixel Push
+[03767] Frontend Developer hits Chief Ilmari Officer with Pixel Push for 137 (absorbed 0)
+[03767] Chief Ilmari Officer gains specificity
+[03771] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[03774] boardroom 5 desks, inbox 6000 ms, severance 0 ms, tiles 0b0
+[03774] Chief Ilmari Officer yells: New message. It is from me. It is urgent. Everything from me is urgent. That is how you know it is from me.
+[03775] Backend Engineer uses il_inbox_2 (1)
+[03775] Fullstack Engineer uses il_inbox_2 (0)
+[03775] Frontend Developer uses il_inbox_2 (0)
+[03775] boardroom 5 desks, inbox 0 ms, severance 0 ms, tiles 0b0
+[03779] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[03784] Backend Engineer casts Blocking Call
+[03784] Backend Engineer misses Chief Ilmari Officer with Blocking Call
+[03785] Backend Engineer swings at Chief Ilmari Officer
+[03785] Backend Engineer hits Chief Ilmari Officer with melee for 16 (absorbed 0)
+[03788] Fullstack Engineer casts Code Review
+[03788] Fullstack Engineer hits Chief Ilmari Officer with Code Review for 226 (absorbed 0)
+[03788] Chief Ilmari Officer gains code_smell
+[03788] Fullstack Engineer swings at Chief Ilmari Officer
+[03788] Fullstack Engineer hits Chief Ilmari Officer with melee for 11 (absorbed 0)
+[03789] Fullstack Engineer begins Refactor (2333 ms)
+[03811] Frontend Developer casts !important
+[03811] Chief Ilmari Officer loses specificity (Consumed)
+[03811] Frontend Developer hits Chief Ilmari Officer with !important for 718 (absorbed 0) CRIT COMBO
+[03811] Chief Ilmari Officer casts Roadmap
+[03811] Chief Ilmari Officer telegraphs Roadmap #29 Line { length_m: 34.0, width_m: 3.5 } at (-2.4, -481.1) in 1800 ms
+[03811] Chief Ilmari Officer telegraphs Roadmap #30 Line { length_m: 34.0, width_m: 3.5 } at (-3.0, -489.1) in 2500 ms
+[03811] Chief Ilmari Officer telegraphs Roadmap #31 Line { length_m: 34.0, width_m: 3.5 } at (-3.5, -497.1) in 3200 ms
+[03817] Chief Ilmari Officer swings at Backend Engineer
+[03817] Chief Ilmari Officer misses Backend Engineer with melee
+[03830] Backend Engineer casts Blocking Call
+[03830] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 84 (absorbed 0)
+[03830] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[03831] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[03845] Backend Engineer swings at Chief Ilmari Officer
+[03845] Backend Engineer hits Chief Ilmari Officer with melee for 20 (absorbed 0)
+[03855] Frontend Developer casts CSS Combo
+[03855] Frontend Developer hits Chief Ilmari Officer with CSS Combo for 174 (absorbed 0)
+[03855] Chief Ilmari Officer gains specificity
+[03855] Chief Ilmari Officer gains specificity
+[03859] Fullstack Engineer casts Refactor
+[03859] Chief Ilmari Officer loses code_smell (Consumed)
+[03859] Fullstack Engineer hits Chief Ilmari Officer with Refactor for 402 (absorbed 0) COMBO
+[03859] Fullstack Engineer swings at Chief Ilmari Officer
+[03859] Fullstack Engineer hits Chief Ilmari Officer with melee for 12 (absorbed 0)
+[03860] Fullstack Engineer begins Code Review (1866 ms)
+[03865] telegraph #29 lands
+[03865] Chief Ilmari Officer telegraphs Roadmap #32 Line { length_m: 34.0, width_m: 3.5 } at (-2.4, -481.1) in 2200 ms
+[03869] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[03876] Backend Engineer casts Blocking Call
+[03876] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 84 (absorbed 0)
+[03876] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[03878] Backend Engineer loses il_synergy_link (Expired)
+[03878] Fullstack Engineer loses il_synergy_link (Expired)
+[03878] Frontend Developer loses il_synergy_link (Expired)
+[03878] raid "ilmari6/3" async false week 0 locked [] tethers []
+[03886] Chief Ilmari Officer swings at Backend Engineer
+[03886] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[03886] telegraph #30 lands
+[03886] Chief Ilmari Officer telegraphs Roadmap #33 Line { length_m: 34.0, width_m: 3.5 } at (-3.0, -489.1) in 2200 ms
+[03891] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[03899] Frontend Developer casts Pixel Push
+[03899] Frontend Developer hits Chief Ilmari Officer with Pixel Push for 137 (absorbed 0)
+[03899] Chief Ilmari Officer gains specificity
+[03900] Backend Engineer burnout 120 (Combat)
+[03900] Fullstack Engineer burnout 140 (Combat)
+[03900] Frontend Developer burnout 120 (Combat)
+[03905] Backend Engineer swings at Chief Ilmari Officer
+[03905] Backend Engineer hits Chief Ilmari Officer with melee for 18 (absorbed 0)
+[03907] telegraph #31 lands
+[03907] Chief Ilmari Officer telegraphs Roadmap #34 Line { length_m: 34.0, width_m: 3.5 } at (-3.5, -497.1) in 2200 ms
+[03916] Fullstack Engineer casts Code Review
+[03916] Fullstack Engineer yells: Who approved this? Oh. The AI approved itself.
+[03916] Fullstack Engineer hits Chief Ilmari Officer with Code Review for 226 (absorbed 0)
+[03916] Chief Ilmari Officer gains code_smell
+[03916] Fullstack Engineer swings at Chief Ilmari Officer
+[03916] Fullstack Engineer hits Chief Ilmari Officer with melee for 9 (absorbed 0)
+[03917] Fullstack Engineer begins Refactor (2333 ms)
+[03922] Backend Engineer casts Blocking Call
+[03922] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 84 (absorbed 0)
+[03922] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[03923] Chief Ilmari Officer casts Circle Back
+[03923] Chief Ilmari Officer telegraphs Circle Back #35 Circle { radius_m: 4.6 } at (-2.4, -477.6) in 2600 ms
+[03923] Chief Ilmari Officer yells: Let us circle back. The circle is on you. The circle will return.
+[03924] Fullstack Engineer Refactor interrupted by movement/cancel (lockout 0 ms)
+[03931] telegraph #32 lands
+[03931] Chief Ilmari Officer hits Fullstack Engineer with Roadmap for 77 (absorbed 0)
+[03931] Chief Ilmari Officer telegraphs Roadmap #36 Line { length_m: 34.0, width_m: 3.5 } at (-2.4, -481.1) in 2200 ms
+[03943] Frontend Developer casts Pixel Push
+[03943] Frontend Developer hits Chief Ilmari Officer with Pixel Push for 137 (absorbed 0)
+[03943] Chief Ilmari Officer gains specificity
+[03951] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[03951] Chief Ilmari Officer loses infinite_scroll (Expired)
+[03952] telegraph #33 lands
+[03952] Chief Ilmari Officer telegraphs Roadmap #37 Line { length_m: 34.0, width_m: 3.5 } at (-3.0, -489.1) in 2200 ms
+[03955] Chief Ilmari Officer swings at Backend Engineer
+[03955] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[03959] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[03960] Fullstack Engineer begins Refactor (2333 ms)
+[03964] Chief Ilmari Officer begins Hallucination Blast (2500 ms)
+[03964] Chief Ilmari Officer ai Casting
+[03965] Backend Engineer swings at Chief Ilmari Officer
+[03965] Backend Engineer hits Chief Ilmari Officer with melee for 18 (absorbed 0)
+[03968] Backend Engineer casts Rate Limiter
+[03968] Backend Engineer gains rate_limiter
+[03973] telegraph #34 lands
+[03973] Chief Ilmari Officer telegraphs Roadmap #38 Line { length_m: 34.0, width_m: 3.5 } at (-3.5, -497.1) in 2200 ms
+[03987] Frontend Developer casts Infinite Scroll
+[03987] Chief Ilmari Officer gains infinite_scroll
+[03997] telegraph #36 lands
+[03997] Chief Ilmari Officer telegraphs Roadmap #39 Line { length_m: 34.0, width_m: 3.5 } at (-2.4, -481.1) in 2200 ms
+[04001] telegraph #35 lands
+[04001] Chief Ilmari Officer telegraphs Circle Back #40 Circle { radius_m: 4.6 } at (-2.4, -477.6) in 6000 ms
+[04014] Backend Engineer casts Cache Invalidation
+[04014] Backend Engineer hits Chief Ilmari Officer with Cache Invalidation for 192 (absorbed 0)
+[04014] Backend Engineer heals Backend Engineer with Cache Invalidation for 11
+[04018] telegraph #37 lands
+[04018] Chief Ilmari Officer telegraphs Roadmap #41 Line { length_m: 34.0, width_m: 3.5 } at (-3.0, -489.1) in 2200 ms
+[04025] Backend Engineer swings at Chief Ilmari Officer
+[04025] Backend Engineer hits Chief Ilmari Officer with melee for 20 (absorbed 0)
+[04030] Fullstack Engineer casts Refactor
+[04030] Chief Ilmari Officer loses code_smell (Consumed)
+[04030] Fullstack Engineer hits Chief Ilmari Officer with Refactor for 402 (absorbed 0) COMBO
+[04030] Fullstack Engineer swings at Chief Ilmari Officer
+[04030] Fullstack Engineer hits Chief Ilmari Officer with melee for 12 (absorbed 0)
+[04030] Chief Ilmari Officer enters phase 2
+[04030] Chief Ilmari Officer casts Org Chart Reshuffle
+[04030] Chief Ilmari Officer yells: Phase two of the strategy. The strategy has phases. I have been told this one is 'agile'.
+[04031] Fullstack Engineer begins Code Review (1866 ms)
+[04031] Frontend Developer casts Rewrite It in a New Framework
+[04031] Frontend Developer hits Chief Ilmari Officer with Rewrite It in a New Framework for 506 (absorbed 0)
+[04039] Chief Ilmari Officer casts Hallucination Blast
+[04039] Chief Ilmari Officer hits Backend Engineer with Hallucination Blast for 0 (absorbed 67)
+[04039] Chief Ilmari Officer ai Attack
+[04039] Chief Ilmari Officer swings at Backend Engineer
+[04039] Chief Ilmari Officer hits Backend Engineer with melee for 0 (absorbed 31)
+[04039] telegraph #38 lands
+[04039] Chief Ilmari Officer telegraphs Roadmap #42 Line { length_m: 34.0, width_m: 3.5 } at (-3.5, -497.1) in 2200 ms
+[04047] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[04049] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[04060] Backend Engineer casts DROP TABLE
+[04060] Backend Engineer hits Chief Ilmari Officer with DROP TABLE for 357 (absorbed 0)
+[04060] Backend Engineer heals Backend Engineer with DROP TABLE for 21
+[04063] telegraph #39 lands
+[04075] Frontend Developer casts !important
+[04075] Chief Ilmari Officer loses specificity (Consumed)
+[04075] Frontend Developer hits Chief Ilmari Officer with !important for 479 (absorbed 0) COMBO
+[04084] telegraph #41 lands
+[04085] Backend Engineer swings at Chief Ilmari Officer
+[04085] Backend Engineer hits Chief Ilmari Officer with melee for 18 (absorbed 0)
+[04087] Fullstack Engineer casts Code Review
+[04087] Fullstack Engineer hits Chief Ilmari Officer with Code Review for 226 (absorbed 0)
+[04087] Chief Ilmari Officer gains code_smell
+[04087] Fullstack Engineer swings at Chief Ilmari Officer
+[04087] Fullstack Engineer hits Chief Ilmari Officer with melee for 12 (absorbed 0)
+[04088] Fullstack Engineer begins Refactor (2333 ms)
+[04090] Chief Ilmari Officer casts Hire Consultants (Invoiced)
+[04090] Chief Ilmari Officer summons Invoiced Consultant #78
+[04090] Invoiced Consultant ai Chase
+[04090] Chief Ilmari Officer summons Invoiced Consultant #79
+[04090] Invoiced Consultant ai Chase
+[04090] Invoiced Consultant enters combat
+[04090] Invoiced Consultant enters combat
+[04090] Chief Ilmari Officer yells: Get me the consultants. The expensive ones. Each comes with an invoice and a timer.
+[04091] Backend Engineer auto attack off
+[04091] Backend Engineer auto attack on
+[04091] Backend Engineer casts Who Touched Prod?
+[04091] Fullstack Engineer auto attack off
+[04091] Fullstack Engineer auto attack on
+[04091] Frontend Developer auto attack off
+[04091] Frontend Developer auto attack on
+[04091] Frontend Developer swings at Invoiced Consultant
+[04091] Frontend Developer hits Invoiced Consultant with melee for 31 (absorbed 0) CRIT
+[04091] Invoiced Consultant ai Attack
+[04091] Invoiced Consultant swings at Frontend Developer
+[04091] Invoiced Consultant hits Frontend Developer with melee for 18 (absorbed 0)
+[04091] Invoiced Consultant ai Attack
+[04091] Invoiced Consultant swings at Backend Engineer
+[04091] Invoiced Consultant hits Backend Engineer with melee for 0 (absorbed 8)
+[04105] telegraph #42 lands
+[04106] Backend Engineer casts Connection Pool
+[04106] Backend Engineer hits Chief Ilmari Officer with Connection Pool for 64 (absorbed 0)
+[04106] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[04106] Backend Engineer hits Invoiced Consultant with Connection Pool for 64 (absorbed 0)
+[04106] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[04106] Backend Engineer hits Invoiced Consultant with Connection Pool for 64 (absorbed 0)
+[04106] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[04106] Invoiced Consultant ai Chase
+[04107] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[04108] Chief Ilmari Officer swings at Backend Engineer
+[04108] Chief Ilmari Officer hits Backend Engineer with melee for 17 (absorbed 14)
+[04108] Backend Engineer loses rate_limiter (Depleted)
+[04113] Invoiced Consultant ai Attack
+[04116] Invoiced Consultant casts Billable Synergy (Retained)
+[04116] Chief Ilmari Officer gains il_retainer
+[04116] Invoiced Consultant gains il_retainer
+[04116] Invoiced Consultant gains il_retainer
+[04119] Frontend Developer casts Infinite Scroll
+[04119] Invoiced Consultant gains infinite_scroll
+[04120] Invoiced Consultant casts Billable Synergy (Retained)
+[04120] Chief Ilmari Officer gains il_retainer
+[04120] Invoiced Consultant gains il_retainer
+[04120] Invoiced Consultant gains il_retainer
+[04138] Invoiced Consultant casts Invoice Statement
+[04138] Backend Engineer gains il_billed
+[04138] Fullstack Engineer gains il_billed
+[04138] Frontend Developer gains il_billed
+[04139] Frontend Developer swings at Invoiced Consultant
+[04139] Frontend Developer hits Invoiced Consultant with melee for 9 (absorbed 0)
+[04139] Invoiced Consultant casts Invoice Statement
+[04139] Backend Engineer gains il_billed
+[04139] Fullstack Engineer gains il_billed
+[04139] Frontend Developer gains il_billed
+[04139] Fullstack Engineer hits Chief Ilmari Officer with git blame for 28 (absorbed 0)
+[04145] Backend Engineer swings at Invoiced Consultant
+[04145] Backend Engineer hits Invoiced Consultant with melee for 11 (absorbed 0)
+[04152] Backend Engineer casts Blocking Call
+[04152] Backend Engineer hits Invoiced Consultant with Blocking Call for 46 (absorbed 0)
+[04152] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[04157] Invoiced Consultant swings at Backend Engineer
+[04157] Invoiced Consultant hits Backend Engineer with melee for 11 (absorbed 0)
+[04157] Invoiced Consultant swings at Backend Engineer
+[04157] Invoiced Consultant misses Backend Engineer with melee
+[04158] Fullstack Engineer casts Refactor
+[04158] Chief Ilmari Officer loses code_smell (Consumed)
+[04158] Fullstack Engineer hits Chief Ilmari Officer with Refactor for 221 (absorbed 0) COMBO
+[04158] Fullstack Engineer swings at Invoiced Consultant
+[04158] Fullstack Engineer hits Invoiced Consultant with melee for 7 (absorbed 0)
+[04159] Fullstack Engineer casts git blame
+[04159] Invoiced Consultant gains git_blame
+[04163] Frontend Developer casts CSS Combo
+[04163] Frontend Developer hits Invoiced Consultant with CSS Combo for 95 (absorbed 0)
+[04163] Invoiced Consultant gains specificity
+[04163] Invoiced Consultant gains specificity
+[04167] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 28 (absorbed 0)
+[04177] Chief Ilmari Officer swings at Backend Engineer
+[04177] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[04179] Frontend Developer hits Invoiced Consultant with Infinite Scroll for 28 (absorbed 0)
+[04181] telegraph #40 lands
+[04187] Frontend Developer swings at Invoiced Consultant
+[04187] Frontend Developer hits Invoiced Consultant with melee for 9 (absorbed 0)
+[04198] Backend Engineer casts Blocking Call
+[04198] Backend Engineer hits Invoiced Consultant with Blocking Call for 46 (absorbed 0)
+[04198] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[04200] Backend Engineer burnout 135 (Combat)
+[04200] Fullstack Engineer burnout 155 (Combat)
+[04200] Frontend Developer burnout 135 (Combat)
+[04202] Fullstack Engineer begins Write It By Hand (3733 ms)
+[04205] Backend Engineer swings at Invoiced Consultant
+[04205] Backend Engineer hits Invoiced Consultant with melee for 9 (absorbed 0)
+[04207] Frontend Developer casts Pixel Push
+[04207] Frontend Developer hits Invoiced Consultant with Pixel Push for 75 (absorbed 0)
+[04207] Invoiced Consultant gains specificity
+[04210] Chief Ilmari Officer casts Earnings Call, Live
+[04210] Chief Ilmari Officer telegraphs Earnings Call, Live #43 Circle { radius_m: 60.0 } at (-3.0, -489.1) in 5000 ms
+[04210] boardroom 4 desks, inbox 0 ms, severance 0 ms, tiles 0b0
+[04210] Chief Ilmari Officer yells: Earnings call, live. Every call retires a desk. It is called depreciation. You are the asset.
+[04211] Fullstack Engineer Write It By Hand interrupted by movement/cancel (lockout 0 ms)
+[04211] Invoiced Consultant ai Chase
+[04212] Fullstack Engineer swings at Invoiced Consultant
+[04212] Fullstack Engineer hits Invoiced Consultant with melee for 5 (absorbed 0)
+[04215] Chief Ilmari Officer ai Chase
+[04221] Invoiced Consultant ai Chase
+[04227] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 28 (absorbed 0)
+[04229] Fullstack Engineer hits Chief Ilmari Officer with git blame for 28 (absorbed 0)
+[04229] Chief Ilmari Officer loses git_blame (Expired)
+[04239] Frontend Developer hits Invoiced Consultant with Infinite Scroll for 28 (absorbed 0)
+[04249] Fullstack Engineer hits Invoiced Consultant with git blame for 28 (absorbed 0)
+[04257] Backend Engineer casts Cache Invalidation
+[04257] Backend Engineer hits Invoiced Consultant with Cache Invalidation for 105 (absorbed 0)
+[04257] Backend Engineer heals Backend Engineer with Cache Invalidation for 11
+[04262] Fullstack Engineer begins Write It By Hand (3733 ms)
+[04265] Backend Engineer swings at Invoiced Consultant
+[04265] Backend Engineer hits Invoiced Consultant with melee for 9 (absorbed 0)
+[04269] Invoiced Consultant ai Attack
+[04269] Invoiced Consultant swings at Backend Engineer
+[04269] Invoiced Consultant hits Backend Engineer with melee for 11 (absorbed 0)
+[04273] Backend Engineer auto attack off
+[04273] Backend Engineer auto attack on
+[04273] Fullstack Engineer auto attack off
+[04273] Fullstack Engineer auto attack on
+[04273] Invoiced Consultant casts Billable Synergy (Retained)
+[04273] Chief Ilmari Officer gains il_retainer
+[04273] Invoiced Consultant gains il_retainer
+[04273] Invoiced Consultant gains il_retainer
+[04273] Invoiced Consultant ai Attack
+[04273] Invoiced Consultant swings at Backend Engineer
+[04273] Invoiced Consultant hits Backend Engineer with melee for 11 (absorbed 0)
+[04274] Invoiced Consultant casts Billable Synergy (Retained)
+[04274] Chief Ilmari Officer gains il_retainer
+[04274] Invoiced Consultant gains il_retainer
+[04274] Invoiced Consultant gains il_retainer
+[04287] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 28 (absorbed 0)
+[04290] Invoiced Consultant casts Invoice Statement
+[04290] Backend Engineer gains il_billed
+[04290] Fullstack Engineer gains il_billed
+[04290] Frontend Developer gains il_billed
+[04297] Chief Ilmari Officer ai Attack
+[04297] Chief Ilmari Officer swings at Backend Engineer
+[04297] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[04299] Frontend Developer hits Invoiced Consultant with Infinite Scroll for 28 (absorbed 0)
+[04303] Backend Engineer casts Connection Pool
+[04303] Backend Engineer hits Chief Ilmari Officer with Connection Pool for 35 (absorbed 0)
+[04303] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[04303] Backend Engineer hits Invoiced Consultant with Connection Pool for 35 (absorbed 0)
+[04303] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[04303] Backend Engineer hits Invoiced Consultant with Connection Pool for 35 (absorbed 0)
+[04303] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[04311] Chief Ilmari Officer casts Roadmap
+[04311] Chief Ilmari Officer telegraphs Roadmap #44 Line { length_m: 34.0, width_m: 3.5 } at (-11.5, -479.5) in 1800 ms
+[04311] Chief Ilmari Officer telegraphs Roadmap #45 Line { length_m: 34.0, width_m: 3.5 } at (-12.1, -487.5) in 2500 ms
+[04311] Chief Ilmari Officer telegraphs Roadmap #46 Line { length_m: 34.0, width_m: 3.5 } at (-12.6, -495.5) in 3200 ms
+[04311] Invoiced Consultant casts Invoice Statement
+[04311] Backend Engineer gains il_billed
+[04311] Fullstack Engineer gains il_billed
+[04311] Frontend Developer gains il_billed
+[04311] Chief Ilmari Officer yells: Let me share my vision. It is a vision. I share it. It is shared.
+[04312] Fullstack Engineer Write It By Hand interrupted by movement/cancel (lockout 0 ms)
+[04312] Fullstack Engineer swings at Invoiced Consultant
+[04312] Fullstack Engineer hits Invoiced Consultant with melee for 7 (absorbed 0)
+[04312] Chief Ilmari Officer ai Chase
+[04312] Invoiced Consultant ai Chase
+[04313] Invoiced Consultant ai Chase
+[04322] Fullstack Engineer auto attack off
+[04322] Fullstack Engineer auto attack on
+[04323] Backend Engineer auto attack off
+[04323] Backend Engineer auto attack on
+[04323] Fullstack Engineer begins Write It By Hand (3733 ms)
+[04324] Invoiced Consultant ai Attack
+[04325] Backend Engineer auto attack off
+[04325] Backend Engineer auto attack on
+[04325] Fullstack Engineer auto attack off
+[04325] Fullstack Engineer auto attack on
+[04325] Backend Engineer swings at Invoiced Consultant
+[04325] Backend Engineer hits Invoiced Consultant with melee for 9 (absorbed 0)
+[04325] Invoiced Consultant ai Attack
+[04326] Chief Ilmari Officer begins Hallucination Blast (2500 ms)
+[04326] Chief Ilmari Officer ai Casting
+[04335] Invoiced Consultant swings at Backend Engineer
+[04335] Invoiced Consultant hits Backend Engineer with melee for 11 (absorbed 0)
+[04339] Invoiced Consultant swings at Backend Engineer
+[04339] Invoiced Consultant hits Backend Engineer with melee for 11 (absorbed 0)
+[04339] Fullstack Engineer hits Invoiced Consultant with git blame for 28 (absorbed 0)
+[04347] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 28 (absorbed 0)
+[04347] Chief Ilmari Officer loses infinite_scroll (Expired)
+[04349] Backend Engineer casts Blocking Call
+[04349] Backend Engineer yells: Timeout set to infinity. Like this meeting.
+[04349] Backend Engineer hits Invoiced Consultant with Blocking Call for 46 (absorbed 0)
+[04349] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[04359] Frontend Developer hits Invoiced Consultant with Infinite Scroll for 28 (absorbed 0)
+[04360] telegraph #43 lands
+[04360] Chief Ilmari Officer hits Frontend Developer with Earnings Call, Live for 288 (absorbed 0)
+[04365] telegraph #44 lands
+[04365] Chief Ilmari Officer telegraphs Roadmap #47 Line { length_m: 34.0, width_m: 3.5 } at (-11.5, -479.5) in 2200 ms
+[04385] Backend Engineer swings at Invoiced Consultant
+[04385] Backend Engineer hits Invoiced Consultant with melee for 9 (absorbed 0)
+[04386] telegraph #45 lands
+[04386] Chief Ilmari Officer telegraphs Roadmap #48 Line { length_m: 34.0, width_m: 3.5 } at (-12.1, -487.5) in 2200 ms
+[04395] Backend Engineer casts Blocking Call
+[04395] Backend Engineer hits Invoiced Consultant with Blocking Call for 46 (absorbed 0)
+[04395] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[04401] Chief Ilmari Officer casts Hallucination Blast
+[04401] Chief Ilmari Officer hits Backend Engineer with Hallucination Blast for 97 (absorbed 0)
+[04401] Chief Ilmari Officer begins Synergy Link (1500 ms)
+[04401] Invoiced Consultant swings at Backend Engineer
+[04401] Invoiced Consultant hits Backend Engineer with melee for 11 (absorbed 0)
+[04401] Chief Ilmari Officer yells: Synergy link: you are now partners. The partnership is a leash. Please do not drift. Drift is a metric.
+[04405] Invoiced Consultant swings at Backend Engineer
+[04405] Invoiced Consultant hits Backend Engineer with melee for 11 (absorbed 0)
+[04407] telegraph #46 lands
+[04407] Chief Ilmari Officer telegraphs Roadmap #49 Line { length_m: 34.0, width_m: 3.5 } at (-12.6, -495.5) in 2200 ms
+[04419] Frontend Developer hits Invoiced Consultant with Infinite Scroll for 28 (absorbed 0)
+[04429] Fullstack Engineer hits Invoiced Consultant with git blame for 28 (absorbed 0)
+[04431] telegraph #47 lands
+[04431] Chief Ilmari Officer telegraphs Roadmap #50 Line { length_m: 34.0, width_m: 3.5 } at (-11.5, -479.5) in 2200 ms
+[04435] Fullstack Engineer casts Write It By Hand
+[04435] Fullstack Engineer hits Invoiced Consultant with Write It By Hand for 386 (absorbed 0)
+[04435] Fullstack Engineer swings at Invoiced Consultant
+[04435] Fullstack Engineer hits Invoiced Consultant with melee for 9 (absorbed 0) CRIT
+[04436] Fullstack Engineer casts git blame
+[04436] Invoiced Consultant gains git_blame
+[04441] Backend Engineer casts Retry With Exponential Backoff
+[04441] Backend Engineer gains retry_backoff
+[04441] Backend Engineer loses il_billed (Consumed)
+[04442] Invoiced Consultant casts Billable Synergy (Retained)
+[04442] Chief Ilmari Officer gains il_retainer
+[04442] Invoiced Consultant gains il_retainer
+[04442] Invoiced Consultant gains il_retainer
+[04445] Backend Engineer swings at Invoiced Consultant
+[04445] Backend Engineer hits Invoiced Consultant with melee for 13 (absorbed 0)
+[04445] Invoiced Consultant casts Invoice Statement
+[04445] Backend Engineer gains il_billed
+[04445] Fullstack Engineer gains il_billed
+[04445] Frontend Developer gains il_billed
+[04446] Chief Ilmari Officer casts Synergy Link
+[04446] Fullstack Engineer gains il_synergy_link
+[04446] Frontend Developer gains il_synergy_link
+[04446] Backend Engineer gains il_synergy_link
+[04446] raid "ilmari6/3" async false week 0 locked [] tethers [(55, 56), (1, 74)]
+[04446] Chief Ilmari Officer begins Low-Hanging Fruit (1000 ms)
+[04446] Invoiced Consultant casts Billable Synergy (Retained)
+[04446] Chief Ilmari Officer gains il_retainer
+[04446] Invoiced Consultant gains il_retainer
+[04446] Invoiced Consultant gains il_retainer
+[04452] telegraph #48 lands
+[04452] Chief Ilmari Officer telegraphs Roadmap #51 Line { length_m: 34.0, width_m: 3.5 } at (-12.1, -487.5) in 2200 ms
+[04467] Invoiced Consultant swings at Backend Engineer
+[04467] Invoiced Consultant hits Backend Engineer with melee for 11 (absorbed 0)
+[04470] Frontend Developer auto attack off
+[04470] Frontend Developer auto attack on
+[04470] Frontend Developer casts Dark Mode
+[04470] Frontend Developer yells: Switching to dark mode. My soul was already there.
+[04470] Frontend Developer gains dark_mode
+[04470] Frontend Developer heals Frontend Developer with Dark Mode for 406
+[04470] Frontend Developer loses il_synergy_link (Consumed)
+[04470] Frontend Developer casts Responsive Layout
+[04470] Frontend Developer hits Chief Ilmari Officer with Responsive Layout for 75 (absorbed 0)
+[04470] Frontend Developer hits Invoiced Consultant with Responsive Layout for 75 (absorbed 0)
+[04470] Frontend Developer hits Invoiced Consultant with Responsive Layout for 113 (absorbed 0) CRIT
+[04471] Invoiced Consultant swings at Backend Engineer
+[04471] Invoiced Consultant hits Backend Engineer with melee for 11 (absorbed 0)
+[04473] telegraph #49 lands
+[04473] Chief Ilmari Officer telegraphs Roadmap #52 Line { length_m: 34.0, width_m: 3.5 } at (-12.6, -495.5) in 2200 ms
+[04476] Chief Ilmari Officer casts Low-Hanging Fruit
+[04476] Chief Ilmari Officer summons Low-Hanging Fruit #80
+[04476] Low-Hanging Fruit ai Chase
+[04476] Chief Ilmari Officer summons Low-Hanging Fruit #81
+[04476] Low-Hanging Fruit ai Chase
+[04476] Chief Ilmari Officer summons Low-Hanging Fruit #82
+[04476] Low-Hanging Fruit ai Chase
+[04476] Chief Ilmari Officer ai Chase
+[04476] Low-Hanging Fruit enters combat
+[04476] Low-Hanging Fruit enters combat
+[04476] Low-Hanging Fruit enters combat
+[04477] Backend Engineer auto attack off
+[04477] Backend Engineer auto attack on
+[04477] Fullstack Engineer auto attack off
+[04477] Fullstack Engineer auto attack on
+[04477] Frontend Developer auto attack off
+[04477] Frontend Developer auto attack on
+[04477] Frontend Developer swings at Low-Hanging Fruit
+[04477] Frontend Developer hits Low-Hanging Fruit with melee for 17 (absorbed 0)
+[04477] Chief Ilmari Officer casts Circle Back
+[04477] Chief Ilmari Officer telegraphs Circle Back #53 Circle { radius_m: 4.6 } at (-17.2, -489.0) in 2600 ms
+[04477] Low-Hanging Fruit ai Attack
+[04477] Low-Hanging Fruit swings at Frontend Developer
+[04477] Low-Hanging Fruit hits Frontend Developer with melee for 8 (absorbed 0)
+[04477] Chief Ilmari Officer yells: Circling back to the thing that already hit you. Circling back again.
+[04479] Chief Ilmari Officer ai Attack
+[04479] Chief Ilmari Officer swings at Backend Engineer
+[04479] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[04479] Low-Hanging Fruit ai Attack
+[04479] Low-Hanging Fruit swings at Backend Engineer
+[04479] Low-Hanging Fruit misses Backend Engineer with melee
+[04479] Frontend Developer hits Invoiced Consultant with Infinite Scroll for 28 (absorbed 0)
+[04479] Invoiced Consultant loses infinite_scroll (Expired)
+[04484] Low-Hanging Fruit ai Attack
+[04484] Low-Hanging Fruit swings at Backend Engineer
+[04484] Low-Hanging Fruit hits Backend Engineer with melee for 11 (absorbed 0)
+[04486] Invoiced Consultant casts Invoice Statement
+[04486] Backend Engineer gains il_billed
+[04486] Fullstack Engineer gains il_billed
+[04486] Frontend Developer gains il_billed
+[04489] Fullstack Engineer swings at Low-Hanging Fruit
+[04489] Fullstack Engineer hits Low-Hanging Fruit with melee for 9 (absorbed 0)
+[04489] Low-Hanging Fruit ai Chase
+[04494] Invoiced Consultant ai Chase
+[04494] Invoiced Consultant ai Chase
+[04497] Chief Ilmari Officer ai Chase
+[04497] Low-Hanging Fruit ai Chase
+[04497] telegraph #50 lands
+[04497] Chief Ilmari Officer telegraphs Roadmap #54 Line { length_m: 34.0, width_m: 3.5 } at (-11.5, -479.5) in 2200 ms
+[04498] Fullstack Engineer casts git blame
+[04498] Low-Hanging Fruit gains git_blame
+[04498] Chief Ilmari Officer ai Attack
+[04498] Invoiced Consultant ai Attack
+[04498] Invoiced Consultant ai Attack
+[04498] Low-Hanging Fruit ai Attack
+[04500] Backend Engineer burnout 150 (Combat)
+[04500] Fullstack Engineer burnout 170 (Combat)
+[04500] Frontend Developer burnout 150 (Combat)
+[04501] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[04504] Low-Hanging Fruit ai Attack
+[04514] Frontend Developer casts Infinite Scroll
+[04514] Low-Hanging Fruit gains infinite_scroll
+[04518] telegraph #51 lands
+[04518] Chief Ilmari Officer hits Backend Engineer with Roadmap for 50 (absorbed 0)
+[04518] Chief Ilmari Officer telegraphs Roadmap #55 Line { length_m: 34.0, width_m: 3.5 } at (-12.1, -487.5) in 2200 ms
+[04519] Fullstack Engineer hits Invoiced Consultant with git blame for 28 (absorbed 0)
+[04525] Frontend Developer swings at Low-Hanging Fruit
+[04525] Frontend Developer hits Low-Hanging Fruit with melee for 16 (absorbed 0)
+[04525] Low-Hanging Fruit swings at Frontend Developer
+[04525] Low-Hanging Fruit hits Frontend Developer with melee for 8 (absorbed 0)
+[04526] Fullstack Engineer hits Invoiced Consultant with git blame for 28 (absorbed 0)
+[04527] Low-Hanging Fruit swings at Fullstack Engineer
+[04527] Low-Hanging Fruit hits Fullstack Engineer with melee for 17 (absorbed 0)
+[04532] Low-Hanging Fruit swings at Backend Engineer
+[04532] Low-Hanging Fruit hits Backend Engineer with melee for 11 (absorbed 0)
+[04533] Invoiced Consultant swings at Backend Engineer
+[04533] Invoiced Consultant hits Backend Engineer with melee for 11 (absorbed 0)
+[04537] Invoiced Consultant swings at Backend Engineer
+[04537] Invoiced Consultant hits Backend Engineer with melee for 11 (absorbed 0)
+[04539] telegraph #52 lands
+[04539] Chief Ilmari Officer telegraphs Roadmap #56 Line { length_m: 34.0, width_m: 3.5 } at (-12.6, -495.5) in 2200 ms
+[04541] Fullstack Engineer begins Code Review (1866 ms)
+[04548] Chief Ilmari Officer swings at Backend Engineer
+[04548] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[04555] telegraph #53 lands
+[04555] Chief Ilmari Officer hits Backend Engineer with Circle Back for 85 (absorbed 0)
+[04555] Chief Ilmari Officer telegraphs Circle Back #57 Circle { radius_m: 4.6 } at (-17.2, -489.0) in 6000 ms
+[04558] Frontend Developer casts CSS Combo
+[04558] Frontend Developer hits Low-Hanging Fruit with CSS Combo for 147 (absorbed 0)
+[04558] Low-Hanging Fruit gains specificity
+[04558] Low-Hanging Fruit gains specificity
+[04561] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[04563] telegraph #54 lands
+[04573] Frontend Developer swings at Low-Hanging Fruit
+[04573] Frontend Developer hits Low-Hanging Fruit with melee for 14 (absorbed 0)
+[04573] Low-Hanging Fruit swings at Frontend Developer
+[04573] Low-Hanging Fruit hits Frontend Developer with melee for 8 (absorbed 0)
+[04574] Frontend Developer hits Low-Hanging Fruit with Infinite Scroll for 44 (absorbed 0)
+[04575] Low-Hanging Fruit swings at Fullstack Engineer
+[04575] Low-Hanging Fruit misses Fullstack Engineer with melee
+[04580] Low-Hanging Fruit swings at Backend Engineer
+[04580] Low-Hanging Fruit hits Backend Engineer with melee for 11 (absorbed 0)
+[04584] telegraph #55 lands
+[04588] Fullstack Engineer hits Low-Hanging Fruit with git blame for 44 (absorbed 0)
+[04589] Backend Engineer auto attack off
+[04589] Backend Engineer auto attack on
+[04589] Backend Engineer casts Horizontal Scaling
+[04589] Backend Engineer gains horizontal_scaling
+[04589] Backend Engineer casts Rate Limiter
+[04589] Backend Engineer gains rate_limiter
+[04589] Backend Engineer swings at Low-Hanging Fruit
+[04589] Backend Engineer hits Low-Hanging Fruit with melee for 18 (absorbed 0)
+[04595] Invoiced Consultant casts Billable Synergy (Retained)
+[04595] Chief Ilmari Officer gains il_retainer
+[04595] Invoiced Consultant gains il_retainer
+[04595] Invoiced Consultant gains il_retainer
+[04595] Low-Hanging Fruit gains il_retainer
+[04595] Low-Hanging Fruit gains il_retainer
+[04595] Low-Hanging Fruit gains il_retainer
+[04595] Invoiced Consultant yells: Retainer renewed. The invoice is attached to your HP.
+[04597] Fullstack Engineer casts Code Review
+[04597] Fullstack Engineer yells: Line one: no. Line two: also no.
+[04597] Fullstack Engineer hits Low-Hanging Fruit with Code Review for 124 (absorbed 0)
+[04597] Low-Hanging Fruit gains code_smell
+[04597] Fullstack Engineer swings at Low-Hanging Fruit
+[04597] Fullstack Engineer hits Low-Hanging Fruit with melee for 6 (absorbed 0)
+[04597] Invoiced Consultant casts Billable Synergy (Retained)
+[04597] Chief Ilmari Officer gains il_retainer
+[04597] Invoiced Consultant gains il_retainer
+[04597] Invoiced Consultant gains il_retainer
+[04597] Low-Hanging Fruit gains il_retainer
+[04597] Low-Hanging Fruit gains il_retainer
+[04597] Low-Hanging Fruit gains il_retainer
+[04598] Fullstack Engineer begins Refactor (2333 ms)
+[04598] Invoiced Consultant casts Invoice Statement
+[04598] Backend Engineer gains il_billed
+[04598] Fullstack Engineer gains il_billed
+[04598] Frontend Developer gains il_billed
+[04599] Invoiced Consultant swings at Backend Engineer
+[04599] Invoiced Consultant hits Backend Engineer with melee for 0 (absorbed 8)
+[04602] Frontend Developer casts Pixel Push
+[04602] Frontend Developer hits Low-Hanging Fruit with Pixel Push for 75 (absorbed 0)
+[04602] Low-Hanging Fruit gains specificity
+[04603] Invoiced Consultant swings at Backend Engineer
+[04603] Invoiced Consultant hits Backend Engineer with melee for 0 (absorbed 8)
+[04605] telegraph #56 lands
+[04609] Fullstack Engineer hits Invoiced Consultant with git blame for 28 (absorbed 0)
+[04616] Fullstack Engineer hits Invoiced Consultant with git blame for 28 (absorbed 0)
+[04617] Chief Ilmari Officer swings at Backend Engineer
+[04617] Chief Ilmari Officer misses Backend Engineer with melee
+[04621] Frontend Developer swings at Low-Hanging Fruit
+[04621] Frontend Developer misses Low-Hanging Fruit with melee
+[04621] Low-Hanging Fruit swings at Frontend Developer
+[04621] Low-Hanging Fruit hits Frontend Developer with melee for 8 (absorbed 0)
+[04621] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[04623] Low-Hanging Fruit swings at Fullstack Engineer
+[04623] Low-Hanging Fruit hits Fullstack Engineer with melee for 17 (absorbed 0)
+[04628] Low-Hanging Fruit swings at Backend Engineer
+[04628] Low-Hanging Fruit hits Backend Engineer with melee for 0 (absorbed 8)
+[04630] Chief Ilmari Officer begins Pivot to Ilmari (4000 ms)
+[04630] Chief Ilmari Officer ai Casting
+[04631] Backend Engineer auto attack off
+[04631] Backend Engineer auto attack on
+[04631] Fullstack Engineer auto attack off
+[04631] Fullstack Engineer auto attack on
+[04631] Frontend Developer auto attack off
+[04631] Frontend Developer auto attack on
+[04632] Backend Engineer casts Kill Query
+[04632] Chief Ilmari Officer Pivot to Ilmari interrupted by Backend Engineer (lockout 4000 ms)
+[04632] Fullstack Engineer failed Reject PR: Nothing to interrupt.
+[04632] Frontend Developer failed Lighthouse Audit: Nothing to interrupt.
+[04632] Chief Ilmari Officer ai Attack
+[04633] Backend Engineer auto attack off
+[04633] Backend Engineer auto attack on
+[04633] Fullstack Engineer auto attack off
+[04633] Fullstack Engineer auto attack on
+[04633] Frontend Developer auto attack off
+[04633] Frontend Developer auto attack on
+[04634] Frontend Developer hits Low-Hanging Fruit with Infinite Scroll for 28 (absorbed 0)
+[04635] Backend Engineer casts Connection Pool
+[04635] Backend Engineer hits Chief Ilmari Officer with Connection Pool for 35 (absorbed 0)
+[04635] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[04635] Backend Engineer hits Invoiced Consultant with Connection Pool for 35 (absorbed 0)
+[04635] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[04635] Backend Engineer hits Invoiced Consultant with Connection Pool for 35 (absorbed 0)
+[04635] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[04635] Backend Engineer hits Low-Hanging Fruit with Connection Pool for 35 (absorbed 0)
+[04635] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[04635] Backend Engineer hits Low-Hanging Fruit with Connection Pool for 35 (absorbed 0)
+[04635] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[04635] Backend Engineer hits Low-Hanging Fruit with Connection Pool for 35 (absorbed 0)
+[04635] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[04635] Low-Hanging Fruit ai Chase
+[04646] Frontend Developer casts Pixel Push
+[04646] Frontend Developer hits Low-Hanging Fruit with Pixel Push for 75 (absorbed 0)
+[04646] Low-Hanging Fruit gains specificity
+[04647] Invoiced Consultant casts Invoice Statement
+[04647] Backend Engineer gains il_billed
+[04647] Fullstack Engineer gains il_billed
+[04647] Frontend Developer gains il_billed
+[04647] Low-Hanging Fruit ai Attack
+[04649] Backend Engineer swings at Low-Hanging Fruit
+[04649] Backend Engineer hits Low-Hanging Fruit with melee for 10 (absorbed 0)
+[04650] Frontend Developer loses dark_mode (Expired)
+[04665] Invoiced Consultant swings at Backend Engineer
+[04665] Invoiced Consultant hits Backend Engineer with melee for 0 (absorbed 8)
+[04669] Frontend Developer swings at Low-Hanging Fruit
+[04669] Frontend Developer hits Low-Hanging Fruit with melee for 8 (absorbed 0)
+[04669] Invoiced Consultant swings at Backend Engineer
+[04669] Invoiced Consultant hits Backend Engineer with melee for 0 (absorbed 8)
+[04669] Low-Hanging Fruit swings at Frontend Developer
+[04669] Low-Hanging Fruit hits Frontend Developer with melee for 18 (absorbed 0)
+[04671] Low-Hanging Fruit swings at Backend Engineer
+[04671] Low-Hanging Fruit hits Backend Engineer with melee for 0 (absorbed 8)
+[04676] Low-Hanging Fruit swings at Backend Engineer
+[04676] Low-Hanging Fruit hits Backend Engineer with melee for 0 (absorbed 8)
+[04678] Fullstack Engineer hits Low-Hanging Fruit with git blame for 28 (absorbed 0)
+[04681] Backend Engineer casts Cache Invalidation
+[04681] Backend Engineer hits Low-Hanging Fruit with Cache Invalidation for 105 (absorbed 0)
+[04681] Backend Engineer heals Backend Engineer with Cache Invalidation for 11
+[04681] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[04683] Fullstack Engineer casts Refactor
+[04683] Low-Hanging Fruit loses code_smell (Consumed)
+[04683] Fullstack Engineer hits Low-Hanging Fruit with Refactor for 221 (absorbed 0) COMBO
+[04683] Fullstack Engineer swings at Low-Hanging Fruit
+[04683] Fullstack Engineer hits Low-Hanging Fruit with melee for 7 (absorbed 0)
+[04683] Low-Hanging Fruit ai Chase
+[04684] Fullstack Engineer casts Guardrails
+[04684] Fullstack Engineer gains guardrails
+[04686] Chief Ilmari Officer swings at Backend Engineer
+[04686] Chief Ilmari Officer hits Backend Engineer with melee for 0 (absorbed 31)
+[04690] Frontend Developer casts !important
+[04690] Low-Hanging Fruit loses specificity (Consumed)
+[04690] Frontend Developer hits Low-Hanging Fruit with !important for 300 (absorbed 0) COMBO
+[04690] Low-Hanging Fruit loses infinite_scroll (Death)
+[04690] Low-Hanging Fruit loses il_retainer (Death)
+[04690] Frontend Developer auto attack off
+[04690] Low-Hanging Fruit dies (killer Frontend Developer)
+[04690] Chief Ilmari Officer heals Frontend Developer with ? for 15
+[04690] Low-Hanging Fruit ai Dead
+[04690] Low-Hanging Fruit drops [] and 0 SP
+[04690] Low-Hanging Fruit drops [] and 0 SP
+[04690] Low-Hanging Fruit drops [] and 0 SP
+[04690] Low-Hanging Fruit leaves combat
+[04690] Low-Hanging Fruit yells: Picked... at last... by a stakeholder...
+[04691] Frontend Developer auto attack on
+[04694] Low-Hanging Fruit ai Attack
+[04699] Fullstack Engineer hits Invoiced Consultant with git blame for 28 (absorbed 0)
+[04699] Invoiced Consultant loses git_blame (Expired)
+[04706] Fullstack Engineer hits Invoiced Consultant with git blame for 28 (absorbed 0)
+[04709] Backend Engineer swings at Low-Hanging Fruit
+[04709] Backend Engineer hits Low-Hanging Fruit with melee for 8 (absorbed 0)
+[04719] Low-Hanging Fruit swings at Fullstack Engineer
+[04719] Low-Hanging Fruit hits Fullstack Engineer with melee for 0 (absorbed 17)
+[04724] Low-Hanging Fruit swings at Backend Engineer
+[04724] Low-Hanging Fruit hits Backend Engineer with melee for 0 (absorbed 8)
+[04727] Backend Engineer casts Blocking Call
+[04727] Backend Engineer hits Low-Hanging Fruit with Blocking Call for 46 (absorbed 0)
+[04727] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[04727] Fullstack Engineer casts Postmortem
+[04727] Fullstack Engineer hits Low-Hanging Fruit with Postmortem for 308 (absorbed 0)
+[04727] Chief Ilmari Officer gains git_blame
+[04727] Low-Hanging Fruit loses git_blame (Death)
+[04727] Low-Hanging Fruit loses il_retainer (Death)
+[04727] Fullstack Engineer auto attack off
+[04727] Frontend Developer auto attack off
+[04727] Low-Hanging Fruit dies (killer Fullstack Engineer)
+[04727] Chief Ilmari Officer heals Fullstack Engineer with ? for 14
+[04727] Low-Hanging Fruit ai Dead
+[04727] Low-Hanging Fruit drops [] and 0 SP
+[04727] Low-Hanging Fruit drops [] and 0 SP
+[04727] Low-Hanging Fruit drops [] and 0 SP
+[04727] Low-Hanging Fruit leaves combat
+[04728] Fullstack Engineer auto attack on
+[04728] Frontend Developer auto attack on
+[04731] Invoiced Consultant swings at Backend Engineer
+[04731] Invoiced Consultant hits Backend Engineer with melee for 0 (absorbed 8)
+[04734] Frontend Developer casts Responsive Layout
+[04734] Frontend Developer hits Chief Ilmari Officer with Responsive Layout for 113 (absorbed 0) CRIT
+[04734] Frontend Developer hits Invoiced Consultant with Responsive Layout for 85 (absorbed 0)
+[04734] Frontend Developer hits Invoiced Consultant with Responsive Layout for 85 (absorbed 0)
+[04734] Invoiced Consultant loses il_retainer (Death)
+[04734] Invoiced Consultant dies (killer Frontend Developer)
+[04734] Invoiced Consultant ai Dead
+[04734] Invoiced Consultant drops [] and 0 SP
+[04734] Invoiced Consultant drops [] and 0 SP
+[04734] Invoiced Consultant drops [] and 0 SP
+[04734] Frontend Developer hits Low-Hanging Fruit with Responsive Layout for 75 (absorbed 0)
+[04734] Invoiced Consultant leaves combat
+[04735] Invoiced Consultant swings at Backend Engineer
+[04735] Invoiced Consultant hits Backend Engineer with melee for 0 (absorbed 8)
+[04735] telegraph #57 lands
+[04737] Fullstack Engineer swings at Low-Hanging Fruit
+[04737] Fullstack Engineer hits Low-Hanging Fruit with melee for 5 (absorbed 0)
+[04741] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[04750] #78 despawns
+[04750] Backend Engineer burnout 270 (Collateral)
+[04750] Fullstack Engineer burnout 290 (Collateral)
+[04750] Frontend Developer burnout 270 (Collateral)
+[04755] Chief Ilmari Officer swings at Backend Engineer
+[04755] Chief Ilmari Officer hits Backend Engineer with melee for 22 (absorbed 9)
+[04755] Backend Engineer loses rate_limiter (Depleted)
+[04757] Chief Ilmari Officer begins Hallucination Blast (2500 ms)
+[04757] Chief Ilmari Officer ai Casting
+[04769] Backend Engineer swings at Low-Hanging Fruit
+[04769] Backend Engineer misses Low-Hanging Fruit with melee
+[04770] Fullstack Engineer casts git blame
+[04770] Low-Hanging Fruit gains git_blame
+[04772] Low-Hanging Fruit swings at Backend Engineer
+[04772] Low-Hanging Fruit hits Backend Engineer with melee for 11 (absorbed 0)
+[04773] Backend Engineer casts Blocking Call
+[04773] Backend Engineer hits Low-Hanging Fruit with Blocking Call for 47 (absorbed 0)
+[04773] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[04778] Frontend Developer casts CSS Combo
+[04778] Frontend Developer hits Low-Hanging Fruit with CSS Combo for 99 (absorbed 0)
+[04778] Low-Hanging Fruit gains specificity
+[04778] Low-Hanging Fruit gains specificity
+[04791] Fullstack Engineer swings at Low-Hanging Fruit
+[04791] Fullstack Engineer hits Low-Hanging Fruit with melee for 4 (absorbed 0)
+[04800] Backend Engineer burnout 285 (Combat)
+[04800] Fullstack Engineer burnout 305 (Combat)
+[04800] Frontend Developer burnout 285 (Combat)
+[04801] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[04801] Backend Engineer loses retry_backoff (Expired)
+[04806] Backend Engineer loses il_synergy_link (Expired)
+[04806] Fullstack Engineer loses il_synergy_link (Expired)
+[04806] raid "ilmari6/3" async false week 0 locked [] tethers []
+[04807] Chief Ilmari Officer loses il_retainer (Expired)
+[04807] Low-Hanging Fruit loses il_retainer (Expired)
+[04813] Fullstack Engineer begins Code Review (1966 ms)
+[04817] Fullstack Engineer hits Chief Ilmari Officer with git blame for 44 (absorbed 0)
+[04819] Backend Engineer casts Connection Pool
+[04819] Backend Engineer hits Chief Ilmari Officer with Connection Pool for 56 (absorbed 0)
+[04819] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[04819] Backend Engineer hits Low-Hanging Fruit with Connection Pool for 56 (absorbed 0)
+[04819] Low-Hanging Fruit loses git_blame (Death)
+[04819] Low-Hanging Fruit loses specificity (Death)
+[04819] Backend Engineer auto attack off
+[04819] Fullstack Engineer auto attack off
+[04819] Frontend Developer auto attack off
+[04819] Low-Hanging Fruit dies (killer Backend Engineer)
+[04819] Chief Ilmari Officer heals Backend Engineer with ? for 33
+[04819] Low-Hanging Fruit ai Dead
+[04819] Low-Hanging Fruit drops [] and 0 SP
+[04819] Low-Hanging Fruit drops [] and 0 SP
+[04819] Low-Hanging Fruit drops [] and 0 SP
+[04819] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[04819] Low-Hanging Fruit leaves combat
+[04819] Low-Hanging Fruit yells: Picked... at last... by a stakeholder...
+[04820] Backend Engineer auto attack on
+[04820] Fullstack Engineer auto attack on
+[04820] Frontend Developer auto attack on
+[04820] Frontend Developer swings at Chief Ilmari Officer
+[04820] Frontend Developer hits Chief Ilmari Officer with melee for 14 (absorbed 0)
+[04822] Frontend Developer casts Infinite Scroll
+[04822] Chief Ilmari Officer gains infinite_scroll
+[04829] Backend Engineer swings at Chief Ilmari Officer
+[04829] Backend Engineer hits Chief Ilmari Officer with melee for 15 (absorbed 0)
+[04832] Chief Ilmari Officer casts Hallucination Blast
+[04832] Chief Ilmari Officer hits Backend Engineer with Hallucination Blast for 97 (absorbed 0)
+[04832] Chief Ilmari Officer casts Roadmap
+[04832] Chief Ilmari Officer telegraphs Roadmap #58 Line { length_m: 34.0, width_m: 3.5 } at (-14.1, -495.8) in 1800 ms
+[04832] Chief Ilmari Officer telegraphs Roadmap #59 Line { length_m: 34.0, width_m: 3.5 } at (-14.0, -487.8) in 2500 ms
+[04832] Chief Ilmari Officer telegraphs Roadmap #60 Line { length_m: 34.0, width_m: 3.5 } at (-13.9, -479.8) in 3200 ms
+[04832] Chief Ilmari Officer ai Attack
+[04832] Chief Ilmari Officer swings at Backend Engineer
+[04832] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[04857] Backend Engineer loses il_billed (Expired)
+[04857] Fullstack Engineer loses il_billed (Expired)
+[04857] Frontend Developer loses il_billed (Expired)
+[04865] Backend Engineer casts Blocking Call
+[04865] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 86 (absorbed 0)
+[04865] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[04866] Frontend Developer casts Pixel Push
+[04866] Frontend Developer hits Chief Ilmari Officer with Pixel Push for 142 (absorbed 0)
+[04866] Chief Ilmari Officer gains specificity
+[04868] Frontend Developer swings at Chief Ilmari Officer
+[04868] Frontend Developer hits Chief Ilmari Officer with melee for 17 (absorbed 0)
+[04872] Fullstack Engineer failed Code Review: Target is dead.
+[04872] Fullstack Engineer swings at Chief Ilmari Officer
+[04872] Fullstack Engineer hits Chief Ilmari Officer with melee for 9 (absorbed 0)
+[04873] Fullstack Engineer begins Code Review (1966 ms)
+[04882] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[04886] telegraph #58 lands
+[04886] Chief Ilmari Officer telegraphs Roadmap #61 Line { length_m: 34.0, width_m: 3.5 } at (-14.1, -495.8) in 2200 ms
+[04889] Backend Engineer swings at Chief Ilmari Officer
+[04889] Backend Engineer hits Chief Ilmari Officer with melee for 21 (absorbed 0)
+[04901] Chief Ilmari Officer swings at Backend Engineer
+[04901] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[04907] telegraph #59 lands
+[04907] Chief Ilmari Officer telegraphs Roadmap #62 Line { length_m: 34.0, width_m: 3.5 } at (-14.0, -487.8) in 2200 ms
+[04907] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[04910] Frontend Developer casts Pixel Push
+[04910] Frontend Developer hits Chief Ilmari Officer with Pixel Push for 142 (absorbed 0)
+[04910] Chief Ilmari Officer gains specificity
+[04911] Backend Engineer casts Blocking Call
+[04911] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 86 (absorbed 0)
+[04911] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[04916] Frontend Developer swings at Chief Ilmari Officer
+[04916] Frontend Developer hits Chief Ilmari Officer with melee for 21 (absorbed 0)
+[04928] telegraph #60 lands
+[04928] Chief Ilmari Officer telegraphs Roadmap #63 Line { length_m: 34.0, width_m: 3.5 } at (-13.9, -479.8) in 2200 ms
+[04930] Chief Ilmari Officer casts Earnings Call, Live
+[04930] Chief Ilmari Officer telegraphs Earnings Call, Live #64 Circle { radius_m: 60.0 } at (-14.0, -487.8) in 5000 ms
+[04930] boardroom 3 desks, inbox 0 ms, severance 0 ms, tiles 0b0
+[04930] Chief Ilmari Officer yells: Earnings call, live. Every call retires a desk. It is called depreciation. You are the asset.
+[04931] Fullstack Engineer Code Review interrupted by movement/cancel (lockout 0 ms)
+[04931] Fullstack Engineer swings at Chief Ilmari Officer
+[04931] Fullstack Engineer hits Chief Ilmari Officer with melee for 10 (absorbed 0)
+[04942] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[04946] Fullstack Engineer begins Code Review (1966 ms)
+[04949] Backend Engineer swings at Chief Ilmari Officer
+[04949] Backend Engineer hits Chief Ilmari Officer with melee for 19 (absorbed 0)
+[04952] telegraph #61 lands
+[04952] Chief Ilmari Officer telegraphs Roadmap #65 Line { length_m: 34.0, width_m: 3.5 } at (-14.1, -495.8) in 2200 ms
+[04954] Frontend Developer casts Rewrite It in a New Framework
+[04954] Frontend Developer hits Chief Ilmari Officer with Rewrite It in a New Framework for 521 (absorbed 0)
+[04957] Backend Engineer casts Cache Invalidation
+[04957] Backend Engineer yells: There are two hard problems. You are both.
+[04957] Backend Engineer hits Chief Ilmari Officer with Cache Invalidation for 197 (absorbed 0)
+[04957] Backend Engineer heals Backend Engineer with Cache Invalidation for 11
+[04964] Frontend Developer swings at Chief Ilmari Officer
+[04964] Frontend Developer hits Chief Ilmari Officer with melee for 16 (absorbed 0)
+[04970] Chief Ilmari Officer swings at Backend Engineer
+[04970] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[04973] telegraph #62 lands
+[04973] Chief Ilmari Officer telegraphs Roadmap #66 Line { length_m: 34.0, width_m: 3.5 } at (-14.0, -487.8) in 2200 ms
+[04975] boardroom 3 desks, inbox 6000 ms, severance 0 ms, tiles 0b0
+[04976] Backend Engineer uses il_inbox_2 (1)
+[04976] Fullstack Engineer uses il_inbox_2 (0)
+[04976] Frontend Developer uses il_inbox_2 (0)
+[04976] boardroom 3 desks, inbox 0 ms, severance 0 ms, tiles 0b0
+[04984] Fullstack Engineer loses guardrails (Expired)
+[04994] telegraph #63 lands
+[04994] Chief Ilmari Officer telegraphs Roadmap #67 Line { length_m: 34.0, width_m: 3.5 } at (-13.9, -479.8) in 2200 ms
+[04997] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[04998] Frontend Developer casts CSS Combo
+[04998] Frontend Developer hits Chief Ilmari Officer with CSS Combo for 180 (absorbed 0)
+[04998] Chief Ilmari Officer gains specificity
+[04998] Chief Ilmari Officer gains specificity
+[05002] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05003] Backend Engineer casts DROP TABLE
+[05003] Backend Engineer hits Chief Ilmari Officer with DROP TABLE for 368 (absorbed 0)
+[05003] Backend Engineer heals Backend Engineer with DROP TABLE for 22
+[05005] Fullstack Engineer casts Code Review
+[05005] Fullstack Engineer hits Chief Ilmari Officer with Code Review for 234 (absorbed 0)
+[05005] Chief Ilmari Officer gains code_smell
+[05005] Fullstack Engineer swings at Chief Ilmari Officer
+[05005] Fullstack Engineer hits Chief Ilmari Officer with melee for 18 (absorbed 0) CRIT
+[05006] Fullstack Engineer begins Refactor (2433 ms)
+[05009] Backend Engineer swings at Chief Ilmari Officer
+[05009] Backend Engineer hits Chief Ilmari Officer with melee for 28 (absorbed 0) CRIT
+[05012] Frontend Developer swings at Chief Ilmari Officer
+[05012] Frontend Developer hits Chief Ilmari Officer with melee for 17 (absorbed 0)
+[05018] telegraph #65 lands
+[05018] Chief Ilmari Officer telegraphs Roadmap #68 Line { length_m: 34.0, width_m: 3.5 } at (-14.1, -495.8) in 2200 ms
+[05039] Chief Ilmari Officer swings at Backend Engineer
+[05039] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[05039] telegraph #66 lands
+[05039] Chief Ilmari Officer telegraphs Roadmap #69 Line { length_m: 34.0, width_m: 3.5 } at (-14.0, -487.8) in 2200 ms
+[05039] Backend Engineer loses horizontal_scaling (Expired)
+[05042] Frontend Developer casts !important
+[05042] Chief Ilmari Officer loses specificity (Consumed)
+[05042] Frontend Developer hits Chief Ilmari Officer with !important for 489 (absorbed 0) COMBO
+[05049] Backend Engineer casts Blocking Call
+[05049] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 129 (absorbed 0) CRIT
+[05049] Backend Engineer heals Backend Engineer with Blocking Call for 7
+[05060] Frontend Developer swings at Chief Ilmari Officer
+[05060] Frontend Developer hits Chief Ilmari Officer with melee for 24 (absorbed 0) CRIT
+[05060] telegraph #67 lands
+[05060] Chief Ilmari Officer telegraphs Roadmap #70 Line { length_m: 34.0, width_m: 3.5 } at (-13.9, -479.8) in 2200 ms
+[05062] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05065] Chief Ilmari Officer casts Circle Back
+[05065] Chief Ilmari Officer telegraphs Circle Back #71 Circle { radius_m: 4.6 } at (-15.2, -487.7) in 2600 ms
+[05065] Chief Ilmari Officer yells: Let us circle back. The circle is on you. The circle will return.
+[05066] Fullstack Engineer Refactor interrupted by movement/cancel (lockout 0 ms)
+[05066] Fullstack Engineer swings at Chief Ilmari Officer
+[05066] Fullstack Engineer hits Chief Ilmari Officer with melee for 12 (absorbed 0)
+[05069] Backend Engineer swings at Chief Ilmari Officer
+[05069] Backend Engineer hits Chief Ilmari Officer with melee for 21 (absorbed 0)
+[05080] Chief Ilmari Officer ai Chase
+[05080] telegraph #64 lands
+[05080] Chief Ilmari Officer hits Backend Engineer with Earnings Call, Live for 182 (absorbed 0)
+[05080] Chief Ilmari Officer hits Fullstack Engineer with Earnings Call, Live for 276 (absorbed 0)
+[05080] Chief Ilmari Officer hits Frontend Developer with Earnings Call, Live for 288 (absorbed 0)
+[05081] Fullstack Engineer casts Rollback
+[05081] Fullstack Engineer heals Fullstack Engineer with Rollback for 260
+[05082] Frontend Developer casts Dark Mode
+[05082] Frontend Developer yells: Contrast ratio too low to be targeted.
+[05082] Frontend Developer gains dark_mode
+[05082] Frontend Developer heals Frontend Developer with Dark Mode for 368
+[05084] telegraph #68 lands
+[05086] Frontend Developer casts Pixel Push
+[05086] Frontend Developer hits Chief Ilmari Officer with Pixel Push for 142 (absorbed 0)
+[05086] Chief Ilmari Officer gains specificity
+[05087] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[05092] Chief Ilmari Officer ai Attack
+[05095] Backend Engineer casts Blocking Call
+[05095] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 86 (absorbed 0)
+[05095] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[05100] Backend Engineer burnout 300 (Combat)
+[05100] Fullstack Engineer burnout 320 (Combat)
+[05100] Frontend Developer burnout 300 (Combat)
+[05105] telegraph #69 lands
+[05108] Frontend Developer swings at Chief Ilmari Officer
+[05108] Frontend Developer hits Chief Ilmari Officer with melee for 21 (absorbed 0)
+[05108] Chief Ilmari Officer swings at Backend Engineer
+[05108] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[05120] Fullstack Engineer swings at Chief Ilmari Officer
+[05120] Fullstack Engineer hits Chief Ilmari Officer with melee for 12 (absorbed 0)
+[05122] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05124] Fullstack Engineer begins Refactor (2433 ms)
+[05126] telegraph #70 lands
+[05129] Backend Engineer swings at Chief Ilmari Officer
+[05129] Backend Engineer hits Chief Ilmari Officer with melee for 17 (absorbed 0)
+[05130] Frontend Developer casts Pixel Push
+[05130] Frontend Developer hits Chief Ilmari Officer with Pixel Push for 142 (absorbed 0)
+[05130] Chief Ilmari Officer gains specificity
+[05141] Backend Engineer casts Blocking Call
+[05141] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 86 (absorbed 0)
+[05141] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[05143] telegraph #71 lands
+[05143] Chief Ilmari Officer telegraphs Circle Back #72 Circle { radius_m: 4.6 } at (-15.2, -487.7) in 6000 ms
+[05156] Frontend Developer swings at Chief Ilmari Officer
+[05156] Frontend Developer hits Chief Ilmari Officer with melee for 21 (absorbed 0)
+[05174] Frontend Developer casts Pixel Push
+[05174] Frontend Developer hits Chief Ilmari Officer with Pixel Push for 142 (absorbed 0)
+[05174] Chief Ilmari Officer gains specificity
+[05177] Chief Ilmari Officer swings at Backend Engineer
+[05177] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[05177] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[05182] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05182] Chief Ilmari Officer loses infinite_scroll (Expired)
+[05187] Backend Engineer casts Blocking Call
+[05187] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 86 (absorbed 0)
+[05187] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[05189] Backend Engineer swings at Chief Ilmari Officer
+[05189] Backend Engineer hits Chief Ilmari Officer with melee for 18 (absorbed 0)
+[05192] Chief Ilmari Officer begins Hallucination Blast (2500 ms)
+[05192] Chief Ilmari Officer ai Casting
+[05197] Fullstack Engineer casts Refactor
+[05197] Fullstack Engineer yells: Deleting three thousand lines of generated code. Feels great.
+[05197] Chief Ilmari Officer loses code_smell (Consumed)
+[05197] Fullstack Engineer hits Chief Ilmari Officer with Refactor for 414 (absorbed 0) COMBO
+[05197] Fullstack Engineer swings at Chief Ilmari Officer
+[05197] Fullstack Engineer hits Chief Ilmari Officer with melee for 10 (absorbed 0)
+[05198] Fullstack Engineer begins Code Review (1966 ms)
+[05204] Frontend Developer swings at Chief Ilmari Officer
+[05204] Frontend Developer hits Chief Ilmari Officer with melee for 20 (absorbed 0)
+[05218] Frontend Developer casts Infinite Scroll
+[05218] Chief Ilmari Officer gains infinite_scroll
+[05233] Backend Engineer casts Rate Limiter
+[05233] Backend Engineer gains rate_limiter
+[05249] Backend Engineer swings at Chief Ilmari Officer
+[05249] Backend Engineer hits Chief Ilmari Officer with melee for 19 (absorbed 0)
+[05252] Frontend Developer swings at Chief Ilmari Officer
+[05252] Frontend Developer hits Chief Ilmari Officer with melee for 19 (absorbed 0)
+[05257] Fullstack Engineer casts Code Review
+[05257] Fullstack Engineer hits Chief Ilmari Officer with Code Review for 234 (absorbed 0)
+[05257] Chief Ilmari Officer gains code_smell
+[05257] Fullstack Engineer swings at Chief Ilmari Officer
+[05257] Fullstack Engineer hits Chief Ilmari Officer with melee for 13 (absorbed 0)
+[05258] Fullstack Engineer begins Refactor (2433 ms)
+[05262] Frontend Developer casts CSS Combo
+[05262] Frontend Developer hits Chief Ilmari Officer with CSS Combo for 180 (absorbed 0)
+[05262] Chief Ilmari Officer gains specificity
+[05262] Chief Ilmari Officer gains specificity
+[05262] Frontend Developer loses dark_mode (Expired)
+[05267] Chief Ilmari Officer casts Hallucination Blast
+[05267] Chief Ilmari Officer hits Backend Engineer with Hallucination Blast for 0 (absorbed 67)
+[05267] Chief Ilmari Officer begins Synergy Link (1500 ms)
+[05267] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[05267] Chief Ilmari Officer loses git_blame (Expired)
+[05267] Chief Ilmari Officer yells: Synergy link: you are now partners. The partnership is a leash. Please do not drift. Drift is a metric.
+[05278] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05279] Backend Engineer casts Cache Invalidation
+[05279] Backend Engineer hits Chief Ilmari Officer with Cache Invalidation for 197 (absorbed 0)
+[05279] Backend Engineer heals Backend Engineer with Cache Invalidation for 11
+[05300] Frontend Developer swings at Chief Ilmari Officer
+[05300] Frontend Developer hits Chief Ilmari Officer with melee for 17 (absorbed 0)
+[05306] Frontend Developer casts !important
+[05306] Chief Ilmari Officer loses specificity (Consumed)
+[05306] Frontend Developer hits Chief Ilmari Officer with !important for 576 (absorbed 0) COMBO
+[05309] Backend Engineer swings at Chief Ilmari Officer
+[05309] Backend Engineer hits Chief Ilmari Officer with melee for 17 (absorbed 0)
+[05312] Chief Ilmari Officer casts Synergy Link
+[05312] Backend Engineer gains il_synergy_link
+[05312] Fullstack Engineer gains il_synergy_link
+[05312] Frontend Developer gains il_synergy_link
+[05312] raid "ilmari6/3" async false week 0 locked [] tethers [(1, 55), (56, 74)]
+[05312] Chief Ilmari Officer casts Roadmap
+[05312] Chief Ilmari Officer telegraphs Roadmap #73 Line { length_m: 34.0, width_m: 3.5 } at (-22.1, -487.1) in 1800 ms
+[05312] Chief Ilmari Officer telegraphs Roadmap #74 Line { length_m: 34.0, width_m: 3.5 } at (-14.4, -489.1) in 2500 ms
+[05312] Chief Ilmari Officer telegraphs Roadmap #75 Line { length_m: 34.0, width_m: 3.5 } at (-6.6, -491.1) in 3200 ms
+[05312] Chief Ilmari Officer ai Attack
+[05312] Chief Ilmari Officer swings at Backend Engineer
+[05312] Chief Ilmari Officer hits Backend Engineer with melee for 0 (absorbed 31)
+[05313] Fullstack Engineer Refactor interrupted by movement/cancel (lockout 0 ms)
+[05313] Fullstack Engineer swings at Chief Ilmari Officer
+[05313] Fullstack Engineer hits Chief Ilmari Officer with melee for 21 (absorbed 0) CRIT
+[05313] Chief Ilmari Officer ai Chase
+[05319] Fullstack Engineer casts git blame
+[05319] Chief Ilmari Officer gains git_blame
+[05323] telegraph #72 lands
+[05325] Backend Engineer casts Blocking Call
+[05325] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 86 (absorbed 0)
+[05325] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[05325] Chief Ilmari Officer ai Attack
+[05338] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05348] Frontend Developer swings at Chief Ilmari Officer
+[05348] Frontend Developer hits Chief Ilmari Officer with melee for 15 (absorbed 0)
+[05350] Frontend Developer casts Pixel Push
+[05350] Frontend Developer hits Chief Ilmari Officer with Pixel Push for 142 (absorbed 0)
+[05350] Chief Ilmari Officer gains specificity
+[05362] Fullstack Engineer begins Refactor (2433 ms)
+[05366] telegraph #73 lands
+[05366] Chief Ilmari Officer telegraphs Roadmap #76 Line { length_m: 34.0, width_m: 3.5 } at (-22.1, -487.1) in 2200 ms
+[05369] Backend Engineer swings at Chief Ilmari Officer
+[05369] Backend Engineer hits Chief Ilmari Officer with melee for 27 (absorbed 0) CRIT
+[05371] Backend Engineer casts Blocking Call
+[05371] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 86 (absorbed 0)
+[05371] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[05372] Chief Ilmari Officer begins Low-Hanging Fruit (1000 ms)
+[05372] Chief Ilmari Officer ai Casting
+[05372] Chief Ilmari Officer yells: Low-hanging fruit! Reach up and take a bite. It is an apple. That is the metaphor.
+[05387] telegraph #74 lands
+[05387] Chief Ilmari Officer telegraphs Roadmap #77 Line { length_m: 34.0, width_m: 3.5 } at (-14.4, -489.1) in 2200 ms
+[05394] Frontend Developer casts Pixel Push
+[05394] Frontend Developer hits Chief Ilmari Officer with Pixel Push for 142 (absorbed 0)
+[05394] Chief Ilmari Officer gains specificity
+[05394] Chief Ilmari Officer enters phase 3
+[05394] Chief Ilmari Officer casts Org Chart Reshuffle
+[05394] Chief Ilmari Officer yells: The plan is working. It is working on you. Let us make it final.
+[05396] Frontend Developer swings at Chief Ilmari Officer
+[05396] Frontend Developer hits Chief Ilmari Officer with melee for 17 (absorbed 0)
+[05398] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05400] Backend Engineer burnout 315 (Combat)
+[05400] Fullstack Engineer burnout 335 (Combat)
+[05400] Fullstack Engineer Yawn #0
+[05400] Frontend Developer burnout 315 (Combat)
+[05402] Chief Ilmari Officer casts Low-Hanging Fruit
+[05402] Chief Ilmari Officer summons Low-Hanging Fruit #83
+[05402] Low-Hanging Fruit ai Chase
+[05402] Chief Ilmari Officer summons Low-Hanging Fruit #84
+[05402] Low-Hanging Fruit ai Chase
+[05402] Chief Ilmari Officer summons Low-Hanging Fruit #85
+[05402] Low-Hanging Fruit ai Chase
+[05402] Chief Ilmari Officer ai Attack
+[05402] Chief Ilmari Officer swings at Backend Engineer
+[05402] Chief Ilmari Officer hits Backend Engineer with melee for 9 (absorbed 22)
+[05402] Backend Engineer loses rate_limiter (Depleted)
+[05402] Low-Hanging Fruit enters combat
+[05402] Low-Hanging Fruit enters combat
+[05402] Low-Hanging Fruit enters combat
+[05403] Backend Engineer auto attack off
+[05403] Backend Engineer auto attack on
+[05403] Fullstack Engineer auto attack off
+[05403] Fullstack Engineer auto attack on
+[05403] Frontend Developer auto attack off
+[05403] Frontend Developer auto attack on
+[05408] telegraph #75 lands
+[05408] Chief Ilmari Officer telegraphs Roadmap #78 Line { length_m: 34.0, width_m: 3.5 } at (-6.6, -491.1) in 2200 ms
+[05409] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[05414] Low-Hanging Fruit ai Attack
+[05414] Low-Hanging Fruit swings at Backend Engineer
+[05414] Low-Hanging Fruit hits Backend Engineer with melee for 11 (absorbed 0)
+[05416] Low-Hanging Fruit ai Attack
+[05416] Low-Hanging Fruit swings at Backend Engineer
+[05416] Low-Hanging Fruit hits Backend Engineer with melee for 11 (absorbed 0)
+[05417] Backend Engineer casts Retry With Exponential Backoff
+[05417] Backend Engineer gains retry_backoff
+[05417] Backend Engineer loses il_synergy_link (Consumed)
+[05418] Low-Hanging Fruit ai Attack
+[05418] Low-Hanging Fruit swings at Backend Engineer
+[05418] Low-Hanging Fruit hits Backend Engineer with melee for 11 (absorbed 0)
+[05429] Backend Engineer swings at Low-Hanging Fruit
+[05429] Backend Engineer hits Low-Hanging Fruit with melee for 19 (absorbed 0)
+[05432] telegraph #76 lands
+[05432] Chief Ilmari Officer telegraphs Roadmap #79 Line { length_m: 34.0, width_m: 3.5 } at (-22.1, -487.1) in 2200 ms
+[05435] Fullstack Engineer casts Refactor
+[05435] Chief Ilmari Officer loses code_smell (Consumed)
+[05435] Fullstack Engineer hits Chief Ilmari Officer with Refactor for 414 (absorbed 0) COMBO
+[05435] Fullstack Engineer swings at Low-Hanging Fruit
+[05435] Fullstack Engineer hits Low-Hanging Fruit with melee for 13 (absorbed 0) CRIT
+[05435] Low-Hanging Fruit ai Chase
+[05436] Fullstack Engineer casts git blame
+[05436] Low-Hanging Fruit gains git_blame
+[05438] Frontend Developer casts Responsive Layout
+[05438] Frontend Developer hits Chief Ilmari Officer with Responsive Layout for 161 (absorbed 0)
+[05438] Frontend Developer hits Low-Hanging Fruit with Responsive Layout for 142 (absorbed 0)
+[05438] Frontend Developer hits Low-Hanging Fruit with Responsive Layout for 213 (absorbed 0) CRIT
+[05438] Frontend Developer hits Low-Hanging Fruit with Responsive Layout for 213 (absorbed 0) CRIT
+[05439] Backend Engineer auto attack off
+[05439] Backend Engineer auto attack on
+[05439] Backend Engineer casts Who Touched Prod?
+[05439] Low-Hanging Fruit ai Attack
+[05444] Frontend Developer swings at Low-Hanging Fruit
+[05444] Frontend Developer hits Low-Hanging Fruit with melee for 18 (absorbed 0)
+[05453] telegraph #77 lands
+[05453] Chief Ilmari Officer telegraphs Roadmap #80 Line { length_m: 34.0, width_m: 3.5 } at (-14.4, -489.1) in 2200 ms
+[05458] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05462] Low-Hanging Fruit swings at Frontend Developer
+[05462] Low-Hanging Fruit hits Frontend Developer with melee for 18 (absorbed 0)
+[05463] Backend Engineer casts Connection Pool
+[05463] Backend Engineer hits Chief Ilmari Officer with Connection Pool for 66 (absorbed 0)
+[05463] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[05463] Backend Engineer hits Low-Hanging Fruit with Connection Pool for 66 (absorbed 0)
+[05463] Backend Engineer heals Backend Engineer with Connection Pool for 3
+[05463] Backend Engineer misses Low-Hanging Fruit with Connection Pool
+[05463] Backend Engineer misses Low-Hanging Fruit with Connection Pool
+[05464] Low-Hanging Fruit swings at Backend Engineer
+[05464] Low-Hanging Fruit hits Backend Engineer with melee for 11 (absorbed 0)
+[05466] Low-Hanging Fruit swings at Backend Engineer
+[05466] Low-Hanging Fruit hits Backend Engineer with melee for 11 (absorbed 0)
+[05471] Chief Ilmari Officer swings at Backend Engineer
+[05471] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[05474] telegraph #78 lands
+[05474] Chief Ilmari Officer telegraphs Roadmap #81 Line { length_m: 34.0, width_m: 3.5 } at (-6.6, -491.1) in 2200 ms
+[05477] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[05479] Fullstack Engineer begins Code Review (1966 ms)
+[05482] Frontend Developer casts Infinite Scroll
+[05482] Low-Hanging Fruit gains infinite_scroll
+[05484] Chief Ilmari Officer casts Right-Sizing
+[05484] Chief Ilmari Officer telegraphs Right-Sizing #82 Circle { radius_m: 3.4 } at (-6.5, -490.0) in 2200 ms
+[05484] boardroom 3 desks, inbox 0 ms, severance 0 ms, tiles 0b1000
+[05484] Chief Ilmari Officer yells: Right-sizing the floor plan. This tile has been optimised into an overflow.
+[05489] Backend Engineer swings at Low-Hanging Fruit
+[05489] Backend Engineer hits Low-Hanging Fruit with melee for 21 (absorbed 0)
+[05492] Frontend Developer swings at Low-Hanging Fruit
+[05492] Frontend Developer hits Low-Hanging Fruit with melee for 20 (absorbed 0)
+[05498] telegraph #79 lands
+[05498] Chief Ilmari Officer telegraphs Roadmap #83 Line { length_m: 34.0, width_m: 3.5 } at (-22.1, -487.1) in 2200 ms
+[05499] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[05509] Backend Engineer casts Blocking Call
+[05509] Backend Engineer hits Low-Hanging Fruit with Blocking Call for 86 (absorbed 0)
+[05509] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[05510] Low-Hanging Fruit swings at Backend Engineer
+[05510] Low-Hanging Fruit hits Backend Engineer with melee for 11 (absorbed 0)
+[05512] Low-Hanging Fruit swings at Backend Engineer
+[05512] Low-Hanging Fruit hits Backend Engineer with melee for 11 (absorbed 0)
+[05514] Low-Hanging Fruit swings at Backend Engineer
+[05514] Low-Hanging Fruit hits Backend Engineer with melee for 11 (absorbed 0)
+[05518] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05519] telegraph #80 lands
+[05519] Chief Ilmari Officer telegraphs Roadmap #84 Line { length_m: 34.0, width_m: 3.5 } at (-14.4, -489.1) in 2200 ms
+[05526] Frontend Developer casts CSS Combo
+[05526] Frontend Developer hits Low-Hanging Fruit with CSS Combo for 270 (absorbed 0) CRIT
+[05526] Low-Hanging Fruit loses infinite_scroll (Death)
+[05526] Frontend Developer auto attack off
+[05526] Low-Hanging Fruit dies (killer Frontend Developer)
+[05526] Chief Ilmari Officer heals Frontend Developer with ? for 15
+[05526] Low-Hanging Fruit ai Dead
+[05526] Low-Hanging Fruit drops [] and 0 SP
+[05526] Low-Hanging Fruit drops [] and 0 SP
+[05526] Low-Hanging Fruit drops [] and 0 SP
+[05526] Fullstack Engineer hits Low-Hanging Fruit with git blame for 52 (absorbed 0)
+[05526] Low-Hanging Fruit leaves combat
+[05527] Frontend Developer auto attack on
+[05537] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[05538] Fullstack Engineer casts Code Review
+[05538] Fullstack Engineer hits Low-Hanging Fruit with Code Review for 234 (absorbed 0)
+[05538] Low-Hanging Fruit gains git_blame
+[05538] Low-Hanging Fruit loses git_blame (Death)
+[05538] Backend Engineer auto attack off
+[05538] Fullstack Engineer auto attack off
+[05538] Frontend Developer auto attack off
+[05538] Low-Hanging Fruit dies (killer Fullstack Engineer)
+[05538] Chief Ilmari Officer heals Fullstack Engineer with ? for 14
+[05538] Low-Hanging Fruit ai Dead
+[05538] Low-Hanging Fruit drops [] and 0 SP
+[05538] Low-Hanging Fruit drops [] and 0 SP
+[05538] Low-Hanging Fruit drops [] and 0 SP
+[05538] Low-Hanging Fruit leaves combat
+[05539] Backend Engineer auto attack on
+[05539] Fullstack Engineer auto attack on
+[05539] Frontend Developer auto attack on
+[05539] Fullstack Engineer swings at Low-Hanging Fruit
+[05539] Fullstack Engineer hits Low-Hanging Fruit with melee for 14 (absorbed 0)
+[05540] Fullstack Engineer begins Code Review (1966 ms)
+[05540] Frontend Developer swings at Low-Hanging Fruit
+[05540] Frontend Developer hits Low-Hanging Fruit with melee for 20 (absorbed 0)
+[05540] Chief Ilmari Officer swings at Backend Engineer
+[05540] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[05540] telegraph #81 lands
+[05540] Chief Ilmari Officer telegraphs Roadmap #85 Line { length_m: 34.0, width_m: 3.5 } at (-6.6, -491.1) in 2200 ms
+[05549] Backend Engineer swings at Low-Hanging Fruit
+[05549] Backend Engineer hits Low-Hanging Fruit with melee for 18 (absorbed 0)
+[05550] telegraph #82 lands
+[05550] Chief Ilmari Officer telegraphs Right-Sizing #86 Circle { radius_m: 3.4 } at (-6.5, -490.0) in 1400 ms
+[05555] Backend Engineer casts Cache Invalidation
+[05555] Backend Engineer hits Low-Hanging Fruit with Cache Invalidation for 197 (absorbed 0)
+[05555] Backend Engineer heals Backend Engineer with Cache Invalidation for 11
+[05560] #75 despawns
+[05562] Low-Hanging Fruit swings at Backend Engineer
+[05562] Low-Hanging Fruit hits Backend Engineer with melee for 11 (absorbed 0)
+[05564] telegraph #83 lands
+[05570] Frontend Developer casts Pixel Push
+[05570] Frontend Developer hits Low-Hanging Fruit with Pixel Push for 161 (absorbed 0)
+[05570] Low-Hanging Fruit loses git_blame (Death)
+[05570] Backend Engineer auto attack off
+[05570] Fullstack Engineer auto attack off
+[05570] Frontend Developer auto attack off
+[05570] Low-Hanging Fruit dies (killer Frontend Developer)
+[05570] Chief Ilmari Officer heals Frontend Developer with ? for 15
+[05570] Low-Hanging Fruit ai Dead
+[05570] Low-Hanging Fruit drops [] and 0 SP
+[05570] Low-Hanging Fruit drops [] and 0 SP
+[05570] Low-Hanging Fruit drops [] and 0 SP
+[05570] Low-Hanging Fruit leaves combat
+[05570] Low-Hanging Fruit yells: Picked... at last... by a stakeholder...
+[05571] Backend Engineer auto attack on
+[05571] Fullstack Engineer auto attack on
+[05571] Frontend Developer auto attack on
+[05578] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05578] Chief Ilmari Officer loses infinite_scroll (Expired)
+[05585] telegraph #84 lands
+[05588] Frontend Developer swings at Chief Ilmari Officer
+[05588] Frontend Developer hits Chief Ilmari Officer with melee for 16 (absorbed 0)
+[05589] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[05590] #80 despawns
+[05592] telegraph #86 lands
+[05592] Chief Ilmari Officer telegraphs Right-Sizing #87 Circle { radius_m: 3.4 } at (-6.5, -490.0) in 1400 ms
+[05597] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[05599] Fullstack Engineer failed Code Review: Target is dead.
+[05599] Fullstack Engineer swings at Chief Ilmari Officer
+[05599] Fullstack Engineer hits Chief Ilmari Officer with melee for 14 (absorbed 0)
+[05600] Fullstack Engineer casts Postmortem
+[05600] Fullstack Engineer hits Chief Ilmari Officer with Postmortem for 576 (absorbed 0)
+[05601] Backend Engineer casts Blocking Call
+[05601] Backend Engineer yells: Nothing proceeds until I return. I may not return.
+[05601] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 86 (absorbed 0)
+[05601] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[05606] telegraph #85 lands
+[05609] Backend Engineer swings at Chief Ilmari Officer
+[05609] Backend Engineer hits Chief Ilmari Officer with melee for 16 (absorbed 0)
+[05609] Chief Ilmari Officer swings at Backend Engineer
+[05609] Chief Ilmari Officer misses Backend Engineer with melee
+[05614] Frontend Developer casts Infinite Scroll
+[05614] Chief Ilmari Officer gains infinite_scroll
+[05621] Chief Ilmari Officer casts Circle Back
+[05621] Chief Ilmari Officer telegraphs Circle Back #88 Circle { radius_m: 4.6 } at (-13.7, -493.8) in 2600 ms
+[05622] Chief Ilmari Officer ai Chase
+[05627] #81 despawns
+[05628] Chief Ilmari Officer casts Touch Base
+[05628] Backend Engineer teleported to (0.0, -493.0)
+[05628] Backend Engineer gains il_aligned_calendar
+[05634] telegraph #87 lands
+[05634] Chief Ilmari Officer telegraphs Right-Sizing #89 Circle { radius_m: 3.4 } at (-6.5, -490.0) in 1400 ms
+[05634] #79 despawns
+[05650] Chief Ilmari Officer casts Earnings Call, Live
+[05650] Chief Ilmari Officer telegraphs Earnings Call, Live #90 Circle { radius_m: 60.0 } at (-11.7, -491.6) in 5000 ms
+[05650] boardroom 2 desks, inbox 0 ms, severance 0 ms, tiles 0b1000
+[05650] Chief Ilmari Officer yells: Earnings call, live. Every call retires a desk. It is called depreciation. You are the asset.
+[05653] Fullstack Engineer swings at Chief Ilmari Officer
+[05653] Fullstack Engineer hits Chief Ilmari Officer with melee for 13 (absorbed 0)
+[05655] Chief Ilmari Officer begins Hallucination Blast (2500 ms)
+[05655] Chief Ilmari Officer ai Casting
+[05657] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[05662] Fullstack Engineer begins Code Review (1966 ms)
+[05669] Backend Engineer swings at Chief Ilmari Officer
+[05669] Backend Engineer hits Chief Ilmari Officer with melee for 22 (absorbed 0)
+[05672] Fullstack Engineer loses il_synergy_link (Expired)
+[05672] Frontend Developer loses il_synergy_link (Expired)
+[05672] raid "ilmari6/3" async false week 0 locked [] tethers []
+[05674] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05676] telegraph #89 lands
+[05676] Chief Ilmari Officer telegraphs Right-Sizing #91 Circle { radius_m: 3.4 } at (-6.5, -490.0) in 1400 ms
+[05679] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[05699] telegraph #88 lands
+[05699] Chief Ilmari Officer telegraphs Circle Back #92 Circle { radius_m: 4.6 } at (-13.7, -493.8) in 6000 ms
+[05700] Backend Engineer burnout 330 (Combat)
+[05700] Fullstack Engineer burnout 350 (Combat)
+[05700] Frontend Developer burnout 330 (Combat)
+[05717] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[05718] telegraph #91 lands
+[05718] Chief Ilmari Officer telegraphs Right-Sizing #93 Circle { radius_m: 3.4 } at (-6.5, -490.0) in 1400 ms
+[05718] Backend Engineer loses il_aligned_calendar (Expired)
+[05719] #82 despawns
+[05721] Fullstack Engineer casts Code Review
+[05721] Fullstack Engineer hits Chief Ilmari Officer with Code Review for 234 (absorbed 0)
+[05721] Chief Ilmari Officer gains code_smell
+[05721] Fullstack Engineer swings at Chief Ilmari Officer
+[05721] Fullstack Engineer hits Chief Ilmari Officer with melee for 11 (absorbed 0)
+[05722] Fullstack Engineer begins Refactor (2433 ms)
+[05730] Chief Ilmari Officer casts Hallucination Blast
+[05730] Chief Ilmari Officer hits Backend Engineer with Hallucination Blast for 97 (absorbed 0)
+[05730] Chief Ilmari Officer ai Chase
+[05734] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05736] Backend Engineer casts Blocking Call
+[05736] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 86 (absorbed 0)
+[05736] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[05740] Backend Engineer swings at Chief Ilmari Officer
+[05740] Backend Engineer hits Chief Ilmari Officer with melee for 22 (absorbed 0)
+[05746] Chief Ilmari Officer ai Attack
+[05746] Chief Ilmari Officer swings at Backend Engineer
+[05746] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[05760] telegraph #93 lands
+[05760] Chief Ilmari Officer telegraphs Right-Sizing #94 Circle { radius_m: 3.4 } at (-6.5, -490.0) in 1400 ms
+[05769] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[05777] Backend Engineer heals Backend Engineer with Retry With Exponential Backoff for 62
+[05777] Backend Engineer loses retry_backoff (Expired)
+[05778] #65 despawns
+[05782] Backend Engineer casts Blocking Call
+[05782] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 86 (absorbed 0)
+[05782] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[05794] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05795] Fullstack Engineer casts Refactor
+[05795] Chief Ilmari Officer loses code_smell (Consumed)
+[05795] Fullstack Engineer hits Chief Ilmari Officer with Refactor for 414 (absorbed 0) COMBO
+[05795] Fullstack Engineer swings at Chief Ilmari Officer
+[05795] Fullstack Engineer hits Chief Ilmari Officer with melee for 12 (absorbed 0)
+[05796] Fullstack Engineer begins Code Review (1966 ms)
+[05800] Backend Engineer swings at Chief Ilmari Officer
+[05800] Backend Engineer hits Chief Ilmari Officer with melee for 20 (absorbed 0)
+[05800] telegraph #90 lands
+[05800] Chief Ilmari Officer hits Frontend Developer with Earnings Call, Live for 288 (absorbed 0)
+[05802] telegraph #94 lands
+[05802] Chief Ilmari Officer telegraphs Right-Sizing #95 Circle { radius_m: 3.4 } at (-6.5, -490.0) in 1400 ms
+[05802] #67 despawns
+[05811] Chief Ilmari Officer casts Roadmap
+[05811] Chief Ilmari Officer telegraphs Roadmap #96 Line { length_m: 34.0, width_m: 3.5 } at (-7.4, -484.4) in 1800 ms
+[05811] Chief Ilmari Officer telegraphs Roadmap #97 Line { length_m: 34.0, width_m: 3.5 } at (-12.6, -490.5) in 2500 ms
+[05811] Chief Ilmari Officer telegraphs Roadmap #98 Line { length_m: 34.0, width_m: 3.5 } at (-17.9, -496.6) in 3200 ms
+[05811] Chief Ilmari Officer yells: Behold the roadmap. It is a line. Lines are how you know the plan has direction.
+[05814] Chief Ilmari Officer casts Right-Sizing
+[05814] Chief Ilmari Officer telegraphs Right-Sizing #99 Circle { radius_m: 3.4 } at (-6.5, -483.5) in 2200 ms
+[05814] boardroom 2 desks, inbox 0 ms, severance 0 ms, tiles 0b1001
+[05815] Chief Ilmari Officer swings at Backend Engineer
+[05815] Chief Ilmari Officer hits Backend Engineer with melee for 45 (absorbed 0)
+[05816] Chief Ilmari Officer ai Chase
+[05817] Chief Ilmari Officer ai Attack
+[05818] Chief Ilmari Officer ai Chase
+[05820] Chief Ilmari Officer ai Attack
+[05828] Backend Engineer casts Cache Invalidation
+[05828] Backend Engineer hits Chief Ilmari Officer with Cache Invalidation for 197 (absorbed 0)
+[05828] Backend Engineer heals Backend Engineer with Cache Invalidation for 11
+[05844] telegraph #95 lands
+[05844] Chief Ilmari Officer telegraphs Right-Sizing #100 Circle { radius_m: 3.4 } at (-6.5, -490.0) in 1400 ms
+[05854] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05855] Fullstack Engineer casts Code Review
+[05855] Fullstack Engineer yells: This function has forty parameters and a vibe.
+[05855] Fullstack Engineer hits Chief Ilmari Officer with Code Review for 234 (absorbed 0)
+[05855] Chief Ilmari Officer gains code_smell
+[05855] Fullstack Engineer swings at Chief Ilmari Officer
+[05855] Fullstack Engineer hits Chief Ilmari Officer with melee for 10 (absorbed 0)
+[05856] Fullstack Engineer casts On-Call Caffeine
+[05856] Fullstack Engineer gains caffeine
+[05857] Fullstack Engineer casts Postmortem
+[05857] Fullstack Engineer hits Chief Ilmari Officer with Postmortem for 576 (absorbed 0)
+[05857] telegraph #99 fizzles
+[05857] telegraph #100 fizzles
+[05857] boardroom 2 desks, inbox 0 ms, severance 0 ms, tiles 0b0
+[05857] Chief Ilmari Officer yells: Hiring freeze. Two desks are back. They are not for you. They are for a person who does not exist yet.
+[05859] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[05859] Chief Ilmari Officer loses git_blame (Expired)
+[05860] Backend Engineer swings at Chief Ilmari Officer
+[05860] Backend Engineer hits Chief Ilmari Officer with melee for 25 (absorbed 0) CRIT
+[05865] telegraph #96 lands
+[05865] Chief Ilmari Officer telegraphs Roadmap #101 Line { length_m: 34.0, width_m: 3.5 } at (-7.4, -484.4) in 2200 ms
+[05874] Backend Engineer casts Rate Limiter
+[05874] Backend Engineer gains rate_limiter
+[05879] telegraph #92 lands
+[05881] Frontend Developer casts Rewrite It in a New Framework
+[05881] Frontend Developer yells: Rewriting in something with a cooler logo.
+[05881] Frontend Developer hits Chief Ilmari Officer with Rewrite It in a New Framework for 591 (absorbed 0)
+[05884] Chief Ilmari Officer swings at Backend Engineer
+[05884] Chief Ilmari Officer hits Backend Engineer with melee for 0 (absorbed 31)
+[05886] telegraph #97 lands
+[05886] Chief Ilmari Officer telegraphs Roadmap #102 Line { length_m: 34.0, width_m: 3.5 } at (-12.6, -490.5) in 2200 ms
+[05891] Fullstack Engineer casts git blame
+[05891] Chief Ilmari Officer gains git_blame
+[05907] telegraph #98 lands
+[05907] Chief Ilmari Officer telegraphs Roadmap #103 Line { length_m: 34.0, width_m: 3.5 } at (-17.9, -496.6) in 2200 ms
+[05909] Fullstack Engineer swings at Chief Ilmari Officer
+[05909] Fullstack Engineer hits Chief Ilmari Officer with melee for 13 (absorbed 0)
+[05914] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05920] Backend Engineer casts DROP TABLE
+[05920] Backend Engineer hits Chief Ilmari Officer with DROP TABLE for 552 (absorbed 0) CRIT
+[05920] Backend Engineer heals Backend Engineer with DROP TABLE for 33
+[05920] Backend Engineer swings at Chief Ilmari Officer
+[05920] Backend Engineer hits Chief Ilmari Officer with melee for 17 (absorbed 0)
+[05920] Chief Ilmari Officer gains il_offboarding
+[05920] boardroom 2 desks, inbox 0 ms, severance 10000 ms, tiles 0b0
+[05920] Chief Ilmari Officer yells: I would like to thank the team. I have thanked the team. I am being thanked back.
+[05925] Fullstack Engineer begins Refactor (1933 ms)
+[05925] Frontend Developer casts !important
+[05925] Chief Ilmari Officer loses specificity (Consumed)
+[05925] Frontend Developer hits Chief Ilmari Officer with !important for 358 (absorbed 0) COMBO
+[05931] telegraph #101 lands
+[05931] Chief Ilmari Officer telegraphs Roadmap #104 Line { length_m: 34.0, width_m: 3.5 } at (-7.4, -484.4) in 2200 ms
+[05948] #66 despawns
+[05950] boardroom 2 desks, inbox 0 ms, severance 9000 ms, tiles 0b0
+[05952] telegraph #102 lands
+[05952] Chief Ilmari Officer telegraphs Roadmap #105 Line { length_m: 34.0, width_m: 3.5 } at (-12.6, -490.5) in 2200 ms
+[05966] Backend Engineer casts Blocking Call
+[05966] Backend Engineer hits Chief Ilmari Officer with Blocking Call for 86 (absorbed 0)
+[05966] Backend Engineer heals Backend Engineer with Blocking Call for 5
+[05969] Frontend Developer casts CSS Combo
+[05969] Frontend Developer hits Chief Ilmari Officer with CSS Combo for 204 (absorbed 0)
+[05969] Chief Ilmari Officer gains specificity
+[05969] Chief Ilmari Officer gains specificity
+[05973] telegraph #103 lands
+[05973] Chief Ilmari Officer telegraphs Roadmap #106 Line { length_m: 34.0, width_m: 3.5 } at (-17.9, -496.6) in 2200 ms
+[05974] Frontend Developer hits Chief Ilmari Officer with Infinite Scroll for 52 (absorbed 0)
+[05974] Chief Ilmari Officer loses infinite_scroll (Expired)
+[05980] Backend Engineer swings at Chief Ilmari Officer
+[05980] Backend Engineer hits Chief Ilmari Officer with melee for 18 (absorbed 0)
+[05980] boardroom 2 desks, inbox 0 ms, severance 8000 ms, tiles 0b0
+[05981] Fullstack Engineer hits Chief Ilmari Officer with git blame for 52 (absorbed 0)
+[05983] Fullstack Engineer casts Refactor
+[05983] Chief Ilmari Officer loses code_smell (Consumed)
+[05983] Fullstack Engineer hits Chief Ilmari Officer with Refactor for 414 (absorbed 0) COMBO
+[05983] Chief Ilmari Officer loses git_blame (Death)
+[05983] Chief Ilmari Officer loses il_offboarding (Death)
+[05983] Chief Ilmari Officer loses specificity (Death)
+[05983] Backend Engineer auto attack off
+[05983] Fullstack Engineer auto attack off
+[05983] Frontend Developer auto attack off
+[05983] Chief Ilmari Officer dies (killer Fullstack Engineer)
+[05983] #83 despawns
+[05983] #84 despawns
+[05983] #85 despawns
+[05983] Chief Ilmari Officer ai Dead
+[05983] Backend Engineer rank 0, 11773 XP to the next
+[05983] Fullstack Engineer rank 0, 11773 XP to the next
+[05983] Frontend Developer rank 0, 11773 XP to the next
+[05983] Backend Engineer bag: 0 items, 0 SP
+[05983] Fullstack Engineer bag: 0 items, 0 SP
+[05983] Frontend Developer bag: 0 items, 0 SP
+[05983] Backend Engineer bag: 0 items, 120 SP
+[05983] Backend Engineer earns il_w6_nobody
+[05983] Backend Engineer wears title "il_w6_nobody"
+[05983] Backend Engineer bag: 0 items, 210 SP
+[05983] Backend Engineer earns il_w6_topfloor
+[05983] Backend Engineer wears title "il_w6_topfloor"
+[05983] Fullstack Engineer bag: 0 items, 120 SP
+[05983] Fullstack Engineer earns il_w6_nobody
+[05983] Fullstack Engineer wears title "il_w6_nobody"
+[05983] Fullstack Engineer bag: 0 items, 210 SP
+[05983] Fullstack Engineer earns il_w6_topfloor
+[05983] Fullstack Engineer wears title "il_w6_topfloor"
+[05983] Frontend Developer bag: 0 items, 120 SP
+[05983] Frontend Developer earns il_w6_nobody
+[05983] Frontend Developer wears title "il_w6_nobody"
+[05983] Frontend Developer bag: 0 items, 210 SP
+[05983] Frontend Developer earns il_w6_topfloor
+[05983] Frontend Developer wears title "il_w6_topfloor"
+[05983] raid "ilmari6/3" async false week 0 locked ["il_cio"] tethers []
+[05983] Backend Engineer dept 0 standing 100
+[05983] Backend Engineer dept 1 standing 100
+[05983] Backend Engineer dept 2 standing 100
+[05983] Backend Engineer dept 3 standing 100
+[05983] Backend Engineer dept 4 standing 100
+[05983] Backend Engineer dept 5 standing 100
+[05983] Fullstack Engineer dept 0 standing 100
+[05983] Fullstack Engineer dept 1 standing 100
+[05983] Fullstack Engineer dept 2 standing 100
+[05983] Fullstack Engineer dept 3 standing 100
+[05983] Fullstack Engineer dept 4 standing 100
+[05983] Fullstack Engineer dept 5 standing 100
+[05983] Frontend Developer dept 0 standing 100
+[05983] Frontend Developer dept 1 standing 100
+[05983] Frontend Developer dept 2 standing 100
+[05983] Frontend Developer dept 3 standing 100
+[05983] Frontend Developer dept 4 standing 100
+[05983] Frontend Developer dept 5 standing 100
+[05983] Chief Ilmari Officer drops ["Guardrails Plate (Load-Bearing)", "Guardrails Plate (Load-Bearing)"] and 317 SP
+[05983] Chief Ilmari Officer drops ["Cardigan Of 128K Tokens", "Cardigan Of 128K Tokens"] and 276 SP
+[05983] Chief Ilmari Officer drops ["Severance Letter Opener", "Hoodie Of Persistence"] and 276 SP
+[05983] zone ilmari6/3 cleared
+[05983] Backend Engineer leaves combat
+[05983] Fullstack Engineer leaves combat
+[05983] Frontend Developer leaves combat
+[05983] Chief Ilmari Officer leaves combat
+[05983] telegraph #104 fizzles
+[05983] telegraph #105 fizzles
+[05983] telegraph #106 fizzles
+[05983] boardroom 255 desks, inbox 0 ms, severance 0 ms, tiles 0b0
+[05983] drafts [] marked []
+[05983] Chief Ilmari Officer yells: I would like to emphasise that Ilmari reports to me. I report to... can you check who I report to?

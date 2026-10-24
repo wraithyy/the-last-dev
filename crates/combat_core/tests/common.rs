@@ -558,6 +558,20 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             sensors,
             merged,
         } => format!("exercise standby {standby}, {sensors} sensors, merged {merged}"),
+        Event::Boardroom {
+            desks,
+            inbox_ms,
+            severance_ms,
+            tiles,
+        } => format!(
+            "boardroom {desks} desks, inbox {inbox_ms} ms, severance {severance_ms} ms, tiles {tiles:#b}"
+        ),
+        Event::PairKick {
+            boss,
+            by,
+            have,
+            need,
+        } => format!("pair kick {have}/{need} on {boss:?} by {by:?}"),
         Event::PlatformState { idx, state, at_ms } => {
             format!("platform {idx} is {state:?} since {at_ms} ms")
         }

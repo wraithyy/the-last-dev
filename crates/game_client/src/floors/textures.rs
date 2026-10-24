@@ -264,6 +264,7 @@ fn unlit(tex: Tex) -> bool {
                 | Sign::IlHiringOne
                 | Sign::IlConcerns
                 | Sign::IlKiosk
+                | Sign::IlInbox
                 | Sign::IlSensorLane
                 | Sign::IlAlignDone
                 | Sign::IlLiftPlate
@@ -3391,6 +3392,12 @@ fn sign_spec(s: Sign) -> SignSpec {
             [10, 40, 30],
             [200, 255, 225],
             [255, 255, 120],
+        ),
+        Sign::IlInbox => sp(
+            &["INBOX (1 NEW)", "FROM: THE CIO", "URGENT. RE: URGENT."],
+            [30, 8, 8],
+            [255, 225, 205],
+            [255, 190, 60],
         ),
         Sign::IlTerms => sp(
             &["TERMS", "SEE TERMS", "(TERMS: SEE TERMS)"],

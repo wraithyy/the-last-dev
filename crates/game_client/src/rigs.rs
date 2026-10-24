@@ -177,6 +177,7 @@ fn parts(kind: &str) -> Vec<Part> {
         "demo_gremlin" => demo_gremlin(),
         "energy_pyramid" => energy_pyramid(),
         "pizza_slice" => pizza_slice(),
+        "apple" => apple(),
         "hallucination" => hallucination(),
         "release_halo" => release_halo(),
         "agi_prototype" => agi_prototype(),
@@ -1454,6 +1455,23 @@ fn pizza_slice() -> Vec<Part> {
     ]
 }
 
+/// Add: Low-Hanging Fruit, an apple on little legs with a leaf and a very eager face.
+fn apple() -> Vec<Part> {
+    const RED: [f32; 3] = [0.82, 0.1, 0.1];
+    const GREEN: [f32; 3] = [0.25, 0.65, 0.2];
+    vec![
+        Part::ball([0.0, 0.62, 0.0], 0.72, RED).bob(0.06, 5.0),
+        Part::ball([0.0, 0.58, 0.0], 0.64, [0.9, 0.18, 0.12]),
+        Part::cube([0.0, 1.05, 0.0], [0.06, 0.2, 0.06], [0.35, 0.22, 0.1]),
+        Part::cube([0.14, 1.12, 0.0], [0.26, 0.04, 0.14], GREEN).rot([0.0, 0.0, 20.0]),
+        Part::ball([-0.14, 0.7, -0.3], 0.13, [1.0, 1.0, 1.0]),
+        Part::ball([0.14, 0.7, -0.3], 0.13, [1.0, 1.0, 1.0]),
+        Part::cube([0.0, 0.5, -0.34], [0.3, 0.05, 0.03], DARK),
+        Part::cyl([-0.18, 0.12, 0.0], 0.1, 0.25, DARK),
+        Part::cyl([0.18, 0.12, 0.0], 0.1, 0.25, DARK),
+    ]
+}
+
 /// Add: a Hallucination, a glowing teal blob with a very sure expression and a question mark.
 fn hallucination() -> Vec<Part> {
     vec![
@@ -2243,6 +2261,7 @@ mod tests {
             "demo_gremlin",
             "energy_pyramid",
             "pizza_slice",
+            "apple",
             "hallucination",
             "release_halo",
             "agi_prototype",

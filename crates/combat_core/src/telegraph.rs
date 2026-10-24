@@ -110,6 +110,9 @@ pub(crate) struct TelegraphRt {
     pub cover_radius_m: f32,
     /// Hostility of the source: telegraphs hit the other side only.
     pub hostile: bool,
+    /// Firings left after this one and the gap between them (`TelegraphDef::repeat`).
+    pub again: u8,
+    pub again_ms: u32,
 }
 
 /// A split telegraph nobody stood in hits everyone of the other side within this range.
@@ -144,11 +147,18 @@ impl Sim {
         };
         let me = self.units[ci].state.pos;
         let hostile = self.units[ci].state.hostile;
-        let anchors: Vec<Vec3> = match def.at {
-            TelegraphAt::Caster => vec![me],
-            TelegraphAt::Target => vec![target.map_or(me, |t| self.units[t].state.pos)],
+        let (spawn, spawn_yaw) = (self.units[ci].spawn_pos, self.units[ci].spawn_yaw);
+        let (sf, sr) = (forward(spawn_yaw), right(spawn_yaw));
+        let anchors: Vec<Vec3> = match (def.anchor, def.at) {
+            (Some((r, f)), _) => vec![Vec3::new(
+                spawn.x + sr.x * r + sf.x * f,
+                spawn.y,
+                spawn.z + sr.z * r + sf.z * f,
+            )],
+            (None, TelegraphAt::Caster) => vec![me],
+            (None, TelegraphAt::Target) => vec![target.map_or(me, |t| self.units[t].state.pos)],
             // Fighters only: a bystander NPC of the other side never gets a mark.
-            TelegraphAt::EachHostile => (0..self.units.len())
+            (None, TelegraphAt::EachHostile) => (0..self.units.len())
                 .filter(|&o| {
                     let u = &self.units[o];
                     u.state.alive
@@ -168,8 +178,6 @@ impl Sim {
         } else {
             self.units[ci].state.yaw
         };
-        let (spawn, spawn_yaw) = (self.units[ci].spawn_pos, self.units[ci].spawn_yaw);
-        let (sf, sr) = (forward(spawn_yaw), right(spawn_yaw));
         let cover: Vec<Vec3> = def
             .cover
             .iter()
@@ -221,6 +229,8 @@ impl Sim {
                     cover: cover.clone(),
                     cover_radius_m: def.cover_radius_m,
                     hostile,
+                    again: def.repeat,
+                    again_ms: def.repeat_ms,
                 });
                 self.events.push(Event::TelegraphStarted {
                     id,
@@ -317,6 +327,29 @@ impl Sim {
                     self.apply_effect(ci, &spell, e, Some(o));
                 }
             }
+        }
+        // The next firing is painted at once: the floor shows where it will land.
+        if t.again > 0 && self.units[ci].state.alive {
+            let id = self.next_telegraph;
+            self.next_telegraph = self.next_telegraph.wrapping_add(1);
+            let at = self.now + ticks(t.again_ms);
+            self.events.push(Event::TelegraphStarted {
+                id,
+                source: t.source,
+                spell: t.spell,
+                shape: t.shape,
+                pos: t.pos,
+                facing: t.facing,
+                resolve_ms: t.again_ms,
+                cover: t.cover.clone(),
+            });
+            self.telegraphs.push(TelegraphRt {
+                id,
+                start: self.now,
+                at,
+                again: t.again - 1,
+                ..t
+            });
         }
     }
 

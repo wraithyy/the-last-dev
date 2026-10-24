@@ -229,6 +229,9 @@ struct Bot {
     /// Wing 5's Alignment Consultant: walk to an opt-out kiosk whenever an offer is pending.
     refuse: bool,
     refuse_next: u64,
+    /// Wing 6's Chief Ilmari Officer: a message is pending and the bot clears it at a terminal.
+    inbox: bool,
+    inbox_next: u64,
 }
 
 fn yaw_to(from: Vec3, to: Vec3) -> f32 {
@@ -293,6 +296,8 @@ impl Bot {
             on_platforms: false,
             refuse: false,
             refuse_next: 0,
+            inbox: false,
+            inbox_next: 0,
         }
     }
 
@@ -365,6 +370,7 @@ impl Bot {
                     self.human_kills += 1;
                 }
                 Event::ZoneCleared { .. } => self.report.cleared = true,
+                Event::Boardroom { inbox_ms, .. } => self.inbox = *inbox_ms > 0,
                 _ => {}
             }
             let _ = writeln!(self.log, "{}", log_line(&self.sim, now, e));
@@ -805,8 +811,20 @@ impl Bot {
         self.use_prop_remotely(format!("il_optout_{k}"));
     }
 
+    /// Wing 6's inbox: one terminal use clears the message for the party (four terminals, rotated).
+    fn clear_inbox(&mut self) {
+        let now = self.sim.now().0;
+        if !self.inbox || self.inbox_next > now || !self.me().alive || self.me().stunned {
+            return;
+        }
+        self.inbox_next = now + ms_to_ticks(1000);
+        let k = now / 30 % 4 + 1;
+        self.use_prop_remotely(format!("il_inbox_{k}"));
+    }
+
     fn act(&mut self) {
         self.refuse_offers();
+        self.clear_inbox();
         self.label_cables();
         self.appeal();
         self.lobby();
@@ -2812,6 +2830,7 @@ const WING2: [&str; 3] = ["ilmari2/1", "ilmari2/2", "ilmari2/3"];
 const WING3: [&str; 3] = ["ilmari3/1", "ilmari3/2", "ilmari3/3"];
 const WING4: [&str; 3] = ["ilmari4/1", "ilmari4/2", "ilmari4/3"];
 const WING5: [&str; 3] = ["ilmari5/1", "ilmari5/2", "ilmari5/3"];
+const WING6: [&str; 3] = ["ilmari6/1", "ilmari6/2", "ilmari6/3"];
 
 fn boss_of(sim: &Sim, zone: &str) -> String {
     sim.content()
@@ -3236,6 +3255,7 @@ fn story_with_two_companions_clears_each_wing_and_is_not_much_easier() {
             ("Wing 3", &WING3),
             ("Wing 4", &WING4),
             ("Wing 5", &WING5),
+            ("Wing 6", &WING6),
         ] {
             let want = bosses_in(zones);
             for seed in [7, 42, 1234] {
@@ -3670,5 +3690,113 @@ fn wing_five_probe() {
     );
     if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
         let _ = std::fs::write(PathBuf::from(dir).join("probe5.log"), &b.log);
+    }
+}
+
+// ---- Ilmari Wing 6, the Boardroom in the Sky (docs/ILMARI_1_0.md D9).
+
+/// Story is the solo difficulty: every class clears the Jib Walk, the Executive Floor and the
+/// Chief Ilmari Officer on three seeds (one consultant, a gentle link, one kick for the landing).
+#[test]
+fn every_class_clears_wing_six_on_story_solo() {
+    let want = bosses_in(&WING6);
+    let mut failures = Vec::new();
+    for class in CLASSES {
+        for seed in [7, 42, 1234] {
+            let mut b = Bot::new_as(class, "campus", 10, seed);
+            b.wear_legacy_gear();
+            b.rest_alert = true;
+            let (bosses, secs, low, _) = b.wing(&WING6, true);
+            println!(
+                "{class:14} Wing 6 Story seed {seed:4}: {bosses}/{want} bosses in {secs} s, low {low}%"
+            );
+            if bosses < want {
+                failures.push(format!("{class} seed {seed}: {bosses}/{want} bosses"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Full is the group difficulty: a trio that clears its inbox and kicks the landing in pairs
+/// beats the CIO on three seeds; the same wing alone is meant to fail.
+#[test]
+fn a_trio_clears_wing_six_on_full_and_a_lone_player_does_not() {
+    let want = bosses_in(&WING6);
+    let mut failures = Vec::new();
+    for seed in [7, 42, 1234] {
+        let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
+        let (bosses, secs, deaths) = g.wing(&WING6);
+        println!(
+            "trio Wing 6 Full seed {seed:4}: {bosses}/{want} bosses in {secs} s, {deaths} dead, boss fights {:?} s",
+            g.boss_secs
+        );
+        if bosses < want {
+            failures.push(format!("trio seed {seed}: {bosses}/{want} bosses"));
+        }
+    }
+    for class in CLASSES {
+        let mut b = Bot::new_as(class, "campus", 10, 7);
+        b.wear_legacy_gear();
+        b.rest_alert = true;
+        let (bosses, secs, low, _) = b.wing(&WING6, false);
+        println!("{class:14} Wing 6 Full alone: {bosses}/{want} bosses in {secs} s, low {low}%");
+        if bosses >= want {
+            failures.push(format!("{class} cleared Full alone"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// QA probe for Wing 6 balance: `W6_CLASS`, `W6_SEED`, `W6_STORY`, `W6_ROOM` (1..3, 0 for all), `W6_TRIO`
+/// and a log dump in `WOW_BOT_DUMP`. Not part of the gates.
+#[test]
+#[ignore = "balance probe: W6_CLASS=<class> W6_SEED=<n> W6_STORY=1 W6_ROOM=3"]
+fn wing_six_probe() {
+    let class = std::env::var("W6_CLASS").unwrap_or_else(|_| "fullstack".into());
+    let class: &'static str = CLASSES
+        .iter()
+        .find(|c| **c == class)
+        .copied()
+        .unwrap_or("fullstack");
+    let seed = std::env::var("W6_SEED")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(7);
+    let story = std::env::var("W6_STORY").is_ok_and(|s| s == "1");
+    let room: usize = std::env::var("W6_ROOM")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3);
+    // Room 0 is the whole wing.
+    let zones = if room == 0 {
+        &WING6[..]
+    } else {
+        &WING6[room - 1..room]
+    };
+    if std::env::var("W6_TRIO").is_ok() {
+        let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
+        let (bosses, secs, deaths) = g.wing(zones);
+        println!(
+            "probe trio room {room} Full seed {seed}: {bosses}/1 in {secs} s, {deaths} dead, fights {:?}",
+            g.boss_secs
+        );
+        if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+            let _ = std::fs::write(PathBuf::from(dir).join("probe6.log"), &g.bots[0].log);
+        }
+        return;
+    }
+    let mut b = Bot::new_as(class, "campus", 10, seed);
+    b.wear_legacy_gear();
+    b.rest_alert = true;
+    let (bosses, secs, low, _) = b.wing(zones, story);
+    println!(
+        "probe {class} room {room} {} seed {seed}: {bosses}/1 in {secs} s, low {low}%, died {}, boss fight {:?} s",
+        if story { "Story" } else { "Full" },
+        b.report.died,
+        b.report.after.last().map(|a| a.2)
+    );
+    if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+        let _ = std::fs::write(PathBuf::from(dir).join("probe6.log"), &b.log);
     }
 }

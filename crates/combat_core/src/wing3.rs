@@ -88,6 +88,7 @@ impl Sim {
             EncounterDef::Illusion => {}
             e @ (EncounterDef::Cloud(_) | EncounterDef::Outage(_)) => self.wing4_arm(bi, &e),
             EncounterDef::Squads(cfg) => self.wing5_arm(bi, &cfg),
+            EncounterDef::Boardroom(cfg) => self.wing6_arm(bi, &cfg),
             EncounterDef::Echo {
                 add_unit,
                 strike_pct,
@@ -118,6 +119,7 @@ impl Sim {
         self.illusion_end();
         self.wing4_disarm();
         self.wing5_disarm();
+        self.wing6_disarm();
         for i in 0..self.units.len() {
             let u = &self.units[i];
             if !u.despawned && self.content.units[u.def].swarm.is_some() {

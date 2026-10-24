@@ -13,11 +13,11 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - The Alignment Lab, through the new ethics stairs on the occupied campus: three rooms and two bosses. The Alignment Consultant keeps offering you things you did not ask for (silence counts as yes, and the opt-out kiosks are real), and Red Team Blue Team hold a tabletop exercise until somebody is seen, so mind the cones. Both come with their own gear, titles and Story and Full versions.
 - The Security Engineer's Tailgating also cancels every offer around them in the Alignment Lab.
 - Three new quest chain steps, a hard-hat errand, a whitepaper to defend and a Roomba part to salvage on the occupied campus, plus new pages in the Quartermaster's stock.
-- A lift in the Lab's roof hoist leads up to the Boardroom in the Sky, as far as its first floors for now.
+- The Boardroom in the Sky, up the hoist from the Lab's roof: the Jib Walk, the Executive Floor and the Boardroom, with new faces in every room, ending in the Chief Ilmari Officer. He is the old CEO's whole act with every buzzword now a weapon: roadmaps that stay on the floor, invoiced consultants, apples with opinions, earnings calls that retire a desk each time, a parachute whose landing takes two of you kicking within a second and a half, and an inbox that has to be cleared at a terminal. Story and Full, with his own gear and titles.
 
 ### Changed
 
-- Co-op needs this version on both sides (protocol 42).
+- Co-op needs this version on both sides (protocol 43).
 
 ## [0.10.0] - 2026-10-24
 

@@ -103,6 +103,9 @@ pub enum PropKind {
     /// A honeypot in the Red-Blue Range (`EncounterDef::Squads`): a use turns every Blue cone to
     /// it for 8 s, on a cooldown the whole group shares.
     Honeypot,
+    /// An inbox terminal in the Boardroom (`EncounterDef::Boardroom`): a use clears the pending
+    /// message for the whole party (any class).
+    Inbox,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -602,6 +605,9 @@ impl Sim {
         }
         if def.kind == PropKind::Honeypot {
             return self.use_honeypot_prop(pi, k, spot);
+        }
+        if def.kind == PropKind::Inbox {
+            return self.use_inbox_prop(pi, k);
         }
         // Mirrored controls in a fight would be a griefing tool, not a joke; a shuttle would be
         // a free escape.

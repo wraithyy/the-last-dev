@@ -836,6 +836,7 @@ pub enum Sign {
     IlHiringOne,
     IlConcerns,
     IlKiosk,
+    IlInbox,
     IlTerms,
     IlAlignedBanner,
     IlSafeDefault,
@@ -1623,6 +1624,7 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
         | Sign::IlHiringOne
         | Sign::IlConcerns
         | Sign::IlKiosk
+        | Sign::IlInbox
         | Sign::IlTerms
         | Sign::IlAlignedBanner
         | Sign::IlSafeDefault

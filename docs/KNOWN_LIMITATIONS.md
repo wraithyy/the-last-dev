@@ -217,6 +217,14 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - Guardrail costs are mapped onto existing aura fields (plus the new `healing_taken_pct`); the fine print is spelled out in the aura names on Story only.
 - Red Team Blue Team has no shared HP bar (the boss bar only), no mirrored-name plates and no "mirrored" -20 % damage aura. Story uses one Red copy, one filler and two cameras.
 - A wing-wide balance note: Red and Blue numbers were tuned with the generic bots, which wake Red at once by hitting it; a careful stealth group has an easier first minute than the gates measure.
-- Wing 6 has rooms, a placeholder boss (`il_cio`, a stub that makes `il_w6_done` reachable) and a door to the empty core zone; the real fight, the core and the ending are D9 onwards.
+- Wing 6 has its boss now (below); the core zone behind the lift is still an empty skeleton, and the core and the ending are D10 onwards.
 - Ill Marie's desk is a prop only; Brenda's core page and the Roomba ride are deferred.
 - No client effects yet for `Event::Exercise` (no standby banner, no cone decals); kiosks and honeypots are geometry only.
+
+## Wing 6: The Boardroom in the Sky (docs/ILMARI_1_0.md D.4, D9)
+
+- The Heir has his own HP (6,500) and no shared bar; the CIO's `Succession Plan` is a second body, not a mirrored one. Killing the CIO takes the Heir with him.
+- Companions do not take part in the pair: on Story one kick stops the landing, so Rupert's "kick the first" is not built. The Prompted rotation of the action bar is a cue only on every difficulty (Full costs 10 % damage, Story nothing).
+- Right-Sizing is a circle that repeats on a floor tile, not a permanent `Cleared Desk` hazard in the `HazardGrid`; it ends with the fight. Synergy Link is the `PairUp` leash without the shared damage.
+- The client draws the inbox terminals, the tile grid and the apples, but nothing yet reacts to `Event::Boardroom` or `Event::PairKick`: the desks stay standing on screen (the Earnings Call decal says how many count), there is no envelope ping, severance bar or "kick now" prompt.
+- A wing-wide balance note: the bots clear the inbox and the pair by reading events, so a real group's first attempts will be messier than the gates; Judgment Day numbers for the CIO (and the Heir's kick rule) are D15's.

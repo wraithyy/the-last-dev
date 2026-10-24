@@ -844,6 +844,24 @@ pub enum Event {
         sensors: u8,
         merged: bool,
     },
+    /// The Chief Ilmari Officer's boardroom: desks still standing, the milliseconds left to clear
+    /// the inbox (0: no message pending), the severance meter (0: not offboarding) and the
+    /// floor tiles gone (bit per tile). Sent when one of them changes and to a joiner; all
+    /// zero with `desks` 255 ends the display.
+    Boardroom {
+        desks: u8,
+        inbox_ms: u16,
+        severance_ms: u16,
+        tiles: u16,
+    },
+    /// A kick landed on a cast that needs two different interrupters inside the window: `have`
+    /// of `need` are in (the cast goes on until the second arrives in time).
+    PairKick {
+        boss: EntityId,
+        by: EntityId,
+        have: u8,
+        need: u8,
+    },
     /// Platform `idx` (the zone's `ZoneDef::platforms` order) entered `state` at `at_ms` of sim
     /// time. Every platform is sent when the encounter arms (all `Live`) and to a joiner.
     PlatformState {
