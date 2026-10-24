@@ -182,6 +182,7 @@ fn parts(kind: &str) -> Vec<Part> {
         "release_halo" => release_halo(),
         "agi_prototype" => agi_prototype(),
         "scooter" => scooter(),
+        "roomba_mk9" => roomba_mount(),
         "unreviewed_pr" => unreviewed_pr(),
         "demo_bug" => demo_bug(),
         "agi_beta" => agi_beta(),
@@ -1756,6 +1757,15 @@ fn pet(key: &str) -> Vec<Part> {
                 )])
                 .spin(Vec3::Y, 14.0),
         ],
+        // The reformed robot (`ilmari.rewards.pet`): a Roomba with a small white flag and a green light.
+        "clean_slate" => vec![
+            Part::cyl([0.0, 0.01, 0.0], 0.46, 0.02, DARK),
+            Part::cyl([0.0, 0.06, 0.0], 0.5, 0.1, [0.78, 0.8, 0.84]),
+            Part::cyl([0.0, 0.115, 0.0], 0.4, 0.01, [0.95, 0.96, 0.98]),
+            Part::cyl([0.0, 0.13, 0.08], 0.08, 0.02, [0.2, 0.9, 0.3]).glow(2.0),
+            Part::cube([0.12, 0.3, 0.1], [0.012, 0.34, 0.012], STEEL),
+            Part::cube([0.18, 0.4, 0.1], [0.14, 0.09, 0.01], [1.0, 1.0, 1.0]).bob(0.01, 4.0),
+        ],
         "tamagotchi" => vec![
             Part::ball([0.0, 0.22, 0.0], 0.34, [0.95, 0.55, 0.8]),
             Part::cube([0.0, 0.24, -0.15], [0.16, 0.13, 0.03], [0.1, 0.12, 0.1]),
@@ -1995,6 +2005,29 @@ fn scooter() -> Vec<Part> {
         Part::cyl([0.0, 0.1, -0.45], 0.2, 0.05, DARK).rot([0.0, 0.0, 90.0]),
         Part::cyl([0.0, 0.1, 0.45], 0.2, 0.05, DARK).rot([0.0, 0.0, 90.0]),
         Part::cube([0.0, 0.14, 0.0], [0.2, 0.01, 0.8], [1.0, 0.4, 0.1]).glow(1.0),
+    ]
+}
+
+/// The Refurbished Roomba Mk. IX under a rider (`ilmari.rewards.mount`): a disc deck at the scooter's
+/// deck height, a swivel chair behind the rider, two printer cannons that never fire and a bumper
+/// that says OOPS.
+fn roomba_mount() -> Vec<Part> {
+    vec![
+        Part::cyl([0.0, 0.07, 0.0], 1.1, 0.14, [0.16, 0.16, 0.19]),
+        Part::cyl([0.0, 0.142, 0.0], 0.96, 0.012, [0.32, 0.34, 0.4]),
+        Part::cyl([0.0, 0.3, 0.34], 0.06, 0.34, STEEL),
+        Part::cube([0.0, 0.5, 0.34], [0.4, 0.07, 0.34], [0.2, 0.2, 0.26]),
+        Part::cube([0.0, 0.76, 0.5], [0.4, 0.46, 0.06], [0.2, 0.2, 0.26]),
+        Part::cube([-0.46, 0.26, -0.1], [0.16, 0.16, 0.44], [0.85, 0.86, 0.88]),
+        Part::cube([-0.46, 0.26, -0.34], [0.1, 0.1, 0.05], DARK),
+        Part::cube([0.46, 0.26, -0.1], [0.16, 0.16, 0.44], [0.85, 0.86, 0.88]),
+        Part::cube([0.46, 0.26, -0.34], [0.1, 0.1, 0.05], DARK),
+        Part::cube([0.0, 0.1, -0.56], [0.7, 0.1, 0.06], [1.0, 0.8, 0.1]),
+        Part::cube([0.0, 0.1, -0.595], [0.3, 0.05, 0.01], HOT).glow(2.0),
+        Part::cube([0.0, 0.15, -0.4], [0.14, 0.02, 0.04], CYAN).glow(2.5),
+        Part::cube([0.0, 0.12, 0.0], [0.0; 3], STEEL)
+            .with(vec![Part::cube([0.0, 0.0, 0.0], [0.5, 0.01, 0.04], STEEL)])
+            .spin(Vec3::Y, 9.0),
     ]
 }
 
@@ -2266,6 +2299,8 @@ mod tests {
             "release_halo",
             "agi_prototype",
             "scooter",
+            "roomba_mk9",
+            "pet_clean_slate",
             "unreviewed_pr",
             "demo_bug",
             "agi_beta",

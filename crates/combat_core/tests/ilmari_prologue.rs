@@ -922,3 +922,61 @@ fn saves_carry_tokens_and_days_and_old_saves_load() {
     assert!(fresh.import_save(f, &SaveData::decode(&plain).expect("decode")));
     assert_eq!(fresh.ilmari_tokens_left(), ilmari::TOKEN_WEEK_CAP);
 }
+
+/// The ending's marker opens Clean Slate; turning it in gives the pet and puts it at the heel.
+#[test]
+fn the_robot_defects_after_the_ending_and_becomes_a_pet() {
+    let mut w = W::opened();
+    w.load("resistance/1");
+    assert!(
+        !w.sim.units().any(|u| u.key == "il_clean_slate"),
+        "the robot only rolls in after the ending"
+    );
+    assert_eq!(w.sim.quest_status("il_16_clean_slate"), QuestStatus::Locked);
+    assert!(
+        w.sim
+            .debug_set_quest_of(w.p, "il_w7_done", QuestStatus::Done)
+    );
+    w.load("resistance/1");
+    assert_eq!(
+        w.sim.quest_status("il_16_clean_slate"),
+        QuestStatus::Available
+    );
+    w.accept("il_clean_slate", "il_16_clean_slate");
+    w.talk("il_clean_slate");
+    w.turn_in("il_16_clean_slate");
+    let pet = w.sim.content().ilmari.rewards.pet.clone().expect("pet");
+    assert!(w.sim.pets_of(w.p).contains(&pet.key));
+    assert_eq!(w.sim.unit(w.p).map(|u| u.pet.clone()), Some(pet.key));
+    // The robot has defected: it is no longer on the floor of the base after a reload.
+    w.load("resistance/1");
+    assert!(!w.sim.units().any(|u| u.key == "il_clean_slate"));
+}
+
+/// The Roomba replaces the scooter's ride for whoever finished Dale's workbench, everywhere.
+#[test]
+fn the_roomba_is_the_ride_once_the_workbench_quest_is_done() {
+    let mut w = W::opened();
+    w.load("campus");
+    let spell = w.sim.content().mount_spell().expect("mount spell").id;
+    let ride = |w: &W| {
+        w.sim
+            .unit(w.p)
+            .map(|u| u.auras.iter().map(|a| a.key.clone()).collect::<Vec<_>>())
+            .unwrap_or_default()
+    };
+    w.cmd(Command::Cast { caster: w.p, spell });
+    w.secs(2);
+    assert!(ride(&w).iter().any(|k| k == "e_scooter"), "{:?}", ride(&w));
+    w.cmd(Command::Cast { caster: w.p, spell });
+    assert!(ride(&w).is_empty(), "the second press gets off");
+    assert!(
+        w.sim
+            .debug_set_quest_of(w.p, "il_17_roomba", QuestStatus::Done)
+    );
+    w.cmd(Command::Cast { caster: w.p, spell });
+    w.secs(2);
+    let on = ride(&w);
+    assert!(on.iter().any(|k| k == "roomba_mk9"), "{on:?}");
+    assert!(!on.iter().any(|k| k == "e_scooter"), "{on:?}");
+}

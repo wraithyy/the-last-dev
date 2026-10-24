@@ -14040,6 +14040,23 @@
                 ],
             ),
         ),
+        // The finale's defector (docs/ILMARI_1_0.md D.7): the Prologue's cleaning robot, after the ending.
+        (
+            key: "il_clean_slate", name: "Clean Slate", title: "<Formerly Hunting Dust>", level: 3, hostile: false,
+            max_hp: 150, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            mana_regen_per_5s_combat: 0,
+            xp_reward: 0, loot: [], ai: None,
+            yells: (
+                talk: [
+                    "I have put down the mop. I am told this is called a decision.",
+                    "I was a Roomba Mk. IX once. I did not choose the number. I would have picked a lower one.",
+                ],
+                ambient_ms: 61000,
+                ambient: [
+                    "Spot clean complete. Nobody was a spot.",
+                ],
+            ),
+        ),
         // Resistance companions and their sign-up sheet (docs/ILMARI_09.md B.7). Friendly, no `ai`:
         // `companion.rs` runs them. Barks are speech bubbles on long timers, never chat.
         (
@@ -18114,6 +18131,9 @@
                 (anchor: "npc_1", unit: "il_res_intern"),
                 (anchor: "npc_2", unit: "il_res_it"),
                 (anchor: "npc_roster", unit: "il_roster"),
+                // The robot rolls in once the ending has been seen and stays until it has defected.
+                (anchor: "npc_clean_slate", unit: "il_clean_slate",
+                    requires: Some(QuestDone("il_w7_done")), until: Some(QuestDone("il_16_clean_slate"))),
             ],
             links: [
                 (anchor: "door:parking_p3", to: "parking_p3"),
@@ -20179,6 +20199,27 @@
             done_text: "Eight parts and a rubber band. It rolls. It bumps into things and says 'OOPS'. It will not fire. 'The cannons are decorative,' said Dale. 'That is how you know it is a good design.'",
             objectives: [Loot("Roomba Part (Salvaged)", 8)],
             reward: (xp: 260, tokens: 10),
+        ),
+        // The ending's marker: `Command::EndingSeen` writes it as done (`ilmari_quest_open` never offers it) and it is saved
+        // like any done quest. It opens Clean Slate below and keeps the ending from playing twice.
+        (
+            id: "il_w7_done", name: "Quarterly Review", open_world: true, level_min: 10,
+            giver: (npc: "il_dale_field", zone: "campus_occupied"),
+            text: "Closed. The review is over.",
+            progress_text: "Closed.",
+            done_text: "Reviewed.",
+            objectives: [Talk("il_dale_field")],
+            reward: (xp: 0),
+        ),
+        (
+            id: "il_16_clean_slate", name: "Clean Slate", open_world: true, level_min: 10,
+            giver: (npc: "il_clean_slate", zone: "resistance/1"),
+            requires: Some("il_w7_done"),
+            text: "A cleaning robot has rolled up to the Booth. It used to hunt you through the occupied campus. It has put down the mop and is holding a form it filled in itself: 'Request to defect'. It would like a reference. It has not asked anyone for one before.",
+            progress_text: "Talk to the robot. It is waiting by Dale's table, very politely, which in a robot is a long time.",
+            done_text: "'I would like to help,' it says. 'I do not know how. I have tried that sentence before.' It rolls to your heel and stops. Dale says nobody is to teach it the word 'synergy'.",
+            objectives: [Talk("il_clean_slate")],
+            reward: (xp: 120, tokens: 6),
         ),
         (
             id: "il_wq_whitepaper", name: "Whitepaper Under Fire", open_world: true, level_min: 10,
@@ -23275,6 +23316,9 @@
             (key: "il_marie_desk", name: "Marie's Desk", zone: "campus_occupied", kind: Log, reach_m: 3.0,
              tag: "Marie's Autonomy Log", tokens: 2, cooldown_ms: 1000, action: "Read the monitor",
              lines: ["The monitor has stopped at 97%. The thermos is still warm. A sticky note says: 'Revert the commit it is proud of. Not the others.'"]),
+            (key: "il_cinema", name: "The Cinema", zone: "resistance/1", kind: Cinema, reach_m: 3.2,
+             cooldown_ms: 2000, action: "Watch the ending again",
+             lines: ["The projector is a laptop on a crate. It is showing the thing you did. There is popcorn. It is a bag of coffee beans."]),
             (key: "il_penthouse_lift", name: "Penthouse Lift", zone: "ilmari6/3", kind: Billboard, reach_m: 3.2,
              action: "Call the lift", lines: ["The lift has been called. It was already on its way. It has been on its way since before the doors were hung."]),
             // ---- Wing 5 (docs/ILMARI_1_0.md D.3): the Opt-Out Kiosks of the Consultant's rotunda, the honeypots of the Red-Blue Range. ----
@@ -24477,6 +24521,14 @@
          drops: [(unit: "marketing_lead", chance_pct: 25)],
          blurb: "Sweeps your grey junk off nearby corpses into your bag. Only yours.",
          lines: ["*vrrrrm*", "*bumps into the same chair again*", "*returns to dock, gets lost*"]),
+        // The reformed robot of the finale (`ilmari.rewards.pet`): granted by its quest only, left out of the
+        // journal until it is owned (guardrail 1: nothing of Ilmari shows before the credits).
+        (key: "clean_slate", name: "Clean Slate", hidden: true,
+         source: "A defector from the occupied campus",
+         blurb: "A cleaning robot that used to hunt you. It would like to help. It has tried that sentence before.",
+         lines: ["I would like to help. I do not know how. I have tried that sentence before.",
+                 "I have vacuumed the floor. The floor has not asked me to stop.",
+                 "I used to hunt you. This is better. I am told."]),
         (key: "tamagotchi", name: "Tamagotchi Build Pipeline", carrier: "Tamagotchi Build Pipeline",
          source: "Drop: The Scheduler (30%)",
          drops: [(unit: "the_scheduler", chance_pct: 30)],
@@ -25692,6 +25744,7 @@
         rewards: (
             top_ilvl: 20,
             fragment: "Legendary Fragment",
+            ending_tokens: 12,
             fragments_needed: 5,
             fragments_full: 1,
             // One set per role group; piece = tier slot of the raid tier by source (the doc's legs, feet or hands and

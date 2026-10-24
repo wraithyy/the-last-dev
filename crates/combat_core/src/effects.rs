@@ -777,6 +777,11 @@ impl Sim {
         let Some(def) = self.content.aura(key).cloned() else {
             return;
         };
+        if def.mount
+            && let Some(ride) = self.roomba_ride(ti, key)
+        {
+            return self.apply_aura(ti, &ride, duration_ms, absorb, source, spell);
+        }
         let cc = def.cc_cat();
         // A boss shrugs off other people's stuns, not its own: Patch Tuesday's reboot is authored.
         if self.units[ti].state.boss

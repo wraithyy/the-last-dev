@@ -118,7 +118,7 @@ fn stamp_the_end(mut events: MessageReader<CombatEvent>, mut pending: ResMut<Pen
 }
 
 /// The device clock: unix seconds, offset east of UTC in minutes and the short zone name.
-fn device_clock() -> (u64, i16, String) {
+pub(crate) fn device_clock() -> (u64, i16, String) {
     #[cfg(target_arch = "wasm32")]
     {
         let now = js_sys::Date::new_0();

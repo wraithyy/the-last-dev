@@ -289,8 +289,14 @@ fn the_rewards_block_is_what_the_doc_promises() {
         (scooter.speed_pct, true, false)
     );
     assert_eq!(r.mount.as_ref().map(|m| m.parts), Some(8));
-    // The pet is no companion and no base-game pet; the journal never lists it.
-    assert!(c.pets.iter().all(|p| p.key != "clean_slate"));
+    // The pet is no companion; it is a hidden, granted-only `pets` entry, so the journal never lists it before it is owned.
+    assert!(
+        c.pets
+            .iter()
+            .filter(|p| p.key == "clean_slate")
+            .all(|p| p.hidden && p.carrier.is_empty() && p.drops.is_empty())
+    );
+    assert!(c.pets.iter().any(|p| p.key == "clean_slate"));
     assert!(r.pet.as_ref().is_some_and(|p| p.lines.len() >= 3));
     // Cosmetics cost tokens and fit under the weekly cap.
     assert!(

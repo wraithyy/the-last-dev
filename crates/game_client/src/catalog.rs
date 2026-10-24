@@ -2351,6 +2351,16 @@ static TABLE: &[(&str, UnitVisual)] = &[
         ),
     ),
     (
+        "il_clean_slate",
+        v(
+            "prim/delivery_robot",
+            1.0,
+            "Clean Slate",
+            "<Formerly Hunting Dust>",
+            &[],
+        ),
+    ),
+    (
         "il_printer_turret",
         v(
             "prim/overheated_rack",

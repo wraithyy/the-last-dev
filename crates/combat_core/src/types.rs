@@ -282,6 +282,10 @@ pub enum Command {
     /// (`judgment.rs`). Judgment is refused with `Event::IlmariRefused` unless the room has the
     /// quorum, has cleared Ilmari on Full and stands outside Wings 1-4.
     SetIlmariMode(crate::ilmari::IlmariMode),
+    /// The ending cutscene played or was skipped on this client (never from a Cinema replay):
+    /// marks it seen for this player and pays the ending's rewards once (`rewards.rs`). Only
+    /// valid once the room's core has fallen.
+    EndingSeen,
 }
 
 /// Why an item command did nothing; routed to the player.

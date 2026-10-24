@@ -290,6 +290,7 @@ impl Sim {
         if def.reward.tokens > 0 {
             self.grant_ilmari_tokens(pid, def.reward.tokens);
         }
+        self.reward_pet_on_quest(pid, id);
         if let Some(t) = &def.reward.trophy {
             self.add_trophies(pi, std::slice::from_ref(t));
         }

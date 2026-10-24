@@ -19,6 +19,7 @@ mod game;
 mod gear;
 mod hair;
 mod hud;
+mod ilmari_end;
 mod ilmari_fx;
 mod ilmari_open;
 mod ilmari_wing;
@@ -163,6 +164,7 @@ fn main() {
         settings::SettingsPlugin,
         cutscene::CutscenePlugin,
         ilmari_open::IlmariOpenPlugin,
+        ilmari_end::IlmariEndPlugin,
         marie_log::MarieLogPlugin,
         ilmari_world::IlmariWorldPlugin,
         ilmari_wing::IlmariWingPlugin,

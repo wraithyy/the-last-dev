@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 46;
+pub const PROTOCOL_VERSION: u16 = 47;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -687,6 +687,8 @@ pub fn is_player_command(cmd: &Command) -> bool {
         // The end stamp is the same line of text, and the sim only takes it after a core kill.
         Command::StampIlmariEnd { .. } => true,
         Command::IlmariReveal => true,
+        // Per player and idempotent; the sim refuses it before the core has fallen.
+        Command::EndingSeen => true,
     }
 }
 

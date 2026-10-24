@@ -638,6 +638,7 @@ impl Sim {
             | Command::StampIlmari { .. }
             | Command::StampIlmariEnd { .. }
             | Command::IlmariReveal
+            | Command::EndingSeen
             | Command::SetIlmariStory { .. }
             | Command::SetIlmariMode(_)
             | Command::MinigamePick { .. } => {}
@@ -883,6 +884,7 @@ impl Sim {
                     self.reveal_ilmari();
                 }
             }
+            Command::EndingSeen => self.ending_seen(actor),
             Command::SetIlmariStory { story } => {
                 let mode = if story {
                     crate::ilmari::IlmariMode::Story
@@ -954,6 +956,7 @@ impl Sim {
             | Command::StampIlmari { .. }
             | Command::StampIlmariEnd { .. }
             | Command::IlmariReveal
+            | Command::EndingSeen
             | Command::SetIlmariStory { .. }
             | Command::SetIlmariMode(_)
             | Command::MinigamePick { .. } => {}

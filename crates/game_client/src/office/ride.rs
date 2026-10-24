@@ -44,6 +44,8 @@ pub fn pose_of(e: Emote) -> Option<PoseClip> {
 #[derive(Component, Default)]
 pub struct WorldPose {
     pub mounted: bool,
+    /// The ride is the Refurbished Roomba, not the scooter (`ilmari.rewards.mount`).
+    pub roomba: bool,
     /// Roll into turns plus a little wobble, radians.
     pub lean: f32,
     /// (pose, started at, where).
@@ -79,7 +81,7 @@ pub struct EmotePlayed(pub EntityId, pub Emote);
 pub struct RideModel;
 /// The rider's `RideModel` child.
 #[derive(Component)]
-pub struct HasRide(Entity);
+pub struct HasRide(Entity, bool);
 
 pub fn add_poses(mut commands: Commands, new: Query<Entity, (Added<SimUnit>, Without<WorldPose>)>) {
     for e in &new {
@@ -146,6 +148,20 @@ pub fn update_poses(
         if w.mounted != mounted {
             w.mounted = mounted;
         }
+        let roomba = mounted
+            && sim
+                .content()
+                .ilmari
+                .rewards
+                .mount
+                .as_ref()
+                .is_some_and(|m| {
+                    sim.unit(su.0)
+                        .is_some_and(|u| u.auras.iter().any(|a| a.key == m.aura))
+                });
+        if w.roomba != roomba {
+            w.roomba = roomba;
+        }
         if let Some((pose, t0, at)) = w.emote {
             let moved = Vec2::new(tf.translation.x - at.x, tf.translation.z - at.z).length();
             let over = match pose {
@@ -184,18 +200,21 @@ pub fn ride_models(
     mut models: Query<(&ChildOf, &mut Transform), With<RideModel>>,
 ) {
     for (e, w, has) in &riders {
-        match (w.mounted, has) {
+        // A rider who swaps rides (scooter to Roomba) gets the other rig on the next frame.
+        let stale = has.filter(|h| h.1 != w.roomba);
+        let want = w.mounted && stale.is_none();
+        match (want, has) {
             (true, None) => {
                 let child = commands
                     .spawn((
                         RideModel,
-                        PrimRig("scooter"),
+                        PrimRig(if w.roomba { "roomba_mk9" } else { "scooter" }),
                         ChildOf(e),
                         Transform::default(),
                         Visibility::default(),
                     ))
                     .id();
-                commands.entity(e).insert(HasRide(child));
+                commands.entity(e).insert(HasRide(child, w.roomba));
             }
             (false, Some(h)) => {
                 commands.entity(h.0).despawn();

@@ -73,6 +73,8 @@ pub fn build() -> FloorLayout {
     at("npc_2", &mut p, -10.0, -6.0, (-6.0, 0.0));
     // The sign-up sheet for the companions, on the wall side of the hall where the board hangs.
     at("npc_roster", &mut p, 9.0, -6.5, (9.0, 0.0));
+    // The defecting cleaning robot waits by Dale's table (spawned after the ending, see the zone's `friendly`).
+    at("npc_clean_slate", &mut p, -2.0, 4.5, (-5.0, 3.5));
     assemble(ZONE, 1, "The Booth, Sub-Level", false, p, theme())
 }
 
@@ -91,6 +93,17 @@ fn hall(p: &mut Plan) {
         beanbag(p, x, z, Mat::BeanA);
     }
     put_crates(p, 11.4, 6.0);
+    cinema(p);
+}
+
+/// The Cinema (docs/ILMARI_1_0.md D.8): a bedsheet on the south wall, a laptop projector on a crate and the
+/// beanbags in front of it. Using it replays the ending, with no rewards.
+fn cinema(p: &mut Plan) {
+    p.boxed(v(6.0, 2.1, 9.55), v(5.0, 2.4, 0.06), Mat::Paper, false);
+    p.boxed(v(6.0, 2.1, 9.5), v(4.4, 1.9, 0.04), Mat::ScreenGlow, false);
+    p.boxed(v(6.0, 0.35, 5.6), v(0.7, 0.7, 0.7), Mat::Wood, true);
+    p.boxed(v(6.0, 0.75, 5.6), v(0.5, 0.06, 0.34), Mat::Metal, false);
+    p.interactable("prop:il_cinema", v(6.0, 1.0, 5.6), v(6.0, 0.0, 4.2));
 }
 
 /// Brenda's counter, shelves of stamped boxes and the sign that explains the quotes.

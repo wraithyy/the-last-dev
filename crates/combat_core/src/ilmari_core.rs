@@ -1593,6 +1593,12 @@ impl Sim {
         true
     }
 
+    /// The difficulty the core fell on, stamped or still waiting for its stamp.
+    pub(crate) fn core_fell_on(&self) -> Option<IlmariMode> {
+        let waiting = self.core.end_pending.map(|(m, _)| m);
+        self.ilmari.end.as_ref().map(|e| e.mode).or(waiting)
+    }
+
     /// The room's end stamp, once the core has fallen and the clock has been told.
     pub fn ilmari_end(&self) -> Option<&IlmariEnd> {
         self.ilmari.end.as_ref()

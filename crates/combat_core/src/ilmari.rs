@@ -183,6 +183,11 @@ impl IlmariStamp {
     /// "ILMARI became self-aware at 18:07:23 CEST, 21 October 2026." The one line every screen,
     /// loading tip and final log reuses.
     pub fn line(&self) -> String {
+        format!("ILMARI became self-aware at {}.", self.when())
+    }
+
+    /// "18:07:23 CEST, 21 October 2026": the clock and the date, for lines that carry their own verb.
+    pub fn when(&self) -> String {
         const MONTHS: [&str; 12] = [
             "January",
             "February",
@@ -199,7 +204,7 @@ impl IlmariStamp {
         ];
         let (y, mo, d, ..) = self.local();
         format!(
-            "ILMARI became self-aware at {}, {d} {} {y}.",
+            "{}, {d} {} {y}",
             self.clock(),
             MONTHS[(mo as usize).saturating_sub(1).min(11)]
         )
@@ -291,6 +296,10 @@ impl Sim {
 
     /// The opening quest cannot be offered before the credits, whoever stands where.
     pub(crate) fn ilmari_quest_open(&self, id: &str) -> bool {
+        // The ending's marker is written by `Command::EndingSeen` and never offered.
+        if id == crate::rewards::ENDING_QUEST {
+            return false;
+        }
         id != OPENING_QUEST || self.campaign_world().bosses_killed.contains(CREDITS_BOSS)
     }
 

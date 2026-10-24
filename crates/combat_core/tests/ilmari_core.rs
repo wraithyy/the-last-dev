@@ -520,6 +520,82 @@ fn the_end_stamp_is_kept_once_and_only_after_the_core_fell() {
     assert_eq!(IlmariEnd::parse(&end.code()), Some(end.clone()));
 }
 
+// ---------------------------------------------------------------- the ending (D18)
+
+#[test]
+fn the_ending_is_seen_once_per_player_pays_once_and_opens_the_robot() {
+    let (mut sim, ids, _boss) = pulled(false, &["backend", "devops", "fullstack"], 5);
+    let marker = combat_core::rewards::ENDING_QUEST;
+    let tokens = |sim: &Sim, p: EntityId| {
+        sim.unit(p).map_or(0, |u| {
+            u.inventory
+                .iter()
+                .filter(|(n, _)| n == combat_core::ilmari::TOKEN)
+                .map(|(_, c)| *c)
+                .sum::<u32>()
+        })
+    };
+    // Nothing happens while the core stands.
+    sim.apply_as(ids[0], Command::EndingSeen);
+    sim.tick();
+    assert_ne!(
+        sim.quest_status_of(ids[0], marker),
+        combat_core::QuestStatus::Done
+    );
+    bar_at(&mut sim, 1);
+    sim.debug_hit(ids[0], screens(&sim)[0], 10_000_000);
+    run(&mut sim, 2);
+    let before = tokens(&sim, ids[0]);
+    sim.apply_as(ids[0], Command::EndingSeen);
+    sim.tick();
+    assert_eq!(
+        sim.quest_status_of(ids[0], marker),
+        combat_core::QuestStatus::Done
+    );
+    let pays = sim.content().ilmari.rewards.ending_tokens;
+    assert!(pays > 0 && tokens(&sim, ids[0]) >= before + pays.min(1));
+    let title = sim
+        .content()
+        .ilmari
+        .rewards
+        .core_title(combat_core::ilmari::IlmariMode::Full)
+        .map(|t| t.title.clone());
+    let me = sim.unit(ids[0]).expect("player");
+    assert_eq!(
+        Some(&me.title),
+        title.as_ref(),
+        "the title of the difficulty that fell"
+    );
+    // A second send is a no-op; the others have their own copy of the ending.
+    let after = tokens(&sim, ids[0]);
+    sim.apply_as(ids[0], Command::EndingSeen);
+    sim.tick();
+    assert_eq!(tokens(&sim, ids[0]), after);
+    assert_ne!(
+        sim.quest_status_of(ids[1], marker),
+        combat_core::QuestStatus::Done
+    );
+    // The robot's quest opens for the one who saw it, not for the one who did not.
+    assert_eq!(
+        sim.quest_status_of(ids[0], "il_16_clean_slate"),
+        combat_core::QuestStatus::Available
+    );
+    assert_eq!(
+        sim.quest_status_of(ids[1], "il_16_clean_slate"),
+        combat_core::QuestStatus::Locked
+    );
+    // The marker is never on offer by itself and survives a save.
+    let text = sim.export_save(ids[0]).expect("save").encode();
+    let mut back = Sim::new(content(), 7);
+    let q = back.spawn_player("fullstack", Vec3::new(0.0, 0.0, 0.0), 0.0);
+    assert!(back.import_save(q, &combat_core::SaveData::decode(&text).expect("decode")));
+    assert_eq!(
+        back.quest_status_of(q, marker),
+        combat_core::QuestStatus::Done
+    );
+    assert_eq!(back.unit(q).map(|u| u.title.clone()), title);
+}
+
 // ---------------------------------------------------------------- P1: the deck of reruns
 
 /// The deck's draws in order: the name on the wall banner every time a rerun is drawn.

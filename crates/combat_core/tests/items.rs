@@ -180,13 +180,14 @@ fn every_item_is_reachable_from_some_source() {
         .collect();
     let top = eco.campaign_top_tier();
     // Every Ilmari tier piece and Legendary has to drop from its boss (the strict check: `drops_from`, a boss
-    // that exists). Only the tokens D18 grants (the fragment is paid by the core, the Roomba parts by the
-    // quest) stay exempt; `tests/ilmari_band.rs` guards the band.
+    // that exists); `tests/ilmari_band.rs` guards the band. The Roomba's parts are quest-gated loot of real
+    // units (`trophy_sources` below). The fragment is paid to every member by the core's own death
+    // (`core_pay_fragments`), so its source is a core encounter that exists and a payout that is not zero.
     let r = &c.ilmari.rewards;
-    let pending: Vec<&str> = [r.fragment.as_str()]
-        .into_iter()
-        .chain(r.mount.iter().map(|m| m.part_item.as_str()))
-        .collect();
+    let core_pays = r.fragments_full > 0
+        && c.units
+            .iter()
+            .any(|u| u.hostile && matches!(u.encounter, Some(combat_core::EncounterDef::Core(_))));
     let mut bad = Vec::new();
     for g in &eco.gear {
         let ok = match &g.source {
@@ -204,9 +205,7 @@ fn every_item_is_reachable_from_some_source() {
             // Brenda's shelf until the wings drop their own: above the cap, sold for tokens.
             GearSource::Ilmari => {
                 g.ilvl > combat_core::BASE_ILVL_CAP
-                    && (shelves.contains(&&g.name)
-                        || g.drops_from.is_some()
-                        || pending.contains(&g.name.as_str()))
+                    && (shelves.contains(&&g.name) || g.drops_from.is_some())
             }
             // Medal rewards only: some medal must hand it out, and no vendor sells it.
             GearSource::Minigame => {
@@ -241,18 +240,15 @@ fn every_item_is_reachable_from_some_source() {
     // Tokens also come from quest rewards (`tokens`), not only from loot.
     let paid = c.quests.iter().any(|q| q.reward.tokens > 0);
     for t in &c.items {
-        let token_paid = paid && t.name == combat_core::ilmari::TOKEN;
+        let token_paid =
+            (paid && t.name == combat_core::ilmari::TOKEN) || (core_pays && t.name == r.fragment);
         // Marie's desk hands the log over (`PropKind::Log` names it in `tag`).
         let desk_gives = c
             .world
             .props
             .iter()
             .any(|p| p.kind == combat_core::PropKind::Log && p.tag == t.name);
-        if !trophy_sources.contains(&&t.name)
-            && !token_paid
-            && !desk_gives
-            && !pending.contains(&t.name.as_str())
-        {
+        if !trophy_sources.contains(&&t.name) && !token_paid && !desk_gives {
             bad.push(format!("trophy {}", t.name));
         }
     }

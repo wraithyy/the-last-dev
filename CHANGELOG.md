@@ -29,10 +29,12 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - The Quartermaster has a shelf each for Training Data, The Cloud and the Core.
 - Ill Marie's badge has a grey silhouette where the photo should be, and now and then, once, the campus map gets her name wrong.
 - Joining a room after its Opening played now lets you watch it too.
+- The ending: when the Core falls, every screen on campus rewinds, the final log prints, the campus comes back and the credits roll with your own Judgment Day on them. One key skips all of it at any moment and still pays out. It plays once per player; the Cinema screen in the Resistance base shows it again, for free.
+- Finishing the ending pays a handful of Ilmari Tokens and your title for the difficulty, and a cleaning robot rolls into the Resistance base with a request of its own. Dale's Roomba, once assembled, replaces the e-scooter as your ride, and the robot becomes a pet.
 
 ### Changed
 
-- Co-op needs this version on both sides (protocol 46).
+- Co-op needs this version on both sides (protocol 47).
 
 ## [0.10.0] - 2026-10-24
 

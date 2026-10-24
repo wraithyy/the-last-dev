@@ -103,7 +103,7 @@ pub struct GameFlow {
     tip: usize,
     victory_in: Option<f32>,
     pub victory: bool,
-    /// The post-credits Opening is playing (`ilmari_open.rs`).
+    /// The post-credits Opening or the ending is playing (`ilmari_open.rs`, `ilmari_end.rs`).
     pub opening: bool,
     pub unlock_all: bool,
     /// Run statistics for the victory screen.

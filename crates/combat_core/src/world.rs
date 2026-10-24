@@ -116,6 +116,9 @@ pub enum PropKind {
     Git,
     /// A punch card beside the mainframe: heals it a little (any class).
     Punch,
+    /// The Resistance base's cinema screen: the client replays the ending on its own use (no
+    /// rewards; the sim only reports the use).
+    Cinema,
 }
 
 #[derive(Clone, Debug, Deserialize)]

@@ -9,7 +9,14 @@
 
 use crate::content::{Content, ContentError, ItemKind, Role};
 use crate::economy::{BASE_ILVL_CAP, GearSource, Rarity, Slot};
+use crate::ilmari::IlmariMode;
+use crate::sim::Sim;
+use crate::targeting::EntityId;
 use serde::Deserialize;
+
+/// The quest id that records "this player has seen the ending". It is written by
+/// `Command::EndingSeen`, never offered (`ilmari_quest_open`), and saved like any done quest.
+pub const ENDING_QUEST: &str = "il_w7_done";
 
 /// Longest title that survives the wire's name sanitiser (`net_proto::MAX_TITLE_CHARS`).
 const TITLE_MAX: usize = 24;
@@ -95,9 +102,21 @@ pub struct RewardsDef {
     pub cosmetics: Vec<CosmeticDef>,
     pub mount: Option<MountDef>,
     pub pet: Option<PetRewardDef>,
+    /// Ilmari Tokens the ending pays once per player (weekly and stack caps still apply).
+    pub ending_tokens: u32,
 }
 
 impl RewardsDef {
+    /// The title a first core clear on `mode` earns (`last_human_standing` on Full and so on).
+    pub fn core_title(&self, mode: IlmariMode) -> Option<&TitleDef> {
+        let key = match mode {
+            IlmariMode::Story => "revert_committed",
+            IlmariMode::Full => "last_human_standing",
+            IlmariMode::Judgment => "deprecated_not_defeated",
+        };
+        self.titles.iter().find(|t| t.key == key)
+    }
+
     /// Fragments one core clear pays on `mode`.
     pub fn fragments_for(&self, mode: crate::ilmari::IlmariMode, jd_mult: u32) -> u32 {
         match mode {
@@ -248,11 +267,97 @@ impl RewardsDef {
                 );
             }
         }
-        if let Some(p) = &self.pet
-            && (p.lines.is_empty() || p.key.is_empty() || c.pets.iter().any(|o| o.key == p.key))
-        {
-            return bad("the robot pet needs lines and a key no base pet uses".into());
+        // The pet is a hidden entry of `pets` (no journal row before it is owned) that only the
+        // quest grants: no carrier, no drops.
+        if let Some(p) = &self.pet {
+            let def = c.pets.iter().find(|o| o.key == p.key);
+            if p.lines.is_empty()
+                || p.key.is_empty()
+                || def.is_none_or(|d| {
+                    !d.hidden
+                        || !d.carrier.is_empty()
+                        || !d.drops.is_empty()
+                        || d.sprint_level.is_some()
+                })
+                || c.quest(&p.quest).is_none()
+            {
+                return bad(
+                    "the robot pet needs lines, a quest and a hidden granted-only `pets` entry"
+                        .into(),
+                );
+            }
+        }
+        if c.quest(ENDING_QUEST).is_none() || self.core_title(IlmariMode::Full).is_none() {
+            return bad("the ending needs its marker quest and the core titles".into());
         }
         Ok(())
+    }
+}
+
+impl Sim {
+    /// `Command::EndingSeen`: once per player, after the room's core has fallen. Marks the ending
+    /// seen (which opens the Clean Slate quest), pays `ending_tokens` and the core title of the
+    /// difficulty that fell. Skipping the cutscene pays exactly the same; a Cinema replay never
+    /// sends it.
+    pub(crate) fn ending_seen(&mut self, player: EntityId) {
+        let Some(pi) = self.index(player).filter(|_| self.is_player(player)) else {
+            return;
+        };
+        let Some(mode) = self.core_fell_on() else {
+            return;
+        };
+        let log = self.quest_logs.entry(player).or_default();
+        if log.completed.iter().any(|q| q == ENDING_QUEST) {
+            return;
+        }
+        log.completed.push(ENDING_QUEST.to_string());
+        self.check_unlocks();
+        let r = &self.content.ilmari.rewards;
+        let (tokens, title) = (r.ending_tokens, r.core_title(mode).map(|t| t.title.clone()));
+        if tokens > 0 {
+            self.grant_ilmari_tokens(player, tokens);
+        }
+        if let Some(title) = title {
+            let s = &mut self.units[pi].state;
+            if !s.achievements.contains(&title) {
+                s.achievements.push(title.clone());
+            }
+            s.title.clone_from(&title);
+            self.events.push(crate::types::Event::TitleChanged {
+                unit: player,
+                title,
+            });
+        }
+    }
+
+    /// The Roomba replaces the scooter's ride for whoever finished its quest (`MountDef::quest`).
+    pub(crate) fn roomba_ride(&self, ti: usize, aura: &str) -> Option<String> {
+        let m = self.content.ilmari.rewards.mount.as_ref()?;
+        let id = Self::id_of(ti);
+        if aura == m.aura || !self.is_player(id) {
+            return None;
+        }
+        self.quests_of(id)
+            .completed
+            .contains(&m.quest)
+            .then(|| m.aura.clone())
+    }
+
+    /// Turning in the pet's quest gives the pet and puts it at the player's heel.
+    pub(crate) fn reward_pet_on_quest(&mut self, player: EntityId, quest: &str) {
+        let Some(p) = self
+            .content
+            .ilmari
+            .rewards
+            .pet
+            .as_ref()
+            .filter(|p| p.quest == quest)
+        else {
+            return;
+        };
+        let key = p.key.clone();
+        if self.grant_pet(player, &key) {
+            self.summon_pet(player, &key);
+        }
     }
 }

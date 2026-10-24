@@ -200,6 +200,8 @@ fn marie_gates_only_use_existing_progress() {
         .iter()
         .flat_map(|z| z.friendly.iter())
         .filter(|f| f.requires.is_some() || f.until.is_some())
+        // The finale's defecting robot has its own gate (the ending's marker quest).
+        .filter(|f| f.unit != "il_clean_slate")
         .collect();
     // Desk and queue handover, the two dungeon cameos, the bench and the Opening's reveal Marie.
     assert_eq!(gated.len(), 6);

@@ -326,3 +326,54 @@ mod ilmari_tests {
         }
     }
 }
+
+// ---- the ending (docs/ILMARI_1_0.md D.8) ----
+
+/// "3 days, 4 hours, 12 minutes": the real time between the awakening and the revert. Zero units
+/// are left out; under a minute it says so.
+pub fn ilmari_duration(secs: u64) -> String {
+    let (d, h, m) = (secs / 86_400, secs % 86_400 / 3_600, secs % 3_600 / 60);
+    let unit = |n: u64, one: &str| format!("{n} {one}{}", if n == 1 { "" } else { "s" });
+    let parts: Vec<String> = [(d, "day"), (h, "hour"), (m, "minute")]
+        .into_iter()
+        .filter(|(n, _)| *n > 0)
+        .map(|(n, one)| unit(n, one))
+        .collect();
+    if parts.is_empty() {
+        "under a minute".to_string()
+    } else {
+        parts.join(", ")
+    }
+}
+
+/// The core fight's own clock, "14:52".
+pub fn fight_clock(ms: u32) -> String {
+    format!("{}:{:02}", ms / 60_000, ms / 1_000 % 60)
+}
+
+/// The difficulty as the credits name it.
+pub fn ilmari_mode_name(mode: combat_core::ilmari::IlmariMode) -> &'static str {
+    match mode {
+        combat_core::ilmari::IlmariMode::Story => "Story",
+        combat_core::ilmari::IlmariMode::Full => "Full Programme",
+        combat_core::ilmari::IlmariMode::Judgment => "Judgment Day",
+    }
+}
+
+#[cfg(test)]
+mod ending_tests {
+    use super::*;
+
+    #[test]
+    fn durations_read_in_days_hours_minutes() {
+        assert_eq!(
+            ilmari_duration(3 * 86_400 + 4 * 3_600 + 12 * 60 + 9),
+            "3 days, 4 hours, 12 minutes"
+        );
+        assert_eq!(ilmari_duration(86_400 + 60), "1 day, 1 minute");
+        assert_eq!(ilmari_duration(2 * 3_600), "2 hours");
+        assert_eq!(ilmari_duration(59), "under a minute");
+        assert_eq!(fight_clock(892_000), "14:52");
+        assert_eq!(fight_clock(61_000), "1:01");
+    }
+}

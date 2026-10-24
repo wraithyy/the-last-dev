@@ -690,7 +690,16 @@ impl Sim {
         u.bag = bag;
         u.equipped = equipped;
         u.inventory = trophies;
-        let known = |k: &String| self.content.achievement(k).is_some();
+        let known = |k: &String| {
+            self.content.achievement(k).is_some()
+                || self
+                    .content
+                    .ilmari
+                    .rewards
+                    .titles
+                    .iter()
+                    .any(|t| t.title == *k)
+        };
         let achievements: Vec<String> = save
             .achievements
             .iter()

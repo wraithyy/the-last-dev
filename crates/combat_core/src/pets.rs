@@ -42,6 +42,9 @@ pub struct PetDef {
     /// Granted to every member delivering a Sprint at this level or higher.
     #[serde(default)]
     pub sprint_level: Option<u8>,
+    /// Left out of the journal until owned (the Ilmari reward pet, guardrail 1).
+    #[serde(default)]
+    pub hidden: bool,
     /// Things it says now and then (the client picks them).
     #[serde(default)]
     pub lines: Vec<String>,
