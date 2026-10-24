@@ -198,6 +198,8 @@ fn hover_radius(kind: PropKind) -> f32 {
         | PropKind::Inbox
         | PropKind::Vote
         | PropKind::Log
+        | PropKind::Git
+        | PropKind::Punch
         | PropKind::Device => 0.9,
         PropKind::Pickup => 0.6,
         PropKind::QuietRoom => 1.2,

@@ -3232,6 +3232,56 @@ static TABLE: &[(&str, UnitVisual)] = &[
     ),
     // Ill Marie in the core: the mask on her chin, a blanket for a shirt, the stare.
     (
+        "il_ilmari_arm",
+        v(
+            "prim/rack_golem",
+            3.4,
+            "Rack Arm",
+            "<Printer Cannons, Cable Whip>",
+            &[],
+        ),
+    ),
+    (
+        "il_ilmari_head",
+        v(
+            "prim/kpi_dashboard",
+            2.2,
+            "Swivel-Chair Gantry",
+            "<Currently Planning>",
+            &[],
+        ),
+    ),
+    (
+        "il_jam_turret",
+        v(
+            "prim/overheated_rack",
+            1.5,
+            "Jammed Printer Turret",
+            "<Out Of Paper, In Spirit>",
+            &[],
+        ),
+    ),
+    (
+        "il_core_mainframe",
+        v(
+            "prim/cutover_rack",
+            3.8,
+            "COBOL Mainframe",
+            "<PAYROLL.CBL, 1974>",
+            &[],
+        ),
+    ),
+    (
+        "il_modern_replacement",
+        v(
+            "prim/delivery_robot",
+            1.3,
+            "Modern Replacement",
+            "<Memory Safe, Test Free>",
+            &[],
+        ),
+    ),
+    (
         "il_marie_core",
         v(
             CASUAL_F,

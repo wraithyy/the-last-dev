@@ -8,6 +8,7 @@ use super::datacenter::dress::*;
 use super::ilmari1::label_printer;
 use super::ilmari2::{ballot, portal};
 use super::ilmari3::{arrival_kit, casing};
+use super::ilmari5::kiosk;
 use super::kit::*;
 use super::layout::{FloorKind, FloorLayout, Theme, assemble};
 use super::models::{self, MUG};
@@ -175,6 +176,23 @@ fn core_room(p: &mut Plan) -> Theme {
     ] {
         ballot(p, key, x, z, -1.0, sign);
     }
+    // P3's Opt-Out Kiosk (a Helpful Suggestion is cancelled here), P4's three punch cards beside the
+    // hatch and the three terminals of the revert on the east side of the ring.
+    kiosk(p, "prop:il_core_optout", cx + 12.0, 11.0, 1.0);
+    for (key, z) in [
+        ("prop:il_punch_1", -7.2),
+        ("prop:il_punch_2", -3.6),
+        ("prop:il_punch_3", -0.4),
+    ] {
+        punch_card_reader(p, key, cx + 5.2, z);
+    }
+    for (key, z) in [
+        ("prop:il_git_1", -13.0),
+        ("prop:il_git_2", -9.5),
+        ("prop:il_git_3", -6.0),
+    ] {
+        revert_terminal(p, key, cx + 11.5, z);
+    }
     label_printer(p, "prop:il_core_printer", cx - 12.0, -22.0, 1.0);
     portal(p, "prop:il_core_portal_1", cx + 12.0, -22.0, 1.0);
     portal(p, "prop:il_core_portal_2", cx, 22.2, -1.0);
@@ -230,4 +248,34 @@ fn seats(p: &mut Plan, boss: Vec3, yaw: f32) {
             Mat::Dark,
         );
     }
+}
+
+/// A card reader on a pedestal beside the hatch: a hopper of punch cards, a slot, a lamp. P4's heal
+/// for the mainframe, open to every class.
+fn punch_card_reader(p: &mut Plan, key: &'static str, x: f32, z: f32) {
+    p.boxed(v(x, 0.5, z), v(0.7, 1.0, 0.8), Mat::Metal, true);
+    p.boxed(v(x, 1.05, z), v(0.8, 0.1, 0.9), Mat::Dark, false);
+    p.boxed(v(x - 0.1, 1.14, z), v(0.3, 0.08, 0.5), Mat::Paper, false);
+    p.boxed(
+        v(x - 0.36, 0.78, z),
+        v(0.04, 0.12, 0.5),
+        Mat::LedGreen,
+        false,
+    );
+    p.interactable(key, v(x, 1.0, z), v(x - 1.6, 0.0, z));
+}
+
+/// A revert terminal: a dark console with a green screen turned toward the hatch; whoever stands
+/// at it can `git revert`.
+fn revert_terminal(p: &mut Plan, key: &'static str, x: f32, z: f32) {
+    p.boxed(v(x, 0.55, z), v(0.8, 1.1, 0.9), Mat::Dark, true);
+    p.boxed(
+        v(x - 0.1, 1.3, z),
+        v(0.06, 0.6, 0.8),
+        Mat::ScreenGlow,
+        false,
+    );
+    p.boxed(v(x, 1.14, z), v(0.9, 0.06, 1.0), Mat::Metal, false);
+    p.sign(v(x - 0.2, 2.0, z), FRAC_PI_2, 1.1, Sign::IlCoreMonitor);
+    p.interactable(key, v(x, 0.9, z), v(x - 1.8, 0.0, z));
 }

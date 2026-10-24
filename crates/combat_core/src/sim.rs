@@ -1252,6 +1252,10 @@ impl Sim {
         if self.has_aura_flag(ci, |a| a.silence) {
             return Err(CastError::Silenced);
         }
+        // Judgment's Hot Take: one spell and nothing else.
+        if self.core_hot_take_blocks(u.state.id, spell.id) {
+            return Err(CastError::Silenced);
+        }
         if spell.stealth_only && !self.is_stealthed(ci) {
             return Err(CastError::NeedsStealth);
         }

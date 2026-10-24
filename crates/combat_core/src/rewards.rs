@@ -1,9 +1,9 @@
 //! What Ilmari 1.0 pays out (docs/ILMARI_1_0.md D.7), as data: the ilvl 20 tier sets, the eight
 //! class Legendaries, Legendary Fragments, the titles, the Roomba mech mount, the reformed
-//! cleaning-robot pet and the token cosmetics. Nothing here is reachable yet: the gear pieces
-//! have no `drops_from` until their bosses exist (D5-D13), and titles, mount and pet live in this
-//! block rather than in `achievements` / `pets` so that no journal of the base game lists them
-//! before the credits (guardrail 1). `validate` is the band: every piece sits at the top Ilmari
+//! cleaning-robot pet and the token cosmetics. The gear pieces drop from their source bosses (the
+//! Legendaries from the core, a named roll beside its tier piece); titles, mount and pet live in
+//! this block rather than in `achievements` / `pets` so that no journal of the base game lists
+//! them before the credits (guardrail 1). `validate` is the band: every piece sits at the top Ilmari
 //! item level, so it is exactly the ilvl-14 figure outside Ilmari content and the full one inside
 //! (`Economy::equipment`), and none of it is in a base-game drop table.
 
@@ -167,6 +167,12 @@ impl RewardsDef {
                 return bad(format!("set {} has {carried} pieces, not four", s.set));
             }
         }
+        let core_boss = c
+            .units
+            .iter()
+            .find(|u| matches!(u.encounter, Some(crate::content::EncounterDef::Core(_))))
+            .map(|u| u.key.clone())
+            .unwrap_or_default();
         if self.legendaries.len() != c.classes.len() {
             return bad("needs one Legendary per class".into());
         }
@@ -182,12 +188,13 @@ impl RewardsDef {
                 || g.rarity != Rarity::Legendary
                 || g.slot != Slot::Keyboard
                 || g.role != Some(cl.role)
-                || g.drops_from.is_some()
+                // A Legendary drops from the core and from nowhere else (the forge is D16-D18).
+                || g.drops_from.as_deref() != Some(core_boss.as_str())
                 || l.effect.is_empty()
                 || l.effect.chars().count() > 240
             {
                 return bad(format!(
-                    "{} must be an undropped Legendary Keyboard of ilvl {} for {} with a short effect",
+                    "{} must be a Legendary Keyboard of ilvl {} for {} that drops from the core, with a short effect",
                     l.gear, self.top_ilvl, cl.key
                 ));
             }

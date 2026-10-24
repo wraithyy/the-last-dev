@@ -1,7 +1,7 @@
-//! The Ilmari core (docs/ILMARI_1_0.md D.5, D10 and D11): the engine pieces (the stance table, the
+//! The Ilmari core (docs/ILMARI_1_0.md D.5, D10-D13): the engine pieces (the stance table, the
 //! culprit commit, the death pact, the ward, the six screens on one bar, the end stamp), the
-//! remix deck of P1 and Ill Marie's rounds of P2. The balance gates (Story solo, Full trio) live
-//! in tests/playthrough.rs.
+//! remix deck of P1, Ill Marie's rounds of P2, the mech of P3 and the mainframe of P4. The balance
+//! gates (Story solo, Full trio, every stance, every class) live in tests/playthrough.rs.
 #![allow(clippy::expect_used)]
 
 mod common;
@@ -563,7 +563,13 @@ fn the_deck_is_a_shuffle_bag_of_seven_that_the_group_cannot_change() {
 
 #[test]
 fn the_deck_refills_after_seven_draws() {
-    let d = deck_run(false, &["backend"], 7, 22 + 13 * 45 + 5);
+    // A trio: a lone player on Full meets the soft enrage at 8 minutes and Ilmari talks over his banners.
+    let d = deck_run(
+        false,
+        &["backend", "devops", "fullstack"],
+        7,
+        22 + 13 * 45 + 5,
+    );
     assert_eq!(d.len(), 14, "{d:?}");
     let mut second: Vec<String> = d[7..].to_vec();
     second.sort_unstable();
@@ -1256,6 +1262,7 @@ fn pact_tweak(c: &mut combat_core::Content) {
         both_aura: Some("il_offboarding".into()),
         both_ms: 4_000,
         yells: vec!["Reassembling... please hold.".into()],
+        story_rebuild: true,
     });
 }
 
@@ -1413,4 +1420,1045 @@ fn the_fight_replays_bit_identically() {
     assert!(a.len() > 1000);
     assert_eq!(a, b, "same seed, same fight");
     assert_ne!(a, log(12), "another seed differs");
+}
+
+// ---------------------------------------------------------------- P3: the mech (D12)
+
+/// A fight at the start of P3 with the stance the three rounds `picks` make (every voter takes it).
+fn at_p3(
+    mode: &str,
+    classes: &[&'static str],
+    seed: u64,
+    picks: [usize; 3],
+) -> (Sim, Vec<EntityId>, EntityId) {
+    let (mut sim, ids, boss) = setup_with(mode, classes, seed, |_| {});
+    pull(&mut sim, &ids, boss);
+    run(&mut sim, 5);
+    play_rounds(&mut sim, &ids, picks);
+    assert_eq!(phase_of(&sim), 3, "phase 3");
+    (sim, ids, boss)
+}
+
+const TRIO: [&str; 3] = ["backend", "devops", "fullstack"];
+const ARM: &str = "il_ilmari_arm";
+const HEAD: &str = "il_ilmari_head";
+
+fn units_of(sim: &Sim, key: &str) -> Vec<EntityId> {
+    sim.units()
+        .filter(|u| u.key == key && u.alive)
+        .map(|u| u.id)
+        .collect()
+}
+
+/// The spells the screens cast (instant or cast-bar) in `events`.
+fn screen_casts(sim: &Sim, events: &[Event]) -> Vec<u32> {
+    events
+        .iter()
+        .filter_map(|e| match e {
+            Event::CastSucceeded { caster, spell, .. }
+                if sim.unit(*caster).is_some_and(|u| {
+                    u.key.starts_with("il_ilmari") && u.key != ARM && u.key != HEAD
+                }) =>
+            {
+                Some(spell.0)
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// The live screen: the first that is not on standby.
+fn live_screen(sim: &Sim) -> EntityId {
+    let k = live(sim).first().copied().expect("a live screen");
+    screens(sim)[k]
+}
+
+#[test]
+fn phase_three_builds_the_body_with_two_arms_and_runs_its_kit() {
+    let (mut sim, _ids, _boss) = at_p3("full", &TRIO, 7, [0, 1, 2]);
+    let arms = units_of(&sim, ARM);
+    assert_eq!(arms.len(), 2, "two Rack Arms");
+    let live_id = live_screen(&sim);
+    for a in &arms {
+        let u = sim.unit(*a).expect("arm");
+        assert!(u.hostile && u.alive);
+    }
+    let events = run(&mut sim, 150);
+    let casts = screen_casts(&sim, &events);
+    for want in [2740, 2742, 2744, 2748, 2749, 2750] {
+        assert!(casts.contains(&want), "the kit casts {want}: {casts:?}");
+    }
+    // Hedged: no overlay of any stance.
+    for none in [2756, 2757, 2520, 2758] {
+        assert!(!casts.contains(&none), "hedged has no {none}");
+    }
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, Event::Summoned { summoner, .. } if *summoner == live_id)),
+        "the body summons from the live screen (turrets and the head)"
+    );
+    let w = wall(&events).expect("wall");
+    assert_eq!(w.0, 3, "the wall says phase 3");
+}
+
+#[test]
+fn every_stance_adds_its_own_overlay_to_the_body() {
+    // (picks, the spell only that stance casts)
+    let cases: [([usize; 3], u32); 4] = [
+        ([0, 0, 0], 2756),
+        ([1, 1, 1], 2757),
+        ([2, 2, 2], 2520),
+        ([0, 1, 2], 0),
+    ];
+    for (picks, spell) in cases {
+        let (mut sim, _ids, _boss) = at_p3("full", &TRIO, 7, picks);
+        let events = run(&mut sim, 120);
+        let casts = screen_casts(&sim, &events);
+        for other in [2756, 2757, 2520, 2758] {
+            assert_eq!(
+                casts.contains(&other),
+                other == spell,
+                "picks {picks:?}: {other} in {casts:?}"
+            );
+        }
+    }
+    // Leaky needs the log in the room; Story's single vote is enough.
+    let (mut sim, ids, boss) = pulled_with_log(true, &["backend"], 7);
+    let _ = boss;
+    play_rounds(&mut sim, &ids, [3, 3, 3]);
+    assert_eq!(phase_of(&sim), 3);
+    assert_eq!(stance_on(&sim), ["il_stance_leaky"]);
+    let events = run(&mut sim, 120);
+    let casts = screen_casts(&sim, &events);
+    assert!(
+        casts.contains(&2767),
+        "Token Spill (Story) leaks: {casts:?}"
+    );
+}
+
+#[test]
+fn compliant_offers_are_cancelled_at_the_kiosk_and_adversarial_hardens() {
+    let (mut sim, ids, _boss) = at_p3("full", &TRIO, 7, [0, 0, 0]);
+    // The offer lands within 18 s + the 1.5 s cast: somebody has a pending il_ok_ aura.
+    let mut pending = None;
+    for _ in 0..40 * SECOND {
+        sim.tick();
+        pending = ids.iter().copied().find(|&p| {
+            sim.unit(p)
+                .is_some_and(|u| u.auras.iter().any(|a| a.key == "il_ok_suggestion"))
+        });
+        if pending.is_some() {
+            break;
+        }
+    }
+    let p = pending.expect("a Helpful Suggestion is on somebody");
+    sim.apply_as(
+        p,
+        Command::Interact {
+            prop: "il_core_optout".into(),
+        },
+    );
+    sim.tick();
+    assert!(
+        !has_aura(&sim, p, "il_ok_suggestion"),
+        "the opt-out kiosk cancels it"
+    );
+    let (mut sim, _ids, _boss) = at_p3("full", &TRIO, 7, [1, 1, 1]);
+    let mut hardened = false;
+    for _ in 0..60 * SECOND {
+        sim.tick();
+        if has_aura(&sim, live_screen(&sim), "il_hardened") {
+            hardened = true;
+            break;
+        }
+    }
+    assert!(hardened, "the Defensive body sets like concrete");
+}
+
+#[test]
+fn a_rack_arm_is_rebuilt_at_half_and_both_inside_the_window_cost_the_body() {
+    let (mut sim, ids, _boss) = at_p3("full", &TRIO, 7, [0, 1, 2]);
+    let arms = units_of(&sim, ARM);
+    sim.debug_hit(ids[0], arms[0], 10_000_000);
+    let mut events = sim.tick();
+    assert_eq!(units_of(&sim, ARM).len(), 1, "one fell");
+    events.extend(run(&mut sim, 9));
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, Event::Reassembling { unit, .. } if *unit == arms[0])),
+        "the castbar: Reassembling... please hold"
+    );
+    let now = units_of(&sim, ARM);
+    assert_eq!(now.len(), 2, "the dead arm is back after the window");
+    let rebuilt = now
+        .iter()
+        .find(|a| **a != arms[1])
+        .copied()
+        .expect("rebuilt");
+    let u = sim.unit(rebuilt).expect("rebuilt");
+    assert!(
+        u.hp * 2 <= u.max_hp + 2 && u.hp * 2 + 2 >= u.max_hp,
+        "rebuilt at half: {}/{}",
+        u.hp,
+        u.max_hp
+    );
+
+    // Both inside the window: no rebuild, the body loses 6 % of its max HP and the cable whip.
+    let (mut sim, ids, _boss) = at_p3("full", &TRIO, 7, [0, 1, 2]);
+    let arms = units_of(&sim, ARM);
+    let live_id = live_screen(&sim);
+    let before = sim.unit(live_id).expect("screen").hp;
+    let max = sim.unit(live_id).expect("screen").max_hp;
+    sim.debug_hit(ids[0], arms[0], 10_000_000);
+    run(&mut sim, 3);
+    sim.debug_hit(ids[0], arms[1], 10_000_000);
+    sim.tick();
+    let after = sim.unit(live_id).expect("screen").hp;
+    assert!(
+        before.saturating_sub(after) >= max * 6 / 100 - 2,
+        "the body took 6 %: {before} -> {after} of {max}"
+    );
+    assert!(
+        has_aura(&sim, live_id, "il_whipless"),
+        "no cable whip for 25 s"
+    );
+    let events = run(&mut sim, 20);
+    assert!(units_of(&sim, ARM).is_empty(), "nobody is rebuilt");
+    assert!(
+        !screen_casts(&sim, &events).contains(&2750),
+        "the whip stays unplugged"
+    );
+    let events = run(&mut sim, 20);
+    assert!(
+        screen_casts(&sim, &events).contains(&2750),
+        "and plugs back in"
+    );
+
+    // Story: the arms do not rebuild each other.
+    let (mut sim, ids, _boss) = at_p3("story", &["backend"], 7, [0, 1, 2]);
+    let arms = units_of(&sim, ARM);
+    sim.debug_hit(ids[0], arms[0], 10_000_000);
+    run(&mut sim, 10);
+    assert_eq!(units_of(&sim, ARM).len(), 1, "Story rebuilds nothing");
+}
+
+/// A class's interrupt (a spell with `Effect::Interrupt`).
+fn interrupt_of(sim: &Sim, class: &str) -> SpellId {
+    let c = sim.content();
+    let cl = c.class(class).expect("class");
+    cl.action_bar
+        .iter()
+        .copied()
+        .find(|s| {
+            c.spell(*s)
+                .is_some_and(|d| matches!(d.effect, combat_core::Effect::Interrupt { .. }))
+        })
+        .expect("an interrupt on the bar")
+}
+
+/// Runs until a head stands and casts; returns its id.
+fn wait_for_head(sim: &mut Sim) -> EntityId {
+    for _ in 0..90 * SECOND {
+        sim.tick();
+        if let Some(h) = units_of(sim, HEAD).first().copied()
+            && sim.unit(h).is_some_and(|u| u.cast.is_some())
+        {
+            return h;
+        }
+    }
+    panic!("no head in 90 s");
+}
+
+#[test]
+fn a_kick_on_the_head_delays_quarterly_planning_and_a_finished_plan_lets_the_volley_go() {
+    // Kicked: the volley does not come and the head is back in 20 s (the delay), not in a minute.
+    let (mut sim, ids, _boss) = at_p3("full", &TRIO, 7, [0, 1, 2]);
+    let kick = interrupt_of(&sim, "backend");
+    let head = wait_for_head(&mut sim);
+    let at = sim.unit(head).expect("head").pos;
+    move_to(&mut sim, ids[0], at);
+    sim.apply_as(
+        ids[0],
+        Command::SetTarget {
+            unit: ids[0],
+            target: Some(head),
+        },
+    );
+    sim.apply_as(
+        ids[0],
+        Command::Cast {
+            caster: ids[0],
+            spell: kick,
+        },
+    );
+    let events = run(&mut sim, 3);
+    assert!(
+        events.iter().any(|e| matches!(
+            e,
+            Event::CastInterrupted { caster, .. } if *caster == head
+        )),
+        "the head is interrupted"
+    );
+    let planning_done = |e: &Event| matches!(e, Event::Yell { text, .. } if text.contains("Planning complete") || text.contains("roadmap is final"));
+    let events = run(&mut sim, 7);
+    assert!(!events.iter().any(planning_done), "no volley after a kick");
+    let mut next = None;
+    for k in 0..40 * SECOND {
+        sim.tick();
+        if units_of(&sim, HEAD).first().is_some_and(|h| *h != head) {
+            next = Some(k / SECOND + 10);
+            break;
+        }
+    }
+    assert!(
+        next.is_some_and(|s| (10..=24).contains(&s)),
+        "the next plan starts about 20 s after the kick: {next:?}"
+    );
+
+    // Finished: three casts of the body at once, the same tick.
+    let (mut sim, _ids, _boss) = at_p3("full", &TRIO, 7, [0, 1, 2]);
+    let head = wait_for_head(&mut sim);
+    let mut seen = None;
+    for _ in 0..8 * SECOND {
+        let events = sim.tick();
+        let spells: std::collections::BTreeSet<u32> =
+            screen_casts(&sim, &events).into_iter().collect();
+        let said = events.iter().any(|e| {
+            matches!(e, Event::Yell { text, .. } if text.contains("Planning complete") || text.contains("roadmap is final"))
+        });
+        if spells.len() >= 3 {
+            seen = Some(spells);
+            break;
+        }
+        let _ = said;
+    }
+    let spells = seen.expect("a volley of three casts in one tick");
+    assert!(
+        spells.iter().all(|s| (2740..=2750).contains(s)),
+        "{spells:?}"
+    );
+    assert!(
+        sim.unit(head).is_some(),
+        "the head stands through the volley"
+    );
+}
+
+#[test]
+fn story_splits_the_volley_in_two() {
+    let (mut sim, _ids, _boss) = at_p3("story", &["backend"], 7, [0, 1, 2]);
+    // Nobody kicks: the head's cast finishes, half now and half 4 s later.
+    wait_for_head(&mut sim);
+    let mut ticks_with_casts = Vec::new();
+    for k in 0..12 * SECOND {
+        let events = sim.tick();
+        if !screen_casts(&sim, &events).is_empty() && k > 3 * SECOND {
+            ticks_with_casts.push(k);
+        }
+    }
+    assert!(
+        ticks_with_casts
+            .windows(2)
+            .any(|w| w[1] - w[0] >= 3 * SECOND),
+        "two bursts, a few seconds apart: {ticks_with_casts:?}"
+    );
+}
+
+#[test]
+fn the_hot_take_locks_one_member_to_one_spell_for_eight_seconds() {
+    let (mut sim, ids, boss) = at_p3("full", &TRIO, 7, [0, 1, 2]);
+    // The Judgment rider is the boss's marker aura; Full has none, so wear it here.
+    assert!(sim.debug_apply_aura(boss, "il_rider_remix", 3_600_000));
+    let mut who = None;
+    for _ in 0..70 * SECOND {
+        sim.tick();
+        who = ids.iter().copied().find(|&p| sim.hot_take_of(p).is_some());
+        if who.is_some() {
+            break;
+        }
+    }
+    let p = who.expect("somebody was given a Hot Take");
+    assert!(has_aura(&sim, p, "il_hot_take"), "and the marker shows it");
+    let only = sim.hot_take_of(p).expect("locked spell");
+    let class = TRIO[ids.iter().position(|&i| i == p).expect("a player")];
+    let bar: Vec<SpellId> = sim
+        .content()
+        .class(class)
+        .expect("class")
+        .action_bar
+        .clone();
+    // Any other spell is refused (silenced), and the locked one is not.
+    let other = bar
+        .iter()
+        .copied()
+        .find(|s| *s != only)
+        .expect("another spell of theirs");
+    sim.apply_as(
+        p,
+        Command::Cast {
+            caster: p,
+            spell: other,
+        },
+    );
+    let events = sim.tick();
+    assert!(
+        events.iter().any(|e| matches!(
+            e,
+            Event::CastFailed { caster, reason: combat_core::CastError::Silenced, .. } if *caster == p
+        )),
+        "a second spell is refused"
+    );
+    run(&mut sim, 9);
+    assert!(sim.hot_take_of(p).is_none(), "and it ends");
+}
+
+// ---------------------------------------------------------------- P4: the mainframe (D13)
+
+const WARD: &str = "il_core_mainframe";
+const REWRITE: &str = "il_modern_replacement";
+
+/// A fight at the start of P4 (the bar dropped to the threshold at once).
+fn at_p4(mode: &str, classes: &[&'static str], seed: u64) -> (Sim, Vec<EntityId>, EntityId) {
+    let (mut sim, ids, boss) = at_p3(mode, classes, seed, [0, 1, 2]);
+    bar_at(&mut sim, if mode == "story" { 49 } else { 19 });
+    run(&mut sim, 2);
+    assert_eq!(phase_of(&sim), 4, "phase 4");
+    (sim, ids, boss)
+}
+
+fn ward_of(sim: &Sim) -> EntityId {
+    units_of(sim, WARD).first().copied().expect("the mainframe")
+}
+
+fn stage_of(events: &[Event]) -> Option<(u8, u8, u8, u8)> {
+    events.iter().rev().find_map(|e| match e {
+        Event::Core {
+            stage,
+            clock_s,
+            ward_pct,
+            wrong,
+            ..
+        } => Some((*stage, *clock_s, *ward_pct, *wrong)),
+        _ => None,
+    })
+}
+
+/// The wall as it stands: the sim speaks on a change, so tick (at most four seconds) until it does.
+fn wall_now(sim: &mut Sim) -> (u8, u8, u8, u8) {
+    for _ in 0..4 * SECOND {
+        if let Some(w) = stage_of(&sim.tick()) {
+            return w;
+        }
+    }
+    panic!("the wall said nothing in four seconds");
+}
+
+fn git(sim: &mut Sim, p: EntityId, terminal: usize) -> u32 {
+    let key = format!("il_git_{}", terminal + 1);
+    sim.apply_as(p, Command::Interact { prop: key.clone() });
+    sim.tick()
+        .iter()
+        .find_map(|e| match e {
+            Event::Interacted {
+                unit,
+                prop,
+                outcome,
+            } if *unit == p && *prop == key => Some(*outcome),
+            _ => None,
+        })
+        .unwrap_or(u32::MAX)
+}
+
+#[test]
+fn the_mainframe_rises_at_twenty_percent_and_ilmari_aims_at_it() {
+    let (mut sim, _ids, _boss) = at_p4("full", &TRIO, 7);
+    let ward = ward_of(&sim);
+    let w = sim.unit(ward).expect("ward");
+    assert!(
+        !w.hostile && w.alive && w.max_hp == 24_000,
+        "friendly, 24,000 HP"
+    );
+    assert!(units_of(&sim, ARM).is_empty(), "the mech fell apart");
+    // The bar holds at the floor until the revert, however hard it is hit.
+    let live_id = live_screen(&sim);
+    let max = sim.unit(live_id).expect("screen").max_hp;
+    sim.debug_hit(ward, live_id, max / 10);
+    run(&mut sim, 2);
+    for s in screens(&sim) {
+        let u = sim.unit(s).expect("screen");
+        assert!(
+            u.alive && u.hp * 100 >= u.max_hp * 20,
+            "{} at its floor",
+            u.key
+        );
+    }
+    let events = run(&mut sim, 20);
+    assert!(
+        screen_casts(&sim, &events).contains(&2760),
+        "Deprecation Notice goes through the mainframe"
+    );
+    assert!(
+        sim.unit(ward).expect("ward").hp < 24_000,
+        "and it is the mainframe that hurts"
+    );
+    let (stage, clock, _pct, wrong) = stage_of(&events).expect("wall");
+    assert_eq!((stage, wrong), (1, 0));
+    assert!((140..=180).contains(&clock), "180 s clock: {clock}");
+    // Story keeps it for 120 s and the mainframe takes 40 %.
+    let (sim, _ids, _boss) = at_p4("story", &["backend"], 7);
+    assert!(has_aura(&sim, ward_of(&sim), "il_ward_story"));
+}
+
+#[test]
+fn rewrites_head_for_the_mainframe_and_each_one_killed_takes_two_seconds_off_the_clock() {
+    let (mut sim, ids, boss) = at_p4("full", &TRIO, 7);
+    let ward = ward_of(&sim);
+    let events = run(&mut sim, 16);
+    let adds = units_of(&sim, REWRITE);
+    assert_eq!(adds.len(), 5, "a wave of five at 12 s");
+    assert!(
+        adds.iter().all(|a| sim
+            .unit(*a)
+            .is_some_and(|u| u.target == Some(ward) || u.in_combat)),
+        "they start on the mainframe"
+    );
+    let _ = (events, boss);
+    run(&mut sim, 8);
+    assert!(sim.unit(ward).expect("ward").hp < 24_000, "they chew it");
+    let clock_before = wall_now(&mut sim).1;
+    for a in units_of(&sim, REWRITE).into_iter().take(3) {
+        sim.debug_hit(ids[0], a, 10_000_000);
+    }
+    let clock_after = wall_now(&mut sim).1;
+    assert!(
+        clock_before - clock_after >= 5,
+        "three rewrites took six seconds off: {clock_before} -> {clock_after}"
+    );
+    // The rider's wave is eight; Story's is three.
+    let (mut sim, _ids, boss) = at_p4("full", &TRIO, 8);
+    assert!(sim.debug_apply_aura(boss, "il_rider_remix", 3_600_000));
+    run(&mut sim, 16);
+    assert_eq!(units_of(&sim, REWRITE).len(), 8, "Technical Debt");
+    let (mut sim, _ids, _boss) = at_p4("story", &["backend"], 7);
+    run(&mut sim, 16);
+    assert_eq!(units_of(&sim, REWRITE).len(), 3, "Story");
+}
+
+#[test]
+fn the_clock_cut_is_capped_at_thirty_seconds() {
+    let (mut sim, ids, _boss) = at_p4("full", &TRIO, 7);
+    let ward = ward_of(&sim);
+    let start = wall_now(&mut sim).1;
+    // The party kills every rewrite the moment it appears, for 100 s, with the mainframe held up.
+    let mut killed = 0;
+    for _ in 0..100 {
+        run(&mut sim, 1);
+        sim.debug_set_hp(ward, 24_000);
+        for a in units_of(&sim, REWRITE) {
+            sim.debug_hit(ids[0], a, 10_000_000);
+            killed += 1;
+        }
+    }
+    assert!(killed >= 10, "a few waves came: {killed}");
+    let now = wall_now(&mut sim).1;
+    let passed = 100 + 1;
+    let cut = i32::from(start) - passed - i32::from(now);
+    assert!(
+        (20..=32).contains(&cut),
+        "the party cut 30 s at most, and at least a good part: start {start}, now {now}, cut {cut}"
+    );
+}
+
+#[test]
+fn punch_cards_heal_the_mainframe_for_any_class_once_per_cooldown() {
+    let (mut sim, ids, _boss) = at_p4("full", &["frontend", "fullstack", "qa"], 7);
+    let ward = ward_of(&sim);
+    assert!(sim.debug_set_hp(ward, 10_000));
+    sim.apply_as(
+        ids[0],
+        Command::Interact {
+            prop: "il_punch_1".into(),
+        },
+    );
+    sim.tick();
+    let hp = sim.unit(ward).expect("ward").hp;
+    assert!(
+        (10_400..=10_700).contains(&hp),
+        "2 % of 24,000 is 480: {hp}"
+    );
+    // The same card again is cooling down; another card is not.
+    sim.apply_as(
+        ids[1],
+        Command::Interact {
+            prop: "il_punch_1".into(),
+        },
+    );
+    sim.tick();
+    assert_eq!(sim.unit(ward).expect("ward").hp, hp, "the card is cooling");
+    sim.apply_as(
+        ids[2],
+        Command::Interact {
+            prop: "il_punch_2".into(),
+        },
+    );
+    sim.tick();
+    assert!(sim.unit(ward).expect("ward").hp > hp, "another card works");
+}
+
+#[test]
+fn the_healer_and_the_greybeard_heal_and_patch_the_mainframe() {
+    let (mut sim, ids, _boss) = at_p4("full", &["devops", "cobol", "backend"], 7);
+    let ward = ward_of(&sim);
+    assert!(sim.debug_set_hp(ward, 10_000));
+    let hotfix = SpellId(41);
+    sim.apply_as(
+        ids[0],
+        Command::SetTarget {
+            unit: ids[0],
+            target: Some(ward),
+        },
+    );
+    sim.apply_as(
+        ids[0],
+        Command::Cast {
+            caster: ids[0],
+            spell: hotfix,
+        },
+    );
+    run(&mut sim, 4);
+    assert!(
+        sim.unit(ward).expect("ward").hp > 10_000,
+        "a heal lands on the Ward"
+    );
+    // Patch The Mainframe: 5 % and the Migration Plan stops.
+    assert!(sim.debug_apply_aura(ward, "il_migration", 10_000));
+    assert!(sim.debug_set_hp(ward, 10_000));
+    sim.apply_as(
+        ids[1],
+        Command::SetTarget {
+            unit: ids[1],
+            target: Some(ward),
+        },
+    );
+    sim.apply_as(
+        ids[1],
+        Command::Cast {
+            caster: ids[1],
+            spell: SpellId(2764),
+        },
+    );
+    run(&mut sim, 4);
+    assert!(
+        !has_aura(&sim, ward, "il_migration"),
+        "a fix from the Reagan administration stops the plan"
+    );
+    let hp = sim.unit(ward).expect("ward").hp;
+    // 5 % is 1,200; the plan and the line chewed some of it back while the cast ran.
+    assert!(hp >= 10_500, "and restores about 5 %: {hp}");
+}
+
+#[test]
+fn a_dead_mainframe_wipes_the_room() {
+    let (mut sim, ids, _boss) = at_p4("full", &TRIO, 7);
+    let ward = ward_of(&sim);
+    sim.debug_hit(ids[0], ward, 1_000_000);
+    run(&mut sim, 2);
+    assert!(
+        ids.iter().all(|&p| sim.unit(p).is_some_and(|u| !u.alive)),
+        "Ilmari has successfully modernised it"
+    );
+}
+
+/// P4 with the clock run out (the mainframe held up by hand): the terminals are lit. Returns the
+/// room, the players, the terminal that reverts the culprit and the events up to the log.
+fn at_terminals(
+    mode: &str,
+    classes: &[&'static str],
+    seed: u64,
+) -> (Sim, Vec<EntityId>, usize, Vec<Event>) {
+    let (mut sim, ids, _boss) = at_p4(mode, classes, seed);
+    let ward = ward_of(&sim);
+    let mut events = Vec::new();
+    for _ in 0..220 * SECOND {
+        events.extend(sim.tick());
+        sim.debug_set_hp(ward, 24_000);
+        if events.iter().any(|e| matches!(e, Event::CoreLog { .. })) {
+            break;
+        }
+    }
+    let right = events
+        .iter()
+        .find_map(|e| match e {
+            Event::CoreLog { lines } => lines
+                .iter()
+                .find(|l| l.contains("b210a76"))
+                .and_then(|l| l.chars().nth(1))
+                .and_then(|c| c.to_digit(10))
+                .map(|d| d as usize - 1),
+            _ => None,
+        })
+        .expect("the log is up and names the culprit's terminal");
+    (sim, ids, right, events)
+}
+
+fn last_log(events: &[Event]) -> Vec<String> {
+    events
+        .iter()
+        .rev()
+        .find_map(|e| match e {
+            Event::CoreLog { lines } => Some(lines.clone()),
+            _ => None,
+        })
+        .unwrap_or_default()
+}
+
+#[test]
+fn the_clock_ends_and_the_terminals_light_with_the_log() {
+    let (sim, _ids, right, events) = at_terminals("full", &TRIO, 7);
+    let log = last_log(&events);
+    assert_eq!(log.len(), 6, "six commits");
+    assert!(
+        log.iter().all(|l| l.starts_with('[')),
+        "each row names its terminal"
+    );
+    let culprit = combat_core::culprit_index(0);
+    assert!(
+        log[culprit].contains("b210a76"),
+        "the CEO's commit sits in its row"
+    );
+    assert_eq!(
+        right,
+        culprit % 3,
+        "its terminal is the row's, three terminals for six rows"
+    );
+    assert_eq!(stage_of(&events).map(|s| s.0), Some(2), "stage: revert");
+    assert!(units_of(&sim, REWRITE).is_empty(), "the rewrites pause");
+    // The commit has a person in it, and the stamp, not "ago".
+    assert!(!log[culprit].contains("ago"));
+}
+
+#[test]
+fn a_wrong_pick_reverts_an_innocent_commit_and_costs_the_picker() {
+    let (mut sim, ids, right, _events) = at_terminals("full", &TRIO, 7);
+    let wrong = (right + 1) % 3;
+    // Ilmari's health goes back by 3 %: put the bar at the floor first.
+    bar_at(&mut sim, 20);
+    run(&mut sim, 1);
+    let live_id = live_screen(&sim);
+    let hp = sim.unit(live_id).expect("screen").hp;
+    sim.apply_as(
+        ids[0],
+        Command::Interact {
+            prop: format!("il_git_{}", wrong + 1),
+        },
+    );
+    let mut events = sim.tick();
+    let out = events.iter().find_map(|e| match e {
+        Event::Interacted { outcome, .. } => Some(*outcome),
+        _ => None,
+    });
+    assert_eq!(out, Some(1), "a wrong pick");
+    assert!(
+        has_aura(&sim, ids[0], "il_merge_conflict"),
+        "Merge Conflict on the picker"
+    );
+    let max = sim.unit(live_id).expect("screen").max_hp;
+    assert!(
+        sim.unit(live_id).expect("screen").hp >= hp + max * 3 / 100 - 2,
+        "Ilmari heals 3 %"
+    );
+    events.extend(run(&mut sim, 3));
+    assert!(
+        events.iter().any(|e| matches!(
+            e,
+            Event::Yell { text, .. } if text.starts_with("Reverted: ")
+        )),
+        "Reverted: the commit it holds"
+    );
+    // The picker cannot use a terminal while in conflict; the used one is consumed for 10 s.
+    assert_eq!(git(&mut sim, ids[0], right), 0, "Merge Conflict");
+    assert_eq!(git(&mut sim, ids[1], wrong), 0, "the terminal is down");
+    // After the conflict (10 s) the picker is free again.
+    run(&mut sim, 11);
+    assert!(!has_aura(&sim, ids[0], "il_merge_conflict"));
+}
+
+#[test]
+fn story_marks_the_culprit_after_a_wrong_pick_and_forgives_it_sooner() {
+    let (mut sim, ids, right, events) = at_terminals("story", &["backend"], 7);
+    assert!(
+        !last_log(&events).iter().any(|l| l.contains("<- this one")),
+        "no marker before a wrong pick"
+    );
+    let wrong = (right + 1) % 3;
+    sim.apply_as(
+        ids[0],
+        Command::Interact {
+            prop: format!("il_git_{}", wrong + 1),
+        },
+    );
+    let events = sim.tick();
+    let marked = last_log(&events);
+    assert!(
+        marked
+            .iter()
+            .any(|l| l.contains("b210a76") && l.contains("<- this one")),
+        "the culprit is marked: {marked:?}"
+    );
+    run(&mut sim, 6);
+    assert!(
+        !has_aura(&sim, ids[0], "il_merge_conflict"),
+        "Story: 5 s of conflict"
+    );
+}
+
+#[test]
+fn three_wrong_picks_raise_a_force_push_and_thirty_seconds_of_protection() {
+    let (mut sim, ids, right, _events) = at_terminals("full", &TRIO, 7);
+    let (w1, w2) = ((right + 1) % 3, (right + 2) % 3);
+    assert_eq!(git(&mut sim, ids[0], w1), 1);
+    assert_eq!(git(&mut sim, ids[1], w2), 1);
+    // The first wrong terminal comes back after 10 s.
+    run(&mut sim, 11);
+    sim.apply_as(
+        ids[2],
+        Command::Interact {
+            prop: format!("il_git_{}", w1 + 1),
+        },
+    );
+    let events = run(&mut sim, 3);
+    assert!(
+        events.iter().any(|e| matches!(
+            e,
+            Event::Yell { text, .. } if text.contains("Force push")
+        )),
+        "the third raises a Force Push"
+    );
+    let events = run(&mut sim, 6);
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, Event::TelegraphStarted { spell, .. } if spell.0 == 2763))
+            || screen_casts(&sim, &events).contains(&2763),
+        "a room-wide volley"
+    );
+    let (stage, clock, _pct, wrong) = stage_of(&events).expect("wall");
+    assert_eq!((stage, wrong), (1, 0), "protection again");
+    assert!((15..=30).contains(&clock), "30 s on the clock: {clock}");
+    // Terminals are locked while it runs.
+    assert_eq!(git(&mut sim, ids[0], right), 0, "dark during protection");
+}
+
+#[test]
+fn the_right_pick_is_the_last_commit_and_the_core_falls_to_it() {
+    let (mut sim, ids, right, _events) = at_terminals("full", &TRIO, 7);
+    sim.apply_as(
+        ids[0],
+        Command::Interact {
+            prop: format!("il_git_{}", right + 1),
+        },
+    );
+    let events = sim.tick();
+    let out = events.iter().find_map(|e| match e {
+        Event::Interacted { outcome, .. } => Some(*outcome),
+        _ => None,
+    });
+    assert_eq!(out, Some(combat_core::PROP_OK), "the player's git revert");
+    let log = last_log(&events);
+    let name = sim.unit(ids[0]).expect("p").name.clone();
+    assert_eq!(
+        log.first().map(String::as_str),
+        Some(format!("Author: {name} (the last dev)").as_str()),
+        "the new HEAD is in the picker's name: {log:?}"
+    );
+    assert!(
+        sim.unit(ward_of(&sim)).is_some(),
+        "the mainframe stands through the beat"
+    );
+    // The beat, then the fall.
+    let mut all = Vec::new();
+    for _ in 0..14 * SECOND {
+        all.extend(sim.tick());
+    }
+    assert!(
+        all.iter()
+            .any(|e| matches!(e, Event::Yell { text, .. } if text.contains("Shutting down"))),
+        "Ilmari's last log lines"
+    );
+    assert!(
+        all.iter().any(|e| matches!(e, Event::IlmariEnd { .. })),
+        "the end event"
+    );
+    for s in SCREENS {
+        assert!(
+            sim.units().all(|u| u.key != s || !u.alive),
+            "every screen is down"
+        );
+    }
+    assert!(sim.ilmari_full_cleared(), "a Full kill opens Judgment Day");
+    // The loot: the tier piece and the Legendary roll come from the core, fragments are paid.
+    let drops: Vec<String> = all
+        .iter()
+        .flat_map(|e| match e {
+            Event::LootDropped { items, .. } => items.clone(),
+            _ => Vec::new(),
+        })
+        .collect();
+    assert!(!drops.is_empty(), "the core drops gear");
+    for d in &drops {
+        let g = sim.content().economy.gear(d).expect("gear");
+        assert_eq!(g.drops_from.as_deref(), Some("il_ilmari"), "{d}");
+    }
+    for &p in &ids {
+        let n = sim
+            .unit(p)
+            .and_then(|u| {
+                u.inventory
+                    .iter()
+                    .find(|(n, _)| n == "Legendary Fragment")
+                    .map(|(_, c)| *c)
+            })
+            .unwrap_or(0);
+        assert_eq!(n, 1, "one Legendary Fragment on Full");
+    }
+    // The clock stamp is taken once, after the fall.
+    sim.apply_as(
+        ids[0],
+        Command::StampIlmariEnd {
+            unix_secs: THURSDAY + 4000,
+        },
+    );
+    sim.tick();
+    assert!(sim.ilmari_end().is_some(), "the end is stamped");
+}
+
+#[test]
+fn story_and_judgment_kills_do_not_open_judgment_day_and_pay_their_own_fragments() {
+    let (mut sim, ids, right, _e) = at_terminals("story", &["backend"], 7);
+    sim.apply_as(
+        ids[0],
+        Command::Interact {
+            prop: format!("il_git_{}", right + 1),
+        },
+    );
+    run(&mut sim, 14);
+    assert!(!sim.ilmari_full_cleared(), "Story does not");
+    let has_fragment = sim
+        .unit(ids[0])
+        .is_some_and(|u| u.inventory.iter().any(|(n, _)| n == "Legendary Fragment"));
+    assert!(!has_fragment, "no Story fragments");
+}
+
+#[test]
+fn judgment_names_the_commit_by_its_clock_and_lets_each_member_read_once() {
+    let mut c = content();
+    for k in [
+        "senior_engineer",
+        "backend_dev",
+        "devops_eng",
+        "frontend_dev",
+    ] {
+        def_mut(&mut c, k).max_hp = 10_000_000;
+    }
+    for s in &mut c.spells {
+        s.yells.clear();
+    }
+    let mut sim = Sim::new(c, 33);
+    sim.set_wandering(false);
+    sim.set_clock(THURSDAY);
+    let ids: Vec<EntityId> = (0..3)
+        .map(|k| {
+            let p = sim.spawn_player(TRIO[k], Vec3::new(k as f32, 0.0, 0.0), 0.0);
+            sim.set_level_of(p, 10);
+            p
+        })
+        .collect();
+    sim.debug_ilmari_core_cleared(true);
+    sim.apply_as(
+        ids[0],
+        Command::SetIlmariMode(combat_core::ilmari::IlmariMode::Judgment),
+    );
+    sim.tick();
+    sim.load_zone("ilmari_core/1", &anchors, Vec::new())
+        .expect("core");
+    let boss = unit_by_key(&sim, BOSS).expect("boss");
+    for &p in &ids {
+        move_to(&mut sim, p, Vec3::new(2.0, 0.0, CENTRE_Z + 4.0));
+    }
+    pull(&mut sim, &ids, boss);
+    run(&mut sim, 5);
+    play_rounds(&mut sim, &ids, [0, 1, 2]);
+    bar_at(&mut sim, 19);
+    run(&mut sim, 2);
+    assert_eq!(phase_of(&sim), 4);
+    let ward = ward_of(&sim);
+    let mut events = Vec::new();
+    let mut hint = false;
+    for _ in 0..220 * SECOND {
+        for e in sim.tick() {
+            if let Event::Yell { unit, text } = &e
+                && sim.unit(*unit).is_some_and(|u| u.key == "il_marie_core")
+                && text.contains("Look for the clock")
+            {
+                hint = true;
+            }
+            events.push(e);
+        }
+        sim.debug_set_hp(ward, 24_000);
+        if hint {
+            break;
+        }
+    }
+    assert!(hint, "Marie says what to look for once the terminals light");
+    let right = events
+        .iter()
+        .find_map(|e| match e {
+            Event::CoreLog { lines } => lines
+                .iter()
+                .find(|l| l.contains("b210a76"))
+                .and_then(|l| l.chars().nth(1))
+                .and_then(|c| c.to_digit(10))
+                .map(|d| d as usize - 1),
+            _ => None,
+        })
+        .expect("log");
+    let wrong = (right + 1) % 3;
+    assert_eq!(git(&mut sim, ids[0], wrong), 1);
+    // The same member does not read twice, however long the conflict lasts; another member can.
+    run(&mut sim, 15);
+    assert_eq!(
+        git(&mut sim, ids[0], right),
+        0,
+        "one reader at a time on Judgment"
+    );
+    assert_eq!(
+        git(&mut sim, ids[1], right),
+        combat_core::PROP_OK,
+        "a different member reads"
+    );
+}
+
+#[test]
+fn phases_three_and_four_replay_bit_identically() {
+    let log = |seed: u64| {
+        let (mut sim, _ids, _boss) = at_p3("full", &TRIO, seed, [0, 1, 2]);
+        let mut out = String::new();
+        for k in 0..150 * SECOND {
+            let now = sim.now().0;
+            for e in sim.tick() {
+                out.push_str(&log_line(&sim, now, &e));
+                out.push('\n');
+            }
+            if k == 100 * SECOND {
+                bar_at(&mut sim, 19);
+            }
+        }
+        out
+    };
+    let (a, b) = (log(5), log(5));
+    assert!(a.len() > 20_000);
+    assert!(a.contains("Deprecation Notice"), "the run reached P4");
+    assert_eq!(a, b, "same seed, same fight");
+    assert_ne!(a, log(6), "another seed differs");
 }

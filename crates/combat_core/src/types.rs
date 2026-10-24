@@ -864,8 +864,10 @@ pub enum Event {
     /// seconds to the next swap (0 when it does not swap), the remix on (1-based deck slot, 0
     /// none), the round open (1-3, 0 none) with the seconds left in it and what each ballot has
     /// (Agree, Refuse, Ask, Remember), whether Remember is lit, and the stance chosen (0 none,
-    /// else 1-5 in `Stance` order). Sent when one of them changes and to a joiner; `phase` 0 ends
-    /// the display.
+    /// else 1-5 in `Stance` order). P3 adds the seconds to the next Quarterly Planning and the
+    /// Rack Arms standing; P4 adds the stage (1 protect, 2 revert, 3 the last commit), the clock
+    /// in whole seconds, the mainframe's health in percent and the wrong picks so far. Sent when
+    /// one of them changes and to a joiner; `phase` 0 ends the display.
     Core {
         phase: u8,
         live: u8,
@@ -876,6 +878,18 @@ pub enum Event {
         tally: [u8; 4],
         remember: bool,
         stance: u8,
+        plan_s: u8,
+        arms: u8,
+        stage: u8,
+        clock_s: u8,
+        ward_pct: u8,
+        wrong: u8,
+    },
+    /// The `git log` on the wall of P4, newest first, one rendered line per commit (the terminal
+    /// that reverts a commit is the `[n]` in front of it). Sent when the terminals light, after a
+    /// wrong pick and with the new HEAD once the right one is made; a joiner gets the latest.
+    CoreLog {
+        lines: Vec<String>,
     },
     /// A rebuilt unit is coming back at `at` in `ms` (the Rack Arms' death pact).
     Reassembling {

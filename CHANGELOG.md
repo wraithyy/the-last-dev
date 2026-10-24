@@ -16,10 +16,13 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - The Boardroom in the Sky, up the hoist from the Lab's roof: the Jib Walk, the Executive Floor and the Boardroom, with new faces in every room, ending in the Chief Ilmari Officer. He is the old CEO's whole act with every buzzword now a weapon: roadmaps that stay on the floor, invoiced consultants, apples with opinions, earnings calls that retire a desk each time, a parachute whose landing takes two of you kicking within a second and a half, and an inbox that has to be cleared at a terminal. Story and Full, with his own gear and titles.
 - The Core, behind the Boardroom's private lift: six screens on one health bar with only one open at a time (the open one moves round the room, and the wall shows where to), a deck of seven reruns of old bosses every 45 seconds (Patch Tuesday, the Recruiter, the Cable Hydra, the Board, the Performance Review, a Scraper Swarm, the Autoscaler), and then Ill Marie in the middle of the floor, arguing three rounds for Ilmari while the group votes at four ballot terminals. What you choose decides what Ilmari becomes next. The rest of the fight is still to come.
 - Ill Marie's desk on the occupied campus lets you read her autonomy log (four screens) and keep it: it lights the fourth ballot option, Remember, in the Core.
+- The Core now has its other half. After Ill Marie's three rounds Ilmari builds itself a body out of your furniture: two Rack Arms (kill both within eight seconds of each other for a free chunk of its health and no cable whip for a while; kill one and the other is rebuilt), a head that plans for a few seconds every minute (kick it, or the next three attacks all land at once), printer turrets to interrupt, and the stance your votes chose (helpful offers, hardened plating, hallucinated floors, a leaky token spill, or nothing at all). At 20 % the mech collapses and a COBOL mainframe rises from the hatch: keep it alive while rewritten-in-a-modern-language robots chew on it, feed it punch cards, then read the git log on the wall and revert the one commit that made Ilmari self-aware. A wrong terminal costs the group, the right one has your name on it. The Greybeard gets Patch The Mainframe (default key: comma, where the Data Scientist keeps Ground Truth) and Story, Full and Judgment Day each have their own numbers.
+- Ilmari drops the last tier piece of each set, a rare Legendary Keyboard for your role and a Legendary Fragment on Full and Judgment Day.
+- Companions now keep the mainframe up: Priya heals it, Dale takes the rewrites off it and Rupert shoots them.
 
 ### Changed
 
-- Co-op needs this version on both sides (protocol 44).
+- Co-op needs this version on both sides (protocol 45).
 
 ## [0.10.0] - 2026-10-24
 

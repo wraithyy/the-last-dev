@@ -808,12 +808,22 @@ fn the_wing_door_waits_for_the_scraper_and_each_boss_has_three_own_pieces() {
 #[test]
 fn every_class_has_a_recordable_kit_and_only_the_data_scientist_has_ground_truth() {
     let c = content();
+    // The Data Scientist's Ground Truth, and the Greybeard's Patch The Mainframe (the core, D13).
     for class in &c.classes {
-        let has = class.utility.is_some();
-        assert_eq!(has, class.key == "data_scientist", "{}", class.key);
+        let want = match class.key.as_str() {
+            "data_scientist" => Some(SpellId(2500)),
+            "cobol" => Some(SpellId(2764)),
+            _ => None,
+        };
+        assert_eq!(class.utility, want, "{}", class.key);
     }
     let gt = c.spell(SpellId(2500)).expect("Ground Truth");
     assert!(gt.ilmari_only);
+    assert!(
+        c.spell(SpellId(2764))
+            .expect("Patch The Mainframe")
+            .ilmari_only
+    );
 }
 
 #[test]

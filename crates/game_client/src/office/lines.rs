@@ -482,7 +482,9 @@ pub fn mine(
         | PropKind::Honeypot
         | PropKind::Inbox
         | PropKind::Vote
-        | PropKind::Log => String::new(),
+        | PropKind::Log
+        | PropKind::Git
+        | PropKind::Punch => String::new(),
     })
 }
 
@@ -557,6 +559,8 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::Inbox => "Clear the inbox (the whole party's pending message)",
         PropKind::Vote => "Cast your vote (once per round, the group decides)",
         PropKind::Log => "Read the log (the first time it is yours to keep)",
+        PropKind::Git => "git revert the commit this terminal holds (a wrong one costs the group)",
+        PropKind::Punch => "Feed the mainframe a punch card (it heals a little, once in a while)",
     };
     let extra = match def.kind {
         PropKind::FireAlarm => "WARNING: every enemy on this floor will come for you.".to_string(),

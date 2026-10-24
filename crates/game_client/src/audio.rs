@@ -868,8 +868,9 @@ fn prop_sfx(kind: PropKind) -> Option<Snd> {
         PropKind::Scooter => Some(Snd::Scooter),
         PropKind::ShuttleStop => Some(Snd::Shuttle),
         // The core's ballots click and Marie's log opens like a window: no new sound files.
-        PropKind::Vote => Some(Snd::UiClick),
-        PropKind::Log => Some(Snd::WindowOpen),
+        // The revert terminals click, the punch cards are paper.
+        PropKind::Vote | PropKind::Git => Some(Snd::UiClick),
+        PropKind::Log | PropKind::Punch => Some(Snd::WindowOpen),
         _ => None,
     }
 }

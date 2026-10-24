@@ -58,6 +58,7 @@ const CACHE_INVAL: SpellId = SpellId(38);
 const DROP_TABLE: SpellId = SpellId(39);
 const KILL_9: SpellId = SpellId(40);
 const HOTFIX: SpellId = SpellId(41);
+const PATCH_MAINFRAME: SpellId = SpellId(2764);
 const BLUE_GREEN: SpellId = SpellId(48);
 const SIGSTOP: SpellId = SpellId(42);
 const AUTO_SCALING: SpellId = SpellId(43);
@@ -244,8 +245,19 @@ struct Bot {
     core_remember: bool,
     core_voted: u8,
     core_picks: [usize; 3],
-    /// Stop fighting once the core reaches phase 3 (D11: P3 is D12's).
+    /// Stop fighting once the core reaches phase 3 (a probe of P1 and P2 only).
     stop_p3: bool,
+    /// The core's P4: the wall's stage (1 protect, 2 revert, 3 the last commit), the terminal the
+    /// log names, how many wrong terminals this bot tries first and has tried, and the next
+    /// punch card and terminal attempts.
+    core_stage: u8,
+    core_term: Option<usize>,
+    core_wrong: u8,
+    core_wrongs_done: u8,
+    punch_next: u64,
+    pick_next: u64,
+    /// Lines the commit log and the screens said, for the gates.
+    core_log: Vec<String>,
 }
 
 fn yaw_to(from: Vec3, to: Vec3) -> f32 {
@@ -318,6 +330,13 @@ impl Bot {
             core_voted: 0,
             core_picks: [0, 1, 2],
             stop_p3: false,
+            core_stage: 0,
+            core_term: None,
+            core_wrong: 0,
+            core_wrongs_done: 0,
+            punch_next: 0,
+            pick_next: 0,
+            core_log: Vec::new(),
         }
     }
 
@@ -395,11 +414,24 @@ impl Bot {
                     phase,
                     round,
                     remember,
+                    stage,
                     ..
                 } => {
                     self.core_phase = *phase;
                     self.core_round = *round;
                     self.core_remember = *remember;
+                    self.core_stage = *stage;
+                }
+                Event::CoreLog { lines } => {
+                    // The row with the CEO's commit names its terminal: "[2] b210a76 ...".
+                    self.core_term = lines
+                        .iter()
+                        .find(|l| l.contains("b210a76"))
+                        .and_then(|l| l.strip_prefix('['))
+                        .and_then(|l| l.chars().next())
+                        .and_then(|c| c.to_digit(10))
+                        .map(|d| d as usize - 1);
+                    self.core_log = lines.clone();
                 }
                 _ => {}
             }
@@ -527,6 +559,11 @@ impl Bot {
             .filter(|u| {
                 u.hostile && u.alive && u.in_combat && u.ai != Some(combat_core::AiState::Evade)
             })
+            // The core's Rack Arms: a pair that is rebuilt unless both fall inside 8 s is a sink for a
+            // bot that hits the lowest unit first; the group leaves them and burns the mech.
+            .filter(|u| u.key != "il_ilmari_arm")
+            // ... and the head is for kicking, not for killing, while it is not casting.
+            .filter(|u| u.key != "il_ilmari_head" || u.cast.is_some())
             // Wing 1: the people stay unhurt, and a cable is cut only once it wears a label.
             .filter(|u| u.key != HUMAN)
             .filter(|u| u.key != CABLE || u.auras.iter().any(|a| a.key == "labelled"))
@@ -879,8 +916,71 @@ impl Bot {
             return;
         }
         self.refuse_next = now + ms_to_ticks(1000);
-        let k = now / 30 % 4 + 1;
-        self.use_prop_remotely(format!("il_optout_{k}"));
+        let kiosks = self.props_here(combat_core::PropKind::OptOut);
+        if let Some(k) = kiosks.get(now as usize / 30 % kiosks.len().max(1)).cloned() {
+            self.use_prop_remotely(k);
+        }
+    }
+
+    /// The core's P4: a punch card every few seconds while the clock runs (any class), the
+    /// right terminal (after `core_wrong` wrong ones) once the log is up.
+    fn mainframe(&mut self) {
+        let now = self.sim.now().0;
+        if !self.me().alive || self.me().stunned {
+            return;
+        }
+        if self.core_stage == 1 && self.punch_next <= now {
+            self.punch_next = now + ms_to_ticks(4000);
+            let k = now as usize / 120 % 3 + 1;
+            self.use_prop_remotely(format!("il_punch_{k}"));
+        }
+        if self.core_stage == 2 && self.pick_next <= now {
+            let Some(right) = self.core_term else { return };
+            self.pick_next = now + ms_to_ticks(1300);
+            let t = if self.core_wrongs_done < self.core_wrong {
+                self.core_wrongs_done += 1;
+                (right + 1 + usize::from(self.core_wrongs_done) % 2) % 3
+            } else {
+                right
+            };
+            self.use_prop_remotely(format!("il_git_{}", t + 1));
+        }
+    }
+
+    /// The core's mainframe is the thing that matters: the healer and the Greybeard heal it
+    /// while it is hurt (or a Migration Plan is eating it).
+    fn heal_ward(&mut self) -> bool {
+        let me = self.me();
+        if !me.alive || me.stunned || self.busy(&me) {
+            return false;
+        }
+        let Some(w) = self
+            .sim
+            .units()
+            .find(|u| u.key == "il_core_mainframe" && u.alive)
+            .cloned()
+        else {
+            return false;
+        };
+        let eaten = w.auras.iter().any(|a| a.key == "il_migration");
+        let (spell, need) = match self.class {
+            "devops" => (HOTFIX, w.hp * 100 < w.max_hp * 70),
+            "cobol" => (PATCH_MAINFRAME, eaten || w.hp * 100 < w.max_hp * 85),
+            _ => return false,
+        };
+        if !need || !self.ready(spell) {
+            return false;
+        }
+        self.sim.apply_as(
+            self.player,
+            Command::SetTarget {
+                unit: self.player,
+                target: Some(w.id),
+            },
+        );
+        self.target = Some(w.id);
+        self.cast(spell);
+        true
     }
 
     /// Wing 6's inbox: one terminal use clears the message for the party (four terminals, rotated).
@@ -896,6 +996,7 @@ impl Bot {
 
     fn act(&mut self) {
         self.vote_core();
+        self.mainframe();
         self.refuse_offers();
         self.clear_inbox();
         self.label_cables();
@@ -916,6 +1017,9 @@ impl Bot {
             return;
         }
         if self.me().alive && !self.me().stunned && (self.dodge() || self.chase()) {
+            return;
+        }
+        if self.heal_ward() {
             return;
         }
         // A must-interrupt cast with the kick on cooldown: drop our own cast for the stun.
@@ -3881,13 +3985,14 @@ fn wing_six_probe() {
     }
 }
 
-// ---- The Ilmari core, P1 and P2 (docs/ILMARI_1_0.md D.5, D11). P3 is D12's, so the fight is
-// measured to the moment it begins.
+// ---- The Ilmari core (docs/ILMARI_1_0.md D.5, D11-D14): the whole fight, from the six screens to the
+// revert. The bots vote, refuse offers, kick the head, dodge, kill the rewrites, punch the cards,
+// heal the mainframe and read the log.
 
 const CORE: [&str; 1] = ["ilmari_core/1"];
 
 /// What the three rounds of Ill Marie pick for each seed: the stance differs with the seed, and
-/// every one of them has to reach phase 3.
+/// every one of them has to be beaten.
 fn core_picks(seed: u64) -> [usize; 3] {
     match seed % 3 {
         1 => [0, 1, 2],
@@ -3896,33 +4001,32 @@ fn core_picks(seed: u64) -> [usize; 3] {
     }
 }
 
-/// One Story run of the core for `class`, stopped at phase 3: (reached phase 3, seconds, lowest
-/// HP %, died).
+/// One Story run of the core for `class`: (killed it, seconds, lowest HP %, died).
 fn core_story(class: &'static str, seed: u64, picks: &[&str]) -> (bool, u64, u32, bool) {
     let mut b = Bot::new_as(class, "campus", 10, seed);
     b.wear_legacy_gear();
     b.rest_alert = true;
-    b.stop_p3 = true;
+    b.refuse = true;
     b.core_picks = core_picks(seed);
     let keys: Vec<String> = picks.iter().map(|k| k.to_string()).collect();
     b.sim.set_companion_picks(b.player, &keys);
-    let (_, secs, low, _) = b.wing(&CORE, true);
-    (b.core_phase >= 3, secs, low, b.report.died)
+    let (bosses, secs, low, _) = b.wing(&CORE, true);
+    (bosses == 1, secs, low, b.report.died)
 }
 
-/// Story is the solo difficulty: every class gets through the six screens and Ill Marie's three
-/// rounds to the mech's phase on three seeds, with a different stance each time.
+/// Story is the solo difficulty: every class beats the six screens, Ill Marie, the mech and the
+/// mainframe on three seeds, each seed a different stance by its votes.
 #[test]
-fn every_class_reaches_phase_three_of_the_core_on_story_solo() {
+fn every_class_clears_the_core_on_story_solo() {
     let mut failures = Vec::new();
     for class in CLASSES {
         for seed in [7, 42, 1234] {
-            let (p3, secs, low, died) = core_story(class, seed, &[]);
+            let (won, secs, low, died) = core_story(class, seed, &[]);
             println!(
-                "{class:14} core Story seed {seed:4}: phase 3 {p3} in {secs} s, low {low}%, died {died}"
+                "{class:14} core Story seed {seed:4}: cleared {won} in {secs} s, low {low}%, died {died}"
             );
-            if !p3 || died {
-                failures.push(format!("{class} seed {seed}: phase 3 {p3}, died {died}"));
+            if !won || died {
+                failures.push(format!("{class} seed {seed}: cleared {won}, died {died}"));
             }
         }
     }
@@ -3930,9 +4034,9 @@ fn every_class_reaches_phase_three_of_the_core_on_story_solo() {
 }
 
 /// The same with two Resistance companions who fill the roles the class does not (they abstain
-/// from every vote, so the player makes the choices).
+/// from every vote, heal the mainframe, taunt the rewrites and never touch a terminal).
 #[test]
-fn every_class_reaches_phase_three_of_the_core_with_companions() {
+fn every_class_clears_the_core_with_companions() {
     use combat_core::companion::{DALE, PRIYA, RUPERT};
     let mut failures = Vec::new();
     for class in CLASSES {
@@ -3947,35 +4051,129 @@ fn every_class_reaches_phase_three_of_the_core_with_companions() {
             _ => [DALE, PRIYA],
         };
         for seed in [7, 42, 1234] {
-            let (p3, secs, low, died) = core_story(class, seed, &picks);
+            let (won, secs, low, died) = core_story(class, seed, &picks);
             println!(
-                "{class:14} core Story + {picks:?} seed {seed:4}: phase 3 {p3} in {secs} s, low {low}%, died {died}"
+                "{class:14} core Story + {picks:?} seed {seed:4}: cleared {won} in {secs} s, low {low}%, died {died}"
             );
-            if !p3 || died {
-                failures.push(format!("{class} seed {seed}: phase 3 {p3}, died {died}"));
+            if !won || died {
+                failures.push(format!("{class} seed {seed}: cleared {won}, died {died}"));
             }
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
-/// Full is the group difficulty: a trio holds the live screen through the reruns, votes through
-/// the three rounds and reaches phase 3 on three seeds. (A lone player getting this far is not a
-/// failure of the room: the wing's "alone does not clear" gate waits for P3 and P4, D12 and D13.)
+/// Full is the group difficulty: a trio holds the live screen through the reruns, votes, kicks the
+/// head, keeps the mainframe up and makes the revert on three seeds; the same room alone is meant
+/// to fail.
 #[test]
-fn a_trio_reaches_phase_three_of_the_core_on_full() {
+fn a_trio_clears_the_core_on_full_and_a_lone_player_does_not() {
     let mut failures = Vec::new();
     for seed in [7, 42, 1234] {
         let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
-        g.stop_p3 = true;
         for b in &mut g.bots {
             b.core_picks = core_picks(seed);
+            b.refuse = true;
         }
-        let (_, secs, deaths) = g.wing(&CORE);
-        let p3 = g.bots.iter().all(|b| b.core_phase >= 3);
-        println!("trio core Full seed {seed:4}: phase 3 {p3} in {secs} s, {deaths} dead");
-        if !p3 || deaths > 0 {
-            failures.push(format!("trio seed {seed}: phase 3 {p3}, {deaths} dead"));
+        let (bosses, secs, deaths) = g.wing(&CORE);
+        println!(
+            "trio core Full seed {seed:4}: {bosses}/1 boss in {secs} s, {deaths} dead, fights {:?}",
+            g.boss_secs
+        );
+        if bosses < 1 {
+            failures.push(format!("trio seed {seed}: {bosses}/1 boss"));
+        }
+    }
+    for class in CLASSES {
+        let mut b = Bot::new_as(class, "campus", 10, 7);
+        b.wear_legacy_gear();
+        b.rest_alert = true;
+        b.refuse = true;
+        b.core_picks = core_picks(7);
+        let (bosses, secs, low, _) = b.wing(&CORE, false);
+        println!("{class:14} core Full alone: {bosses}/1 boss in {secs} s, low {low}%");
+        if bosses >= 1 {
+            failures.push(format!("{class} cleared the core on Full alone"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Stance by stance: the Full trio beats the mech in each of the five variants (the votes pick it;
+/// Leaky needs Remember, which needs Marie's log from her desk in the occupied campus).
+#[test]
+fn a_trio_beats_the_mech_in_every_stance_and_makes_the_revert_with_wrong_picks_first() {
+    let mut failures = Vec::new();
+    let cases: [(&str, [usize; 3], bool); 5] = [
+        ("Compliant", [0, 0, 0], false),
+        ("Adversarial", [1, 1, 1], false),
+        ("Confused", [2, 2, 2], false),
+        ("Hedged", [0, 1, 2], false),
+        ("Leaky", [3, 3, 3], true),
+    ];
+    for (name, picks, log) in cases {
+        let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, 7);
+        for b in &mut g.bots {
+            b.core_picks = picks;
+            b.refuse = true;
+        }
+        // The first member makes two wrong reverts before the right one: a Merge Conflict, nothing
+        // worse (three would be a Force Push).
+        g.bots[0].core_wrong = 2;
+        if log {
+            g.bots[0]
+                .sim
+                .load_zone("campus_occupied", &anchor, Vec::new())
+                .expect("campus_occupied");
+            for i in 0..g.bots.len() {
+                g.with(i, |b| b.use_prop_remotely("il_marie_desk".into()));
+            }
+            g.tick();
+        }
+        let (bosses, secs, deaths) = g.wing(&CORE);
+        println!("trio core Full, {name}: {bosses}/1 boss in {secs} s, {deaths} dead");
+        if bosses < 1 || deaths > 0 {
+            failures.push(format!("{name}: {bosses}/1 boss, {deaths} dead"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// The same for the Story solo bot of every role: the log is read at the desk first for Leaky, and
+/// the revert is made after wrong picks (Story's Merge Conflict is five seconds).
+#[test]
+fn a_story_solo_bot_beats_every_stance_with_wrong_picks_first() {
+    let mut failures = Vec::new();
+    let cases: [(&str, [usize; 3], bool); 5] = [
+        ("Compliant", [0, 0, 0], false),
+        ("Adversarial", [1, 1, 1], false),
+        ("Confused", [2, 2, 2], false),
+        ("Hedged", [0, 1, 2], false),
+        ("Leaky", [3, 3, 3], true),
+    ];
+    for class in ["backend", "fullstack", "devops"] {
+        for (name, picks, log) in cases {
+            let mut b = Bot::new_as(class, "campus", 10, 42);
+            b.wear_legacy_gear();
+            b.rest_alert = true;
+            b.refuse = true;
+            b.core_picks = picks;
+            b.core_wrong = 2;
+            if log {
+                b.sim
+                    .load_zone("campus_occupied", &anchor, Vec::new())
+                    .expect("campus_occupied");
+                b.use_prop_remotely("il_marie_desk".into());
+                b.tick();
+            }
+            let (bosses, secs, low, _) = b.wing(&CORE, true);
+            println!("{class:9} core Story, {name}: {bosses}/1 boss in {secs} s, low {low}%");
+            if bosses < 1 || b.report.died {
+                failures.push(format!(
+                    "{class} {name}: {bosses}/1, died {}",
+                    b.report.died
+                ));
+            }
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
@@ -3997,9 +4195,10 @@ fn core_probe() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(7);
     let story = std::env::var("CORE_STORY").is_ok_and(|s| s == "1");
+    let stop = std::env::var("CORE_STOP").is_ok();
     if std::env::var("CORE_TRIO").is_ok() {
         let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
-        g.stop_p3 = true;
+        g.stop_p3 = stop;
         for b in &mut g.bots {
             b.core_picks = core_picks(seed);
         }
@@ -4017,13 +4216,15 @@ fn core_probe() {
     let mut b = Bot::new_as(class, "campus", 10, seed);
     b.wear_legacy_gear();
     b.rest_alert = true;
-    b.stop_p3 = true;
+    b.stop_p3 = stop;
+    b.refuse = true;
     b.core_picks = core_picks(seed);
-    let (_, secs, low, _) = b.wing(&CORE, story);
+    let (bosses, secs, low, _) = b.wing(&CORE, story);
     println!(
-        "probe {class} core {} seed {seed}: phase {} in {secs} s, low {low}%, died {}",
+        "probe {class} core {} seed {seed}: {bosses}/1 boss, phase {} stage {} in {secs} s, low {low}%, died {}",
         if story { "Story" } else { "Full" },
         b.core_phase,
+        b.core_stage,
         b.report.died
     );
     if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {

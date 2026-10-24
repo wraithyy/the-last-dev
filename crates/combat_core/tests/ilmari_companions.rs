@@ -619,3 +619,118 @@ fn companions_abstain_in_the_core_and_a_replay_with_company_is_bit_identical() {
     };
     assert_eq!(run_core(), run_core());
 }
+
+// ---- The core's P3 and P4 (docs/ILMARI_1_0.md D.6, D14): company heals the Ward, taunts the
+// rewrites and kills them; none of them touches a terminal or a punch card.
+
+fn set_bar(sim: &mut Sim, pct: u32) {
+    let all: Vec<EntityId> = sim
+        .units()
+        .filter(|u| u.key.starts_with("il_ilmari") && u.alive)
+        .map(|u| u.id)
+        .collect();
+    for s in all {
+        let max = sim.unit(s).expect("screen").max_hp;
+        sim.debug_set_hp(s, max * pct / 100);
+    }
+}
+
+/// The core on Story with company, brought to the first seconds of P4 (the bar at 49 % ends the
+/// mech on Story). Nobody votes: the rounds end on the tie rule alone.
+fn core_p4_with_company(picks: &[&str]) -> (Sim, EntityId, Vec<Event>) {
+    let (mut sim, ids) = room(1, true, 24);
+    let p = ids[0];
+    sim.set_companion_picks(p, &keys(picks));
+    load(&mut sim, "ilmari_core/1");
+    let boss = unit_of(&sim, "il_ilmari").expect("boss");
+    open_on(&mut sim, p, boss);
+    let mut log = Vec::new();
+    for k in 0..(30 + 3 * 70 + 40) * SECOND {
+        log.extend(sim.tick());
+        if k == 30 * SECOND {
+            set_bar(&mut sim, 69);
+        }
+        if k == (30 + 3 * 70 + 30) * SECOND {
+            set_bar(&mut sim, 49);
+        }
+    }
+    (sim, p, log)
+}
+
+#[test]
+fn priya_heals_the_mainframe_and_dale_takes_the_rewrites_off_it() {
+    let (mut sim, p, _log) = core_p4_with_company(&[DALE, PRIYA]);
+    let ward = unit_of(&sim, "il_core_mainframe").expect("the mainframe rose");
+    let (dale, priya) = (companion_of(&sim, p, DALE), companion_of(&sim, p, PRIYA));
+    sim.debug_set_hp(ward, 9_000);
+    let mut healed = false;
+    let mut taken = false;
+    for _ in 0..60 * SECOND {
+        for e in sim.tick() {
+            if let Event::Heal { source, target, .. } = e
+                && source == priya
+                && target == ward
+            {
+                healed = true;
+            }
+        }
+        taken |= sim
+            .units()
+            .any(|u| u.key == "il_modern_replacement" && u.alive && u.target == Some(dale));
+    }
+    assert!(healed, "Priya heals the mainframe below 70 %");
+    assert!(taken, "Dale taunts a rewrite off it");
+    assert!(
+        sim.unit(ward).is_some_and(|u| u.alive),
+        "and the mainframe is still up"
+    );
+}
+
+#[test]
+fn rupert_kills_the_rewrites_that_chew_the_mainframe() {
+    let (mut sim, _p, _log) = core_p4_with_company(&[DALE, RUPERT]);
+    let ward = unit_of(&sim, "il_core_mainframe").expect("the mainframe rose");
+    let mut died = 0;
+    for _ in 0..70 * SECOND {
+        for e in sim.tick() {
+            if let Event::Death { unit, .. } = e
+                && sim
+                    .unit(unit)
+                    .is_some_and(|u| u.key == "il_modern_replacement")
+            {
+                died += 1;
+            }
+        }
+    }
+    assert!(died >= 3, "the damage dealer kills the rewrites: {died}");
+    assert!(
+        sim.unit(ward).is_some_and(|u| u.alive),
+        "the mainframe holds"
+    );
+}
+
+#[test]
+fn company_never_touches_a_terminal_or_a_card_and_p3_and_p4_replay_bit_identically() {
+    let run_it = || {
+        let (mut sim, p, mut log) = core_p4_with_company(&[DALE, PRIYA]);
+        for _ in 0..90 * SECOND {
+            log.extend(sim.tick());
+        }
+        let mine = sim.companions_of(p);
+        assert_eq!(mine.len(), 2, "company came");
+        assert!(
+            !log.iter().any(|e| matches!(
+                e,
+                Event::Interacted { unit, .. } if mine.contains(unit)
+            )),
+            "a companion used a prop"
+        );
+        assert!(
+            log.iter()
+                .any(|e| matches!(e, Event::PhaseChanged { phase: 4, .. })),
+            "P4 began"
+        );
+        format!("{log:?}")
+    };
+    assert_eq!(run_it(), run_it());
+}

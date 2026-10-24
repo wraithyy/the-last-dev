@@ -12,7 +12,7 @@
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
 use crate::camera::OrbitCamera;
-use crate::combat::{CombatSim, PendingCommands, SimReady};
+use crate::combat::{CombatEvent, CombatSim, PendingCommands, SimReady};
 use crate::copy;
 use crate::game::GameFlow;
 use crate::hud::{ACCENT, DIM, KEY_RIM, KEY_TOP, KEY_TOP_HI, label, set_text, vgrad};
@@ -97,7 +97,21 @@ impl Plugin for IlmariOpenPlugin {
         })
         .add_systems(Startup, spawn_ui)
         .add_systems(PreUpdate, swallow_escape.after(InputSystems))
-        .add_systems(Update, (begin, advance, draw).chain().in_set(SimReady));
+        .add_systems(Update, (begin, advance, draw).chain().in_set(SimReady))
+        .add_systems(Update, stamp_the_end.in_set(SimReady));
+    }
+}
+
+/// The core fell: the device clock is the stamp of the ending (`Command::StampIlmariEnd`; online the
+/// room's server checks it against its own clock, like the opening stamp). The ending cutscene that
+/// reads it is D18; until then the stamp is told and kept.
+fn stamp_the_end(mut events: MessageReader<CombatEvent>, mut pending: ResMut<PendingCommands>) {
+    for CombatEvent(e) in events.read() {
+        if matches!(e, combat_core::Event::IlmariEnd { .. }) {
+            pending.0.push(Command::StampIlmariEnd {
+                unix_secs: device_clock().0,
+            });
+        }
     }
 }
 

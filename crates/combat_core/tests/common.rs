@@ -576,9 +576,16 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             tally,
             remember,
             stance,
+            plan_s,
+            arms,
+            stage,
+            clock_s,
+            ward_pct,
+            wrong,
         } => format!(
-            "core phase {phase} live {live} swap {swap_s}s remix {remix} round {round} ({round_s}s) tally {tally:?} remember {remember} stance {stance}"
+            "core phase {phase} live {live} swap {swap_s}s remix {remix} round {round} ({round_s}s) tally {tally:?} remember {remember} stance {stance} plan {plan_s}s arms {arms} stage {stage} clock {clock_s}s ward {ward_pct}% wrong {wrong}"
         ),
+        Event::CoreLog { lines } => format!("core log: {}", lines.join(" | ")),
         Event::Reassembling { unit, ms, .. } => format!("{unit:?} reassembling in {ms} ms"),
         Event::IlmariEnd { difficulty, ms } => {
             format!("ilmari end on {difficulty:?} after {ms} ms")

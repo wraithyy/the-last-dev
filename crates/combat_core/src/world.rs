@@ -112,6 +112,10 @@ pub enum PropKind {
     /// A desk that hands over a one-time quest item (the token item named in `PropDef::tag`) and
     /// Ilmari tokens (`PropDef::tokens`): Ill Marie's autonomy log.
     Log,
+    /// A terminal of the revert in P4 (`CoreDef::mainframe`): `git revert` of the row it holds.
+    Git,
+    /// A punch card beside the mainframe: heals it a little (any class).
+    Punch,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -626,6 +630,12 @@ impl Sim {
         }
         if def.kind == PropKind::Log {
             return self.use_log_prop(pi, k);
+        }
+        if def.kind == PropKind::Git {
+            return self.use_git_prop(pi, k);
+        }
+        if def.kind == PropKind::Punch {
+            return self.use_punch_prop(pi, k);
         }
         // Mirrored controls in a fight would be a griefing tool, not a joke; a shuttle would be
         // a free escape.

@@ -326,7 +326,7 @@ fn mezzanine(p: &mut Plan) -> Theme {
 
 /// An Opt-Out Kiosk: a lit cabinet with a screen and a sign, `face` toward the room (+1 for the
 /// south wall), and the prop's stand spot 2.2 m in front of it.
-fn kiosk(p: &mut Plan, key: &'static str, x: f32, z: f32, face: f32) {
+pub(super) fn kiosk(p: &mut Plan, key: &'static str, x: f32, z: f32, face: f32) {
     p.boxed(v(x, 0.7, z), v(1.4, 1.4, 0.6), Mat::Dark, true);
     p.boxed(
         v(x, 1.25, z - face * 0.32),

@@ -15,7 +15,7 @@ const TOP: u8 = 20;
 /// Pieces that were at ilvl 20 before 1.0 and stay there: the Wing 2 review hoodie (a boss drop)
 /// and the Resistance notebook (a vendor piece). Everything else at 20 is a D4 piece.
 /// The bosses whose tier pieces drop so far (D6, D7, D9); Ilmari's waits for D13.
-const DROPPING: [&str; 3] = ["il_align_consultant", "il_red_team", "il_cio"];
+const DROPPING: [&str; 4] = ["il_align_consultant", "il_red_team", "il_cio", "il_ilmari"];
 const GRANDFATHERED: [&str; 2] = [
     "Exceeds Expectations Hoodie",
     "Last Paper Notebook in the Building",
@@ -131,7 +131,7 @@ fn all_24_pieces_are_ilvl_20_and_count_as_14_outside_ilmari() {
     for name in rewards_pieces(&c) {
         let g = eco.gear(name).expect("piece");
         assert_eq!((g.ilvl, &g.source), (TOP, &GearSource::Ilmari), "{name}");
-        // A tier piece drops from its own source once that boss is built; a Legendary never drops.
+        // A tier piece drops from its own source once that boss is built; a Legendary from the core.
         let source = c
             .ilmari
             .rewards
@@ -140,6 +140,7 @@ fn all_24_pieces_are_ilvl_20_and_count_as_14_outside_ilmari() {
             .flat_map(|s| &s.pieces)
             .find(|p| p.gear == name)
             .map(|p| p.source.as_str())
+            .or(Some("il_ilmari"))
             .filter(|b| DROPPING.contains(b));
         assert_eq!(
             g.drops_from.as_deref(),

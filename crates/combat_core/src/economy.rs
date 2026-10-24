@@ -1807,7 +1807,9 @@ impl Sim {
                         // boss rolls its own pieces (source Boss) instead of the raid tier.
                         (if raid.is_some() {
                             if ilmari_wing {
+                                // The Legendaries are the named roll below, not a piece of the tier.
                                 g.source == GearSource::Ilmari
+                                    && g.rarity != Rarity::Legendary
                                     && g.drops_from.as_deref() == Some(d.key.as_str())
                             } else if dungeon {
                                 matches!(&g.source, GearSource::Boss(k) if *k == d.key)
@@ -1842,7 +1844,13 @@ impl Sim {
         let named: Vec<&GearDef> = eco
             .gear
             .iter()
-            .filter(|g| matches!(&g.source, GearSource::Boss(k) if *k == d.key))
+            .filter(|g| {
+                matches!(&g.source, GearSource::Boss(k) if *k == d.key)
+                    || (ilmari_wing
+                        && g.source == GearSource::Ilmari
+                        && g.rarity == Rarity::Legendary
+                        && g.drops_from.as_deref() == Some(d.key.as_str()))
+            })
             .collect();
         let named_pct = if let Some(r) = raid {
             r.2

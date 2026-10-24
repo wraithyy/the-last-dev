@@ -8,11 +8,19 @@
 //! (`raid.rs`), the shuffle-bag deck of reruns draws from a stream of its own so the order never
 //! depends on the group.
 //!
-//! And the encounter of P1 and P2 (`CoreDef`, `EncounterDef::Core`): the screens, the seven
-//! remixes, Ill Marie's three rounds at the ballot terminals and the hand-over to P3. The spells
-//! are content; this is the state that outlives a cast. P3 and P4 are D12 and D13 (the screen that
-//! is live fights on until then). Everything here is sim state, the combat rng and a seeded deck
-//! stream, so a replay reproduces it exactly. Numbers: docs/FORMULAS.md, The core.
+//! And the encounter (`CoreDef`, `EncounterDef::Core`): the screens, the seven remixes, Ill
+//! Marie's three rounds at the ballot terminals, the mech of P3 (`body.rs`: the Rack Arms, the
+//! body kit, Quarterly Planning and its volley, the Judgment rider) and the mainframe of P4
+//! (`mainframe.rs`: the ward, the rewrites, the punch cards, the terminals and the revert). The
+//! spells are content; this is the state that outlives a cast. Everything here is sim state, the
+//! combat rng and a seeded deck stream, so a replay reproduces it exactly. Numbers:
+//! docs/FORMULAS.md, The core.
+
+mod body;
+mod mainframe;
+
+pub use body::{BodyDef, HotTakeDef, KitCast};
+pub use mainframe::MainframeDef;
 
 use crate::content::{Content, SpellId, YellKind, ticks};
 use crate::geom::Vec3;
@@ -259,6 +267,13 @@ pub struct PactDef {
     /// Said by the owner when one falls ("Reassembling... please hold").
     #[serde(default)]
     pub yells: Vec<String>,
+    /// Story: the arms do not rebuild each other (the window still pays the bonus when both fall).
+    #[serde(default = "rebuild_on_story")]
+    pub story_rebuild: bool,
+}
+
+fn rebuild_on_story() -> bool {
+    true
 }
 
 struct PactRt {
@@ -369,6 +384,10 @@ pub struct CoreDef {
     /// Boss HP percent that ends P1, and the one that starts P4.
     pub p2_below_pct: u32,
     pub p4_below_pct: u32,
+    /// Story's mech has a smaller share of the bar: P4 begins here instead (the floor of P4 stays
+    /// `p4_below_pct`).
+    #[serde(default)]
+    pub story_p4_below_pct: Option<u32>,
     pub p4_yells: Vec<String>,
     /// P2: stun on every screen; the HP floor is `p2_below_pct`.
     pub hold_aura: String,
@@ -395,9 +414,14 @@ pub struct CoreDef {
     /// The aura per stance in `Stance::ALL` order, and what Ilmari says when it lands.
     pub stance_auras: Vec<String>,
     pub stance_yells: Vec<Vec<String>>,
-    /// The Judgment rider's marker aura on the zone boss: two remixes at once, none cleared.
+    /// The Judgment rider's marker aura on the zone boss: two remixes at once, none cleared, a
+    /// Hot Take in P3 and the Technical Debt waves of P4.
     #[serde(default)]
     pub rider: Option<String>,
+    /// P3: the mech.
+    pub body: BodyDef,
+    /// P4: the mainframe and the revert.
+    pub mainframe: MainframeDef,
 }
 
 impl CoreDef {
@@ -459,12 +483,17 @@ impl CoreDef {
             && self.story_remember_min > 0
             && self.p2_below_pct > self.p4_below_pct
             && self.p4_below_pct > 0
+            && self
+                .story_p4_below_pct
+                .is_none_or(|p| p > self.p4_below_pct && p < self.p2_below_pct)
             && self.deck.iter().all(|r| {
                 r.board.as_ref().is_none_or(|b| {
                     b.show >= 2 && usize::from(b.show) <= b.policies.len() && b.show < 4
                 }) && r.patches.iter().all(|p| p.every_ms > 0)
             })
             && c.unit_def(unit).is_some()
+            && self.body.validate(c)
+            && self.mainframe.validate(c)
     }
 }
 
@@ -527,7 +556,13 @@ struct CoreRt {
     say: Vec<(u64, Voice, String)>,
     /// Stance chosen at the end of P2: 1-5, 0 before.
     stance: u8,
-    sent: [u8; 12],
+    /// Every stance the mech wears (Judgment: the two most chosen), in `Stance` numbering.
+    stances: Vec<u8>,
+    p3: Option<body::P3Rt>,
+    p4: Option<mainframe::P4Rt>,
+    /// The mainframe, kept here so a cast can aim at it while P4's own state is being stepped.
+    ward: Option<EntityId>,
+    sent: [u8; WALL],
 }
 
 /// What the core keeps between ticks.
@@ -537,7 +572,14 @@ pub(crate) struct CoreState {
     pacts: Vec<PactRt>,
     /// A core kill that has not been stamped yet: the difficulty and the fight's length.
     end_pending: Option<(IlmariMode, u32)>,
+    /// Judgment's Hot Take: (player, the one spell left to them, until tick).
+    pub(crate) hot_take: Vec<(EntityId, SpellId, u64)>,
+    /// Adds of the mainframe killed since the P4 clock last looked (each takes seconds off it).
+    pub(crate) add_kills: u32,
 }
+
+/// Bytes of the wall display kept to spot a change.
+const WALL: usize = 18;
 
 /// The room's end stamp, kept in the save (`ilmari_end`).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -630,7 +672,11 @@ impl Sim {
             p2: None,
             say: Vec::new(),
             stance: 0,
-            sent: [0; 12],
+            stances: Vec::new(),
+            p3: None,
+            p4: None,
+            ward: None,
+            sent: [0; WALL],
         };
         let pick = (!cfg.opening_yells.is_empty())
             .then(|| rt.rng.below(cfg.opening_yells.len() as u32) as usize);
@@ -651,8 +697,12 @@ impl Sim {
         for &s in &rt.screens {
             self.cancel_telegraphs_of(s);
         }
+        self.core_clear_body(&rt);
+        self.core_clear_mainframe(&rt);
         self.core.pacts.clear();
-        if rt.sent != [0; 12] {
+        self.core.hot_take.clear();
+        self.core.add_kills = 0;
+        if rt.sent != [0; WALL] {
             self.events.push(Event::Core {
                 phase: 0,
                 live: 0,
@@ -663,6 +713,12 @@ impl Sim {
                 tally: [0; 4],
                 remember: false,
                 stance: 0,
+                plan_s: 0,
+                arms: 0,
+                stage: 0,
+                clock_s: 0,
+                ward_pct: 0,
+                wrong: 0,
             });
         }
     }
@@ -670,8 +726,13 @@ impl Sim {
     /// A joiner is told the wall as it stands.
     pub(crate) fn core_on_join(&mut self, player: EntityId) {
         let Some(rt) = &self.core.rt else { return };
-        if let Some(e) = core_event(&rt.sent) {
+        let wall = core_event(&rt.sent);
+        let log = rt.p4.as_ref().and_then(|p| p.log.clone());
+        if let Some(e) = wall {
             self.emit_to(player, e);
+        }
+        if let Some(lines) = log {
+            self.emit_to(player, Event::CoreLog { lines });
         }
     }
 
@@ -782,14 +843,22 @@ impl Sim {
             1 if hp * 100 <= max * u64::from(rt.cfg.p2_below_pct) => self.core_enter_p2(rt),
             1 => self.core_remixes(rt),
             2 => self.core_p2_step(rt),
-            3 if hp * 100 <= max * u64::from(rt.cfg.p4_below_pct) => {
-                self.core_set_phase(rt, 4);
-                let lines = rt.cfg.p4_yells.clone();
-                self.core_say_any(rt, Voice::Screen, &lines, 0);
+            3 if hp * 100 <= max * u64::from(self.core_p4_threshold(&rt.cfg)) => {
+                self.core_enter_p4(rt)
             }
+            3 => self.core_p3_step(rt),
+            4 => self.core_p4_step(rt),
             _ => {}
         }
         self.core_sync(rt);
+    }
+
+    /// The bar percent that ends the mech.
+    fn core_p4_threshold(&self, cfg: &CoreDef) -> u32 {
+        match cfg.story_p4_below_pct {
+            Some(p) if self.raid.story => p,
+            _ => cfg.p4_below_pct,
+        }
     }
 
     // ---- P1: the remixes ----
@@ -950,6 +1019,11 @@ impl Sim {
     /// One cast of a remix from the live screen. False when it has to wait (the screen is busy
     /// with a cast of its own).
     fn core_cast(&mut self, rt: &CoreRt, c: &RemixCast) -> bool {
+        self.core_cast_as(rt, c, false)
+    }
+
+    /// `instant`: a cast-bar spell lands at once (the volley of Quarterly Planning).
+    fn core_cast_as(&mut self, rt: &CoreRt, c: &RemixCast, instant: bool) -> bool {
         let Some(live) = self.core_live(rt) else {
             return true;
         };
@@ -961,7 +1035,8 @@ impl Sim {
         let Some(spell) = self.content.spell(id).cloned() else {
             return true;
         };
-        if c.cast && self.units[live].cast.is_some() {
+        let cast = c.cast && !instant;
+        if cast && self.units[live].cast.is_some() {
             return false;
         }
         let target = if c.at_player {
@@ -973,7 +1048,7 @@ impl Sim {
         } else {
             Some(Self::id_of(live))
         };
-        if c.cast {
+        if cast {
             self.start_cast(live, &spell, target);
         } else {
             self.resolve(live, &spell, target);
@@ -1225,7 +1300,9 @@ impl Sim {
         }
         let first = stances.first().copied().unwrap_or(Stance::Hedged);
         rt.stance = first as u8;
+        rt.stances = stances.iter().map(|s| *s as u8).collect();
         self.core_set_phase(rt, 3);
+        self.core_enter_p3(rt);
         // Ilmari's own words for it, from the live screen, once Marie is done.
         let lines = cfg.stance_yells[first.index()].clone();
         self.core_say_any(rt, Voice::Screen, &lines, 12_000);
@@ -1289,6 +1366,8 @@ impl Sim {
             (round, round_s, remember) = (p.round as u8 + 1, secs_left(p.until, now), p.remember);
             tally = p.tally;
         }
+        let (plan_s, arms) = self.body_wall(rt);
+        let (stage, clock_s, ward_pct, wrong) = self.mainframe_wall(rt);
         let state = [
             rt.phase,
             live,
@@ -1302,6 +1381,12 @@ impl Sim {
             tally[3],
             u8::from(remember),
             rt.stance,
+            plan_s,
+            arms,
+            stage,
+            clock_s,
+            ward_pct,
+            wrong,
         ];
         if state != rt.sent {
             rt.sent = state;
@@ -1325,6 +1410,15 @@ impl Sim {
         let (ward_wipes, pact) = (d.ward && d.ward_death_wipes, d.death_pact.clone());
         let is_core = self.units[ti].floor_boss
             && matches!(d.encounter, Some(crate::content::EncounterDef::Core(_)));
+        // A rewrite that fell to the party takes seconds off the clock of P4.
+        if self
+            .core
+            .rt
+            .as_ref()
+            .is_some_and(|rt| rt.p4.is_some() && rt.cfg.mainframe.add == self.units[ti].state.key)
+        {
+            self.core.add_kills += 1;
+        }
         if ward_wipes
             && let Some(b) = (0..self.units.len()).find(|&i| {
                 let u = &self.units[i];
@@ -1343,6 +1437,11 @@ impl Sim {
             let ms = crate::time::ticks_to_ms(self.now.saturating_sub(self.units[ti].pulled_at))
                 .min(u64::from(u32::MAX)) as u32;
             self.core.end_pending = Some((self.raid.mode, ms));
+            // Only a Full kill opens Judgment Day (Story and Judgment do not).
+            if self.raid.mode == IlmariMode::Full {
+                self.mark_core_full_clear();
+            }
+            self.core_pay_fragments();
             self.events.push(Event::IlmariEnd {
                 difficulty: self.raid.mode,
                 ms,
@@ -1367,6 +1466,8 @@ impl Sim {
                 .hp
                 .saturating_sub(hit.min(u64::from(u32::MAX)) as u32)
                 .max(1);
+            // The six screens share one bar: the cut is everybody's.
+            self.raid_link_hp(oi);
             if let Some(a) = &p.both_aura
                 && self.units[oi].state.alive
             {
@@ -1418,7 +1519,7 @@ impl Sim {
             let Some(pact) = self.content.units[pr.def].death_pact.clone() else {
                 continue;
             };
-            if !partner {
+            if !partner || (self.raid.story && !pact.story_rebuild) {
                 continue;
             }
             let (level, pack, target) = {
@@ -1498,7 +1599,7 @@ impl Sim {
     }
 }
 
-fn core_event(s: &[u8; 12]) -> Option<Event> {
+fn core_event(s: &[u8; WALL]) -> Option<Event> {
     (s[0] != 0).then_some(Event::Core {
         phase: s[0],
         live: s[1],
@@ -1509,5 +1610,11 @@ fn core_event(s: &[u8; 12]) -> Option<Event> {
         tally: [s[6], s[7], s[8], s[9]],
         remember: s[10] != 0,
         stance: s[11],
+        plan_s: s[12],
+        arms: s[13],
+        stage: s[14],
+        clock_s: s[15],
+        ward_pct: s[16],
+        wrong: s[17],
     })
 }

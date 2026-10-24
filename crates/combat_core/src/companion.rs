@@ -311,6 +311,23 @@ impl Sim {
             && u.state.ai != Some(AiState::Evade)
     }
 
+    /// The core's mainframe (or any unit authored as a ward) while it stands.
+    fn companion_ward(&self) -> Option<usize> {
+        (0..self.units.len()).find(|&o| {
+            let u = &self.units[o];
+            u.state.alive && !u.despawned && self.content.units[u.def].ward
+        })
+    }
+
+    /// Whether `o` is chewing on a ward: the rewrites of P4 are fought for it, not for the owner.
+    fn companion_at_ward(&self, o: usize) -> bool {
+        let u = &self.units[o];
+        top_threat(&u.threat).is_some_and(|t| {
+            self.index(t)
+                .is_some_and(|ti| self.content.units[self.units[ti].def].ward)
+        })
+    }
+
     /// The enemies fighting this owner's side near them, plus whatever the owner has targeted.
     fn companion_foes(&self, oi: usize) -> Vec<usize> {
         let owner = Self::id_of(oi);
@@ -322,6 +339,7 @@ impl Sim {
                     let u = &self.units[o];
                     dist_xz(u.state.pos, at) <= ENGAGE_M
                         && (target == Some(Self::id_of(o))
+                            || self.companion_at_ward(o)
                             // A swarm cluster has no threat table until somebody hits it: it
                             // is a foe by walking at the drafts.
                             || self.content.units[u.def].swarm.is_some()
@@ -354,7 +372,9 @@ impl Sim {
         let loose: Vec<usize> = foes
             .iter()
             .copied()
-            .filter(|&o| top_threat(&self.units[o].threat) == Some(owner))
+            .filter(|&o| {
+                top_threat(&self.units[o].threat) == Some(owner) || self.companion_at_ward(o)
+            })
             .collect();
         let target = self.companion_nearest(ci, &loose).or_else(|| {
             let t = self.units[oi].state.target;
@@ -477,6 +497,16 @@ impl Sim {
 
     /// Heals the most hurt of the owner's side below the threshold; false when nobody needs it.
     fn companion_heal(&mut self, ci: usize, oi: usize, def: &CompanionDef) -> bool {
+        // The mainframe comes before the party: losing it loses the fight.
+        if let Some(w) = self.companion_ward().filter(|&w| {
+            let s = &self.units[w].state;
+            u64::from(s.hp) * 100 < u64::from(s.max_hp) * HEAL_BELOW_PCT
+        }) {
+            self.face(ci, w);
+            if self.companion_cast(ci, def.main, Self::id_of(w)) {
+                return true;
+            }
+        }
         let mut side: Vec<usize> = vec![oi];
         side.extend(
             self.companions
