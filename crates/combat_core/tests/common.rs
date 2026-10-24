@@ -566,6 +566,23 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
         } => format!(
             "boardroom {desks} desks, inbox {inbox_ms} ms, severance {severance_ms} ms, tiles {tiles:#b}"
         ),
+        Event::Core {
+            phase,
+            live,
+            swap_s,
+            remix,
+            round,
+            round_s,
+            tally,
+            remember,
+            stance,
+        } => format!(
+            "core phase {phase} live {live} swap {swap_s}s remix {remix} round {round} ({round_s}s) tally {tally:?} remember {remember} stance {stance}"
+        ),
+        Event::Reassembling { unit, ms, .. } => format!("{unit:?} reassembling in {ms} ms"),
+        Event::IlmariEnd { difficulty, ms } => {
+            format!("ilmari end on {difficulty:?} after {ms} ms")
+        }
         Event::PairKick {
             boss,
             by,

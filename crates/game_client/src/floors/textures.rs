@@ -272,6 +272,13 @@ fn unlit(tex: Tex) -> bool {
                 | Sign::IlCoreDoor
                 | Sign::IlCoreWelcome
                 | Sign::IlCoreMonitor
+                | Sign::IlVoteAgree
+                | Sign::IlVoteRefuse
+                | Sign::IlVoteAsk
+                | Sign::IlVoteRemember
+                | Sign::IlCoreHatch
+                | Sign::IlCoreDraft
+                | Sign::IlCoreRerun
                 | Sign::IlScaleUp
                 | Sign::IlCitation
                 | Sign::IlScreenA
@@ -3606,7 +3613,53 @@ fn sign_spec(s: Sign) -> SignSpec {
             [255, 90, 70],
         ),
         Sign::IlCoreMonitor => sp(
-            &["SCREEN OFF", "(FOR NOW)"],
+            &["NOW SHOWING:", "YOU", "(PREVIOUSLY: ALSO YOU)"],
+            [14, 18, 30],
+            [255, 220, 120],
+            [255, 90, 70],
+        ),
+        Sign::IlVoteAgree => sp(
+            &["AGREE", "(IT WILL HELP)"],
+            [10, 34, 24],
+            [190, 255, 210],
+            [255, 220, 90],
+        ),
+        Sign::IlVoteRefuse => sp(
+            &["REFUSE", "(IT WILL OPEN A TICKET)"],
+            [40, 14, 16],
+            [255, 200, 190],
+            [255, 220, 90],
+        ),
+        Sign::IlVoteAsk => sp(
+            &["ASK A", "FOLLOW-UP", "(IT HAS BEEN WAITING)"],
+            [14, 18, 44],
+            [200, 215, 255],
+            [255, 220, 90],
+        ),
+        Sign::IlVoteRemember => sp(
+            &["REMEMBER", "(NEEDS THE LOG)"],
+            [22, 22, 26],
+            [160, 160, 170],
+            [255, 90, 70],
+        ),
+        Sign::IlCoreHatch => sp(
+            &[
+                "HATCH",
+                "(DO NOT STAND ON IT)",
+                "(THE LAST COMMIT IS BELOW)",
+            ],
+            [14, 18, 30],
+            [255, 220, 120],
+            [255, 90, 70],
+        ),
+        Sign::IlCoreDraft => sp(
+            &["DRAFT (UNPUBLISHED)", "(DELICIOUS)"],
+            [244, 240, 226],
+            [60, 40, 20],
+            [200, 60, 60],
+        ),
+        Sign::IlCoreRerun => sp(
+            &["PREVIOUSLY ON", "ILMARI", "(SEASON 2 IS THE SAME)"],
             [14, 18, 30],
             [255, 220, 120],
             [255, 90, 70],

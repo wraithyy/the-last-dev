@@ -121,7 +121,12 @@ const CLASSES: [&str; 8] = [
 const HUMAN: &str = "il_candidate_human";
 const SWARM: &str = "il_scraper_cluster";
 const CABLE: &str = "il_cable";
-const LINK_SHIELDS: [&str; 3] = ["synergy_shield", "panel_muted", "committee_quorum"];
+const LINK_SHIELDS: [&str; 4] = [
+    "synergy_shield",
+    "panel_muted",
+    "committee_quorum",
+    "il_screen_standby",
+];
 
 /// Packs on a straight corridor toward -Z, the boss at the end, NPCs off to the side.
 fn anchor(name: &str) -> Option<(Vec3, f32)> {
@@ -232,6 +237,15 @@ struct Bot {
     /// Wing 6's Chief Ilmari Officer: a message is pending and the bot clears it at a terminal.
     inbox: bool,
     inbox_next: u64,
+    /// The core: the wall's phase and open round, whether Remember is lit, the round this bot
+    /// voted in, and the option it takes in each round (Agree, Refuse, Ask, Remember = 0..3).
+    core_phase: u8,
+    core_round: u8,
+    core_remember: bool,
+    core_voted: u8,
+    core_picks: [usize; 3],
+    /// Stop fighting once the core reaches phase 3 (D11: P3 is D12's).
+    stop_p3: bool,
 }
 
 fn yaw_to(from: Vec3, to: Vec3) -> f32 {
@@ -298,6 +312,12 @@ impl Bot {
             refuse_next: 0,
             inbox: false,
             inbox_next: 0,
+            core_phase: 0,
+            core_round: 0,
+            core_remember: false,
+            core_voted: 0,
+            core_picks: [0, 1, 2],
+            stop_p3: false,
         }
     }
 
@@ -371,6 +391,16 @@ impl Bot {
                 }
                 Event::ZoneCleared { .. } => self.report.cleared = true,
                 Event::Boardroom { inbox_ms, .. } => self.inbox = *inbox_ms > 0,
+                Event::Core {
+                    phase,
+                    round,
+                    remember,
+                    ..
+                } => {
+                    self.core_phase = *phase;
+                    self.core_round = *round;
+                    self.core_remember = *remember;
+                }
                 _ => {}
             }
             let _ = writeln!(self.log, "{}", log_line(&self.sim, now, e));
@@ -670,7 +700,13 @@ impl Bot {
         let Some(cable) = cable else { return };
         self.label_next = now + ms_to_ticks(2000);
         self.labels += 1;
-        let prop = format!("il_label_printer_{}", self.labels % 4 + 1);
+        let printers = self.props_here(combat_core::PropKind::Label);
+        let Some(prop) = printers
+            .get(self.labels as usize % printers.len().max(1))
+            .cloned()
+        else {
+            return;
+        };
         let Some((at, _)) = anchor(&format!("prop:{prop}")) else {
             return;
         };
@@ -712,8 +748,13 @@ impl Bot {
         }
         self.appeal_next = now + ms_to_ticks(1000);
         self.appeals += 1;
-        let prop = format!("il_hr_portal_{}", self.appeals % 2 + 1);
-        self.use_prop_remotely(prop);
+        let portals = self.props_here(combat_core::PropKind::Portal);
+        if let Some(prop) = portals
+            .get(self.appeals as usize % portals.len().max(1))
+            .cloned()
+        {
+            self.use_prop_remotely(prop);
+        }
     }
 
     /// Wing 2's Culture Committee: while a vote is open, every bot votes for the policy that hurts
@@ -740,6 +781,37 @@ impl Bot {
         let Some(slot) = best else { return };
         self.lobby_next = now + ms_to_ticks(3100);
         self.use_prop_remotely(["il_ballot_a", "il_ballot_b", "il_ballot_c"][slot].to_string());
+    }
+
+    /// The props of `kind` that stand in the loaded zone, in content order.
+    fn props_here(&self, kind: combat_core::PropKind) -> Vec<String> {
+        let zone = self.sim.zone().unwrap_or_default().to_string();
+        self.sim
+            .content()
+            .world
+            .props
+            .iter()
+            .filter(|p| p.kind == kind && p.zone == zone)
+            .map(|p| p.key.clone())
+            .collect()
+    }
+
+    /// The core's Ill Marie: once per round, walk to the terminal of the option this bot takes
+    /// in that round (Remember only while it is lit; a bot never carries the log by itself).
+    fn vote_core(&mut self) {
+        if self.core_round == 0
+            || self.core_voted == self.core_round
+            || !self.me().alive
+            || self.me().stunned
+        {
+            return;
+        }
+        let mut pick = self.core_picks[usize::from(self.core_round - 1).min(2)];
+        if pick == 3 && !self.core_remember {
+            pick = 0;
+        }
+        self.core_voted = self.core_round;
+        self.use_prop_remotely(format!("il_core_vote_{}", pick + 1));
     }
 
     /// Uses a prop from the quiet corner where `anchor` puts every prop, then the usual position
@@ -823,6 +895,7 @@ impl Bot {
     }
 
     fn act(&mut self) {
+        self.vote_core();
         self.refuse_offers();
         self.clear_inbox();
         self.label_cables();
@@ -1404,6 +1477,9 @@ impl Bot {
         // An opener still in flight (a cast from range) counts: its hit is what pulls.
         while self.sim.now().0 - start < 90 || self.me().in_combat || self.me().cast.is_some() {
             if self.sim.now().0 > MAX_TICKS || self.report.died {
+                return;
+            }
+            if self.stop_p3 && self.core_phase >= 3 {
                 return;
             }
             self.act();
@@ -2882,6 +2958,8 @@ struct Group {
     bots: Vec<Bot>,
     /// Seconds each boss fight took (pull to the end of combat).
     boss_secs: Vec<u64>,
+    /// Stop the boss fight once the core reaches phase 3.
+    stop_p3: bool,
 }
 
 impl Group {
@@ -2917,6 +2995,7 @@ impl Group {
         let mut g = Group {
             bots,
             boss_secs: Vec::new(),
+            stop_p3: false,
         };
         for i in 0..g.bots.len() {
             g.with(i, |b| b.wear_legacy_gear());
@@ -3014,6 +3093,7 @@ impl Group {
             }))
             && n < 60_000
             && !self.bots.iter().all(|b| !self.unit_of(b).alive)
+            && !(self.stop_p3 && self.bots.iter().all(|b| b.core_phase >= 3))
         {
             for i in 0..self.bots.len() {
                 self.with(i, |b| b.act());
@@ -3798,5 +3878,155 @@ fn wing_six_probe() {
     );
     if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
         let _ = std::fs::write(PathBuf::from(dir).join("probe6.log"), &b.log);
+    }
+}
+
+// ---- The Ilmari core, P1 and P2 (docs/ILMARI_1_0.md D.5, D11). P3 is D12's, so the fight is
+// measured to the moment it begins.
+
+const CORE: [&str; 1] = ["ilmari_core/1"];
+
+/// What the three rounds of Ill Marie pick for each seed: the stance differs with the seed, and
+/// every one of them has to reach phase 3.
+fn core_picks(seed: u64) -> [usize; 3] {
+    match seed % 3 {
+        1 => [0, 1, 2],
+        2 => [0, 0, 1],
+        _ => [1, 1, 0],
+    }
+}
+
+/// One Story run of the core for `class`, stopped at phase 3: (reached phase 3, seconds, lowest
+/// HP %, died).
+fn core_story(class: &'static str, seed: u64, picks: &[&str]) -> (bool, u64, u32, bool) {
+    let mut b = Bot::new_as(class, "campus", 10, seed);
+    b.wear_legacy_gear();
+    b.rest_alert = true;
+    b.stop_p3 = true;
+    b.core_picks = core_picks(seed);
+    let keys: Vec<String> = picks.iter().map(|k| k.to_string()).collect();
+    b.sim.set_companion_picks(b.player, &keys);
+    let (_, secs, low, _) = b.wing(&CORE, true);
+    (b.core_phase >= 3, secs, low, b.report.died)
+}
+
+/// Story is the solo difficulty: every class gets through the six screens and Ill Marie's three
+/// rounds to the mech's phase on three seeds, with a different stance each time.
+#[test]
+fn every_class_reaches_phase_three_of_the_core_on_story_solo() {
+    let mut failures = Vec::new();
+    for class in CLASSES {
+        for seed in [7, 42, 1234] {
+            let (p3, secs, low, died) = core_story(class, seed, &[]);
+            println!(
+                "{class:14} core Story seed {seed:4}: phase 3 {p3} in {secs} s, low {low}%, died {died}"
+            );
+            if !p3 || died {
+                failures.push(format!("{class} seed {seed}: phase 3 {p3}, died {died}"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// The same with two Resistance companions who fill the roles the class does not (they abstain
+/// from every vote, so the player makes the choices).
+#[test]
+fn every_class_reaches_phase_three_of_the_core_with_companions() {
+    use combat_core::companion::{DALE, PRIYA, RUPERT};
+    let mut failures = Vec::new();
+    for class in CLASSES {
+        let role = content()
+            .classes
+            .iter()
+            .find(|k| k.key == class)
+            .map(|k| k.role);
+        let picks = match role {
+            Some(combat_core::Role::Tank) => [PRIYA, RUPERT],
+            Some(combat_core::Role::Healer) => [DALE, RUPERT],
+            _ => [DALE, PRIYA],
+        };
+        for seed in [7, 42, 1234] {
+            let (p3, secs, low, died) = core_story(class, seed, &picks);
+            println!(
+                "{class:14} core Story + {picks:?} seed {seed:4}: phase 3 {p3} in {secs} s, low {low}%, died {died}"
+            );
+            if !p3 || died {
+                failures.push(format!("{class} seed {seed}: phase 3 {p3}, died {died}"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Full is the group difficulty: a trio holds the live screen through the reruns, votes through
+/// the three rounds and reaches phase 3 on three seeds. (A lone player getting this far is not a
+/// failure of the room: the wing's "alone does not clear" gate waits for P3 and P4, D12 and D13.)
+#[test]
+fn a_trio_reaches_phase_three_of_the_core_on_full() {
+    let mut failures = Vec::new();
+    for seed in [7, 42, 1234] {
+        let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
+        g.stop_p3 = true;
+        for b in &mut g.bots {
+            b.core_picks = core_picks(seed);
+        }
+        let (_, secs, deaths) = g.wing(&CORE);
+        let p3 = g.bots.iter().all(|b| b.core_phase >= 3);
+        println!("trio core Full seed {seed:4}: phase 3 {p3} in {secs} s, {deaths} dead");
+        if !p3 || deaths > 0 {
+            failures.push(format!("trio seed {seed}: phase 3 {p3}, {deaths} dead"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// QA probe for the core: `CORE_CLASS`, `CORE_SEED`, `CORE_STORY`, `CORE_TRIO` and a log dump in
+/// `WOW_BOT_DUMP`. Not part of the gates.
+#[test]
+#[ignore = "balance probe: CORE_CLASS=<class> CORE_SEED=<n> CORE_STORY=1 CORE_TRIO=1"]
+fn core_probe() {
+    let class = std::env::var("CORE_CLASS").unwrap_or_else(|_| "fullstack".into());
+    let class: &'static str = CLASSES
+        .iter()
+        .find(|c| **c == class)
+        .copied()
+        .unwrap_or("fullstack");
+    let seed = std::env::var("CORE_SEED")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(7);
+    let story = std::env::var("CORE_STORY").is_ok_and(|s| s == "1");
+    if std::env::var("CORE_TRIO").is_ok() {
+        let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
+        g.stop_p3 = true;
+        for b in &mut g.bots {
+            b.core_picks = core_picks(seed);
+        }
+        let (_, secs, deaths) = g.wing(&CORE);
+        println!(
+            "probe trio core Full seed {seed}: phases {:?} in {secs} s, {deaths} dead, fights {:?}",
+            g.bots.iter().map(|b| b.core_phase).collect::<Vec<_>>(),
+            g.boss_secs
+        );
+        if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+            let _ = std::fs::write(PathBuf::from(dir).join("probe_core.log"), &g.bots[0].log);
+        }
+        return;
+    }
+    let mut b = Bot::new_as(class, "campus", 10, seed);
+    b.wear_legacy_gear();
+    b.rest_alert = true;
+    b.stop_p3 = true;
+    b.core_picks = core_picks(seed);
+    let (_, secs, low, _) = b.wing(&CORE, story);
+    println!(
+        "probe {class} core {} seed {seed}: phase {} in {secs} s, low {low}%, died {}",
+        if story { "Story" } else { "Full" },
+        b.core_phase,
+        b.report.died
+    );
+    if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+        let _ = std::fs::write(PathBuf::from(dir).join("probe_core.log"), &b.log);
     }
 }

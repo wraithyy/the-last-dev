@@ -126,6 +126,7 @@ the site, including the [changelog page](https://wraithyy.github.io/the-last-dev
 | `WOW_DIE=secs`, `WOW_TRAVEL=zone@secs` | The player dies, or the door fade to that zone starts, that many seconds in (death panel and loading screen shots) |
 | `WOW_SHOT_TIMES=t1,t2,..`, `WOW_SHOT_SIZE=WxH` | Several timed screenshots (`<path>_<n>.png`); offscreen target size (e.g. 2560x1080) |
 | `WOW_FPS=1` | Log average frame time and drawn meshes every 3 s |
+| `WOW_MARIE_LOG=1..4` | Open Ill Marie's autonomy-log window on that screen at start (`marie_log.rs`) |
 | `WOW_MUTE=1` | Start with audio muted (on the web: `?mute=1` in the URL) |
 | `WOW_LEVEL=n` | Start level (overrides the floor minimum) |
 | `WOW_COMPANIONS=dale,priya` | Companion loadout (Dale, Priya, Rupert; two at most); they come into an Ilmari wing on Story (`WOW_RAID_ASYNC=1`) |

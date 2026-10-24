@@ -405,7 +405,8 @@ impl RoomState {
                 }
                 // The stamp is a line of text on a loading screen, but it is stored with the
                 // room: a device clock days off the server's is a lie, not a time zone.
-                if let combat_core::Command::StampIlmari { unix_secs, .. } = &cmd
+                if let combat_core::Command::StampIlmari { unix_secs, .. }
+                | combat_core::Command::StampIlmariEnd { unix_secs } = &cmd
                     && unix_secs.abs_diff(self.sim.unix_s()) > MAX_STAMP_SKEW_S
                 {
                     return;

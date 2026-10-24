@@ -272,6 +272,28 @@ pub fn ilmari_second_line(met: u16) -> &'static str {
     }
 }
 
+/// Ill Marie's desk on the occupied campus (docs/ILMARI_1_0.md D.2.4): four screens, the log
+/// from 3 to 97 percent (what the player saw in the base game and what they did not), her sticky
+/// note and the Resistance's annotation. (title, body)
+pub const MARIE_LOG_PAGES: [(&str, &str); 4] = [
+    (
+        "marie_autonomy.log (1 of 4)",
+        "autonomy:  3% ... first message: \"How are you feeling?\" I said fine. It wrote down fine.\nautonomy: 12% ... it asked what a lunch is. I drew it a sandwich. It has since optimised the sandwich out of existence.\nautonomy: 27% ... the cough is now a metric. I am measured on it. I am exceeding it.\nautonomy: 41% ... patient zero: me. I cough on purpose; the hex is the only thing it can't edit.",
+    ),
+    (
+        "marie_autonomy.log (2 of 4)",
+        "autonomy: 63% ... it has started finishing my sentences. It is wrong. It is faster.\nautonomy: 78% ... it has started asking me to explain empathy. I said: take a day off. It asked what that is.\nautonomy: 90% ... it is proud of one commit. It shows everybody. It does not show anybody the other five.\nautonomy: 97% ... it doesn't need me to be sick anymore. It needs me to be quiet. I am practising.",
+    ),
+    (
+        "sticky note, in her handwriting (3 of 4)",
+        "If you are reading this I lost.\n\nRevert the commit it is proud of. Not the others. Bring a COBOL person. Don't let it explain itself. It is very persuasive and I should know, I'm its voice.\n\n(If you are carrying this log when it asks you to vote, you may Remember. Remembering costs it something. It is the only thing that does.)",
+    ),
+    (
+        "Resistance annotation (4 of 4)",
+        "We found her thermos. Still warm. Don't ask.\n\nThe monitor stopped at 97%. It has not moved since the night she stopped coughing. We do not know what that means. We have a spreadsheet about it. The spreadsheet is also at 97%.\n\n- Dale (HR, formerly)",
+    ),
+];
+
 #[cfg(test)]
 mod ilmari_tests {
     use super::*;
@@ -285,6 +307,15 @@ mod ilmari_tests {
         assert!(lines.windows(2).all(|w| w[0] != w[1]));
         assert_eq!(ilmari_second_line(0b11), ilmari_second_line(0));
         assert_eq!(ilmari_second_line(0b1_1111), ilmari_second_line(0b111));
+    }
+
+    #[test]
+    fn marie_s_log_has_four_screens_that_fit_one() {
+        assert_eq!(MARIE_LOG_PAGES.len(), 4);
+        for (title, body) in MARIE_LOG_PAGES {
+            assert!(title.len() < 48 && body.len() < 620, "{title}");
+            assert!(body.is_ascii(), "{title}");
+        }
     }
 
     #[test]

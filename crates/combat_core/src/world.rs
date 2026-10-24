@@ -106,6 +106,12 @@ pub enum PropKind {
     /// An inbox terminal in the Boardroom (`EncounterDef::Boardroom`): a use clears the pending
     /// message for the whole party (any class).
     Inbox,
+    /// A ballot terminal of the core (`EncounterDef::Core`): the open dialogue round's option, or
+    /// one of the Board's three slots (one vote per player and round).
+    Vote,
+    /// A desk that hands over a one-time quest item (the token item named in `PropDef::tag`) and
+    /// Ilmari tokens (`PropDef::tokens`): Ill Marie's autonomy log.
+    Log,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -165,6 +171,9 @@ pub struct PropDef {
     /// `Class` props: Kudos paid out. With `to` set, a shortcut to that prop's stand spot.
     #[serde(default)]
     pub kudos: u32,
+    /// `Log` props: Ilmari tokens paid with the item, once.
+    #[serde(default)]
+    pub tokens: u32,
 }
 
 /// A friendly unit spawned at a layout anchor of one zone, outside `ZoneDef::friendly`.
@@ -252,6 +261,9 @@ impl WorldDef {
             }
             if let Some(n) = p.items.iter().find(|n| c.economy.goods(n).is_none()) {
                 return bad(format!("prop {} gives unknown goods {n}", p.key));
+            }
+            if p.kind == PropKind::Log && c.item(&p.tag).is_none() {
+                return bad(format!("log prop {} needs a known item in `tag`", p.key));
             }
             if p.kind == PropKind::Class {
                 let shortcut_ok = p.to.is_empty()
@@ -608,6 +620,12 @@ impl Sim {
         }
         if def.kind == PropKind::Inbox {
             return self.use_inbox_prop(pi, k);
+        }
+        if def.kind == PropKind::Vote {
+            return self.use_vote_prop(pi, k);
+        }
+        if def.kind == PropKind::Log {
+            return self.use_log_prop(pi, k);
         }
         // Mirrored controls in a fight would be a griefing tool, not a joke; a shuttle would be
         // a free escape.

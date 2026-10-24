@@ -247,7 +247,16 @@ fn every_item_is_reachable_from_some_source() {
     let paid = c.quests.iter().any(|q| q.reward.tokens > 0);
     for t in &c.items {
         let token_paid = paid && t.name == combat_core::ilmari::TOKEN;
-        if !trophy_sources.contains(&&t.name) && !token_paid && !pending.contains(&t.name.as_str())
+        // Marie's desk hands the log over (`PropKind::Log` names it in `tag`).
+        let desk_gives = c
+            .world
+            .props
+            .iter()
+            .any(|p| p.kind == combat_core::PropKind::Log && p.tag == t.name);
+        if !trophy_sources.contains(&&t.name)
+            && !token_paid
+            && !desk_gives
+            && !pending.contains(&t.name.as_str())
         {
             bad.push(format!("trophy {}", t.name));
         }

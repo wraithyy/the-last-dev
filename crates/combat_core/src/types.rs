@@ -263,6 +263,12 @@ pub enum Command {
         utc_offset_min: i16,
         tz: String,
     },
+    /// The device clock when the core falls, told once after `Event::IlmariEnd` (`ilmari_core.rs`).
+    /// Only the first stamp counts and only while a core kill is waiting for it; the server
+    /// checks the clock against its own like `StampIlmari`.
+    StampIlmariEnd {
+        unix_secs: u64,
+    },
     /// Offline only: the Opening has played or was skipped (needs a stamp), which retires the
     /// post-credits Marie beats and completes the opening quest.
     IlmariReveal,
@@ -853,6 +859,35 @@ pub enum Event {
         inbox_ms: u16,
         severance_ms: u16,
         tiles: u16,
+    },
+    /// The core's wall display (`ilmari_core.rs`): the phase (1-4), the live screen and the whole
+    /// seconds to the next swap (0 when it does not swap), the remix on (1-based deck slot, 0
+    /// none), the round open (1-3, 0 none) with the seconds left in it and what each ballot has
+    /// (Agree, Refuse, Ask, Remember), whether Remember is lit, and the stance chosen (0 none,
+    /// else 1-5 in `Stance` order). Sent when one of them changes and to a joiner; `phase` 0 ends
+    /// the display.
+    Core {
+        phase: u8,
+        live: u8,
+        swap_s: u8,
+        remix: u8,
+        round: u8,
+        round_s: u8,
+        tally: [u8; 4],
+        remember: bool,
+        stance: u8,
+    },
+    /// A rebuilt unit is coming back at `at` in `ms` (the Rack Arms' death pact).
+    Reassembling {
+        unit: EntityId,
+        at: Vec3,
+        ms: u32,
+    },
+    /// The core is down: the difficulty it fell on and the fight's length in milliseconds. The
+    /// room's clock stamp that follows (`Command::StampIlmariEnd`) is the one the ending shows.
+    IlmariEnd {
+        difficulty: crate::ilmari::IlmariMode,
+        ms: u32,
     },
     /// A kick landed on a cast that needs two different interrupters inside the window: `have`
     /// of `need` are in (the cast goes on until the second arrives in time).

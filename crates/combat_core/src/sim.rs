@@ -251,6 +251,7 @@ pub struct Sim {
     pub(crate) wing4: crate::wing4::Wing4State,
     pub(crate) wing5: crate::wing5::Wing5State,
     pub(crate) wing6: crate::wing6::Wing6State,
+    pub(crate) core: crate::ilmari_core::CoreState,
     /// True while an area spell resolves its effects: swarm clusters take a bigger share.
     pub(crate) area_hit: bool,
     /// Ground of the loaded zone, and of every zone a loader registered (`terrain.rs`).
@@ -302,6 +303,7 @@ impl Sim {
             wing4: Default::default(),
             wing5: Default::default(),
             wing6: Default::default(),
+            core: Default::default(),
             illusion: Default::default(),
             echo: Default::default(),
             sight: Default::default(),
@@ -634,6 +636,7 @@ impl Sim {
             | Command::StartMinigame { .. }
             | Command::LeaveMinigame
             | Command::StampIlmari { .. }
+            | Command::StampIlmariEnd { .. }
             | Command::IlmariReveal
             | Command::SetIlmariStory { .. }
             | Command::SetIlmariMode(_)
@@ -870,6 +873,11 @@ impl Sim {
                     self.stamp_ilmari(unix_secs, utc_offset_min, &tz);
                 }
             }
+            Command::StampIlmariEnd { unix_secs } => {
+                if self.ilmari_actor_ok(actor) {
+                    self.stamp_ilmari_end(unix_secs);
+                }
+            }
             Command::IlmariReveal => {
                 if self.ilmari_actor_ok(actor) {
                     self.reveal_ilmari();
@@ -944,6 +952,7 @@ impl Sim {
             | Command::StartMinigame { .. }
             | Command::LeaveMinigame
             | Command::StampIlmari { .. }
+            | Command::StampIlmariEnd { .. }
             | Command::IlmariReveal
             | Command::SetIlmariStory { .. }
             | Command::SetIlmariMode(_)
@@ -1954,6 +1963,7 @@ impl Sim {
         }
         self.death_burnout(ti, killer);
         self.wing6_on_death(ti, killer);
+        self.core_on_death(ti, killer);
         self.request_yell(ti, YellKind::Death);
         if self.is_player(id) {
             self.burnout_on_death(ti);

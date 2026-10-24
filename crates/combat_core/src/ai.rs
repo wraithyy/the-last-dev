@@ -416,11 +416,21 @@ impl Sim {
                     let s = &self.units[o].state;
                     (u64::from(s.hp) * 1000 / u64::from(s.max_hp.max(1)), o)
                 }),
+            // The mainframe soaks the boss's attacks: the nearest living ward in range.
+            AiTarget::Ward => (0..self.units.len())
+                .filter(|&o| {
+                    self.content.units[self.units[o].def].ward
+                        && self.units[o].state.hostile != side
+                        && reachable(self, o)
+                })
+                .min_by_key(|&o| o),
             AiTarget::RandomHostile => {
                 let pool: Vec<usize> = (0..self.units.len())
                     .filter(|&o| {
                         self.units[o].state.hostile != side
                             && self.units[o].state.ai != Some(AiState::Evade)
+                            // Ill Marie stands in the middle of the core and is nobody's target.
+                            && !self.content.units[self.units[o].def].untouchable
                             && reachable(self, o)
                     })
                     .collect();

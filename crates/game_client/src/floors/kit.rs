@@ -868,6 +868,13 @@ pub enum Sign {
     IlCoreWelcome,
     IlCoreMonitor,
     IlCoreRack,
+    IlVoteAgree,
+    IlVoteRefuse,
+    IlVoteAsk,
+    IlVoteRemember,
+    IlCoreHatch,
+    IlCoreDraft,
+    IlCoreRerun,
 }
 
 #[derive(Clone, Debug)]
@@ -1654,7 +1661,10 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
         | Sign::IlCoreDoor
         | Sign::IlCoreWelcome
         | Sign::IlCoreMonitor
-        | Sign::IlCoreRack => (256, 96),
+        | Sign::IlCoreRack
+        | Sign::IlCoreHatch
+        | Sign::IlCoreDraft
+        | Sign::IlCoreRerun => (256, 96),
         Sign::IlRoadmapWall => (256, 128),
         _ => (192, 96),
     }

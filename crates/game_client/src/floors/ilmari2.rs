@@ -288,7 +288,7 @@ fn cast(p: &mut Plan, doors: [(&'static str, Sign); 2]) {
 
 /// A ballot terminal: a pedestal with a glowing screen, its letter above and the prop anchor
 /// 1.8 m in front. `face` is +1 for a terminal on the north wall (stand to its south).
-fn ballot(p: &mut Plan, key: &'static str, x: f32, z: f32, face: f32, sign: Sign) {
+pub(super) fn ballot(p: &mut Plan, key: &'static str, x: f32, z: f32, face: f32, sign: Sign) {
     p.boxed(v(x, 0.55, z), v(0.8, 1.1, 0.6), Mat::Dark, true);
     p.boxed(
         v(x, 1.2, z + face * 0.1),
@@ -415,7 +415,7 @@ fn culture_hub(p: &mut Plan) -> Theme {
 // ------------------------------------------------------------------ ilmari2/3: the review stage
 
 /// An HR Portal: a kiosk with a green button, its sign above and the prop anchor 1.8 m in front.
-fn portal(p: &mut Plan, key: &'static str, x: f32, z: f32, face: f32) {
+pub(super) fn portal(p: &mut Plan, key: &'static str, x: f32, z: f32, face: f32) {
     p.boxed(v(x, 0.7, z), v(0.9, 1.4, 0.6), Mat::White, true);
     p.boxed(
         v(x, 1.3, z + face * 0.31),

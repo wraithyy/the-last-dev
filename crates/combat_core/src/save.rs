@@ -93,6 +93,9 @@ pub struct SaveData {
     /// Ilmari killed on Full at least once: the key to Judgment Day (second field of
     /// `ilmari_flags`); optional, old saves load as not cleared.
     pub ilmari_core_full: bool,
+    /// The clock stamp of the core's fall (`ilmari_end`: unix seconds, difficulty, fight ms);
+    /// optional, old saves have none.
+    pub ilmari_end: Option<crate::ilmari_core::IlmariEnd>,
     /// Ilmari Tokens earned this ISO week (`ilmari_tok`: week, count); optional key.
     pub ilmari_tokens: (u32, u32),
     /// The companion loadout (`companions`, unit keys); optional key, none by default.
@@ -238,6 +241,9 @@ impl SaveData {
                 u8::from(self.ilmari_core_full)
             ));
         }
+        if let Some(e) = &self.ilmari_end {
+            out.push_str(&format!("ilmari_end={}\n", e.code()));
+        }
         if self.ilmari_tokens.1 > 0 {
             out.push_str(&format!(
                 "ilmari_tok={},{}\n",
@@ -361,6 +367,7 @@ impl SaveData {
                         s.ilmari_stamp = Some(crate::ilmari::IlmariStamp::new(t, o, z));
                     }
                 }
+                "ilmari_end" => s.ilmari_end = crate::ilmari_core::IlmariEnd::parse(v),
                 "ilmari_tok" => {
                     let mut f = v.splitn(2, ',').map(|x| x.trim().parse::<u32>());
                     if let (Some(Ok(w)), Some(Ok(n))) = (f.next(), f.next()) {
@@ -574,6 +581,7 @@ impl Sim {
             ilmari_stamp: self.ilmari.stamp.clone(),
             ilmari_revealed: self.ilmari.revealed,
             ilmari_core_full: self.ilmari.core_full,
+            ilmari_end: self.ilmari.end.clone(),
             ilmari_tokens: self.ilmari.tokens.get(&player).copied().unwrap_or_default(),
             companions: self.companion_picks(player),
             quest_days: self
@@ -706,6 +714,10 @@ impl Sim {
             save.ilmari_revealed,
             save.ilmari_core_full,
         );
+        self.ilmari.end = save
+            .ilmari_end
+            .clone()
+            .filter(|_| self.ilmari.stamp.is_some());
         self.restore_ilmari_tokens(player, save.ilmari_tokens.0, save.ilmari_tokens.1);
         self.set_companion_picks(player, &save.companions);
         let class = self.class_at(i).map(|c| c.key.clone()).unwrap_or_default();

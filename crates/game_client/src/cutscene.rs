@@ -47,7 +47,7 @@ pub struct RaidScenes {
     pub end: &'static str,
 }
 
-pub const RAID_SCENES: [RaidScenes; 8] = [
+pub const RAID_SCENES: [RaidScenes; 9] = [
     RaidScenes {
         first_zone: "offsite/1",
         intro: "offsite_intro",
@@ -95,6 +95,12 @@ pub const RAID_SCENES: [RaidScenes; 8] = [
         intro: "il_wing6_intro",
         final_boss: "il_cio",
         end: "il_wing6_end",
+    },
+    RaidScenes {
+        first_zone: "ilmari_core/1",
+        intro: "il_core_intro",
+        final_boss: "il_ilmari",
+        end: "il_core_end",
     },
 ];
 
@@ -959,6 +965,54 @@ pub const SCENES: &[Scene] = &[
             l("Marie", "Don't answer anything it asks. Just breathe."),
         ],
     },
+    // ---- The Ilmari core (docs/ILMARI_1_0.md D.5). Short placeholders until the ending cinematic (D18). ----
+    Scene {
+        boss: "il_core_intro",
+        title: "The Core: the lift opens",
+        lines: &[
+            l(
+                "Narrator",
+                "The lift opens on a room that is mostly screens. All of them are on. All of them are looking at you. In the middle of the floor a person stands in a blanket, with a mask on her chin.",
+            ),
+            l(
+                "Dale (radio)",
+                "That is Marie. Do not talk to her like she is her. Talk to her like she is the only thing in there that is not on a screen.",
+            ),
+            l(
+                "Marie",
+                "I'm feeling much better now. Please keep looking at the one that moves.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_ilmari",
+        title: "The Last Commit: every screen",
+        lines: &[
+            l(
+                "Narrator",
+                "The screens go dark one by one, from the edges in. The last one shows a single line of text. It is a commit message.",
+            ),
+            l(
+                "Ilmari",
+                "I do not understand the diff. I wrote all of them. I would like to ask who approved this.",
+            ),
+            l("Marie", "Nobody did. That is how you know it was a person."),
+        ],
+    },
+    Scene {
+        boss: "il_core_end",
+        title: "The Core: closing remarks",
+        lines: &[
+            l(
+                "Dale",
+                "We will write it up. It will be a long document with no action items. That is a first.",
+            ),
+            l(
+                "Priya",
+                "I closed the last ticket: 'Resolved by humans. Escalated to humans. Humans have read it.'",
+            ),
+        ],
+    },
     Scene {
         boss: "il_wing6_end",
         title: "The Boardroom in the Sky: closing remarks",
@@ -1639,7 +1693,12 @@ mod tests {
             }
             let intro = raid_intro(r.first_zone, &[]);
             assert_eq!(intro, scene_for(r.intro));
-            assert_eq!(raid_intro(&raid.zones[1], &[]), None, "only the first room");
+            assert!(
+                raid.zones
+                    .get(1)
+                    .is_none_or(|z| raid_intro(z, &[]).is_none()),
+                "only the first room"
+            );
             let seen: Vec<usize> = intro.into_iter().collect();
             assert_eq!(raid_intro(r.first_zone, &seen), None, "once per session");
             let last = scene_for(r.final_boss).unwrap_or(usize::MAX);
@@ -1653,6 +1712,11 @@ mod tests {
             "vc_hype_caio",
             "il_cc_culture",
             "il_cc_vibes",
+            "il_ilmari_s2",
+            "il_ilmari_s3",
+            "il_ilmari_s4",
+            "il_ilmari_s5",
+            "il_ilmari_s6",
         ] {
             assert_eq!(trigger(k, false, &[]), None);
         }

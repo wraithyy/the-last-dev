@@ -89,6 +89,7 @@ impl Sim {
             e @ (EncounterDef::Cloud(_) | EncounterDef::Outage(_)) => self.wing4_arm(bi, &e),
             EncounterDef::Squads(cfg) => self.wing5_arm(bi, &cfg),
             EncounterDef::Boardroom(cfg) => self.wing6_arm(bi, &cfg),
+            EncounterDef::Core(cfg) => self.core_arm(bi, &std::sync::Arc::new(*cfg)),
             EncounterDef::Echo {
                 add_unit,
                 strike_pct,
@@ -120,6 +121,7 @@ impl Sim {
         self.wing4_disarm();
         self.wing5_disarm();
         self.wing6_disarm();
+        self.core_disarm();
         for i in 0..self.units.len() {
             let u = &self.units[i];
             if !u.despawned && self.content.units[u.def].swarm.is_some() {
@@ -186,7 +188,7 @@ impl Sim {
     }
 
     /// Every living friendly unit takes a hit that finishes it: players, and companions with them.
-    fn wipe_room(&mut self, boss: EntityId) {
+    pub(crate) fn wipe_room(&mut self, boss: EntityId) {
         let doomed: Vec<(usize, u32)> = (0..self.units.len())
             .filter(|&i| {
                 let u = &self.units[i];

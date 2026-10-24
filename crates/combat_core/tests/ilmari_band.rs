@@ -41,7 +41,7 @@ fn rewards_pieces(c: &Content) -> Vec<&str> {
 fn the_wings_one_to_four_band_as_authored() {
     let c = content();
     let all: Vec<_> = c.raids.iter().filter(|r| r.ilmari).collect();
-    assert_eq!(all.len(), 6, "Wings 1-6 exist, the core is a skeleton zone");
+    assert_eq!(all.len(), 7, "Wings 1-6 and the core exist");
     // Wings 1-4 hold the "three loose pieces per boss" rule; Wing 5 also drops tier pieces (below).
     let wings: Vec<_> = all.into_iter().take(4).collect();
     // (lowest, highest) ilvl of each wing's own drops, read from the content rather than the doc.

@@ -562,3 +562,60 @@ fn companions_are_never_notified_and_a_wing_six_replay_is_bit_identical() {
         assert_eq!(fingerprint(pct), fingerprint(pct), "at {pct}%");
     }
 }
+
+/// The core (D10, D11): Ilmari's screens are not Story's problem for a companion. They never
+/// vote (Ill Marie's rounds decide by the people in the room, and silence takes the tie rule),
+/// they are never put on standby or held, and the fight with company, through the end of the
+/// remixes and every round of P2, replays bit for bit.
+#[test]
+fn companions_abstain_in_the_core_and_a_replay_with_company_is_bit_identical() {
+    let run_core = || {
+        let (mut sim, ids) = room(1, true, 24);
+        let p = ids[0];
+        sim.set_companion_picks(p, &keys(&[DALE, PRIYA]));
+        load(&mut sim, "ilmari_core/1");
+        let boss = unit_of(&sim, "il_ilmari").expect("boss");
+        open_on(&mut sim, p, boss);
+        let mut log = Vec::new();
+        for k in 0..(40 + 3 * 70 + 40) * SECOND {
+            log.extend(sim.tick());
+            if k == 30 * SECOND {
+                for s in sim
+                    .units()
+                    .filter(|u| u.key.starts_with("il_ilmari") && u.alive)
+                    .map(|u| u.id)
+                    .collect::<Vec<_>>()
+                {
+                    let max = sim.unit(s).expect("screen").max_hp;
+                    sim.debug_set_hp(s, max * 69 / 100);
+                }
+            }
+        }
+        let mine = sim.companions_of(p);
+        assert_eq!(mine.len(), 2, "company came");
+        assert!(
+            !log.iter().any(|e| matches!(
+                e,
+                Event::AuraApplied { target, key }
+                    if mine.contains(target)
+                        && (key == "il_screen_standby" || key == "il_alignment_hold" || key.starts_with("il_stance"))
+            )),
+            "a companion was put on standby, held or given a stance"
+        );
+        // Nobody voted: every round ended on the tie rule alone.
+        assert!(
+            log.iter().all(|e| !matches!(
+                e,
+                Event::Core { tally, .. } if tally.iter().any(|n| *n > 0)
+            )),
+            "a companion cast a vote"
+        );
+        assert!(
+            log.iter()
+                .any(|e| matches!(e, Event::PhaseChanged { phase: 3, .. })),
+            "the rounds ran out on their own"
+        );
+        format!("{log:?}")
+    };
+    assert_eq!(run_core(), run_core());
+}

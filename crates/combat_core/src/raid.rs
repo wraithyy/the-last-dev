@@ -33,6 +33,23 @@ fn yes() -> bool {
     true
 }
 
+/// Seat `k` of `n` on a ring of radius `r` around `center`, facing the middle: seat 0 is behind
+/// the middle as seen from where the boss spawn faces (`yaw`), the boss's own anchor; the rest
+/// follow round.
+fn ring_spot(
+    center: crate::geom::Vec3,
+    yaw: f32,
+    r: f32,
+    k: usize,
+    n: usize,
+) -> (crate::geom::Vec3, f32) {
+    let turn = std::f32::consts::TAU * k as f32 / n.max(1) as f32;
+    let a = yaw + std::f32::consts::PI + turn;
+    let f = crate::geom::forward(a);
+    let at = crate::geom::Vec3::new(center.x + f.x * r, center.y, center.z + f.z * r);
+    (at, crate::ai::yaw_toward(at, center))
+}
+
 /// Linked bosses: one shared health bar (proportional), one death, and every member but one
 /// shielded; each swap hands the opening to the next member in order.
 #[derive(Clone, Debug, Deserialize)]
@@ -55,6 +72,18 @@ pub struct TwinsDef {
     /// The Culture Committee: each swap closes a vote on a raid-wide policy.
     #[serde(default)]
     pub vote: Option<VoteDef>,
+    /// The core's six screens: the members stand on a ring of this radius, the boss at its
+    /// anchor (seat 0, the far side from where it faces) and the rest round in member order,
+    /// every one facing the middle.
+    #[serde(default)]
+    pub ring_m: Option<f32>,
+    /// Story swaps on this clock instead of `swap_ms`.
+    #[serde(default)]
+    pub story_swap_ms: Option<u32>,
+    /// The member that opens is quiet for this long (its abilities start late), so a swap hands
+    /// over a target, not a burst.
+    #[serde(default)]
+    pub calm_ms: u32,
 }
 
 /// A panel that votes on a policy at every swap (docs/ILMARI_09.md B.5). `show` of the
@@ -325,7 +354,7 @@ pub(crate) struct RaidState {
     tethers: Vec<Tether>,
     next_tether_check: u64,
     /// Next twin swap; `u64::MAX` while the twins are not fighting.
-    next_swap: u64,
+    pub(crate) next_swap: u64,
     /// Guards the linked-HP mirror against recursion.
     linking: bool,
     announce: bool,
@@ -463,16 +492,18 @@ impl Sim {
         self.wing4_on_join(player);
         self.wing5_on_join(player);
         self.wing6_on_join(player);
+        self.core_on_join(player);
     }
 
     /// The door from outside into a raid opens only with everyone at the level cap (a dungeon:
     /// at its band's lower level); links inside follow their content `requires`.
     pub(crate) fn raid_link_open(&self, from: &str, to: &str) -> Option<bool> {
         let into = self.content.raid_of(to)?;
+        // The lift between the Boardroom and the core joins two Ilmari rooms: still inside.
         let inside = self
             .content
             .raid_of(from)
-            .is_some_and(|r| r.name == into.name);
+            .is_some_and(|r| r.name == into.name || (r.ilmari && into.ilmari));
         (!inside).then(|| self.everyone_at(into.entry_level(&self.content)))
     }
 
@@ -552,12 +583,22 @@ impl Sim {
             let b = &self.units[bi];
             let (pos, yaw, level, pack) = (b.state.pos, b.state.yaw, b.state.level, b.state.pack);
             let side = crate::telegraph::right(yaw);
+            let n = t.members().len();
+            // The boss's anchor is seat 0 of the ring; the middle is a radius ahead of it.
+            let centre = t.ring_m.map(|r| {
+                let f = crate::geom::forward(yaw);
+                crate::geom::Vec3::new(pos.x + f.x * r, pos.y, pos.z + f.z * r)
+            });
             for (k, key) in t.members().into_iter().skip(1).enumerate() {
                 let Ok(def) = self.def_index(key) else {
                     continue;
                 };
                 let off = if k == 0 { 5.0 } else { -5.0 * k as f32 };
                 let at = crate::geom::Vec3::new(pos.x + side.x * off, pos.y, pos.z + side.z * off);
+                let (at, yaw) = match (t.ring_m, centre) {
+                    (Some(r), Some(c)) => ring_spot(c, yaw, r, k + 1, n),
+                    _ => (at, yaw),
+                };
                 let id = self.spawn(
                     def,
                     at,
@@ -789,20 +830,37 @@ impl Sim {
         };
         self.link_threat(&idx);
         let fighting = idx.iter().any(|&i| self.units[i].state.in_combat);
+        let swap_ms = match t.story_swap_ms {
+            Some(ms) if self.raid.story => ms,
+            _ => t.swap_ms,
+        };
         if !fighting {
             self.raid.next_swap = u64::MAX;
             self.vote_reset();
+            // An evade strips every aura, the shields with them: the first member stands open
+            // again, the rest are shielded before the next pull.
+            for &i in &idx[1..] {
+                if !self.has_aura(i, &t.shield_aura) {
+                    let id = Self::id_of(i);
+                    self.apply_aura(i, &t.shield_aura, SHIELD_MS, None, id, None);
+                }
+            }
             return;
         }
         if self.raid.next_swap == u64::MAX {
-            self.raid.next_swap = self.now + ticks(t.swap_ms);
+            self.raid.next_swap = self.now + ticks(swap_ms);
             self.vote_open(&t);
+            return;
+        }
+        // The core's later phases and the Autoscaler remix keep the open screen where it is.
+        if self.core_holds_swap() {
+            self.raid.next_swap = self.now + ticks(swap_ms);
             return;
         }
         if self.now < self.raid.next_swap {
             return;
         }
-        self.raid.next_swap = self.now + ticks(t.swap_ms);
+        self.raid.next_swap = self.now + ticks(swap_ms);
         self.vote_close(&t, idx[0]);
         let n = idx.len();
         if t.swap_places {
@@ -822,6 +880,12 @@ impl Sim {
             .unwrap_or(0);
         let next = idx[(open + 1) % n];
         self.remove_aura(next, &t.shield_aura, AuraEnd::Expired);
+        if t.calm_ms > 0 {
+            let at = self.now + ticks(t.calm_ms);
+            for slot in &mut self.units[next].ability_next {
+                *slot = (*slot).max(at);
+            }
+        }
         let was = idx[open];
         let was_id = Self::id_of(was);
         self.apply_aura(was, &t.shield_aura, SHIELD_MS, None, was_id, None);
@@ -874,6 +938,7 @@ impl Sim {
         self.update_wing4();
         self.update_wing5();
         self.update_wing6();
+        self.update_core();
         self.update_judgment();
     }
 

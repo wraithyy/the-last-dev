@@ -473,7 +473,7 @@ fn hiring_floor(p: &mut Plan) -> Theme {
 
 /// A label printer: a steel box with a paper tongue, a green LED and its own sign. The prop
 /// anchor sits 1.7 m in front of it.
-fn label_printer(p: &mut Plan, key: &'static str, x: f32, z: f32, face: f32) {
+pub(super) fn label_printer(p: &mut Plan, key: &'static str, x: f32, z: f32, face: f32) {
     p.boxed(v(x, 0.45, z), v(1.1, 0.9, 0.7), Mat::Metal, true);
     p.boxed(v(x, 0.95, z), v(0.9, 0.12, 0.6), Mat::Dark, false);
     p.boxed(

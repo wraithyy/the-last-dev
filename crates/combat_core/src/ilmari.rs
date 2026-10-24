@@ -114,6 +114,8 @@ pub(crate) struct IlmariState {
     /// The room's sim has killed Ilmari on Full at least once: the key to Judgment Day. The core
     /// sets it (`mark_core_full_clear`); a save carries it, online it is the room's own progress.
     pub(crate) core_full: bool,
+    /// The clock stamp of the core's fall (`ilmari_end`), once told.
+    pub(crate) end: Option<crate::ilmari_core::IlmariEnd>,
     /// Judgment Day: players who spent their one revive in the pull that is running.
     pub(crate) jd_spent: std::collections::BTreeSet<EntityId>,
 }

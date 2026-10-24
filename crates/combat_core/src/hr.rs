@@ -37,7 +37,7 @@ pub(crate) struct HrState {
     /// The loaded zone belongs to an Ilmari wing: scores are only kept there.
     tracking: bool,
     mirrors: Vec<Mirror>,
-    perf: HashMap<EntityId, Perf>,
+    pub(crate) perf: HashMap<EntityId, Perf>,
     /// The open vote: policy aura keys on the ballot, the uses of each slot, the policy that
     /// passed last.
     pub(crate) offered: Vec<String>,

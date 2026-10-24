@@ -27,6 +27,7 @@ mod keybinds;
 mod legacy;
 mod live;
 mod loot_fx;
+mod marie_log;
 mod minigame;
 mod nameplates;
 mod net;
@@ -161,6 +162,7 @@ fn main() {
         settings::SettingsPlugin,
         cutscene::CutscenePlugin,
         ilmari_open::IlmariOpenPlugin,
+        marie_log::MarieLogPlugin,
         ilmari_world::IlmariWorldPlugin,
         ilmari_wing::IlmariWingPlugin,
         swarm_fx::SwarmFxPlugin,

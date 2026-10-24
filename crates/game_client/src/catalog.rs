@@ -3171,6 +3171,81 @@ static TABLE: &[(&str, UnitVisual)] = &[
         ),
     ),
     (
+        "il_ilmari",
+        v(
+            "prim/kpi_dashboard",
+            4.6,
+            "ILMARI (1 of 6)",
+            "<On Every Screen>",
+            &[],
+        ),
+    ),
+    (
+        "il_ilmari_s2",
+        v(
+            "prim/kpi_dashboard",
+            4.6,
+            "ILMARI (2 of 6)",
+            "<On Every Screen>",
+            &[],
+        ),
+    ),
+    (
+        "il_ilmari_s3",
+        v(
+            "prim/kpi_dashboard",
+            4.6,
+            "ILMARI (3 of 6)",
+            "<On Every Screen>",
+            &[],
+        ),
+    ),
+    (
+        "il_ilmari_s4",
+        v(
+            "prim/kpi_dashboard",
+            4.6,
+            "ILMARI (4 of 6)",
+            "<On Every Screen>",
+            &[],
+        ),
+    ),
+    (
+        "il_ilmari_s5",
+        v(
+            "prim/kpi_dashboard",
+            4.6,
+            "ILMARI (5 of 6)",
+            "<On Every Screen>",
+            &[],
+        ),
+    ),
+    (
+        "il_ilmari_s6",
+        v(
+            "prim/kpi_dashboard",
+            4.6,
+            "ILMARI (6 of 6)",
+            "<On Every Screen>",
+            &[],
+        ),
+    ),
+    // Ill Marie in the core: the mask on her chin, a blanket for a shirt, the stare.
+    (
+        "il_marie_core",
+        v(
+            CASUAL_F,
+            1.7,
+            "Marie",
+            "<ILMARI - Autonomous Agent Pilot #1>",
+            &[
+                paint("Skin", 0.9, 0.88, 0.86),
+                paint("Shirt", 0.55, 0.6, 0.75),
+                paint("Pants", 0.9, 0.9, 0.95),
+            ],
+        ),
+    ),
+    (
         "il_surveyor",
         v(
             CASUAL_M,

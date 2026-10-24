@@ -480,7 +480,9 @@ pub fn mine(
         | PropKind::Rack
         | PropKind::OptOut
         | PropKind::Honeypot
-        | PropKind::Inbox => String::new(),
+        | PropKind::Inbox
+        | PropKind::Vote
+        | PropKind::Log => String::new(),
     })
 }
 
@@ -553,6 +555,8 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
             "Spring the honeypot (every Blue cone looks at it for 8 s, 40 s for the group)"
         }
         PropKind::Inbox => "Clear the inbox (the whole party's pending message)",
+        PropKind::Vote => "Cast your vote (once per round, the group decides)",
+        PropKind::Log => "Read the log (the first time it is yours to keep)",
     };
     let extra = match def.kind {
         PropKind::FireAlarm => "WARNING: every enemy on this floor will come for you.".to_string(),

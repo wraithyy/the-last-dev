@@ -22,6 +22,7 @@ pub mod geom;
 mod hr;
 pub mod illusion;
 pub mod ilmari;
+mod ilmari_core;
 pub mod judgment;
 pub mod legacy;
 pub mod live;
@@ -77,6 +78,10 @@ pub use economy::{
 pub use endgame::{DEPARTMENTS, DepartmentDef, EndgameDef, RankDef, RepTier};
 pub use floors::{CORPSE_EMPTY_MS, CORPSE_LOOT_MS, pack_offsets};
 pub use geom::{Aabb, Vec3, distance, forward, in_range, is_facing, line_of_sight};
+pub use ilmari_core::{
+    COMMITS, Choice, CommitLine, CoreDef, IlmariEnd, OPTIONS, PactDef, ROUNDS, RemixDef, RoundDef,
+    Stance, commit_log, culprit_index, judgment_stances, round_winner, stance_for,
+};
 pub use legacy::{LegacyDef, LegacyError, LegacyTwist, LegacyView, LegacyZone};
 pub use live::WorldBossState;
 pub use minigame::{

@@ -900,6 +900,9 @@ pub enum AiTarget {
     /// The most injured ally (by HP percent) in range, including itself; skipped while all are full.
     AllyLowestHp,
     RandomHostile,
+    /// The living friendly unit flagged `UnitDef::ward` (the core's COBOL mainframe); skipped
+    /// while there is none.
+    Ward,
 }
 
 /// One rule of the enemy ability interpreter.
@@ -1177,6 +1180,15 @@ pub struct UnitDef {
     /// Hostile units: a vision cone and a patrol (`sight.rs`).
     #[serde(default)]
     pub sight: Option<crate::sight::SightDef>,
+    /// A unit that is rebuilt when its partner outlives it (`ilmari_core.rs`, the Rack Arms).
+    #[serde(default)]
+    pub death_pact: Option<crate::ilmari_core::PactDef>,
+    /// A friendly unit the boss's `AiTarget::Ward` attacks go for (the core's mainframe).
+    #[serde(default)]
+    pub ward: bool,
+    /// A ward's death loses the fight: the room wipes.
+    #[serde(default)]
+    pub ward_death_wipes: bool,
 }
 
 /// Rolling-window splitting: more than `threshold_pct` of the unit's max HP in player damage inside
@@ -1298,6 +1310,9 @@ pub enum EncounterDef {
     /// The Chief Ilmari Officer: desks, the inbox, the two-kick landing and the severance meter
     /// (docs/ILMARI_1_0.md D.4).
     Boardroom(Box<crate::wing6::BoardroomDef>),
+    /// Ilmari, "The Last Commit": the remix deck, Ill Marie's rounds and the stance they choose
+    /// (docs/ILMARI_1_0.md D.5).
+    Core(Box<crate::ilmari_core::CoreDef>),
 }
 
 /// The cloud bill: a meter of 0..=1000 points that grows with the living replicas.
@@ -2256,6 +2271,12 @@ impl Content {
                 Some(EncounterDef::Boardroom(b)) if !b.validate(self, &u.key) || !u.boss => {
                     return bad(format!(
                         "unit {} boardroom encounter needs known spells, auras and units, and a boss",
+                        u.key
+                    ));
+                }
+                Some(EncounterDef::Core(c)) if !c.validate(self, &u.key) || !u.boss => {
+                    return bad(format!(
+                        "unit {} core encounter needs known spells, auras and units, a full deck, three rounds, four terminals and a boss",
                         u.key
                     ));
                 }
