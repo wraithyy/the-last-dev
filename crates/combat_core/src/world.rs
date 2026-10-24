@@ -178,6 +178,15 @@ pub struct PropDef {
     /// `Log` props: Ilmari tokens paid with the item, once.
     #[serde(default)]
     pub tokens: u32,
+    /// `Class` props of Wing 3: the swarm clusters move at half speed for this long (a Rate Limit).
+    #[serde(default)]
+    pub swarm_slow_ms: u32,
+    /// `Class` props of Wing 3: the clusters stop eating the drafts for this long (robots.txt).
+    #[serde(default)]
+    pub swarm_comply_ms: u32,
+    /// `OptOut` props: stands on the kiosks' second site, which a relocating offer wave swaps in.
+    #[serde(default)]
+    pub alt: bool,
 }
 
 /// A friendly unit spawned at a layout anchor of one zone, outside `ZoneDef::friendly`.

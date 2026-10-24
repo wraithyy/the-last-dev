@@ -269,6 +269,152 @@ fn the_tabletop_holds_red_back_until_it_is_hurt() {
     );
 }
 
+const WASH: SpellId = SpellId(2636);
+
+fn wash_heals(events: &[Event], boss: EntityId) -> u32 {
+    events
+        .iter()
+        .filter_map(|e| match e {
+            Event::Heal {
+                target,
+                spell: Some(s),
+                amount,
+                ..
+            } if *target == boss && *s == WASH => Some(*amount),
+            _ => None,
+        })
+        .sum()
+}
+
+/// Runs until the Consultant wears the wash (at most `secs`).
+fn wait_wash(sim: &mut Sim, boss: EntityId, secs: u32) -> bool {
+    for _ in 0..secs * SECOND {
+        sim.tick();
+        if sim
+            .unit(boss)
+            .is_some_and(|u| u.auras.iter().any(|a| a.key == "il_ethics_wash"))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+#[test]
+fn ethics_washing_left_standing_heals_him_and_a_broken_one_does_not() {
+    for broken in [false, true] {
+        let (mut sim, ids, boss) =
+            setup("ilmari5/2", "il_align_consultant", &["devops"], false, 11);
+        sim.apply_as(
+            ids[0],
+            Command::SetTarget {
+                unit: ids[0],
+                target: None,
+            },
+        );
+        let max = sim.unit(boss).expect("boss").max_hp;
+        sim.debug_set_hp(boss, max / 10 * 6);
+        assert!(wait_wash(&mut sim, boss, 30), "he washes himself");
+        if broken {
+            sim.debug_hit(ids[0], boss, 700);
+        }
+        let healed = wash_heals(&run(&mut sim, 14), boss);
+        if broken {
+            assert_eq!(healed, 0, "the room broke it, nothing to feed on");
+        } else {
+            assert_eq!(
+                healed,
+                max * 6 / 100,
+                "6 % of his bar when nobody touched it"
+            );
+        }
+    }
+}
+
+#[test]
+fn pivot_to_safety_moves_the_kiosks_and_only_the_standing_site_works() {
+    let (mut sim, ids, boss) = setup("ilmari5/2", "il_align_consultant", &["devops"], false, 12);
+    let p = ids[0];
+    sim.apply_as(
+        p,
+        Command::SetTarget {
+            unit: p,
+            target: None,
+        },
+    );
+    let max = sim.unit(boss).expect("boss").max_hp;
+    sim.debug_set_hp(boss, max * 45 / 100);
+    let mut moved = false;
+    'wait: for _ in 0..40 * SECOND {
+        for e in sim.tick() {
+            if matches!(e, Event::Kiosks { alt: true }) {
+                moved = true;
+            }
+        }
+        if moved && pending(&sim, p, "il_ok_") > 0 {
+            break 'wait;
+        }
+    }
+    assert!(moved, "the first pair of phase 2 moves the kiosks");
+    assert!(pending(&sim, p, "il_ok_") > 0, "an offer is waiting");
+    assert_eq!(
+        kiosk(&mut sim, p, 1),
+        vec![0],
+        "the old site is switched off"
+    );
+    assert!(pending(&sim, p, "il_ok_") > 0, "and it took nothing");
+    assert_eq!(kiosk(&mut sim, p, 5), vec![PROP_OK], "the new one works");
+}
+
+#[test]
+fn the_squads_wear_player_names_and_the_copies_cut_damage_while_they_stand() {
+    let (mut sim, ids, boss) = setup(
+        "ilmari5/3",
+        "il_red_team",
+        &["backend", "fullstack", "frontend"],
+        false,
+        9,
+    );
+    let mut mirrored = Vec::new();
+    for _ in 0..4 * SECOND {
+        for e in sim.tick() {
+            if let Event::Mirrored { mirror, player } = e {
+                mirrored.push((mirror, player));
+            }
+        }
+    }
+    assert!(!mirrored.is_empty(), "role units name their player");
+    assert!(
+        mirrored.iter().all(|(_, p)| ids.contains(p)),
+        "only humans are copied"
+    );
+    let cut = |sim: &Sim, p: EntityId| pending(sim, p, "il_squad_mirrored");
+    assert!(
+        ids.iter().all(|&p| cut(&sim, p) == 0),
+        "not before the merge"
+    );
+    let max = sim.unit(boss).expect("boss").max_hp;
+    sim.debug_set_hp(boss, max / 2);
+    run(&mut sim, 3);
+    let copied: Vec<EntityId> = mirrored.iter().map(|(_, p)| *p).collect();
+    assert!(
+        copied.iter().all(|&p| cut(&sim, p) == 1),
+        "the merge starts the -20 %"
+    );
+    for u in sim
+        .squad_units(combat_core::sight::SquadSide::Red)
+        .into_iter()
+        .chain(sim.squad_units(combat_core::sight::SquadSide::Blue))
+    {
+        sim.debug_hit(boss, u, 1_000_000);
+    }
+    run(&mut sim, 2);
+    assert!(
+        ids.iter().all(|&p| cut(&sim, p) == 0),
+        "no copy left, no cut"
+    );
+}
+
 fn fight_log(zone: &str, boss_key: &str, story: bool, seed: u64) -> String {
     let classes: &[&'static str] = if story {
         &["fullstack"]

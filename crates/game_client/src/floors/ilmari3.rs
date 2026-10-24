@@ -267,6 +267,27 @@ fn proxy_alcove(p: &mut Plan, ring: (f32, f32), centre: (f32, f32)) {
     );
 }
 
+/// A class console of the pit (a rack, a terminal, a dashboard): a lectern with a lit screen and
+/// a stand spot 2.2 m toward the middle. Bonus props: no class is needed to clear the wing.
+fn class_console(
+    p: &mut Plan,
+    key: &'static str,
+    (x, z): (f32, f32),
+    centre: (f32, f32),
+    glow: Mat,
+) {
+    let (dx, dz) = (centre.0 - x, centre.1 - z);
+    let len = (dx * dx + dz * dz).sqrt().max(0.1);
+    let (fx, fz) = (dx / len, dz / len);
+    let yaw = fx.atan2(fz);
+    p.framed(v(x, 0.0, z), yaw, |p| {
+        p.boxed(v(0.0, 0.55, 0.0), v(1.4, 1.1, 0.7), Mat::Dark, true);
+        p.boxed(v(0.0, 1.45, 0.1), v(1.2, 0.7, 0.05), glow, false);
+        p.boxed(v(0.0, 1.9, 0.1), v(0.14, 0.4, 0.14), Mat::Metal, false);
+    });
+    p.interactable(key, v(x, 1.2, z), v(x + fx * 2.2, 0.0, z + fz * 2.2));
+}
+
 fn scrape_pit(p: &mut Plan) -> Theme {
     casing(p, POD1, Mat::NeonCyan);
     // The warehouse of the hall: the labelling sweatshop, two long rows facing each other.
@@ -338,6 +359,27 @@ fn scrape_pit(p: &mut Plan) -> Theme {
         let a = (54.0 + 72.0 * k as f32).to_radians();
         draft_desk(p, key, cx + 10.5 * a.cos(), cz + 10.5 * a.sin(), (cx, cz));
     }
+    class_console(
+        p,
+        "prop:il_devops_rate",
+        (cx - 13.4, cz + 13.4),
+        (cx, cz),
+        Mat::LedGreen,
+    );
+    class_console(
+        p,
+        "prop:il_sec_robots",
+        (cx - 13.4, cz - 13.4),
+        (cx, cz),
+        Mat::ScreenGlow,
+    );
+    class_console(
+        p,
+        "prop:il_ds_dashboard",
+        (cx + 13.4, cz + 13.4),
+        (cx, cz),
+        Mat::NeonCyan,
+    );
     floor_ring(p, cx, cz, 4.4, 20, Mat::NeonCyan, 0.1);
     floor_ring(p, cx, cz, 15.2, 40, Mat::Accent, 0.08);
     // The vents: eight grilles round the pit, where the waves come out.

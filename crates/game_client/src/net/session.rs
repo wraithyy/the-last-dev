@@ -459,6 +459,7 @@ fn apply(
         ServerMsg::Pong { t } => world.record_pong(t, clock()),
         ServerMsg::TickStat { p99_us } => world.link.tick_p99_us = Some(p99_us),
         ServerMsg::IlmariPending { on } => world.set_ilmari_pending(on),
+        ServerMsg::IlmariRevealed => world.ilmari_replay = true,
         ServerMsg::Welcome { .. }
         | ServerMsg::RoomCreated { .. }
         | ServerMsg::Error { .. }

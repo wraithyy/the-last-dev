@@ -491,6 +491,7 @@ impl Sim {
         self.wing3_on_join(player);
         self.wing4_on_join(player);
         self.wing5_on_join(player);
+        self.offers_on_join(player);
         self.wing6_on_join(player);
         self.core_on_join(player);
     }

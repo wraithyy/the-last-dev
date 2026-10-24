@@ -916,7 +916,18 @@ impl Sim {
                 .map(|a| (a.key.clone(), a.source, a.spell, a.expire_amount))
                 .collect();
             for (key, source, spell, boom) in expired {
-                if !self.remove_aura(ti, &key, AuraEnd::Expired) || boom == 0 {
+                let heal_pct = self.content.aura(&key).map_or(0, |d| d.expire_heal_pct);
+                if !self.remove_aura(ti, &key, AuraEnd::Expired) {
+                    continue;
+                }
+                // A shield left standing feeds its bearer (Ethics Washing); a depleted or
+                // dispelled one never gets here.
+                if heal_pct > 0 {
+                    let amount =
+                        (u64::from(self.units[ti].state.max_hp) * u64::from(heal_pct) / 100) as u32;
+                    self.heal(Self::id_of(ti), ti, spell, amount);
+                }
+                if boom == 0 {
                     continue;
                 }
                 let school = self.content.aura(&key).map_or(School::Arcane, |d| d.school);

@@ -121,6 +121,10 @@ impl Sim {
                 self.mark_prop_used(tid, k);
             }
         }
+        if def.swarm_slow_ms > 0 || def.swarm_comply_ms > 0 {
+            let half = |ms: u32| if fullstack { ms / 2 } else { ms };
+            self.swarm_hold(half(def.swarm_slow_ms), half(def.swarm_comply_ms));
+        }
         say(self, PROP_OK | flag);
         self.quest_credit(
             player,

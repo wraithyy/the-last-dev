@@ -342,6 +342,8 @@ impl RoomState {
                 Audience::Only(player),
                 &ServerMsg::IlmariPending { on: true },
             );
+        } else if self.sim.ilmari_open() {
+            self.push(Audience::Only(player), &ServerMsg::IlmariRevealed);
         }
         true
     }

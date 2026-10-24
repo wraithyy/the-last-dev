@@ -197,6 +197,9 @@ pub struct NetWorld {
     unlocked: BTreeSet<String>,
     /// The room's AGI is down and its Opening has not been revealed (`ServerMsg::IlmariPending`).
     pub ilmari_pending: bool,
+    /// The room revealed its Opening before this client joined (`ServerMsg::IlmariRevealed`):
+    /// this client may play its own copy once, for show.
+    pub ilmari_replay: bool,
     tick: u64,
     cooldowns: HashMap<SpellId, (u64, u32)>,
     gcd: (u64, u32),
@@ -250,6 +253,7 @@ impl NetWorld {
             bosses_killed: BTreeSet::new(),
             unlocked: BTreeSet::new(),
             ilmari_pending: false,
+            ilmari_replay: false,
             tick: 0,
             cooldowns: HashMap::new(),
             gcd: (0, 0),

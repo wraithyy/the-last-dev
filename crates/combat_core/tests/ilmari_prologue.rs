@@ -403,7 +403,7 @@ fn the_new_world_quests_play_out_in_the_occupied_campus() {
     assert_eq!(w.tokens(), 5 + 5);
 }
 
-/// Brenda's Wing 5 and 6 pages: a rubber band for one token and a shelf for each wing, tokens only.
+/// Brenda's pages for Wings 3 to 6 and the core: a rubber band for one token and a shelf for each, tokens only.
 #[test]
 fn the_quartermasters_new_pages_cost_tokens() {
     let c = content();
@@ -417,6 +417,9 @@ fn the_quartermasters_new_pages_cost_tokens() {
         ("Rubber Band (The Missing One)", 1),
         ("Ethics Hotline Hold Music (Cassette)", 6),
         ("Hard Hat (Aligned With Your Head)", 6),
+        ("Annotation Tea (Ground Truth Blend)", 4),
+        ("Spot Instance Voucher (Revoked)", 5),
+        ("Last Commit Mint (Signed Off)", 8),
     ] {
         assert!(
             shop.stock.iter().any(|s| s == item),

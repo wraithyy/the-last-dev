@@ -42,6 +42,10 @@ pub struct SquadsDef {
     /// Mirrored onto both squads when the boss wears it (Budget Approved).
     #[serde(default)]
     pub enrage_aura: Option<String>,
+    /// On every player with a living copy in the squads from the merge on ("mirrored": the
+    /// copied player hits 20 % weaker while their copy stands).
+    #[serde(default)]
+    pub mirror_aura: Option<String>,
     /// Judgment's rider: live from the start, no honeypots, a sighting teleports.
     #[serde(default)]
     pub rider: Option<String>,
@@ -63,6 +67,7 @@ impl SquadsDef {
         let auras = [&self.standby_aura, &self.boss_aura, &self.purple_aura]
             .into_iter()
             .chain(self.enrage_aura.iter())
+            .chain(self.mirror_aura.iter())
             .chain(self.rider.iter());
         auras.into_iter().all(|a| c.aura(a).is_some())
             && self.merge_phase >= 2
@@ -153,6 +158,19 @@ impl Sim {
     }
 
     pub(crate) fn wing5_disarm(&mut self) {
+        self.offers_reset_kiosks();
+        if let Some(aura) = self
+            .wing5
+            .rt
+            .as_ref()
+            .and_then(|rt| rt.cfg.mirror_aura.clone())
+        {
+            for (p, _) in self.squad_copied_players() {
+                if let Some(pi) = self.index(p) {
+                    self.remove_aura(pi, &aura, AuraEnd::Expired);
+                }
+            }
+        }
         if let Some(rt) = self.wing5.rt.take()
             && rt.sent != (false, 0, false)
         {
@@ -312,6 +330,21 @@ impl Sim {
             }
             if blue.is_empty() && rt.blue_gone.is_none() {
                 rt.blue_gone = Some(self.now);
+            }
+        }
+        if rt.merged
+            && !story
+            && let Some(a) = &cfg.mirror_aura
+        {
+            for (p, copy_alive) in self.squad_copied_players() {
+                let Some(pi) = self.index(p) else { continue };
+                let wants = copy_alive && self.units[pi].state.alive;
+                let has = self.has_aura(pi, a);
+                if wants && !has {
+                    self.apply_aura(pi, a, LONG_MS, None, boss, None);
+                } else if !wants && has {
+                    self.remove_aura(pi, a, AuraEnd::Expired);
+                }
             }
         }
         if let Some(e) = &cfg.enrage_aura

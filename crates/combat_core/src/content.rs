@@ -184,6 +184,10 @@ pub struct AuraDef {
     /// Damage dealt to the bearer when the aura runs out naturally (not when dispelled).
     #[serde(default)]
     pub expire_damage: u32,
+    /// The bearer heals this percent of its max HP when the aura runs out naturally (a shield
+    /// nobody broke); not when it is dispelled, depleted or dies.
+    #[serde(default)]
+    pub expire_heal_pct: u32,
     /// The bearer gains a stack whenever it casts the same spell twice in a row.
     #[serde(default)]
     pub stack_on_repeat_cast: bool,

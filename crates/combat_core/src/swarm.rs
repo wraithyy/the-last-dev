@@ -63,6 +63,10 @@ pub struct DraftView {
 #[derive(Default)]
 pub(crate) struct SwarmState {
     drafts: Vec<Draft>,
+    /// Until these ticks the clusters walk at half speed (a DevOps rack's Rate Limit) and leave
+    /// the drafts alone (a Security terminal's robots.txt).
+    slow_until: u64,
+    comply_until: u64,
 }
 
 impl Sim {
@@ -89,9 +93,28 @@ impl Sim {
         true
     }
 
+    /// A class prop's hold on the clusters: half speed for `slow_ms`, no eating for `comply_ms`.
+    pub(crate) fn swarm_hold(&mut self, slow_ms: u32, comply_ms: u32) {
+        let now = self.now;
+        if slow_ms > 0 {
+            self.swarm.slow_until = self
+                .swarm
+                .slow_until
+                .max(now + crate::content::ticks(slow_ms));
+        }
+        if comply_ms > 0 {
+            self.swarm.comply_until = self
+                .swarm
+                .comply_until
+                .max(now + crate::content::ticks(comply_ms));
+        }
+    }
+
     /// Forgets every draft (the encounter ended or reset).
     pub(crate) fn drafts_clear(&mut self) {
         self.swarm.drafts.clear();
+        self.swarm.slow_until = 0;
+        self.swarm.comply_until = 0;
     }
 
     /// Marks draft `k` Confidential: it takes no bites for `ms`, then waits `cooldown_ms` before
@@ -361,7 +384,12 @@ impl Sim {
         };
         let goal = self.swarm.drafts[di].pos;
         if dist_xz(me, goal) > EAT_RANGE_M {
-            let step = sw.speed / TICK_HZ as f32;
+            let slow = if self.now < self.swarm.slow_until {
+                0.5
+            } else {
+                1.0
+            };
+            let step = sw.speed * slow / TICK_HZ as f32;
             self.units[i].state.yaw = yaw_toward(me, goal);
             self.units[i].state.pos = step_toward(me, goal, step, STOP_M);
             self.units[i].moving = true;
@@ -371,7 +399,7 @@ impl Sim {
         let count = u64::from(sw.count(self.units[i].state.hp));
         let now = self.now;
         let d = &mut self.swarm.drafts[di];
-        if now < d.shield_until {
+        if now < d.shield_until || now < self.swarm.comply_until {
             return;
         }
         let total = count * u64::from(sw.eat_per_drone_per_s) + u64::from(d.acc);

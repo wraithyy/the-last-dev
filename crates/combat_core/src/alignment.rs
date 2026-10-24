@@ -11,7 +11,7 @@ use crate::content::ticks;
 use crate::content::{Content, ContentError};
 use crate::sim::Sim;
 use crate::targeting::EntityId;
-use crate::types::AuraEnd;
+use crate::types::{AuraEnd, Event};
 use serde::Deserialize;
 
 /// `Aligned` and `Pushback` last "until the fight ends"; evade and death clear every aura.
@@ -49,6 +49,10 @@ pub struct OfferDef {
     /// Judgment's rider: while the boss wears this aura the kiosk's per-player cooldown is `.1` ms.
     #[serde(default)]
     pub rider_kiosk: Option<(String, u32)>,
+    /// Each wave moves the Opt-Out Kiosks to the other site ("the policy has been updated"):
+    /// props with `alt: true` work only while the room is on the second site.
+    #[serde(default)]
+    pub relocate: bool,
 }
 
 impl OfferDef {
@@ -111,6 +115,8 @@ pub(crate) struct OfferState {
     /// Per offering boss: (aligned aura, heal tenths per stack) and the next heal tick.
     heals: Vec<(EntityId, String, u32)>,
     next_heal: u64,
+    /// The kiosks stand on their second site (`OfferDef::relocate`).
+    kiosk_alt: bool,
 }
 
 impl OfferState {
@@ -130,6 +136,21 @@ impl Sim {
         self.offers = OfferState::default();
     }
 
+    /// A joiner is told where the kiosks stand (only when they are not on their first site).
+    pub(crate) fn offers_on_join(&mut self, player: EntityId) {
+        if self.offers.kiosk_alt {
+            self.emit_to(player, Event::Kiosks { alt: true });
+        }
+    }
+
+    /// The pull ended: the kiosks go back to their first site.
+    pub(crate) fn offers_reset_kiosks(&mut self) {
+        if self.offers.kiosk_alt {
+            self.offers.kiosk_alt = false;
+            self.events.push(Event::Kiosks { alt: false });
+        }
+    }
+
     /// Guardrails accepted in the pull that began at `since`.
     pub(crate) fn offers_accepted(&self, since: u64) -> u32 {
         self.offers.accepted_in(since)
@@ -145,6 +166,12 @@ impl Sim {
         let boss = Self::id_of(ci);
         let me = self.units[ci].state.pos;
         self.offers.wave_refused = false;
+        if def.relocate {
+            self.offers.kiosk_alt = !self.offers.kiosk_alt;
+            self.events.push(Event::Kiosks {
+                alt: self.offers.kiosk_alt,
+            });
+        }
         let since = self.units[ci].combat_since;
         if self.offers.accepted.0 != since {
             self.offers.accepted = (since, 0);
@@ -365,7 +392,12 @@ impl Sim {
             });
         let cooldown = rider.map_or(def.cooldown_ms, |ms| ms.max(def.cooldown_ms));
         let mine = self.offers.pending.iter().any(|o| o.player == player);
-        if mine && self.prop_ready(player, k, cooldown) && self.offers_cancel(player) > 0 {
+        // A kiosk of the other site is switched off.
+        if mine
+            && def.alt == self.offers.kiosk_alt
+            && self.prop_ready(player, k, cooldown)
+            && self.offers_cancel(player) > 0
+        {
             outcome = crate::world::PROP_OK;
         }
         self.events.push(crate::types::Event::Interacted {

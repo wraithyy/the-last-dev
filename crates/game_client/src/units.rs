@@ -35,6 +35,8 @@ pub struct UnitAssets {
     /// Wing 1 candidates: the human's mug, the android's lanyard (white, no photo; red on Story).
     mug: Handle<StandardMaterial>,
     lanyard: Handle<StandardMaterial>,
+    /// Ill Marie's badge: the grey where a photo should be.
+    grey: Handle<StandardMaterial>,
 }
 
 /// The android candidate's lanyard strip; `ilmari_wing` turns it red on Story (the tell the
@@ -70,6 +72,10 @@ fn setup_unit_assets(
         }),
         lanyard: materials.add(StandardMaterial {
             base_color: Color::srgb(0.92, 0.92, 0.95),
+            ..default()
+        }),
+        grey: materials.add(StandardMaterial {
+            base_color: Color::srgb(0.62, 0.64, 0.66),
             ..default()
         }),
         halo_mesh: meshes.add(Torus::new(0.2, 0.3)),
@@ -185,6 +191,52 @@ pub fn spawn_unit(
                     Transform::from_xyz(0.0, height * 0.55, -0.16)
                         .with_scale(Vec3::new(0.14, 0.18, 0.02)),
                 ));
+            });
+        }
+        // Her badge has a grey silhouette where the photo goes (ILMARI_09.md A.4): strap, white
+        // card, grey photo field with a dark head and shoulders. The tell for whoever looks.
+        k if k.starts_with("ill_marie") => {
+            let part = |c: &mut ChildSpawnerCommands,
+                        mat: &Handle<StandardMaterial>,
+                        at: Vec3,
+                        size: Vec3| {
+                c.spawn((
+                    Mesh3d(assets.cube.clone()),
+                    MeshMaterial3d(mat.clone()),
+                    Transform::from_translation(at).with_scale(size),
+                ));
+            };
+            commands.entity(e).with_children(|c| {
+                part(
+                    c,
+                    &assets.dark,
+                    Vec3::new(0.0, height * 0.74, -0.15),
+                    Vec3::new(0.03, 0.34, 0.015),
+                );
+                part(
+                    c,
+                    &assets.lanyard,
+                    Vec3::new(0.0, height * 0.55, -0.16),
+                    Vec3::new(0.13, 0.17, 0.015),
+                );
+                part(
+                    c,
+                    &assets.grey,
+                    Vec3::new(0.0, height * 0.565, -0.168),
+                    Vec3::new(0.09, 0.09, 0.01),
+                );
+                part(
+                    c,
+                    &assets.dark,
+                    Vec3::new(0.0, height * 0.575, -0.174),
+                    Vec3::new(0.035, 0.035, 0.01),
+                );
+                part(
+                    c,
+                    &assets.dark,
+                    Vec3::new(0.0, height * 0.545, -0.174),
+                    Vec3::new(0.07, 0.025, 0.01),
+                );
             });
         }
         "rollback_wraith" => {

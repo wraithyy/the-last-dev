@@ -155,6 +155,8 @@ pub(crate) struct SightState {
     runs: BTreeMap<EntityId, Run>,
     /// Summoned squad members and their side.
     pub(crate) squads: Vec<(EntityId, SquadSide)>,
+    /// Squad members that wear a player's name: (unit, the player it copies).
+    pub(crate) owners: Vec<(EntityId, EntityId)>,
     /// Incidents raised since `wing5` last looked: (player, sensor).
     pub(crate) incidents: Vec<(EntityId, EntityId)>,
     /// A honeypot is turning every cone toward `.1` until tick `.0`.
@@ -400,10 +402,13 @@ impl Sim {
                 self.class_at(i).map(|c| c.role)
             })
             .collect();
-        let mut keys: Vec<String> = [Role::Tank, Role::Healer, Role::Melee, Role::Ranged]
+        let present: Vec<Role> = [Role::Tank, Role::Healer, Role::Melee, Role::Ranged]
             .into_iter()
             .filter(|r| roles.contains(r))
-            .map(|r| per_role.key(r).to_string())
+            .collect();
+        let mut keys: Vec<String> = present
+            .iter()
+            .map(|&r| per_role.key(r).to_string())
             .collect();
         while keys.len() < squad_size(&roles, min_bodies) {
             keys.push(filler.to_string());
@@ -417,8 +422,39 @@ impl Sim {
             self.summon_with(ci, at, key, (1, u8::MAX, k as u8), idle);
             for i in before..self.units.len() {
                 self.sight.squads.push((Self::id_of(i), side));
+                // A unit built for a role wears the name of the first living player in it (a
+                // filler body copies nobody); the client glitches the plate like Wing 2's.
+                let owner = present.get(k).and_then(|&role| {
+                    self.players.iter().copied().find(|&p| {
+                        self.index(p).is_some_and(|pi| {
+                            self.units[pi].state.alive
+                                && self.class_at(pi).is_some_and(|c| c.role == role)
+                        })
+                    })
+                });
+                if let Some(player) = owner {
+                    let unit = Self::id_of(i);
+                    self.sight.owners.push((unit, player));
+                    self.events.push(Event::Mirrored {
+                        mirror: unit,
+                        player,
+                    });
+                }
             }
         }
+    }
+
+    /// Players with a living copy among the squads (the `mirrored` damage cut lasts while one stands).
+    pub(crate) fn squad_copied_players(&self) -> Vec<(EntityId, bool)> {
+        let mut out: Vec<(EntityId, bool)> = Vec::new();
+        for &(unit, player) in &self.sight.owners {
+            let alive = self.unit(unit).is_some_and(|u| u.alive);
+            match out.iter_mut().find(|(p, _)| *p == player) {
+                Some((_, a)) => *a |= alive,
+                None => out.push((player, alive)),
+            }
+        }
+        out
     }
 }
 

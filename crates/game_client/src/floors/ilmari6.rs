@@ -212,6 +212,117 @@ fn lattice(p: &mut Plan, x: f32, z: f32, h: f32) {
     p.block(v(x, 1.0, z), v(1.2, 2.0, 0.4));
 }
 
+/// The jib's own machinery in the counterweight deck: a hook block hanging on its falls over the
+/// hub (above head height, so nobody walks into it), the hoist drum it winds on, a sheave wheel
+/// in the ceiling run and the operator's cab with the one chair and the one lever. Visual only
+/// except for the cab and the drum (blocks).
+fn crane_props(p: &mut Plan, cx: f32, cz: f32) {
+    let top = p.top();
+    let hook = v(cx + 2.0, 2.45, cz - 2.0);
+    for dx in [-0.22_f32, 0.22] {
+        p.boxed(
+            v(hook.x + dx, (hook.y + top) / 2.0, hook.z),
+            v(0.04, top - hook.y, 0.04),
+            Mat::Metal,
+            false,
+        );
+    }
+    p.boxed(
+        v(hook.x, top - 0.12, hook.z),
+        v(0.9, 0.24, 0.4),
+        Mat::Dark,
+        false,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(hook.x, top - 0.2, hook.z),
+        v(0.5, 0.12, 0.5),
+        Mat::Metal,
+    );
+    p.boxed(hook, v(0.7, 0.3, 0.4), Mat::Yellow, false);
+    p.boxed(
+        v(hook.x, hook.y - 0.3, hook.z),
+        v(0.1, 0.3, 0.1),
+        Mat::Metal,
+        false,
+    );
+    p.prim(
+        PrimKind::Cone,
+        v(hook.x, hook.y - 0.55, hook.z),
+        v(0.3, 0.3, 0.3),
+        Mat::Hot,
+    );
+    // The hoist drum on its stand, wound with rope (a darker ring between two flanges).
+    let drum = v(cx + 12.0, 0.0, cz + 10.0);
+    p.boxed(
+        v(drum.x, 0.25, drum.z),
+        v(3.2, 0.5, 1.6),
+        Mat::Concrete,
+        true,
+    );
+    p.prim(
+        PrimKind::Cylinder,
+        v(drum.x, 1.1, drum.z),
+        v(1.8, 1.4, 1.8),
+        Mat::Dark,
+    );
+    for dy in [0.4_f32, 1.8] {
+        p.prim(
+            PrimKind::Cylinder,
+            v(drum.x, dy, drum.z),
+            v(2.3, 0.12, 2.3),
+            Mat::Hazard,
+        );
+    }
+    // The cab: a glass-fronted box on the far corner, a chair and a lever behind the glass.
+    let cab = v(cx + 14.0, 0.0, cz - 12.0);
+    p.boxed(
+        v(cab.x, 1.1, cab.z - 1.1),
+        v(2.6, 2.2, 0.1),
+        Mat::Dark,
+        true,
+    );
+    p.boxed(
+        v(cab.x - 1.3, 1.1, cab.z),
+        v(0.1, 2.2, 2.2),
+        Mat::Dark,
+        true,
+    );
+    p.boxed(
+        v(cab.x + 1.3, 1.1, cab.z),
+        v(0.1, 2.2, 2.2),
+        Mat::Dark,
+        true,
+    );
+    p.boxed(v(cab.x, 2.25, cab.z), v(2.8, 0.1, 2.4), Mat::Yellow, false);
+    p.boxed(
+        v(cab.x, 1.55, cab.z + 1.1),
+        v(2.5, 1.2, 0.05),
+        Mat::Glass,
+        true,
+    );
+    p.boxed(
+        v(cab.x, 0.35, cab.z + 1.1),
+        v(2.5, 0.7, 0.08),
+        Mat::Yellow,
+        true,
+    );
+    p.prop(&CHAIR_DESK, v(cab.x, 0.0, cab.z - 0.2), PI, false);
+    p.boxed(
+        v(cab.x + 0.7, 0.7, cab.z + 0.4),
+        v(0.06, 0.5, 0.06),
+        Mat::Metal,
+        false,
+    );
+    p.boxed(
+        v(cab.x + 0.7, 0.98, cab.z + 0.4),
+        v(0.12, 0.12, 0.12),
+        Mat::LedRed,
+        false,
+    );
+    p.sign(v(cab.x, 2.65, cab.z + 1.2), 0.0, 1.6, Sign::IlCraneNote);
+}
+
 fn casing6(p: &mut Plan, pod: (f32, f32, f32), glow: Mat) {
     casing(p, pod, glow);
 }
@@ -316,6 +427,7 @@ fn jib_walk(p: &mut Plan) -> Theme {
         Mat::Hazard,
     );
     p.block(v(cx - 8.0, 1.0, cz + 11.0), v(3.0, 2.0, 3.0));
+    crane_props(p, cx, cz);
     floor_ring(p, cx, cz, 5.0, 24, Mat::NeonYellow, 0.1);
     floor_ring(p, cx, cz, 9.5, 36, Mat::Hazard, 0.1);
     for x in [-14.0, 0.0, 14.0] {

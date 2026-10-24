@@ -842,6 +842,11 @@ pub enum Event {
         copies: u8,
         reserved: bool,
     },
+    /// The Consultant's Opt-Out Kiosks moved: `alt` is the second site (props with `alt: true`).
+    /// Sent when a relocating wave swaps them, when the pull ends (`false`) and to a joiner.
+    Kiosks {
+        alt: bool,
+    },
     /// Red Team Blue Team's exercise: whether the boss and Red are still standing by, how many
     /// Blue sensors stand watch and whether the squads have merged. Sent when one of them changes
     /// and to a joiner; `false / 0 / false` ends the display.

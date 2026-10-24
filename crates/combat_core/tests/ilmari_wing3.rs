@@ -900,3 +900,79 @@ fn a_boss_drops_only_its_own_pieces_and_pays_tokens() {
         }
     }
 }
+
+// ------------------------------------------------------------------ the class consoles
+
+fn pit(seed: u64) -> (Sim, Vec<EntityId>) {
+    let (mut sim, ids) = wing(
+        4,
+        false,
+        &["devops", "security", "data_scientist", "backend"],
+        seed,
+    );
+    load(&mut sim, "ilmari3/1");
+    let boss = unit_of(&sim, "il_scraper_queen").expect("boss");
+    pull(&mut sim, &ids, boss);
+    run(&mut sim, 1, "il_scraper_queen");
+    (sim, ids)
+}
+
+/// How far a cluster dropped 20 m from the first draft walks in two seconds.
+fn walked(sim: &mut Sim) -> f32 {
+    let at = sim.drafts()[0].pos;
+    let start = Vec3::new(at.x + 20.0, 0.0, at.z);
+    let c = sim
+        .spawn_swarm("il_scraper_cluster", start, 100)
+        .expect("cluster");
+    run(sim, 2, "il_scraper_queen");
+    let now = sim.unit(c).expect("cluster").pos;
+    ((now.x - start.x).powi(2) + (now.z - start.z).powi(2)).sqrt()
+}
+
+#[test]
+fn the_rate_limit_rack_halves_the_clusters_and_only_a_devops_may_pull_it() {
+    let (mut free, _) = pit(5);
+    let base = walked(&mut free);
+    let (mut sim, ids) = pit(5);
+    let ev = interact(&mut sim, ids[3], "il_devops_rate");
+    assert!(
+        outcome(&ev, "il_devops_rate").is_some_and(|o| o & combat_core::PROP_REFUSED != 0),
+        "a backend dev is refused"
+    );
+    let ev = interact(&mut sim, ids[0], "il_devops_rate");
+    assert_eq!(outcome(&ev, "il_devops_rate"), Some(PROP_OK));
+    let slow = walked(&mut sim);
+    assert!(
+        slow < base * 0.7 && slow > 0.0,
+        "{slow} m against {base} m: the Rate Limit slows them"
+    );
+}
+
+#[test]
+fn robots_txt_makes_the_crawlers_leave_the_drafts_alone_for_ten_seconds() {
+    let (mut sim, ids) = pit(6);
+    let at = sim.drafts()[0].pos;
+    sim.spawn_swarm("il_scraper_cluster", Vec3::new(at.x + 1.0, 0.0, at.z), 100)
+        .expect("cluster");
+    let ev = interact(&mut sim, ids[1], "il_sec_robots");
+    assert_eq!(outcome(&ev, "il_sec_robots"), Some(PROP_OK));
+    let before = sim.drafts()[0].integrity;
+    run(&mut sim, 8, "il_scraper_queen");
+    assert_eq!(sim.drafts()[0].integrity, before, "compliant");
+    run(&mut sim, 6, "il_scraper_queen");
+    assert!(
+        sim.drafts()[0].integrity < before,
+        "then it ignores the file again"
+    );
+}
+
+#[test]
+fn the_dashboard_gives_the_data_scientists_group_a_forecast() {
+    let (mut sim, ids) = pit(7);
+    let ev = interact(&mut sim, ids[2], "il_ds_dashboard");
+    assert_eq!(outcome(&ev, "il_ds_dashboard"), Some(PROP_OK));
+    assert!(
+        ids.iter()
+            .all(|&p| auras(&sim, p).iter().any(|a| a == "il_forecast"))
+    );
+}

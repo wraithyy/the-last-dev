@@ -222,6 +222,37 @@ async fn a_fresh_player_joining_a_revealed_room_is_past_the_opening_and_stays_so
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_joiner_after_the_reveal_is_told_the_room_has_seen_the_opening() {
+    let mut s = room();
+    s.on_join(0, "Lead", "backend");
+    s.tick();
+    credits_rolled(&mut s);
+    let st = stamp_now(&s);
+    s.on_message(0, ClientMsg::Cmd(st));
+    s.on_message(0, ClientMsg::Cmd(Command::IlmariReveal));
+    s.tick();
+    s.on_join(1, "Late", "devops");
+    let out = s.tick();
+    let told = msgs(&out, 1)
+        .into_iter()
+        .any(|m| matches!(m, ServerMsg::IlmariRevealed));
+    assert!(told, "the joiner may play its own copy");
+    assert!(
+        pending_msgs(&out, 1).is_empty(),
+        "nothing is pending any more"
+    );
+    // Before the credits there is nothing to catch up on.
+    let mut fresh = room();
+    fresh.on_join(0, "Early", "backend");
+    let out = fresh.tick();
+    assert!(
+        !msgs(&out, 0)
+            .into_iter()
+            .any(|m| matches!(m, ServerMsg::IlmariRevealed))
+    );
+}
+
+#[tokio::test(start_paused = true)]
 async fn the_occupied_campus_the_base_and_the_wings_load_in_a_room_and_phases_are_per_room() {
     let mut a = room();
     a.on_join(0, "Lead", "backend");

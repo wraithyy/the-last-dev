@@ -376,6 +376,9 @@ pub enum Tex {
     Blinds,
     /// The corporate art print: beige abstraction, dusty.
     CorpArt,
+    /// Ilmari's face on a core wall monitor: awake (green) and standing by (red, eyes shut).
+    CoreFaceLive,
+    CoreFaceStandby,
     Sign(Sign),
 }
 

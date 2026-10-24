@@ -8,16 +8,19 @@
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
 use crate::combat::{CombatEvent, SimReady, SimView};
-use crate::floors::{BOARD_DESKS, BOARD_INBOXES, BOARD_POD, CORE_POD};
+use crate::floors::{
+    BOARD_DESKS, BOARD_INBOXES, BOARD_POD, CORE_POD, FloorEntity, LAB_KIOSKS, LAB_KIOSKS_ALT,
+    LAB_PILLARS, LAB_ROTUNDA, core_face,
+};
 use crate::game::{GameFlow, ZoneDecor};
 use crate::hud::{DIM, drop_shadow, label, panel_bg, set_text};
 use bevy::asset::RenderAssetUsages;
 use bevy::light::NotShadowCaster;
 use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
-use combat_core::{EntityId, Event};
+use combat_core::{CastError, EntityId, Event};
 use std::collections::HashMap;
-use std::f32::consts::{FRAC_PI_2, PI};
+use std::f32::consts::FRAC_PI_2;
 
 const KICK_SHOW_S: f32 = 2.5;
 /// Segments of a cone's arc: smooth enough at 20 m, cheap enough to ignore.
@@ -36,6 +39,7 @@ impl Plugin for IlmariFxPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Wall>()
             .init_resource::<Cones>()
+            .init_resource::<Hideables>()
             .add_systems(Startup, (setup, spawn_hud))
             .add_systems(
                 Update,
@@ -43,6 +47,8 @@ impl Plugin for IlmariFxPlugin {
                     stage_qa,
                     read_events,
                     build_zone,
+                    bind_floor,
+                    update_hideables,
                     update_cones,
                     update_boardroom,
                     update_monitors,
@@ -52,7 +58,8 @@ impl Plugin for IlmariFxPlugin {
                 )
                     .chain()
                     .in_set(SimReady),
-            );
+            )
+            .add_systems(Update, update_hot_take.in_set(SimReady));
     }
 }
 
@@ -108,7 +115,17 @@ struct Wall {
     log: Vec<String>,
     kick: Option<(u8, u8, f32)>,
     zone: String,
+    /// The Opt-Out Kiosks stand on their second site (`Event::Kiosks`).
+    kiosk_alt: bool,
+    /// The pillar a `Principles` cast took away (index into `LAB_PILLARS`) and the time it is
+    /// back, in elapsed seconds.
+    pillar_gone: Option<(usize, f32)>,
 }
+
+/// `Principles` and its two variants (one pillar fewer each time).
+const PRINCIPLES: [u32; 3] = [2638, 2769, 2770];
+/// A taken pillar stays away this long past the cast landing.
+const PILLAR_BACK_S: f32 = 1.5;
 
 #[derive(Clone, Copy, PartialEq)]
 struct CoreWall {
@@ -139,6 +156,34 @@ fn read_events(mut events: MessageReader<CombatEvent>, time: Res<Time>, mut wall
             } => {
                 let off = !*standby && *sensors == 0 && !*merged;
                 wall.exercise = (!off).then_some((*standby, *sensors, *merged));
+            }
+            Event::Kiosks { alt } => wall.kiosk_alt = *alt,
+            Event::TelegraphStarted {
+                spell,
+                cover,
+                resolve_ms,
+                ..
+            } if PRINCIPLES.contains(&spell.0) => {
+                // The pillar that no cover spot of the cast stands on is the one that is gone.
+                let (cx, cz) = LAB_ROTUNDA;
+                let far = |(dx, dz): (f32, f32)| {
+                    cover
+                        .iter()
+                        .map(|c| (c.x - (cx + dx)).hypot(c.z - (cz + dz)))
+                        .fold(f32::MAX, f32::min)
+                };
+                wall.pillar_gone = LAB_PILLARS
+                    .into_iter()
+                    .enumerate()
+                    .map(|(k, p)| (k, far(p)))
+                    .filter(|(_, d)| *d > 2.0)
+                    .max_by(|a, b| a.1.total_cmp(&b.1))
+                    .map(|(k, _)| {
+                        (
+                            k,
+                            time.elapsed_secs() + *resolve_ms as f32 / 1000.0 + PILLAR_BACK_S,
+                        )
+                    });
             }
             Event::Boardroom {
                 desks,
@@ -212,9 +257,9 @@ fn read_events(mut events: MessageReader<CombatEvent>, time: Res<Time>, mut wall
 #[derive(Resource)]
 struct Assets6 {
     square: Handle<Mesh>,
-    cuboid: Handle<Mesh>,
     envelope: Handle<Mesh>,
-    box_mat: Handle<StandardMaterial>,
+    face_live: Handle<StandardMaterial>,
+    face_standby: Handle<StandardMaterial>,
     tile_mat: Handle<StandardMaterial>,
     envelope_mat: Handle<StandardMaterial>,
     live_mat: Handle<StandardMaterial>,
@@ -237,6 +282,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let mut m = |c: Color| materials.add(unlit(c));
     let cone_calm = m(Color::srgba(1.0, 0.8, 0.2, 0.2));
@@ -245,17 +291,17 @@ fn setup(
     let envelope_mat = m(Color::srgba(1.0, 0.95, 0.6, 0.95));
     let live_mat = m(Color::srgba(0.3, 1.0, 0.6, 0.95));
     let standby_mat = m(Color::srgba(1.0, 0.3, 0.2, 0.55));
-    // Cardboard the desk has been packed into, lit like the rest of the floor.
-    let box_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.62, 0.47, 0.3),
-        perceptual_roughness: 0.9,
-        ..default()
-    });
+    // Ilmari's two faces for the wall monitors: made once, the monitors only swap handles.
+    let mut face = |live: bool| {
+        let (img, mat) = core_face(live);
+        materials.add(mat(images.add(img)))
+    };
+    let (face_live, face_standby) = (face(true), face(false));
     commands.insert_resource(Assets6 {
         square: meshes.add(Rectangle::new(1.0, 1.0)),
-        cuboid: meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
         envelope: meshes.add(Cuboid::new(0.5, 0.32, 0.04)),
-        box_mat,
+        face_live,
+        face_standby,
         tile_mat,
         envelope_mat,
         live_mat,
@@ -267,13 +313,13 @@ fn setup(
 
 /// The zone's own entities, spawned once per visit (`ZoneDecor` takes them with the zone).
 #[derive(Component)]
-struct DeskBox(usize);
-#[derive(Component)]
 struct TileCover(usize);
 #[derive(Component)]
 struct Envelope(usize);
 #[derive(Component)]
 struct MonitorGlow(usize);
+#[derive(Component)]
+struct MonitorFace(usize);
 
 fn build_zone(
     mut commands: Commands,
@@ -281,7 +327,7 @@ fn build_zone(
     assets: Option<Res<Assets6>>,
     mut wall: ResMut<Wall>,
     mut cones: ResMut<Cones>,
-    props: Query<(), Or<(With<DeskBox>, With<MonitorGlow>)>>,
+    props: Query<(), Or<(With<TileCover>, With<MonitorGlow>)>>,
 ) {
     // A reload of the same zone takes the props with `ZoneDecor` without the zone key changing.
     let wants_props = flow.zone.starts_with("ilmari6/") || flow.zone == "ilmari_core/1";
@@ -289,28 +335,12 @@ fn build_zone(
         return;
     }
     flow.zone.clone_into(&mut wall.zone);
+    wall.kiosk_alt = false;
+    wall.pillar_gone = None;
     cones.live.clear();
     let Some(assets) = assets else { return };
     if flow.zone.starts_with("ilmari6/") {
         let (cx, cz) = (BOARD_POD.0, 0.0);
-        for (k, (dx, dz)) in BOARD_DESKS.into_iter().enumerate() {
-            let yaw = if dz.abs() > 1.0 {
-                if dz < 0.0 { PI } else { 0.0 }
-            } else {
-                FRAC_PI_2
-            };
-            // The box swallows the desk, its screen and the chair a metre behind it.
-            commands.spawn((
-                DeskBox(k),
-                Mesh3d(assets.cuboid.clone()),
-                MeshMaterial3d(assets.box_mat.clone()),
-                Transform::from_xyz(cx + dx, 0.8, cz + dz)
-                    .with_rotation(Quat::from_rotation_y(yaw))
-                    .with_scale(Vec3::new(2.1, 1.6, 0.9)),
-                Visibility::Hidden,
-                ZoneDecor,
-            ));
-        }
         for k in 0..9 {
             let (dx, dz) = ((k / 3) as f32 - 1.0, (k % 3) as f32 - 1.0);
             commands.spawn((
@@ -344,6 +374,17 @@ fn build_zone(
                 MeshMaterial3d(assets.standby_mat.clone()),
                 Transform::from_xyz(CORE_POD.0 - 15.0 + k as f32 * 6.0, 2.6, -23.82)
                     .with_scale(Vec3::new(5.0, 3.0, 1.0)),
+                Visibility::Hidden,
+                NotShadowCaster,
+                ZoneDecor,
+            ));
+            // Ilmari's face on the monitor itself, a hair in front of the baked screen.
+            commands.spawn((
+                MonitorFace(k),
+                Mesh3d(assets.square.clone()),
+                MeshMaterial3d(assets.face_standby.clone()),
+                Transform::from_xyz(CORE_POD.0 - 15.0 + k as f32 * 6.0, 2.6, -23.5)
+                    .with_scale(Vec3::new(4.2, 2.36, 1.0)),
                 Visibility::Hidden,
                 NotShadowCaster,
                 ZoneDecor,
@@ -470,6 +511,117 @@ fn update_cones(
     });
 }
 
+// ------------------------------------------------------------------ baked pieces that come and go
+
+/// The floor's own entities around the desks (Wing 6), the kiosks and the pillars (Wing 5), found
+/// once per visit by position: they are baked pieces of the floor, and hiding the real thing beats
+/// drawing something over it.
+#[derive(Resource, Default)]
+struct Hideables {
+    zone: String,
+    desks: Vec<Vec<Entity>>,
+    kiosks: Vec<Vec<Entity>>,
+    pillars: Vec<Vec<Entity>>,
+    tries: u8,
+}
+
+/// Binding gives up after this many frames without a complete set.
+const BIND_TRIES: u8 = 120;
+
+fn group_near(
+    floor: &Query<(Entity, &Transform), (With<FloorEntity>, Without<PointLight>)>,
+    spots: &[(f32, f32)],
+    r: f32,
+) -> Vec<Vec<Entity>> {
+    let mut groups = vec![Vec::new(); spots.len()];
+    for (e, tf) in floor {
+        // Walls, the floor and the ceiling are big; everything that belongs to a desk, a kiosk
+        // or a pillar is small and under the ceiling.
+        if tf.scale.max_element() > 3.0 || tf.translation.y > 4.0 {
+            continue;
+        }
+        let at = tf.translation;
+        if let Some(k) = spots
+            .iter()
+            .position(|(x, z)| (at.x - x).hypot(at.z - z) <= r)
+        {
+            groups[k].push(e);
+        }
+    }
+    groups
+}
+
+fn bind_floor(
+    flow: Res<GameFlow>,
+    mut hide: ResMut<Hideables>,
+    floor: Query<(Entity, &Transform), (With<FloorEntity>, Without<PointLight>)>,
+) {
+    if hide.zone != flow.zone {
+        flow.zone.clone_into(&mut hide.zone);
+        hide.desks.clear();
+        hide.kiosks.clear();
+        hide.pillars.clear();
+        hide.tries = 0;
+    }
+    let complete = |g: &Vec<Vec<Entity>>| !g.is_empty() && g.iter().all(|v| !v.is_empty());
+    if hide.tries >= BIND_TRIES || floor.is_empty() {
+        return;
+    }
+    if flow.zone == "ilmari6/3" && !complete(&hide.desks) {
+        hide.tries += 1;
+        let spots: Vec<(f32, f32)> = BOARD_DESKS
+            .iter()
+            .map(|(dx, dz)| (BOARD_POD.0 + dx, *dz))
+            .collect();
+        // 1.2 m takes the desk, its screen and its chair (1 m behind it) but not the table's chairs.
+        hide.desks = group_near(&floor, &spots, 1.2);
+    } else if flow.zone == "ilmari5/2" && !(complete(&hide.kiosks) && complete(&hide.pillars)) {
+        hide.tries += 1;
+        let (cx, cz) = LAB_ROTUNDA;
+        let at = |s: &[(f32, f32)]| -> Vec<(f32, f32)> {
+            s.iter().map(|(dx, dz)| (cx + dx, cz + dz)).collect()
+        };
+        let both = [LAB_KIOSKS.as_slice(), LAB_KIOSKS_ALT.as_slice()].concat();
+        hide.kiosks = group_near(&floor, &at(&both), 1.1);
+        hide.pillars = group_near(&floor, &at(&LAB_PILLARS), 1.7);
+    }
+}
+
+fn set_group(group: &[Entity], show: bool, vis: &mut Query<&mut Visibility>) {
+    let want = visible(show);
+    for e in group {
+        if let Ok(mut v) = vis.get_mut(*e)
+            && *v != want
+        {
+            *v = want;
+        }
+    }
+}
+
+fn update_hideables(
+    time: Res<Time>,
+    wall: Res<Wall>,
+    hide: Res<Hideables>,
+    mut vis: Query<&mut Visibility>,
+) {
+    // Earnings Call takes the desks from the last one; with no fight on, all five stand.
+    for (k, g) in hide.desks.iter().enumerate() {
+        let standing = wall.board.is_none_or(|b| k < usize::from(b.0));
+        set_group(g, standing, &mut vis);
+    }
+    // The first four kiosks stand on the first site, the second four on the second.
+    for (k, g) in hide.kiosks.iter().enumerate() {
+        set_group(g, (k < LAB_KIOSKS.len()) != wall.kiosk_alt, &mut vis);
+    }
+    let now = time.elapsed_secs();
+    for (k, g) in hide.pillars.iter().enumerate() {
+        let gone = wall
+            .pillar_gone
+            .is_some_and(|(i, until)| i == k && now < until);
+        set_group(g, !gone, &mut vis);
+    }
+}
+
 // ------------------------------------------------------------------ Wing 6: the boardroom
 
 fn visible(show: bool) -> Visibility {
@@ -483,21 +635,10 @@ fn visible(show: bool) -> Visibility {
 fn update_boardroom(
     time: Res<Time>,
     wall: Res<Wall>,
-    mut desks: Query<(&DeskBox, &mut Visibility), (Without<TileCover>, Without<Envelope>)>,
-    mut tiles: Query<(&TileCover, &mut Visibility), (Without<DeskBox>, Without<Envelope>)>,
-    mut mail: Query<
-        (&Envelope, &mut Visibility, &mut Transform),
-        (Without<DeskBox>, Without<TileCover>),
-    >,
+    mut tiles: Query<(&TileCover, &mut Visibility), Without<Envelope>>,
+    mut mail: Query<(&Envelope, &mut Visibility, &mut Transform), Without<TileCover>>,
 ) {
     let board = wall.board;
-    for (d, mut vis) in &mut desks {
-        // Earnings Call takes the desks from the last one.
-        let v = visible(board.is_some_and(|b| d.0 >= usize::from(b.0)));
-        if *vis != v {
-            *vis = v;
-        }
-    }
     for (t, mut vis) in &mut tiles {
         let v = visible(board.is_some_and(|b| b.3 & (1 << t.0) != 0));
         if *vis != v {
@@ -528,8 +669,31 @@ fn update_monitors(
         &mut Visibility,
         &mut MeshMaterial3d<StandardMaterial>,
     )>,
+    mut faces: Query<
+        (
+            &MonitorFace,
+            &mut Visibility,
+            &mut MeshMaterial3d<StandardMaterial>,
+        ),
+        Without<MonitorGlow>,
+    >,
 ) {
     let Some(assets) = assets else { return };
+    for (m, mut vis, mut mat) in &mut faces {
+        let v = visible(wall.core.is_some());
+        if *vis != v {
+            *vis = v;
+        }
+        let live = wall.core.is_some_and(|c| usize::from(c.live) == m.0);
+        let want = if live {
+            &assets.face_live
+        } else {
+            &assets.face_standby
+        };
+        if mat.0 != *want {
+            mat.0 = want.clone();
+        }
+    }
     for (m, mut vis, mut mat) in &mut q {
         let v = visible(wall.core.is_some());
         if *vis != v {
@@ -565,6 +729,12 @@ struct LogText;
 struct KickPrompt;
 #[derive(Component)]
 struct KickText;
+#[derive(Component)]
+struct HotRoot;
+#[derive(Component)]
+struct HotText;
+#[derive(Component)]
+struct HotFill;
 
 fn spawn_hud(mut commands: Commands) {
     commands
@@ -647,6 +817,57 @@ fn spawn_hud(mut commands: Commands) {
                 TextColor(Color::srgb(0.5, 1.0, 0.65)),
                 TextLayout::no_wrap(),
             ));
+        });
+    // Judgment's Hot Take: above the action bar, which spell is left and for how long.
+    commands
+        .spawn((
+            HotRoot,
+            Node {
+                position_type: PositionType::Absolute,
+                bottom: px(190),
+                left: percent(50),
+                width: px(320),
+                margin: UiRect::left(px(-160)),
+                padding: UiRect::axes(px(10), px(5)),
+                flex_direction: FlexDirection::Column,
+                row_gap: px(4),
+                align_items: AlignItems::Center,
+                border: UiRect::all(px(1)),
+                border_radius: BorderRadius::all(px(5)),
+                display: Display::None,
+                ..default()
+            },
+            BorderColor::all(Color::srgba(1.0, 0.45, 0.25, 0.7)),
+            panel_bg(),
+            drop_shadow(),
+            GlobalZIndex(13),
+        ))
+        .with_children(|c| {
+            c.spawn((
+                HotText,
+                label("", 14.0),
+                TextColor(Color::srgb(1.0, 0.75, 0.45)),
+                TextLayout::justify(Justify::Center),
+            ));
+            c.spawn((
+                Node {
+                    width: percent(100),
+                    height: px(7),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.03, 0.04, 0.06, 0.9)),
+            ))
+            .with_children(|b| {
+                b.spawn((
+                    HotFill,
+                    Node {
+                        width: percent(100),
+                        height: percent(100),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(1.0, 0.45, 0.25)),
+                ));
+            });
         });
     commands
         .spawn((
@@ -897,6 +1118,52 @@ fn update_log(
     }
     if on && wall.is_changed() {
         set_text(&mut text, &format!("$ git log\n{}", wall.log.join("\n")));
+    }
+}
+
+/// The Hot Take bar: while the `il_hot_take` aura is on the player, one of the first three spells
+/// is all that is left (the locked keycaps already wear the padlock). The seconds and the spell
+/// are read off the aura and the keycaps' own verdict, so it is the same online and offline.
+fn update_hot_take(
+    sim: SimView,
+    mut cache: Local<(u32, u32)>,
+    mut root: Single<&mut Node, (With<HotRoot>, Without<HotFill>)>,
+    mut text: Single<&mut Text, With<HotText>>,
+    mut fill: Single<&mut Node, (With<HotFill>, Without<HotRoot>)>,
+) {
+    let me = sim.player();
+    let aura = me
+        .and_then(|m| sim.unit(m))
+        .and_then(|u| u.auras.iter().find(|a| a.key == "il_hot_take").cloned());
+    let show = aura.is_some();
+    let d = if show { Display::Flex } else { Display::None };
+    if root.display != d {
+        root.display = d;
+    }
+    let (Some(me), Some(a)) = (me, aura) else {
+        return;
+    };
+    let only = sim
+        .bar_of(me)
+        .iter()
+        .take(3)
+        .copied()
+        .find(|&id| sim.cooldown(me, id).usable != Err(CastError::Silenced));
+    let tenths = a.remaining_ms / 100;
+    let key = only.map_or(0, |id| id.0);
+    if cache.0 != tenths + 1 || cache.1 != key {
+        *cache = (tenths + 1, key);
+        let name = only
+            .and_then(|id| sim.content().spell(id))
+            .map_or("one spell", |s| s.name.as_str());
+        set_text(
+            &mut text,
+            &format!(
+                "HOT TAKE - only {name} for {} s",
+                a.remaining_ms.div_ceil(1000)
+            ),
+        );
+        fill.width = percent(a.remaining_ms as f32 / a.total_ms.max(1) as f32 * 100.0);
     }
 }
 

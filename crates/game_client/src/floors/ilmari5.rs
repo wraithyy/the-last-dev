@@ -23,11 +23,16 @@ use std::f32::consts::{FRAC_PI_2, PI};
 const POD1: (f32, f32, f32) = (46.0, 18.0, 16.0);
 const POD2: (f32, f32, f32) = (46.0, 22.0, 20.0);
 const POD3: (f32, f32, f32) = (46.0, 24.0, 21.0);
+/// The centre of the Consultant's rotunda (his spawn point).
+pub const ROTUNDA: (f32, f32) = (POD2.0, 0.0);
 /// Where the Consultant's three pillars stand, as offsets from his spawn point (x, z): the cover
 /// of `Principles` is `(right, forward)` = `(-9, 10)`, `(9, 10)` and `(0, 17)` and he faces west.
 pub const PILLARS: [(f32, f32); 3] = [(-10.0, 9.0), (-10.0, -9.0), (-17.0, 0.0)];
 /// The four Opt-Out Kiosks of the rotunda: offsets from the pod centre.
 pub const KIOSKS: [(f32, f32); 4] = [(-4.0, -18.0), (-4.0, 18.0), (14.0, -18.0), (14.0, 18.0)];
+/// The kiosks' second site: a relocating offer wave of the Consultant swaps these in (and the
+/// first four out), the client hides whichever set is off (`ilmari_fx.rs`).
+pub const KIOSKS_ALT: [(f32, f32); 4] = [(-12.0, -16.0), (-12.0, 16.0), (8.0, -11.0), (8.0, 11.0)];
 /// The three honeypots of the range: offsets from the pod centre.
 pub const HONEYPOTS: [(f32, f32); 3] = [(-14.0, -17.0), (-2.0, 17.0), (18.0, -2.0)];
 
@@ -419,6 +424,15 @@ fn policy_floor(p: &mut Plan) -> Theme {
             "prop:il_optout_2",
             "prop:il_optout_3",
             "prop:il_optout_4",
+        ][k];
+        kiosk(p, key, cx + dx, cz + dz, dz.signum());
+    }
+    for (k, (dx, dz)) in KIOSKS_ALT.into_iter().enumerate() {
+        let key = [
+            "prop:il_optout_5",
+            "prop:il_optout_6",
+            "prop:il_optout_7",
+            "prop:il_optout_8",
         ][k];
         kiosk(p, key, cx + dx, cz + dz, dz.signum());
     }

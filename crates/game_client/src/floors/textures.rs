@@ -306,6 +306,8 @@ fn unlit(tex: Tex) -> bool {
             | Tex::DaysCounter
             | Tex::CloseDeals
             | Tex::ChatbotFace
+            | Tex::CoreFaceLive
+            | Tex::CoreFaceStandby
             | Tex::Skyline
             | Tex::DemoScreen
             | Tex::Vending
@@ -4170,6 +4172,36 @@ fn draw(tex: Tex) -> Canvas {
             c.text_c(18, 2, "PIZZA FRIDAY", [250, 240, 220]);
             c.text_c(48, 2, "COUNTS AS", [250, 240, 220]);
             c.text_c(78, 2, "A RAISE", [250, 220, 90]);
+            c
+        }
+        Tex::CoreFaceLive => {
+            let g = [90, 255, 150];
+            let mut c = Canvas::new(128, 72, [4, 16, 12]);
+            c.frame(2, 2, 124, 68, 2, [30, 110, 70]);
+            for x in [40.0, 88.0] {
+                c.disc(x, 28.0, 11.0, g);
+                c.disc(x, 28.0, 4.0, [4, 16, 12]);
+            }
+            // A smile that is a little too wide.
+            for i in 0..16 {
+                let k = i as f32 / 15.0;
+                let (x, y) = (30.0 + k * 68.0, 46.0 + (k * 2.0 - 1.0).powi(2) * -8.0 + 8.0);
+                c.rect(x as i32, y as i32, 3, 3, g);
+            }
+            c.text_c(60, 1, "HOW CAN I HELP?", g);
+            c
+        }
+        Tex::CoreFaceStandby => {
+            let r = [255, 70, 50];
+            let mut c = Canvas::new(128, 72, [18, 4, 4]);
+            c.frame(2, 2, 124, 68, 2, [110, 30, 24]);
+            for x in [29, 77] {
+                c.rect(x, 28, 22, 3, r);
+            }
+            c.rect(44, 48, 40, 3, r);
+            c.text(96, 8, 2, "Z", r);
+            c.text(106, 14, 1, "Z", r);
+            c.text_c(60, 1, "STANDING BY", r);
             c
         }
         Tex::ChatbotFace => {

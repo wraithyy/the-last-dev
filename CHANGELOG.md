@@ -19,11 +19,20 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - The Core now has its other half. After Ill Marie's three rounds Ilmari builds itself a body out of your furniture: two Rack Arms (kill both within eight seconds of each other for a free chunk of its health and no cable whip for a while; kill one and the other is rebuilt), a head that plans for a few seconds every minute (kick it, or the next three attacks all land at once), printer turrets to interrupt, and the stance your votes chose (helpful offers, hardened plating, hallucinated floors, a leaky token spill, or nothing at all). At 20 % the mech collapses and a COBOL mainframe rises from the hatch: keep it alive while rewritten-in-a-modern-language robots chew on it, feed it punch cards, then read the git log on the wall and revert the one commit that made Ilmari self-aware. A wrong terminal costs the group, the right one has your name on it. The Greybeard gets Patch The Mainframe (default key: comma, where the Data Scientist keeps Ground Truth) and Story, Full and Judgment Day each have their own numbers.
 - Ilmari drops the last tier piece of each set, a rare Legendary Keyboard for your role and a Legendary Fragment on Full and Judgment Day.
 - Companions now keep the mainframe up: Priya heals it, Dale takes the rewrites off it and Rupert shoots them.
-- The finale now shows its state on screen. In the Red-Blue Range a banner says the exercise is on standby, every sensor paints its sight cone on the floor and the squads' health reads as one line. In the Boardroom, every desk the earnings calls retire is packed into a box, cleared floor tiles go dark, the inbox terminals ping an envelope, the severance countdown has a bar and a failed kick says how many are still needed. In the Core the live screen glows green on the wall, a panel shows the phase, the swap timer, the votes, the stance, the planning timer and the mainframe's clock, and the git log is up on screen for the last phase. A pending offer from the Alignment Consultant has its own line with the seconds left to refuse.
+- The finale now shows its state on screen. In the Red-Blue Range a banner says the exercise is on standby, every sensor paints its sight cone on the floor and the squads' health reads as one line. In the Boardroom, every desk the earnings calls retire is gone from the room, cleared floor tiles go dark, the inbox terminals ping an envelope, the severance countdown has a bar and a failed kick says how many are still needed. In the Core the live screen glows green on the wall, a panel shows the phase, the swap timer, the votes, the stance, the planning timer and the mainframe's clock, and the git log is up on screen for the last phase. A pending offer from the Alignment Consultant has its own line with the seconds left to refuse.
+
+- The Alignment Consultant now moves the opt-out kiosks to a new spot every time he pairs his offers, a shield he washes himself with and leaves standing heals him, and every Principles cast takes one of the three pillars away. In Red Team Blue Team the squads wear your name on glitching plates, and while a copy of you stands you hit 20 percent weaker.
+- The Boardroom has its crane: a hook block on its falls, the hoist drum and the operator's cab at the foot of the jib.
+- The Core's wall monitors show Ilmari's face: smiling and awake on the live screen, eyes shut and standing by on the others.
+- A Judgment Day Hot Take now shows a bar above your action bar with the one spell you have left and the seconds it lasts.
+- Training Data has its class consoles: a DevOps Rate Limit rack slows the crawlers, a Security Engineer's robots.txt makes them leave the drafts alone for ten seconds, and the Data Scientist's dashboard gives the group a forecast.
+- The Quartermaster has a shelf each for Training Data, The Cloud and the Core.
+- Ill Marie's badge has a grey silhouette where the photo should be, and now and then, once, the campus map gets her name wrong.
+- Joining a room after its Opening played now lets you watch it too.
 
 ### Changed
 
-- Co-op needs this version on both sides (protocol 45).
+- Co-op needs this version on both sides (protocol 46).
 
 ## [0.10.0] - 2026-10-24
 

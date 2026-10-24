@@ -553,6 +553,7 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             copies,
             reserved,
         } => format!("cloud bill {bill} with {copies} copies (reserved {reserved})"),
+        Event::Kiosks { alt } => format!("kiosks alt {alt}"),
         Event::Exercise {
             standby,
             sensors,

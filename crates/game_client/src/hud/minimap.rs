@@ -42,6 +42,26 @@ struct MarkCache {
     at: f32,
     zoom: usize,
     marks: Vec<(Vec2, Kind)>,
+    /// Where Ill Marie stands, while she is in view of the last scan.
+    marie: Option<Vec2>,
+    /// The last mark is the one-frame `ILMARI` label and goes again before the next frame.
+    flick: bool,
+}
+
+/// The single frame in which Ill Marie's label on the campus map reads `ILMARI`
+/// (docs/ILMARI_09.md A.4): rolled once when the campus is first up, between 3 and 20 minutes in,
+/// at most once per session, only while she is in view of the map. A client timer, never sim.
+#[derive(Default)]
+struct MarieFlicker {
+    due: Option<f32>,
+    done: bool,
+}
+
+impl MarieFlicker {
+    /// Seconds from the roll (`unit` in 0..1) to the flicker.
+    fn delay_secs(unit: f32) -> f32 {
+        180.0 + unit.clamp(0.0, 1.0) * 1020.0
+    }
 }
 const MARK_PERIOD: f32 = 0.1;
 
@@ -365,6 +385,7 @@ fn update_radar(
     >,
     mut glyphs: Query<(&RadarGlyph, &mut Text, &mut TextColor)>,
     mut cache: Local<MarkCache>,
+    mut flicker: Local<MarieFlicker>,
     (mut zone_text, mut coords): (
         Single<&mut Text, (With<RadarZone>, Without<RadarGlyph>, Without<RadarCoords>)>,
         Single<
@@ -444,14 +465,22 @@ fn update_radar(
     // The unit scan (quest lookups per giver) is the costly part and dots are 5-12 px, so it
     // runs at 10 Hz; dot positions below still follow the player every frame.
     let now = time.elapsed_secs();
+    if cache.flick {
+        cache.marks.pop();
+        cache.flick = false;
+    }
     if now - cache.at >= MARK_PERIOD || now < cache.at || cache.zoom != radar.zoom {
         let mut marks = std::mem::take(&mut cache.marks);
         marks.clear();
+        cache.marie = None;
         let wanted = super::quests::objective_units(&*sim, &track);
         for u in sim.units() {
             let p = Vec2::new(u.pos.x, u.pos.z);
             if Some(u.id) == sim.player() || !in_view(p) {
                 continue;
+            }
+            if u.alive && !u.hostile && u.key.starts_with("ill_marie") {
+                cache.marie = Some(p);
             }
             if u.lootable {
                 marks.push((p, Kind::Loot));
@@ -509,6 +538,19 @@ fn update_radar(
         cache.marks = marks;
         cache.at = now;
         cache.zoom = radar.zoom;
+    }
+    if flow.zone == "campus" && !flicker.done {
+        let due = *flicker
+            .due
+            .get_or_insert_with(|| now + MarieFlicker::delay_secs((now * 7919.0).fract()));
+        if now >= due
+            && let Some(p) = cache.marie
+            && cache.marks.len() < POOL
+        {
+            cache.marks.push((p, Kind::Glyph("ILMARI", ACCENT_WARM)));
+            cache.flick = true;
+            flicker.done = true;
+        }
     }
     let marks = &cache.marks;
 
@@ -575,6 +617,17 @@ fn update_radar(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn marie_flickers_between_three_and_twenty_minutes_in() {
+        assert_eq!(MarieFlicker::delay_secs(0.0), 180.0);
+        assert_eq!(MarieFlicker::delay_secs(1.0), 1200.0);
+        assert_eq!(
+            MarieFlicker::delay_secs(7.0),
+            1200.0,
+            "a bad roll is clamped"
+        );
+    }
 
     #[test]
     fn zoom_steps_clamp_to_the_table() {

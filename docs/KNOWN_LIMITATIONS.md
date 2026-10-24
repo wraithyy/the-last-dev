@@ -135,8 +135,10 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
   sound, and Marie does not walk to the tower; the reveal retires her where she stands.
 - The sim has no wall clock, so the client stamps it. Online, every client plays its own Opening
   when the room announces it (`IlmariPending`); the first member to finish or skip it reveals it for
-  the room, and a member who joins afterwards never sees it. The room keeps the first stamp sent, not
-  the lead's, and the stamp line each client shows is its own.
+  the room. A member who joins afterwards is told (`IlmariRevealed`) and watches their own copy once,
+  for show (nothing is stamped or revealed back), unless their own save has watched it; the replay is
+  once per room visit, not remembered across rooms. The room keeps the first stamp sent, not the
+  lead's, and the stamp line each client shows is its own.
 - Native reads the zone with `date +%z %Z`; Windows has no such `date` and stamps UTC. The web build
   has the offset but no abbreviation, so it prints `UTC+hh:mm`. The date is always `D Month YYYY`, 24 h.
 - A player with the "Cough Drops" ticket still open when the Opening plays loses its giver (the queue
@@ -154,6 +156,9 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - The weekly quartermaster rotation follows sim time (`rotate_ms` per window), not the calendar week;
   the token allowance (200) follows the ISO week of the office clock.
 - Brenda sells no cosmetics or titles yet (no shop for them exists); consumables and band pieces only.
+- Ill Marie's badge is a few cubes (strap, card, grey photo field with a dark head and shoulders), not a
+  texture, and the campus map's one-frame `ILMARI` label only fires while she is inside the map's view and
+  has a bubble of her own (it is a client timer: once per session, 3 to 20 minutes after the campus is up).
 - Ambient android extras are presentation only (`live/ambient.rs`): they pace fixed lines, do not
   react, and have no sim unit. The "ILMARI" screens are baked textures on the landmarks; the Lab's
   splash is on its east face because its neon takes the front.
@@ -197,10 +202,12 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 
 ## Wing 3: Training Data (docs/ILMARI_10.md C.4)
 
+- The Scrape Pit's class consoles (`il_devops_rate`, `il_sec_robots`, `il_ds_dashboard`) are bonus props: the DevOps rack halves every cluster's speed for 12 s (not only the ones near it), the Security terminal makes every cluster stop eating for 10 s (no `robots.txt` line on the floor that they path around), and the Data Scientist's dashboard is a 20 s `Forecast` aura (+10 % damage) for the group, not a readout of each cluster's pool. Fullstack gets half the time, as on every class prop. Brenda's Wing 3 shelf is one consumable.
+
 ## Wing 4: The Cloud (docs/ILMARI_10.md C9-C14)
 
 - The Region Outage has no Dark-platform damage over time and no phase-3 hub shrink: Failover covers Dark, and phase 3 only runs the cascade faster. It also gains Single Point Of Failure, which makes the hub itself dangerous.
-- The first room (the Cooling Deck) has no boss. The Reserved Instance racks work for every class; there are no class props, no forecast board and no vendor page.
+- The first room (the Cooling Deck) has no boss. The Reserved Instance racks work for every class; there are no class props and no forecast board.
 - Full solo is blocked by a 75 s enrage on a lone player rather than by a mechanic that needs a second body.
 - A split replica that nobody kills keeps its share of the pool: a group that ignores them fights one boss spread over several bodies until the last one falls.
 - The wing's teaser door on the Cooling Deck opens onto nothing yet; Wings 5-6 and the core belong to 1.0.
@@ -208,17 +215,17 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - Bots read hazards off the sim where a player reads the boards, so the Hallucination is balanced for reading, not for guessing; a player who ignores the boards and the shimmer takes real damage.
 - Story keeps the engine's 3 x 3 grid and three circles; the spec's smaller Story grid is not built.
 - Ground Truth sits on the Comma key because every letter is bound; rebind it under Controls.
-- The Brenda vendor page and the class props (robots.txt, Rate Limit, dashboard) are not built.
+- Wing 4 has no class props of its own (the Scrape Pit's consoles are Wing 3's); Brenda's Wing 4 shelf is one consumable.
 - Companions hold position instead of re-entering a pending hazard, so melee companions lose some uptime while the Hallucination's warning runs.
 
 ## Wing 5: The Alignment Lab (docs/ILMARI_1_0.md D.2, D.3, D5-D8)
 
-- The Consultant's kiosks do not relocate in phase 2, and Ethics Washing's absorb does not heal him if it is left standing. The Data Scientist dashboard prop is not built, and all five Principles pillars stay up (none disappears).
+- The kiosks relocate by swapping between two fixed sites (four kiosks each; `il_optout_1`-`4` and `il_optout_5`-`8`, `Event::Kiosks`), once per phase-2 pair, not to a new random spot; the client hides the site that is off, a click on a hidden one is refused. Ethics Washing left standing heals him 6 % (`expire_heal_pct`). `Principles` has three variants of the cast, one per missing pillar (there are three pillars, not five): the client hides the pillar no cover spot of the cast stands on until the cast has landed, then it comes back. The Data Scientist's dashboard prop at each kiosk is not built.
 - Guardrail costs are mapped onto existing aura fields (plus the new `healing_taken_pct`); the fine print is spelled out in the aura names on Story only.
-- Red Team Blue Team's shared health is a HUD readout (Red and Blue percent over the living squad bodies, one bar for Red), not a pooled sim HP; there are still no mirrored-name plates and no "mirrored" -20 % damage aura. Story uses one Red copy, one filler and two cameras.
+- Red Team Blue Team's shared health is a HUD readout (Red and Blue percent over the living squad bodies, one bar for Red), not a pooled sim HP. Each role unit wears the name of the first living player of that role (two players of one role share a copy); the -20 % `Copied (Purple)` aura starts at the merge and lasts while any copy of that player stands (Full and Judgment only; Story has none). Story uses one Red copy, one filler and two cameras.
 - A wing-wide balance note: Red and Blue numbers were tuned with the generic bots, which wake Red at once by hitting it; a careful stealth group has an easier first minute than the gates measure.
 - Wing 6 has its boss now (below); the core zone behind the lift is still an empty skeleton, and the core and the ending are D10 onwards.
-- Ill Marie's desk is a prop only; Brenda's core page and the Roomba ride are deferred.
+- Ill Marie's desk is a prop only; the Roomba ride is deferred. Brenda's core shelf is one consumable.
 - `Event::Exercise` has its standby banner, the squads' percent line and one flat cone per sensor on the floor (amber while calm, red once the sensor fights). The cone is drawn from the unit's range and angle and ignores blockers, so it overstates what a tall prop hides; kiosks and honeypots are geometry only, and the offer line is a HUD text (pending offer and its seconds, guardrails worn), not an overlay on the kiosk.
 
 ## Wing 6: The Boardroom in the Sky (docs/ILMARI_1_0.md D.4, D9)
@@ -226,7 +233,7 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - The Heir has his own HP (6,500); the HUD adds a "one bar" readout (CIO and Heir averaged), but the sim keeps two pools. The CIO's `Succession Plan` is a second body, not a mirrored one. Killing the CIO takes the Heir with him.
 - Companions do not take part in the pair: on Story one kick stops the landing, so Rupert's "kick the first" is not built. The Prompted rotation of the action bar is a cue only on every difficulty (Full costs 10 % damage, Story nothing).
 - Right-Sizing is a circle that repeats on a floor tile, not a permanent `Cleared Desk` hazard in the `HazardGrid`; it ends with the fight. Synergy Link is the `PairUp` leash without the shared damage.
-- The client reacts to `Event::Boardroom` and `Event::PairKick`: a cleared desk is packed into a cardboard box drawn over the baked desk (the sim says how many are left, not which, so the boxes go from the last desk), cleared tiles are a dark square, the four inbox terminals ping an envelope, and the HUD has the severance bar and a "kick now" prompt. The desks themselves stay in the floor geometry (and keep their colliders).
+- The client reacts to `Event::Boardroom` and `Event::PairKick`: a cleared desk disappears (the client hides the desk, its screen and its chair; the sim says how many are left, not which, so they go from the last desk), cleared tiles are a dark square, the four inbox terminals ping an envelope, and the HUD has the severance bar and a "kick now" prompt. The hidden desks stay in the floor geometry and keep their colliders (an invisible block where the desk stood). The jib's crane (hook block, hoist drum, operator's cab) is geometry in the Jib Walk's hub.
 - A wing-wide balance note: the bots clear the inbox and the pair by reading events, so a real group's first attempts will be messier than the gates; Judgment Day numbers for the CIO (and the Heir's kick rule) are D15's.
 
 ## The Core (docs/ILMARI_1_0.md D.5, D10-D14)
@@ -240,7 +247,7 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - P2's hazards are themed telegraph waves (a marching line, a sweep with a gap, a hug circle on every player), not the nine-tile `HazardGrid` or healing orbs; `Attached` comes from standing in overlapping circles, not from touching one orb together.
 - Marie is the voice by bubble and chat line only: no recorded audio, no mask or blanket model (a paint job and a rug, chair and tissues beside her), and she is untouchable but still takes an area spell's aura (Push Update slows her).
 - Companions fight whichever screen the sim tells them to by the old rules (they may hit a standby screen for nothing) and abstain from every vote; in P4 Priya heals the mainframe below 70 % before the party, Dale taunts the rewrites off it and Rupert shoots them (all three read the ward flag, nothing else is new AI), and none of them touches a terminal or a punch card.
-- The core's wall is a HUD panel (phase line with the live screen and swap seconds, round timer and tally, stance, planning seconds and arms, the P4 stage, clock and mainframe bar) and a glow behind each of the six wall monitors (green live, red on standby), plus the `git log` as a text panel in P4. It is not drawn on the in-world screens (world signs are baked textures) and there is no per-member first row on Judgment. The mech, the mainframe and the rewrites use existing rigs (Rack Golem, Cutover Rack, Delivery Robot, KPI Dashboard); `Event::Reassembling` has no castbar.
+- The core's wall is a HUD panel (phase line with the live screen and swap seconds, round timer and tally, stance, planning seconds and arms, the P4 stage, clock and mainframe bar) a glow behind each of the six wall monitors and Ilmari's face on them (awake and smiling on the live one, eyes shut on the standby ones: two shared textures and materials, only the handle swaps), plus the `git log` as a text panel in P4. The wall's text stays a HUD panel (world signs are baked textures) and there is no per-member first row on Judgment. The mech, the mainframe and the rewrites use existing rigs (Rack Golem, Cutover Rack, Delivery Robot, KPI Dashboard); `Event::Reassembling` has no castbar.
 - `Command::StampIlmariEnd` is sent by the client on `Event::IlmariEnd` (the device clock; the server checks it like the first stamp) and kept once; the ending cutscene, the credits and the ladder row are D16 and D18, and the `ilmari_ladder` save line is D16.
 - The lone-player gate on Full is the boss's soft enrage at 8 minutes of fight (`solo_after_ms`, like Wing 6), not a mechanic only a group can do; a lone Full player loses to the timer (or dies first). The Full trio of the gates is tank, damage and damage (no healer): it clears in 10 to 12 minutes with no deaths, a few minutes faster than the doc's 14.5, so the numbers in `FORMULAS.md` keep slack for Judgment.
-- Judgment's Hot Take locks one member of the party to one of the first three spells on their bar (the marker aura `il_hot_take` and `Sim::hot_take_of`); the bar UI that shows it is not built (the aura is on the buff bar). Technical Debt is the bigger rewrite waves and the one-reader rule; the five-bot Judgment clears are D15.
+- Judgment's Hot Take locks one member of the party to one of the first three spells on their bar (the marker aura `il_hot_take` and `Sim::hot_take_of`); a bar above the action bar names the one spell left and the seconds (read from the aura and the keycaps' padlocks, so it is the same online; if a class's first three spells are all silenced for another reason it reads "one spell"). Technical Debt is the bigger rewrite waves and the one-reader rule; the five-bot Judgment clears are D15.

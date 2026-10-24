@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 45;
+pub const PROTOCOL_VERSION: u16 = 46;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -196,6 +196,9 @@ pub enum ServerMsg {
     IlmariPending {
         on: bool,
     },
+    /// Sent to a member who joins after the Opening was revealed: the room has seen it, this
+    /// client may still play its own copy (cosmetic, no stamp and no reveal go back).
+    IlmariRevealed,
 }
 
 /// One public room in `RoomList`. No code, no address: `id` is a separate random token that
@@ -837,6 +840,7 @@ impl Msg for ServerMsg {
             | ServerMsg::Emoted { .. }
             | ServerMsg::Pong { .. }
             | ServerMsg::IlmariPending { .. }
+            | ServerMsg::IlmariRevealed
             | ServerMsg::TickStat { .. } => true,
         };
         if ok {
@@ -1963,6 +1967,7 @@ mod tests {
                     sensors: 2,
                     merged: false,
                 },
+                Event::Kiosks { alt: true },
                 Event::Boardroom {
                     desks: 3,
                     inbox_ms: 4_000,
@@ -2229,6 +2234,8 @@ mod tests {
         }
         let pending = ServerMsg::IlmariPending { on: true };
         assert_eq!(roundtrip(&pending), Ok(pending.clone()));
+        let revealed = ServerMsg::IlmariRevealed;
+        assert_eq!(roundtrip(&revealed), Ok(revealed.clone()));
         let long_key = ClientMsg::Cmd(Command::StartMinigame {
             key: "k".repeat(combat_core::minigame::MINIGAME_KEY_MAX + 1),
         });

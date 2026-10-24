@@ -28,6 +28,10 @@ mod ilmari6;
 mod ilmari_core;
 pub use ilmari_core::POD as CORE_POD;
 pub use ilmari4::status_pylons;
+pub use ilmari5::{
+    KIOSKS as LAB_KIOSKS, KIOSKS_ALT as LAB_KIOSKS_ALT, PILLARS as LAB_PILLARS,
+    ROTUNDA as LAB_ROTUNDA,
+};
 pub use ilmari6::{DESKS as BOARD_DESKS, INBOXES as BOARD_INBOXES, POD3 as BOARD_POD};
 mod kit;
 pub use kit::Sign;
@@ -48,6 +52,18 @@ mod teambuilding;
 #[cfg(test)]
 mod testgrid;
 mod textures;
+
+/// The face on a core wall monitor, awake or standing by, and its (unlit, opaque) material.
+pub fn core_face(live: bool) -> (Image, impl FnOnce(Handle<Image>) -> StandardMaterial) {
+    let tex = if live {
+        Tex::CoreFaceLive
+    } else {
+        Tex::CoreFaceStandby
+    };
+    (textures::tex_image(tex), move |img| {
+        textures::tex_material(tex, img)
+    })
+}
 mod themes;
 mod tower;
 mod vibecon;
@@ -131,7 +147,7 @@ pub struct LoadZone(pub String);
 pub struct BareStage;
 
 #[derive(Component)]
-struct FloorEntity;
+pub(crate) struct FloorEntity;
 
 #[derive(Component)]
 struct Sun;

@@ -40,6 +40,7 @@ fn offer() -> OfferDef {
         stagger_ms: 3000,
         heal_tenths: 0,
         rider_kiosk: None,
+        relocate: false,
     }
 }
 

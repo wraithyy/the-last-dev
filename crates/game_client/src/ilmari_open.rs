@@ -57,6 +57,8 @@ struct Opening {
     start_at: Option<Phase>,
     /// Esc or the skip button was pressed this frame.
     skip: bool,
+    /// Playing the late joiner's copy: no stamp and no reveal go back to the room.
+    replay: bool,
     /// Online: this client's own stamp line (the room's sim holds the first one sent, not ours).
     line: Option<String>,
     /// Online: this room's Opening was played or skipped here; reset when the room is not pending.
@@ -180,11 +182,18 @@ fn begin(
 ) {
     // Online the room says when it is due; the local sim only knows its own (offline) save.
     let online = mode.is_online();
-    let due = match (online, net.as_deref()) {
+    let pending_now = match (online, net.as_deref()) {
         (true, Some(n)) => n.ilmari_pending,
         (true, None) => false,
         (false, _) => sim.0.ilmari_pending(),
     };
+    // A member who joined after the room's reveal still gets the show once per room, unless
+    // this save watched it before: the room has nothing left to take from it, so it is only played.
+    let replay = online
+        && !pending_now
+        && net.as_deref().is_some_and(|n| n.ilmari_replay)
+        && !sim.0.ilmari_open();
+    let due = pending_now || replay;
     if online && !due {
         opening.done_online = false;
     }
@@ -199,13 +208,16 @@ fn begin(
         return;
     }
     let (unix_secs, utc_offset_min, tz) = device_clock();
+    opening.replay = replay;
     if online {
         opening.done_online = true;
-        pending.0.push(Command::StampIlmari {
-            unix_secs,
-            utc_offset_min,
-            tz: tz.clone(),
-        });
+        if !replay {
+            pending.0.push(Command::StampIlmari {
+                unix_secs,
+                utc_offset_min,
+                tz: tz.clone(),
+            });
+        }
         // A save that watched it before is not made to sit through it again for a new room.
         if sim.0.ilmari_open() {
             pending.0.push(Command::IlmariReveal);
@@ -299,8 +311,12 @@ fn advance(
         opening.phase = next;
         opening.t = 0.0;
         if next == Phase::Idle {
-            // Played or skipped, it never plays again; the sim retires the pre-credits Maries.
-            pending.0.push(Command::IlmariReveal);
+            // Played or skipped, it never plays again; the sim retires the pre-credits Maries. A
+            // replay for a late joiner has nothing to retire: the room did that already.
+            if !opening.replay {
+                pending.0.push(Command::IlmariReveal);
+            }
+            opening.replay = false;
             flow.opening = false;
         }
     }
