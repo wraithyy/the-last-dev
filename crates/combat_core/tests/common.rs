@@ -553,6 +553,11 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             copies,
             reserved,
         } => format!("cloud bill {bill} with {copies} copies (reserved {reserved})"),
+        Event::Exercise {
+            standby,
+            sensors,
+            merged,
+        } => format!("exercise standby {standby}, {sensors} sensors, merged {merged}"),
         Event::PlatformState { idx, state, at_ms } => {
             format!("platform {idx} is {state:?} since {at_ms} ms")
         }

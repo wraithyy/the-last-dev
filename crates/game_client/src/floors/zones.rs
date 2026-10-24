@@ -8,10 +8,13 @@ use super::client;
 use super::corporate;
 use super::datacenter;
 use super::hack24;
+use super::ilmari_core;
 use super::ilmari1;
 use super::ilmari2;
 use super::ilmari3;
 use super::ilmari4;
+use super::ilmari5;
+use super::ilmari6;
 use super::kit::{Plan, Sign};
 use super::lab;
 use super::layout::{FloorLayout, TOWER_ZONES, build_floor, yaw_towards};
@@ -28,7 +31,7 @@ use combat_core::Aabb;
 
 /// Every zone id of the contract, in a stable order.
 #[allow(dead_code)] // contract surface; the tests iterate it
-pub const ZONE_IDS: [&str; 48] = [
+pub const ZONE_IDS: [&str; 55] = [
     "campus",
     carpark::ZONE,
     "tower/1",
@@ -76,6 +79,13 @@ pub const ZONE_IDS: [&str; 48] = [
     "ilmari4/1",
     "ilmari4/2",
     "ilmari4/3",
+    "ilmari5/1",
+    "ilmari5/2",
+    "ilmari5/3",
+    "ilmari6/1",
+    "ilmari6/2",
+    "ilmari6/3",
+    "ilmari_core/1",
     // The occupied campus has packs and rares like the campus; the Resistance base (a hub like
     // the easter-egg zone) stays out of the list and its tests.
     "campus_occupied",
@@ -128,6 +138,13 @@ pub fn build_zone(id: &str) -> Option<FloorLayout> {
         "ilmari4/1" => Some(ilmari4::build(1)),
         "ilmari4/2" => Some(ilmari4::build(2)),
         "ilmari4/3" => Some(ilmari4::build(3)),
+        "ilmari5/1" => Some(ilmari5::build(1)),
+        "ilmari5/2" => Some(ilmari5::build(2)),
+        "ilmari5/3" => Some(ilmari5::build(3)),
+        "ilmari6/1" => Some(ilmari6::build(1)),
+        "ilmari6/2" => Some(ilmari6::build(2)),
+        "ilmari6/3" => Some(ilmari6::build(3)),
+        "ilmari_core/1" => Some(ilmari_core::build()),
         client::ZONE => Some(client::build()),
         teambuilding::ZONE => Some(teambuilding::build()),
         id if corporate::ZONES.contains(&id) => corporate::build(id),
@@ -231,7 +248,9 @@ mod tests {
             "onboarding/1" | "onboarding/2" | "onboarding/3" => 2,
             "basement/1" | "qbr/1" | "hack24/2" | "ilmari1/1" | "ilmari1/2" | "ilmari1/3"
             | "ilmari2/1" | "ilmari2/2" | "ilmari2/3" | "ilmari3/1" | "ilmari3/2" | "ilmari3/3"
-            | "ilmari4/1" | "ilmari4/2" | "ilmari4/3" => 3,
+            | "ilmari4/1" | "ilmari4/2" | "ilmari4/3" | "ilmari5/1" | "ilmari5/2" | "ilmari5/3"
+            | "ilmari6/1" | "ilmari6/2" | "ilmari6/3" => 3,
+            "ilmari_core/1" => 0,
             "basement/2" | "basement/3" | "basement/4" | "qbr/2" | "qbr/3" | "qbr/4"
             | "hack24/1" | "hack24/3" | "hack24/4" => 2,
             "offsite/1" | "offsite/2" | "vibecon/1" | "vibecon/2" => 4,
@@ -254,7 +273,8 @@ mod tests {
             "basement/1" | "basement/2" | "basement/3" | "qbr/1" | "qbr/2" | "qbr/3"
             | "hack24/1" | "hack24/2" | "hack24/3" | "ilmari1/1" | "ilmari1/2" | "ilmari1/3"
             | "ilmari2/1" | "ilmari2/2" | "ilmari2/3" | "ilmari3/1" | "ilmari3/2" | "ilmari3/3"
-            | "ilmari4/1" | "ilmari4/2" | "ilmari4/3" => 0,
+            | "ilmari4/1" | "ilmari4/2" | "ilmari4/3" | "ilmari5/1" | "ilmari5/2" | "ilmari5/3"
+            | "ilmari6/1" | "ilmari6/2" | "ilmari6/3" | "ilmari_core/1" => 0,
             "vibecon/2" | "vibecon/3" | "vibecon/4" | "vibecon/5" => 0,
             _ => 1,
         };
@@ -283,6 +303,8 @@ mod tests {
                 "door:ilmari2/1",
                 "door:ilmari3/1",
                 "door:ilmari4/1",
+                "door:ilmari5/1",
+                "door:ilmari6/1",
             ],
             "ilmari1/1" => &["door:campus_occupied", "door:ilmari1/2"],
             "ilmari1/2" => &["door:ilmari1/1", "door:ilmari1/3"],
@@ -296,6 +318,17 @@ mod tests {
             "ilmari4/1" => &["door:campus_occupied", "door:ilmari4/2"],
             "ilmari4/2" => &["door:ilmari4/1", "door:ilmari4/3"],
             "ilmari4/3" => &["door:ilmari4/2", "door:campus_occupied"],
+            "ilmari5/1" => &["door:campus_occupied", "door:ilmari5/2"],
+            "ilmari5/2" => &["door:ilmari5/1", "door:ilmari5/3"],
+            "ilmari5/3" => &["door:ilmari5/2", "door:campus_occupied"],
+            "ilmari6/1" => &["door:campus_occupied", "door:ilmari6/2"],
+            "ilmari6/2" => &["door:ilmari6/1", "door:ilmari6/3"],
+            "ilmari6/3" => &[
+                "door:ilmari6/2",
+                "door:ilmari_core/1",
+                "door:campus_occupied",
+            ],
+            "ilmari_core/1" => &["door:ilmari6/3"],
             "datacenter/1" => &["door:campus", "door:datacenter/2"],
             "datacenter/2" => &["door:datacenter/1", "door:campus"],
             "lab/1" => &["door:campus", "door:lab/2"],
@@ -579,6 +612,9 @@ mod tests {
             "ilmari2/",
             "ilmari3/",
             "ilmari4/",
+            "ilmari5/",
+            "ilmari6/",
+            "ilmari_core/",
         ]
         .iter()
         .any(|p| id.starts_with(p))

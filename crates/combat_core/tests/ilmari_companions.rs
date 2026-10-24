@@ -459,3 +459,67 @@ fn companion_units_are_friendly_and_use_known_spells() {
         assert!(c.spell(def.main).is_some(), "{k}");
     }
 }
+
+/// Wing 5 (D8): the Consultant and the Red Team read people, not companions. A companion is
+/// never offered a guardrail, never marked by a cone, and the exercise starts only on the
+/// owner's account; the fight replays bit for bit with company.
+fn wing_five_fight(
+    zone: &str,
+    boss_key: &str,
+    seed: u64,
+    secs: u32,
+) -> (Sim, EntityId, Vec<Event>) {
+    let (mut sim, ids) = room(1, true, seed);
+    let p = ids[0];
+    sim.set_companion_picks(p, &keys(&[DALE, RUPERT]));
+    load(&mut sim, zone);
+    let boss = unit_of(&sim, boss_key).expect("boss");
+    open_on(&mut sim, p, boss);
+    let mut log = Vec::new();
+    for _ in 0..secs * SECOND {
+        log.extend(sim.tick());
+        sim.debug_set_hp(boss, 10_000_000);
+    }
+    (sim, p, log)
+}
+
+#[test]
+fn companions_are_never_offered_or_detected_in_wing_five() {
+    for (zone, boss) in [
+        ("ilmari5/2", "il_align_consultant"),
+        ("ilmari5/3", "il_red_team"),
+    ] {
+        let (sim, p, log) = wing_five_fight(zone, boss, 21, 60);
+        let mine = sim.companions_of(p);
+        assert_eq!(mine.len(), 2, "{boss}: company came");
+        let bad = |key: &str| {
+            key.starts_with("il_ok") || key.starts_with("il_detected") || key == "il_aligned_stack"
+        };
+        assert!(
+            !log.iter().any(|e| matches!(
+                e,
+                Event::AuraApplied { target, key } if mine.contains(target) && bad(key)
+            )),
+            "{boss}: a companion was offered or marked"
+        );
+    }
+}
+
+#[test]
+fn a_wing_five_replay_with_companions_is_bit_identical() {
+    let fingerprint = |zone: &str, boss: &str| {
+        let (sim, p, log) = wing_five_fight(zone, boss, 22, 40);
+        let pos: Vec<Vec3> = sim
+            .companions_of(p)
+            .iter()
+            .map(|c| sim.unit(*c).expect("unit").pos)
+            .collect();
+        format!("{log:?}{pos:?}")
+    };
+    for (zone, boss) in [
+        ("ilmari5/2", "il_align_consultant"),
+        ("ilmari5/3", "il_red_team"),
+    ] {
+        assert_eq!(fingerprint(zone, boss), fingerprint(zone, boss), "{boss}");
+    }
+}

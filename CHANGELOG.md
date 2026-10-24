@@ -8,6 +8,17 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ## [Unreleased]
 
+### Added
+
+- The Alignment Lab, through the new ethics stairs on the occupied campus: three rooms and two bosses. The Alignment Consultant keeps offering you things you did not ask for (silence counts as yes, and the opt-out kiosks are real), and Red Team Blue Team hold a tabletop exercise until somebody is seen, so mind the cones. Both come with their own gear, titles and Story and Full versions.
+- The Security Engineer's Tailgating also cancels every offer around them in the Alignment Lab.
+- Three new quest chain steps, a hard-hat errand, a whitepaper to defend and a Roomba part to salvage on the occupied campus, plus new pages in the Quartermaster's stock.
+- A lift in the Lab's roof hoist leads up to the Boardroom in the Sky, as far as its first floors for now.
+
+### Changed
+
+- Co-op needs this version on both sides (protocol 42).
+
 ## [0.10.0] - 2026-10-24
 
 ### Added

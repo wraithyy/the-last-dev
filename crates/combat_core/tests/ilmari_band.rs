@@ -14,6 +14,8 @@ use common::content;
 const TOP: u8 = 20;
 /// Pieces that were at ilvl 20 before 1.0 and stay there: the Wing 2 review hoodie (a boss drop)
 /// and the Resistance notebook (a vendor piece). Everything else at 20 is a D4 piece.
+/// The bosses whose tier pieces drop so far (D6, D7); the Chief Ilmari Officer's and Ilmari's wait for D9-D13.
+const DROPPING: [&str; 2] = ["il_align_consultant", "il_red_team"];
 const GRANDFATHERED: [&str; 2] = [
     "Exceeds Expectations Hoodie",
     "Last Paper Notebook in the Building",
@@ -38,12 +40,10 @@ fn rewards_pieces(c: &Content) -> Vec<&str> {
 #[test]
 fn the_wings_one_to_four_band_as_authored() {
     let c = content();
-    let wings: Vec<_> = c.raids.iter().filter(|r| r.ilmari).collect();
-    assert_eq!(
-        wings.len(),
-        4,
-        "Wings 1-4 exist, 5-6 and the core do not yet"
-    );
+    let all: Vec<_> = c.raids.iter().filter(|r| r.ilmari).collect();
+    assert_eq!(all.len(), 6, "Wings 1-6 exist, the core is a skeleton zone");
+    // Wings 1-4 hold the "three loose pieces per boss" rule; Wing 5 also drops tier pieces (below).
+    let wings: Vec<_> = all.into_iter().take(4).collect();
     // (lowest, highest) ilvl of each wing's own drops, read from the content rather than the doc.
     let mut band = Vec::new();
     for w in &wings {
@@ -131,9 +131,20 @@ fn all_24_pieces_are_ilvl_20_and_count_as_14_outside_ilmari() {
     for name in rewards_pieces(&c) {
         let g = eco.gear(name).expect("piece");
         assert_eq!((g.ilvl, &g.source), (TOP, &GearSource::Ilmari), "{name}");
-        assert!(
-            g.drops_from.is_none(),
-            "{name}: data only until its boss exists"
+        // A tier piece drops from its own source once that boss is built; a Legendary never drops.
+        let source = c
+            .ilmari
+            .rewards
+            .tier_sets
+            .iter()
+            .flat_map(|s| &s.pieces)
+            .find(|p| p.gear == name)
+            .map(|p| p.source.as_str())
+            .filter(|b| DROPPING.contains(b));
+        assert_eq!(
+            g.drops_from.as_deref(),
+            source,
+            "{name}: drops from its source boss once that boss is built, never before"
         );
         let mut capped = g.clone();
         capped.ilvl = combat_core::BASE_ILVL_CAP;
@@ -347,7 +358,10 @@ fn the_content_validation_refuses_a_broken_band() {
         ),
         (
             "a title the wire would eat",
-            broken("title: \"Purple\"", "title: \"Purple (Team)\""),
+            broken(
+                "(key: \"purple\", title: \"Purple\"",
+                "(key: \"purple\", title: \"Purple (Team)\"",
+            ),
         ),
         ("a free cosmetic", broken("tokens: 60", "tokens: 0")),
         (

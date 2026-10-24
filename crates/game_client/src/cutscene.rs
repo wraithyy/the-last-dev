@@ -47,7 +47,7 @@ pub struct RaidScenes {
     pub end: &'static str,
 }
 
-pub const RAID_SCENES: [RaidScenes; 6] = [
+pub const RAID_SCENES: [RaidScenes; 8] = [
     RaidScenes {
         first_zone: "offsite/1",
         intro: "offsite_intro",
@@ -83,6 +83,18 @@ pub const RAID_SCENES: [RaidScenes; 6] = [
         intro: "il_wing4_intro",
         final_boss: "il_region_outage",
         end: "il_wing4_end",
+    },
+    RaidScenes {
+        first_zone: "ilmari5/1",
+        intro: "il_wing5_intro",
+        final_boss: "il_red_team",
+        end: "il_wing5_end",
+    },
+    RaidScenes {
+        first_zone: "ilmari6/1",
+        intro: "il_wing6_intro",
+        final_boss: "il_cio",
+        end: "il_wing6_end",
     },
 ];
 
@@ -846,6 +858,118 @@ pub const SCENES: &[Scene] = &[
             l(
                 "Priya",
                 "I closed the ticket: 'Resolved by humans. Root cause: us-east-1. Action items: none.'",
+            ),
+        ],
+    },
+    // ---- Ilmari Wing 5, the Alignment Lab (docs/ILMARI_1_0.md D.3). ----
+    Scene {
+        boss: "il_wing5_intro",
+        title: "The Alignment Lab: the Ethics Wall",
+        lines: &[
+            l(
+                "Dale",
+                "Responsible AI: now hiring, one. I applied in 2011. They told me the position had been filled. By a position.",
+            ),
+            l("You", "So what do we do in there?"),
+            l(
+                "Dale",
+                "Decline. Everything. Not a lanyard, not a mint, not a very kind offer. Declining is a skill, and we are going to practise it.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_align_consultant",
+        title: "Responsible By Design: the Policy Floor",
+        lines: &[
+            l(
+                "Narrator",
+                "The Consultant's badge flips. It now reads ETHICS (CONTRACT, ENDS FRIDAY). Nobody had looked at the back before.",
+            ),
+            l(
+                "Narrator",
+                "The banners rewrite themselves one letter at a time: RESPONSIBLE AI: NOW HIRING (NONE).",
+            ),
+            l("Dale (radio)", "He wasn't evil. He was billable."),
+        ],
+    },
+    Scene {
+        boss: "il_red_team",
+        title: "Purple Is Just Red Plus Budget: the Red-Blue Range",
+        lines: &[
+            l(
+                "Narrator",
+                "Both squads stand, shake hands, say 'good exercise' and fall over. The wall lights read ALIGNMENT: COMPLETE.",
+            ),
+            l(
+                "PA",
+                "A cough that is almost a cough. Then, on every wall screen, in a tired font: COME UP. IT LISTENS TO THE ELEVATORS.",
+            ),
+            l(
+                "Wall screen",
+                "A crane, drawn in the thin outline of somebody with a pencil and a fever. HOIST: CONNECTED.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_wing5_end",
+        title: "The Alignment Lab: closing remarks",
+        lines: &[
+            l(
+                "Dale",
+                "Wing Five is clear. The ethics wall has one plaque left. It says 'TBD'. I am keeping it.",
+            ),
+            l(
+                "Priya",
+                "I closed the ticket: 'Declined by humans. Terms: see Terms.' The system rated it 'compliant'. Nobody asked it to.",
+            ),
+        ],
+    },
+    // ---- Ilmari Wing 6, the Boardroom in the Sky (docs/ILMARI_1_0.md D.4). The Chief Ilmari Officer's scene is a
+    // placeholder until D9. ----
+    Scene {
+        boss: "il_wing6_intro",
+        title: "The Boardroom in the Sky: the crane",
+        lines: &[
+            l(
+                "Dale",
+                "A hundred metres of jib. Facilities said the crane would be done by Q4. They did not say which Q4.",
+            ),
+            l("You", "Is it safe?"),
+            l(
+                "Dale",
+                "It has a safety sign. Signs are a form of safety. Do not look down. Looking down is a metric.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_cio",
+        title: "Reports To Nobody: the Boardroom",
+        lines: &[
+            l(
+                "Wall screen",
+                "REPORTS TO: NOBODY. DIRECT REPORTS: EVERYBODY. THE ORG CHART IS A CIRCLE. THE CIRCLE IS A TABLE.",
+            ),
+            l(
+                "Narrator",
+                "The fruit bowl has one apple. It has been the last apple since Q2. It is low-hanging. Nobody reached.",
+            ),
+            l(
+                "Dale (radio)",
+                "Whatever is behind that chair, it called a lift. I have never seen a lift call itself. Be careful.",
+            ),
+        ],
+    },
+    Scene {
+        boss: "il_wing6_end",
+        title: "The Boardroom in the Sky: closing remarks",
+        lines: &[
+            l(
+                "Dale",
+                "Wing Six is clear. The glass shows the whole campus in red dusk. It looks like a very large screen. It is.",
+            ),
+            l(
+                "Priya",
+                "I closed the ticket: 'Resolved by humans. Escalated to the top. The top has read it.'",
             ),
         ],
     },

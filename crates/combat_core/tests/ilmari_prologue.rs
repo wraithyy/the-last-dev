@@ -273,6 +273,159 @@ fn the_attunement_chain_completes_solo_and_offline() {
     );
 }
 
+/// Wings 5 and 6 and the core (docs/ILMARI_1_0.md D.2, D5): the chain from `il_w4_done` on, played honestly
+/// except for the bosses (killed by the debug hook, their fights are other tests'), reaches every new
+/// door in order, in the real zone geometry, solo and offline.
+#[test]
+fn the_new_chain_reaches_wing_five_wing_six_and_the_core() {
+    let mut w = W::opened();
+    for q in [
+        "il_01_dale",
+        "il_02_sign_in",
+        "il_03_node",
+        "il_04_wing1_attune",
+        "il_w1_done",
+        "il_05_hr_intel",
+        "il_06_wing2_attune",
+        "il_w2_done",
+        "il_07_lab_intel",
+        "il_08_wing3_attune",
+        "il_w3_done",
+        "il_09_roof_intel",
+        "il_10_wing4_attune",
+        "il_w4_done",
+    ] {
+        assert!(w.sim.debug_set_quest(q, QuestStatus::Done), "{q}");
+    }
+    w.load("campus_occupied");
+    assert!(!link_open(&w.sim, "campus_occupied", "ilmari5/1"));
+    // Wing 5: five pages from the Lab's lawns, the Officer, the door.
+    w.accept("il_dale_field", "il_11_ethics_intel");
+    for k in 1..=5 {
+        w.use_prop(&format!("il_principle_page_{k}"));
+    }
+    w.turn_in("il_11_ethics_intel");
+    w.accept("il_dale_field", "il_12_wing5_attune");
+    w.kill_and_loot("il_ethics_chaperone");
+    w.turn_in("il_12_wing5_attune");
+    assert!(link_open(&w.sim, "campus_occupied", "ilmari5/1"));
+    assert!(!link_open(&w.sim, "campus_occupied", "ilmari6/1"));
+    // Eight Roomba parts drop from the Lab's trash, Story included.
+    w.accept("il_dale_field", "il_17_roomba");
+    w.load("ilmari5/1");
+    for k in 0..8 {
+        w.kill_and_loot(["il_prompt_intern", "il_android_auditor"][k % 2]);
+    }
+    assert_eq!(w.counts("il_17_roomba"), [8]);
+    w.load("campus_occupied");
+    w.turn_in("il_17_roomba");
+    w.accept("il_dale_field", "il_w5_done");
+    w.load("ilmari5/3");
+    w.kill_and_loot("il_red_team");
+    w.load("campus_occupied");
+    w.turn_in("il_w5_done");
+    // Wing 6: three hard hat passes on the crane site, the Foreman, the door.
+    w.accept("il_dale_field", "il_13_topping_out");
+    for k in 1..=3 {
+        w.use_prop(&format!("il_hardhat_pass_{k}"));
+    }
+    w.turn_in("il_13_topping_out");
+    w.accept("il_dale_field", "il_14_wing6_attune");
+    w.kill_and_loot("il_crane_foreman");
+    w.turn_in("il_14_wing6_attune");
+    assert!(link_open(&w.sim, "campus_occupied", "ilmari6/1"));
+    w.accept("il_dale_field", "il_w6_done");
+    w.load("ilmari6/3");
+    assert!(!link_open(&w.sim, "ilmari6/3", "ilmari_core/1"));
+    w.kill_and_loot("il_cio");
+    w.load("campus_occupied");
+    w.turn_in("il_w6_done");
+    // The last commit: call the lift in the Boardroom, hand it in, and the core's door opens.
+    w.accept("il_dale_field", "il_15_last_commit");
+    w.load("ilmari6/3");
+    w.use_prop("il_penthouse_lift");
+    w.load("campus_occupied");
+    w.turn_in("il_15_last_commit");
+    w.load("ilmari6/3");
+    assert!(link_open(&w.sim, "ilmari6/3", "ilmari_core/1"));
+    w.load("ilmari_core/1");
+    for q in [
+        "il_11_ethics_intel",
+        "il_12_wing5_attune",
+        "il_w5_done",
+        "il_13_topping_out",
+        "il_14_wing6_attune",
+        "il_w6_done",
+        "il_15_last_commit",
+        "il_17_roomba",
+    ] {
+        assert_eq!(w.sim.quest_status(q), QuestStatus::Done, "{q}");
+    }
+}
+
+/// The two world quests of Wings 5 and 6: hold the whiteboard against the safety interns, walk the surveyor
+/// to the crane foot.
+#[test]
+fn the_new_world_quests_play_out_in_the_occupied_campus() {
+    let mut w = W::opened();
+    for q in [
+        "il_01_dale",
+        "il_02_sign_in",
+        "il_w4_done",
+        "il_11_ethics_intel",
+        "il_w5_done",
+        "il_13_topping_out",
+    ] {
+        assert!(w.sim.debug_set_quest(q, QuestStatus::Done), "{q}");
+    }
+    w.load("campus_occupied");
+    w.accept("il_priya", "il_wq_whitepaper");
+    w.stand_at("il_board_spot");
+    w.secs(95);
+    w.turn_in("il_wq_whitepaper");
+    w.accept("il_rupert", "il_wq_hardhat");
+    for _ in 0..400 {
+        let Some(b) = w
+            .sim
+            .units()
+            .find(|u| u.key == "il_surveyor" && u.alive)
+            .map(|u| u.pos)
+        else {
+            break;
+        };
+        w.move_to(Vec3::new(b.x, 0.0, b.z + 2.0));
+        w.secs(1);
+        if w.sim.quest_status("il_wq_hardhat") == QuestStatus::Ready {
+            break;
+        }
+    }
+    w.turn_in("il_wq_hardhat");
+    assert_eq!(w.tokens(), 5 + 5);
+}
+
+/// Brenda's Wing 5 and 6 pages: a rubber band for one token and a shelf for each wing, tokens only.
+#[test]
+fn the_quartermasters_new_pages_cost_tokens() {
+    let c = content();
+    let shop = c
+        .economy
+        .vendors
+        .iter()
+        .find(|v| v.unit == "il_brenda")
+        .expect("Brenda's shop");
+    for (item, price) in [
+        ("Rubber Band (The Missing One)", 1),
+        ("Ethics Hotline Hold Music (Cassette)", 6),
+        ("Hard Hat (Aligned With Your Head)", 6),
+    ] {
+        assert!(
+            shop.stock.iter().any(|s| s == item),
+            "{item} is on the shelf"
+        );
+        assert_eq!(shop.token_price(item), Some(price), "{item}");
+    }
+}
+
 /// The side quests of the field post, one of each objective kind.
 #[test]
 fn the_world_quests_play_out_in_the_occupied_campus() {
@@ -637,7 +790,9 @@ fn the_phase_toggle_round_trips_and_the_normal_campus_stays_put() {
             "ilmari1/1",
             "ilmari2/1",
             "ilmari3/1",
-            "ilmari4/1"
+            "ilmari4/1",
+            "ilmari5/1",
+            "ilmari6/1"
         ]
         .contains(&l.to.as_str())),
         "the closed buildings have no doors in this phase"

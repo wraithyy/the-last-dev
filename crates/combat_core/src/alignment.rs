@@ -43,6 +43,12 @@ pub struct OfferDef {
     pub stagger_aura: Option<String>,
     #[serde(default)]
     pub stagger_ms: u32,
+    /// Tenths of a percent of the boss's max HP each `Aligned` stack heals it, every 5 s.
+    #[serde(default)]
+    pub heal_tenths: u32,
+    /// Judgment's rider: while the boss wears this aura the kiosk's per-player cooldown is `.1` ms.
+    #[serde(default)]
+    pub rider_kiosk: Option<(String, u32)>,
 }
 
 impl OfferDef {
@@ -53,6 +59,7 @@ impl OfferDef {
             .chain(self.aligned_aura.as_deref())
             .chain(self.pushback_aura.as_deref())
             .chain(self.stagger_aura.as_deref())
+            .chain(self.rider_kiosk.iter().map(|(a, _)| a.as_str()))
             .collect()
     }
 
@@ -90,12 +97,31 @@ struct Worn {
     aligned: Option<String>,
 }
 
+/// Aligned heals tick this often (5 s).
+const HEAL_TICKS: u64 = 150;
+
 #[derive(Default)]
 pub(crate) struct OfferState {
     pending: Vec<Pending>,
     worn: Vec<Worn>,
     /// The first refusal of the current wave staggers the boss; the rest only stack Pushback.
     wave_refused: bool,
+    /// Guardrails accepted (or not read) in the pull that began at tick `.0`.
+    accepted: (u64, u32),
+    /// Per offering boss: (aligned aura, heal tenths per stack) and the next heal tick.
+    heals: Vec<(EntityId, String, u32)>,
+    next_heal: u64,
+}
+
+impl OfferState {
+    /// Guardrails the room has accepted in the pull that began at `since` (0 when it is another).
+    pub(crate) fn accepted_in(&self, since: u64) -> u32 {
+        if self.accepted.0 == since {
+            self.accepted.1
+        } else {
+            0
+        }
+    }
 }
 
 impl Sim {
@@ -104,11 +130,25 @@ impl Sim {
         self.offers = OfferState::default();
     }
 
+    /// Guardrails accepted in the pull that began at `since`.
+    pub(crate) fn offers_accepted(&self, since: u64) -> u32 {
+        self.offers.accepted_in(since)
+    }
+
+    /// Whether any wave of offers was made in the pull that began at `since`.
+    pub(crate) fn offers_waves_seen(&self, since: u64) -> bool {
+        since > 0 && self.offers.accepted.0 == since
+    }
+
     /// `Effect::Offer`: every living player within `range_m` of the boss gets the pending aura.
     pub(crate) fn offer_wave(&mut self, ci: usize, range_m: f32, def: &OfferDef) {
         let boss = Self::id_of(ci);
         let me = self.units[ci].state.pos;
         self.offers.wave_refused = false;
+        let since = self.units[ci].combat_since;
+        if self.offers.accepted.0 != since {
+            self.offers.accepted = (since, 0);
+        }
         for p in self.players.clone() {
             let Some(pi) = self.index(p) else { continue };
             let u = &self.units[pi].state;
@@ -140,6 +180,7 @@ impl Sim {
     /// Windows that ran out convert: the guardrail lands and the boss grows. Offers whose player
     /// died or whose boss is gone just lapse.
     pub(crate) fn update_offers(&mut self) {
+        self.aligned_heal();
         if self.offers.pending.is_empty() && self.offers.worn.is_empty() {
             return;
         }
@@ -157,6 +198,18 @@ impl Sim {
                 continue;
             }
             self.apply_aura(pi, &o.def.bad_aura, o.def.bad_ms, None, o.boss, None);
+            let since = self.units[bi].combat_since;
+            if self.offers.accepted.0 != since {
+                self.offers.accepted = (since, 0);
+            }
+            self.offers.accepted.1 += 1;
+            if let (Some(a), true) = (&o.def.aligned_aura, o.def.heal_tenths > 0)
+                && !self.offers.heals.iter().any(|(b, _, _)| *b == o.boss)
+            {
+                self.offers
+                    .heals
+                    .push((o.boss, a.clone(), o.def.heal_tenths));
+            }
             // Story's offers are honest: nothing is fed to the boss.
             if let Some(a) = o.def.aligned_aura.as_deref().filter(|_| !self.raid.story) {
                 self.apply_aura(bi, a, LONG_MS, None, o.boss, None);
@@ -176,6 +229,56 @@ impl Sim {
                 .is_some_and(|pi| self.has_aura(pi, &w.key));
             if on {
                 self.offers.worn.push(w);
+            }
+        }
+    }
+
+    /// Every accepted guardrail feeds the offering boss: it heals a share of its max HP per
+    /// `Aligned` stack every 5 s (Story feeds it nothing, so the stacks never exist there).
+    fn aligned_heal(&mut self) {
+        if self.offers.heals.is_empty() {
+            return;
+        }
+        if self.offers.next_heal == 0 {
+            self.offers.next_heal = self.now + HEAL_TICKS;
+        }
+        if self.now < self.offers.next_heal {
+            return;
+        }
+        self.offers.next_heal = self.now + HEAL_TICKS;
+        for (boss, aligned, tenths) in self.offers.heals.clone() {
+            let Some(bi) = self.index(boss).filter(|&b| self.units[b].state.alive) else {
+                continue;
+            };
+            let stacks = self.units[bi]
+                .auras
+                .iter()
+                .find(|a| a.key == aligned)
+                .map_or(0, |a| u64::from(a.stacks));
+            let amount = u64::from(self.units[bi].state.max_hp) * u64::from(tenths) * stacks / 1000;
+            if amount > 0 {
+                self.heal(boss, bi, None, amount as u32);
+            }
+        }
+    }
+
+    /// `Effect::ClearOffers`: the pending offers of every living player within `radius_m` of the
+    /// caster lapse without a refusal.
+    pub(crate) fn offers_clear_near(&mut self, ci: usize, radius_m: f32) {
+        let me = self.units[ci].state.pos;
+        for p in self.players.clone() {
+            let Some(pi) = self.index(p) else { continue };
+            let u = &self.units[pi].state;
+            if !u.alive || crate::geom::distance(u.pos, me) > radius_m {
+                continue;
+            }
+            let (mine, rest): (Vec<Pending>, Vec<Pending>) =
+                std::mem::take(&mut self.offers.pending)
+                    .into_iter()
+                    .partition(|o| o.player == p);
+            self.offers.pending = rest;
+            for o in mine {
+                self.remove_aura(pi, &o.def.ok_aura, AuraEnd::Consumed);
             }
         }
     }
@@ -250,8 +353,19 @@ impl Sim {
         let player = Self::id_of(pi);
         let def = self.content.world.props[k].clone();
         let mut outcome = 0;
+        let rider = self
+            .offers
+            .pending
+            .iter()
+            .find(|o| o.player == player)
+            .and_then(|o| {
+                let (aura, ms) = o.def.rider_kiosk.as_ref()?;
+                let bi = self.index(o.boss)?;
+                self.has_aura(bi, aura).then_some(*ms)
+            });
+        let cooldown = rider.map_or(def.cooldown_ms, |ms| ms.max(def.cooldown_ms));
         let mine = self.offers.pending.iter().any(|o| o.player == player);
-        if mine && self.prop_ready(player, k, def.cooldown_ms) && self.offers_cancel(player) > 0 {
+        if mine && self.prop_ready(player, k, cooldown) && self.offers_cancel(player) > 0 {
             outcome = crate::world::PROP_OK;
         }
         self.events.push(crate::types::Event::Interacted {

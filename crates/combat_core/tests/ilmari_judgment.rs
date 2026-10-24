@@ -420,10 +420,7 @@ fn judgment_content_validates_and_the_default_block_is_the_documented_one() {
             "hp_pct: 90, damage_pct: 125",
         ),
         ("min_humans: 3, boss_items", "min_humans: 2, boss_items"),
-        (
-            "riders: [],\n        ),",
-            "riders: [(boss: \"il_patch_tuesday\", aura: \"no_such_aura\")],\n        ),",
-        ),
+        ("aura: \"il_rider_training\"", "aura: \"no_such_aura\""),
     ] {
         assert!(ron.contains(from), "{from}");
         assert!(

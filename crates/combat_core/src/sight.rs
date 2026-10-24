@@ -154,8 +154,17 @@ struct Run {
 pub(crate) struct SightState {
     runs: BTreeMap<EntityId, Run>,
     /// Summoned squad members and their side.
-    squads: Vec<(EntityId, SquadSide)>,
+    pub(crate) squads: Vec<(EntityId, SquadSide)>,
+    /// Incidents raised since `wing5` last looked: (player, sensor).
+    pub(crate) incidents: Vec<(EntityId, EntityId)>,
+    /// A honeypot is turning every cone toward `.1` until tick `.0`.
+    honeypot: Option<(u64, Vec3)>,
+    /// Honeypots share one cooldown, ready again at this tick.
+    honeypot_ready: u64,
 }
+
+/// How long every cone looks at a honeypot.
+pub const HONEYPOT_MS: u32 = 8_000;
 
 fn xz(a: Vec3, b: Vec3) -> f32 {
     distance(Vec3::new(a.x, 0.0, a.z), Vec3::new(b.x, 0.0, b.z))
@@ -306,18 +315,49 @@ impl Sim {
         };
         let by = Self::id_of(sensor);
         self.apply_aura(pi, &aura, ms, None, by, None);
+        self.sight.incidents.push((Self::id_of(pi), by));
         self.events.push(Event::Incident {
             player: Self::id_of(pi),
             by,
         });
     }
 
+    /// A honeypot prop was used: every cone turns to it for `HONEYPOT_MS`. False while the shared
+    /// cooldown (`cooldown_ms`) runs or nothing has eyes to fool.
+    pub(crate) fn honeypot_use(&mut self, at: Vec3, cooldown_ms: u32) -> bool {
+        let sensors = self
+            .units
+            .iter()
+            .any(|u| u.state.alive && u.state.hostile && self.content.units[u.def].sight.is_some());
+        if !sensors || self.now < self.sight.honeypot_ready {
+            return false;
+        }
+        self.sight.honeypot = Some((self.now + crate::content::ticks(HONEYPOT_MS), at));
+        self.sight.honeypot_ready = self.now + crate::content::ticks(cooldown_ms);
+        true
+    }
+
+    /// The honeypot's spot while one is lit.
+    pub fn honeypot_active(&self) -> Option<Vec3> {
+        self.sight
+            .honeypot
+            .filter(|(until, _)| *until > self.now)
+            .map(|(_, at)| at)
+    }
+
     /// Idle sensors with a patrol walk it; a sensor with a target is left to the AI.
     fn walk_patrols(&mut self, eyes: &[usize]) {
         let t_ms = ticks_to_ms(self.now);
+        let lure = self.honeypot_active();
         for &i in eyes {
             let u = &self.units[i];
             if !matches!(u.state.ai, None | Some(AiState::Idle)) || !u.threat.is_empty() {
+                continue;
+            }
+            // Every cone is on the honeypot; the clock's patrol picks up again where it is.
+            if let Some(at) = lure {
+                let from = u.state.pos;
+                self.units[i].state.yaw = crate::ai::yaw_toward(from, at);
                 continue;
             }
             let Some(def) = self.sight_of(i).filter(|s| !s.patrol.is_empty()) else {
@@ -350,6 +390,7 @@ impl Sim {
         filler: &str,
         side: SquadSide,
         min_bodies: u8,
+        idle: bool,
     ) {
         let roles: Vec<Role> = self
             .players
@@ -373,7 +414,7 @@ impl Sim {
         let at = Vec3::new(pos.x + right.x * off, pos.y, pos.z + right.z * off);
         for (k, key) in keys.iter().enumerate() {
             let before = self.units.len();
-            self.summon(ci, at, key, 1, u8::MAX, k as u8);
+            self.summon_with(ci, at, key, (1, u8::MAX, k as u8), idle);
             for i in before..self.units.len() {
                 self.sight.squads.push((Self::id_of(i), side));
             }

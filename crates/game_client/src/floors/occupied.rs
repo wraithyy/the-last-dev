@@ -5,7 +5,7 @@
 //! tunnel shed with its two doors, the Resistance's field post and the spots the Prologue quests
 //! work from.
 
-use super::campus::{building, facade_door};
+use super::campus::{LAB, building, facade_door};
 use super::districts::signpost;
 use super::kit::*;
 use super::layout::{FloorKind, Theme, yaw_towards};
@@ -54,6 +54,9 @@ pub fn overlay(p: &mut Plan) {
     lobby(p);
     airlock(p);
     roof_ladder(p);
+    ethics_stair(p);
+    hoist(p);
+    marie_desk(p);
 }
 
 /// "ILMARI" on the Tower, the Data Center and the Lab, and a closed sign at each door. Signs
@@ -169,6 +172,34 @@ fn roof_ladder(p: &mut Plan) {
     });
     let at = v(WALL_X + 1.8, 0.0, Z);
     p.anchor("door:ilmari4/1", at, -FRAC_PI_2);
+}
+
+/// The Ethics Wall's glass stair (docs/ILMARI_1_0.md D.2.1): a second door in the Innovation Lab's
+/// west wall, under a banner that reads RESPONSIBLE AI: NOW HIRING (ONE). The campus's own Lab
+/// entrance stays Wing 3's airlock; the Responsible AI Officer's quest (`il_12`) opens this one.
+fn ethics_stair(p: &mut Plan) {
+    let (at, yaw) = facade_door(p, LAB, Face::NegX, Sign::IlW5Door);
+    p.anchor("door:ilmari5/1", at, yaw);
+    p.sign(v(-85.2, 3.4, -86.0), -FRAC_PI_2, 3.4, Sign::IlHiringOne);
+    p.sign(v(-85.2, 3.4, -74.0), -FRAC_PI_2, 3.4, Sign::IlConcerns);
+}
+
+/// The New HQ crane's foot (docs/ILMARI_1_0.md D.2.1): a hoist cabin on the site, east of the
+/// crane that never moved, with the ladder policy's cousin on its wall. The Crane Foreman's quest
+/// (`il_14`) opens the door.
+fn hoist(p: &mut Plan) {
+    const CABIN: (Vec2, Vec3) = (Vec2::new(-128.0, -142.0), Vec3::new(6.0, 4.0, 6.0));
+    building(p, CABIN, Mat::Metal);
+    let (at, yaw) = facade_door(p, CABIN, Face::NegX, Sign::IlW6Door);
+    p.anchor("door:ilmari6/1", at, yaw);
+    p.sign(v(-128.0, 3.0, -138.9), 0.0, 2.4, Sign::IlCraneNote);
+}
+
+/// Ill Marie's desk in the occupied phase (docs/ILMARI_1_0.md D.2.4): the base campus's desk, chair,
+/// humidifier and tissue tower stay where they were; what the Resistance can now do is read the
+/// monitor, stopped at 97 %.
+fn marie_desk(p: &mut Plan) {
+    p.interactable("prop:il_marie_desk", v(7.5, 1.0, 118.0), v(5.4, 0.0, 118.0));
 }
 
 /// A roof antenna on the east dock: a mast with a dish and a lit receiver, a prop (stand spot
@@ -342,6 +373,17 @@ fn quest_spots(p: &mut Plan) {
             ][k],
         );
     }
+    // The Lab's west lawn: the Responsible AI Officer of `il_12` stands off the path (20 m from every door), and
+    // the principle pages of `il_11` lie where the staff dropped them. The crane site's foreman of `il_14` stands in
+    // its north-west corner, the hard hat passes of `il_13` where the foremen lost them, and the surveyor of
+    // `il_wq_hardhat` waits at the east gap of the fence with the crane foot as his goal.
+    let officer = v(-112.0, 0.0, -84.0);
+    p.anchor("rare_ethics", officer, yaw_towards(officer, spawn));
+    let foreman = v(-206.0, 0.0, -140.0);
+    p.anchor("rare_crane", foreman, yaw_towards(foreman, spawn));
+    let surveyor = v(-122.0, 0.0, -100.0);
+    p.anchor("il_surveyor_spot", surveyor, yaw_towards(surveyor, spawn));
+    p.anchor("il_crane_goal", v(-146.0, 0.0, -136.0), 0.0);
     // HR passes and mug photos: glowing pickups (the office module draws them).
     for (key, x, z) in [
         ("prop:il_hr_pass_1", -40.0, -35.0),
@@ -355,6 +397,14 @@ fn quest_spots(p: &mut Plan) {
         ("prop:il_mug_proof_2", -20.0, 70.0),
         ("prop:il_mug_proof_3", 110.0, -50.0),
         ("prop:il_mug_proof_4", 90.0, 60.0),
+        ("prop:il_principle_page_1", -95.2, -66.0),
+        ("prop:il_principle_page_2", -112.0, -52.0),
+        ("prop:il_principle_page_3", -100.0, -34.0),
+        ("prop:il_principle_page_4", -84.0, -30.0),
+        ("prop:il_principle_page_5", -66.0, -30.0),
+        ("prop:il_hardhat_pass_1", -190.0, -90.0),
+        ("prop:il_hardhat_pass_2", -160.0, -98.0),
+        ("prop:il_hardhat_pass_3", -128.0, -124.0),
     ] {
         p.interactable(key, v(x, 0.3, z), v(x + 1.2, 0.0, z));
     }

@@ -196,3 +196,108 @@ fn the_reveal_has_no_spoiler_before_the_credits_in_any_player_text() {
         }
     }
 }
+
+/// Wings 5-6 and the core (docs/ILMARI_1_0.md D.11, D5): none of their units stands in a base zone,
+/// no base zone links to them, their doors stay locked until their quest, their quests wait for
+/// the wing before, and Marie's desk prop belongs to the occupied campus only.
+#[test]
+fn ilmari_gating_wings_five_six_and_the_core() {
+    let c = content();
+    let new_zone = |z: &str| {
+        z.starts_with("ilmari5/") || z.starts_with("ilmari6/") || z.starts_with("ilmari_core/")
+    };
+    // The units of the new zones (and the two attunement elites that stand on the occupied campus).
+    let mut new_units: Vec<String> = c
+        .zones
+        .iter()
+        .filter(|z| new_zone(&z.id))
+        .flat_map(|z| c.zone_hostiles(&z.id).into_iter().map(String::from))
+        .collect();
+    new_units.extend(["il_ethics_chaperone", "il_crane_foreman", "il_surveyor"].map(String::from));
+    assert!(new_units.len() > 6);
+    for z in c.zones.iter().filter(|z| !is_ilmari_or_base(&z.id)) {
+        let mut s = Sim::new(content(), 3);
+        s.set_wandering(false);
+        let q = s.spawn_player("fullstack", Vec3::new(0.0, 0.0, 0.0), 0.0);
+        s.set_level_of(q, 10);
+        for b in ALL_BUT_AGI.iter().chain(&["agi_prototype"]) {
+            s.debug_mark_boss(b);
+        }
+        for l in &z.links {
+            assert!(!new_zone(&l.to), "{} links to {}", z.id, l.to);
+        }
+        if s.load_zone(&z.id, &anchors, Vec::new()).is_ok() {
+            assert!(
+                !s.units().any(|u| new_units.contains(&u.key)),
+                "{} spawns an Ilmari 1.0 unit",
+                z.id
+            );
+        }
+    }
+    // The prop is the occupied campus's only.
+    let desks: Vec<&str> = c
+        .world
+        .props
+        .iter()
+        .filter(|p| p.key == "il_marie_desk")
+        .map(|p| p.zone.as_str())
+        .collect();
+    assert_eq!(desks, ["campus_occupied"]);
+    // Quests wait for the wing before; doors wait for their quest.
+    let (mut sim, p) = campus(&["agi_prototype"]);
+    sim.apply_as(
+        p,
+        Command::StampIlmari {
+            unix_secs: STAMP.0,
+            utc_offset_min: STAMP.1,
+            tz: STAMP.2.into(),
+        },
+    );
+    sim.apply_as(p, Command::IlmariReveal);
+    sim.tick();
+    for q in [
+        "il_11_ethics_intel",
+        "il_13_topping_out",
+        "il_15_last_commit",
+    ] {
+        assert_eq!(sim.quest_status_of(p, q), QuestStatus::Locked, "{q}");
+    }
+    sim.load_zone("campus_occupied", &anchors, Vec::new())
+        .expect("occupied campus");
+    let open = |sim: &Sim, zone: &str, to: &str| {
+        sim.zone_links(zone)
+            .iter()
+            .find(|l| l.to == to)
+            .is_some_and(|l| l.unlocked)
+    };
+    assert!(!open(&sim, "campus_occupied", "ilmari5/1"));
+    assert!(!open(&sim, "campus_occupied", "ilmari6/1"));
+    sim.debug_set_quest("il_w4_done", QuestStatus::Done);
+    assert_eq!(
+        sim.quest_status_of(p, "il_11_ethics_intel"),
+        QuestStatus::Available
+    );
+    assert_eq!(
+        sim.quest_status_of(p, "il_13_topping_out"),
+        QuestStatus::Locked
+    );
+    sim.debug_set_quest("il_12_wing5_attune", QuestStatus::Done);
+    assert!(open(&sim, "campus_occupied", "ilmari5/1"));
+    assert!(!open(&sim, "campus_occupied", "ilmari6/1"));
+    sim.debug_set_quest("il_w5_done", QuestStatus::Done);
+    assert_eq!(
+        sim.quest_status_of(p, "il_13_topping_out"),
+        QuestStatus::Available
+    );
+    sim.debug_set_quest("il_14_wing6_attune", QuestStatus::Done);
+    assert!(open(&sim, "campus_occupied", "ilmari6/1"));
+    sim.load_zone("ilmari6/3", &anchors, Vec::new())
+        .expect("boardroom");
+    assert!(!open(&sim, "ilmari6/3", "ilmari_core/1"));
+    sim.debug_set_quest("il_15_last_commit", QuestStatus::Done);
+    assert!(open(&sim, "ilmari6/3", "ilmari_core/1"));
+}
+
+fn is_ilmari_or_base(zone: &str) -> bool {
+    zone.starts_with("ilmari") || zone == "campus_occupied" || zone == "resistance/1"
+}

@@ -179,8 +179,9 @@ fn every_item_is_reachable_from_some_source() {
         })
         .collect();
     let top = eco.campaign_top_tier();
-    // Ilmari 1.0's sets, Legendaries, fragments and Roomba parts are data until D6-D13 attach their
-    // bosses (docs/ILMARI_1_0.md D4); `tests/ilmari_band.rs` guards them instead.
+    // Ilmari 1.0's Legendaries, fragments, Roomba parts and the tier pieces of the bosses that are not built yet
+    // (the Chief Ilmari Officer, Ilmari) are data until D9-D18 attach their sources (docs/ILMARI_1_0.md D4);
+    // `tests/ilmari_band.rs` guards them instead. A tier piece of a built boss has to drop from it: the strict check.
     let r = &c.ilmari.rewards;
     let pending: Vec<&str> = r
         .tier_sets
@@ -189,6 +190,7 @@ fn every_item_is_reachable_from_some_source() {
         .chain(r.legendaries.iter().map(|l| l.gear.as_str()))
         .chain([r.fragment.as_str()])
         .chain(r.mount.iter().map(|m| m.part_item.as_str()))
+        .filter(|n| eco.gear(n).is_none_or(|g| g.drops_from.is_none()))
         .collect();
     let mut bad = Vec::new();
     for g in &eco.gear {

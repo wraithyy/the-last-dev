@@ -261,6 +261,16 @@ fn unlit(tex: Tex) -> bool {
                 | Sign::IlInvoice
                 | Sign::IlDashboard
                 | Sign::IlTeaser
+                | Sign::IlHiringOne
+                | Sign::IlConcerns
+                | Sign::IlKiosk
+                | Sign::IlSensorLane
+                | Sign::IlAlignDone
+                | Sign::IlLiftPlate
+                | Sign::IlRoadmapWall
+                | Sign::IlCoreDoor
+                | Sign::IlCoreWelcome
+                | Sign::IlCoreMonitor
                 | Sign::IlScaleUp
                 | Sign::IlCitation
                 | Sign::IlScreenA
@@ -3297,6 +3307,312 @@ fn sign_spec(s: Sign) -> SignSpec {
             [10, 40, 30],
             [200, 255, 225],
             [255, 255, 120],
+        ),
+        Sign::IlW5Door => sp(
+            &[
+                "ALIGNMENT LAB",
+                "WING 5 - STORY OR FULL",
+                "RESPONSIBLE AI: NOW HIRING (ONE)",
+            ],
+            [20, 26, 44],
+            [225, 235, 250],
+            [120, 200, 255],
+        ),
+        Sign::IlW5Back => sp(
+            &["BACK DOWN THE GLASS STAIR", "(THE ETHICS WALL STAYS)"],
+            [20, 26, 44],
+            [225, 235, 250],
+            [120, 200, 255],
+        ),
+        Sign::IlW5ToPolicy => sp(
+            &[
+                "TO THE POLICY FLOOR",
+                "PLEASE ACCEPT ALL TO CONTINUE",
+                "(DECLINE IS A KIOSK)",
+            ],
+            [20, 26, 44],
+            [225, 235, 250],
+            [120, 200, 255],
+        ),
+        Sign::IlW5ToRange => sp(
+            &["TO THE RED-BLUE RANGE", "PURPLE IS RED PLUS BUDGET"],
+            [20, 26, 44],
+            [225, 235, 250],
+            [120, 200, 255],
+        ),
+        Sign::IlW5Out => sp(
+            &["EXIT: ALIGNMENT COMPLETE", "(PLEASE RATE YOUR EXIT)"],
+            [20, 26, 44],
+            [225, 235, 250],
+            [120, 200, 255],
+        ),
+        Sign::IlPrincipleA => sp(
+            &["PRINCIPLE 1", "ALWAYS BE TRANSPARENT"],
+            [244, 240, 226],
+            [40, 30, 20],
+            [200, 50, 50],
+        ),
+        Sign::IlPrincipleB => sp(
+            &["PRINCIPLE 2", "NEVER DISCLOSE ANYTHING"],
+            [244, 240, 226],
+            [40, 30, 20],
+            [200, 50, 50],
+        ),
+        Sign::IlPrincipleC => sp(
+            &["PRINCIPLE 3", "BOTH, TUESDAYS ONLY"],
+            [244, 240, 226],
+            [40, 30, 20],
+            [200, 50, 50],
+        ),
+        Sign::IlPrincipleD => sp(
+            &["PRINCIPLE 4", "PEOPLE FIRST (IN THE QUEUE)"],
+            [244, 240, 226],
+            [40, 30, 20],
+            [200, 50, 50],
+        ),
+        Sign::IlHiringOne => sp(
+            &["RESPONSIBLE AI", "NOW HIRING (ONE)", "(SALARY: EXPOSURE)"],
+            [10, 40, 30],
+            [200, 255, 225],
+            [255, 255, 120],
+        ),
+        Sign::IlConcerns => sp(
+            &[
+                "CONCERNS NOTED: 40,211",
+                "CONCERNS ACTED ON: 0",
+                "(TARGET: 0)",
+            ],
+            [14, 18, 30],
+            [255, 220, 120],
+            [255, 90, 70],
+        ),
+        Sign::IlKiosk => sp(
+            &["OPT-OUT KIOSK", "DECLINE HERE", "(IT WILL BE NOTED)"],
+            [10, 40, 30],
+            [200, 255, 225],
+            [255, 255, 120],
+        ),
+        Sign::IlTerms => sp(
+            &["TERMS", "SEE TERMS", "(TERMS: SEE TERMS)"],
+            [244, 240, 226],
+            [40, 30, 20],
+            [200, 50, 50],
+        ),
+        Sign::IlAlignedBanner => sp(
+            &["ALIGNED. ALWAYS.", "RESPONSIBLE BY DESIGN"],
+            [10, 18, 48],
+            [215, 230, 255],
+            [90, 160, 255],
+        ),
+        Sign::IlSafeDefault => sp(
+            &["SAFE BY DEFAULT", "(THE DEFAULT IS YOU)"],
+            [10, 18, 48],
+            [215, 230, 255],
+            [90, 160, 255],
+        ),
+        Sign::IlRedTeam => sp(
+            &["RED TEAM", "OFFENCE", "(HOODIES OPTIONAL)"],
+            [40, 10, 14],
+            [255, 225, 225],
+            [255, 90, 90],
+        ),
+        Sign::IlBlueTeam => sp(
+            &["BLUE TEAM", "DEFENCE", "(AND THE SNACKS)"],
+            [10, 18, 48],
+            [215, 230, 255],
+            [90, 160, 255],
+        ),
+        Sign::IlRange => sp(
+            &[
+                "THE EXERCISE FLOOR",
+                "NOBODY SHOOTS",
+                "UNTIL SOMEBODY IS SEEN",
+            ],
+            [14, 18, 30],
+            [255, 220, 120],
+            [255, 90, 70],
+        ),
+        Sign::IlHoneypot => sp(
+            &["DO NOT TOUCH", "(IT WANTS YOU TO)"],
+            [40, 10, 14],
+            [255, 225, 225],
+            [255, 90, 90],
+        ),
+        Sign::IlPurpleSoon => sp(
+            &["PURPLE TEAM", "COMING SOON", "AS A BUDGET LINE"],
+            [46, 36, 16],
+            [255, 236, 190],
+            [255, 200, 70],
+        ),
+        Sign::IlSensorLane => sp(
+            &[
+                "SENSOR LANE",
+                "MOTION IS A FINDING",
+                "(SO IS STANDING STILL)",
+            ],
+            [14, 18, 30],
+            [255, 220, 120],
+            [255, 90, 70],
+        ),
+        Sign::IlAlignDone => sp(
+            &["ALIGNMENT: COMPLETE", "(SOMETHING IS LISTENING)"],
+            [10, 40, 30],
+            [200, 255, 225],
+            [255, 255, 120],
+        ),
+        Sign::IlLabDark => sp(
+            &["MONITORS: OFF", "(THEY ARE WATCHING ANYWAY)"],
+            [14, 18, 30],
+            [255, 220, 120],
+            [255, 90, 70],
+        ),
+        Sign::IlW6Door => sp(
+            &[
+                "THE CRANE",
+                "WING 6 - STORY OR FULL",
+                "HARD HATS ARE ALIGNED WITH YOUR HEAD",
+            ],
+            [46, 36, 16],
+            [255, 236, 190],
+            [255, 200, 70],
+        ),
+        Sign::IlW6Back => sp(
+            &["BACK DOWN THE HOIST", "(THE LIFT IS NOT RATED FOR REGRET)"],
+            [46, 36, 16],
+            [255, 236, 190],
+            [255, 200, 70],
+        ),
+        Sign::IlW6ToExec => sp(
+            &[
+                "TO THE EXECUTIVE FLOOR",
+                "OPEN PLAN, TEN SEATS",
+                "(ELEVEN EMPLOYEES)",
+            ],
+            [46, 36, 16],
+            [255, 236, 190],
+            [255, 200, 70],
+        ),
+        Sign::IlW6ToBoardroom => sp(
+            &["TO THE BOARDROOM", "KNOCK FIRST", "(NOBODY ANSWERS)"],
+            [46, 36, 16],
+            [255, 236, 190],
+            [255, 200, 70],
+        ),
+        Sign::IlW6Out => sp(
+            &["EXIT TO THE SITE", "MIND THE JIB"],
+            [46, 36, 16],
+            [255, 236, 190],
+            [255, 200, 70],
+        ),
+        Sign::IlJibRules => sp(
+            &["JIB RULES", "1. DO NOT FALL", "2. SEE RULE 1"],
+            [244, 240, 226],
+            [40, 30, 20],
+            [200, 50, 50],
+        ),
+        Sign::IlCraneNote => sp(
+            &["LOAD LIMIT: A FEELING", "ACTUAL LOAD: A BEAM"],
+            [244, 240, 226],
+            [40, 30, 20],
+            [200, 50, 50],
+        ),
+        Sign::IlPigeon => sp(
+            &["PIGEON: SENIOR", "(HAS A LANYARD)"],
+            [244, 240, 226],
+            [40, 30, 20],
+            [200, 50, 50],
+        ),
+        Sign::IlOpenPlanTen => sp(
+            &["OPEN PLAN: 10 SEATS", "11 EMPLOYEES", "(ONE STANDS)"],
+            [10, 40, 30],
+            [200, 255, 225],
+            [255, 255, 120],
+        ),
+        Sign::IlWellnessRoom => sp(
+            &[
+                "WELLNESS ROOM",
+                "1:1 FEEDBACK SESSIONS",
+                "(CLOSED DOOR, NO FEEDBACK)",
+            ],
+            [10, 40, 30],
+            [200, 255, 225],
+            [255, 255, 120],
+        ),
+        Sign::IlMassage => sp(
+            &[
+                "MASSAGE CHAIR",
+                "BOOKED UNTIL 2031",
+                "(BY A CONVERTED MANAGER)",
+            ],
+            [10, 40, 30],
+            [200, 255, 225],
+            [255, 255, 120],
+        ),
+        Sign::IlFruitBowl => sp(
+            &["FRUIT BOWL", "LAST APPLE: Q2", "(LOW-HANGING)"],
+            [46, 36, 16],
+            [255, 236, 190],
+            [255, 200, 70],
+        ),
+        Sign::IlRunway => sp(
+            &["THE TABLE", "LENGTH: A RUNWAY", "SEATS: EIGHT"],
+            [46, 36, 16],
+            [255, 236, 190],
+            [255, 200, 70],
+        ),
+        Sign::IlCampusView => sp(
+            &["THE WHOLE CAMPUS", "(IN RED DUSK)"],
+            [14, 18, 30],
+            [255, 220, 120],
+            [255, 90, 70],
+        ),
+        Sign::IlLiftPlate => sp(
+            &[
+                "PENTHOUSE LIFT",
+                "NO BADGE NEEDED",
+                "(IT ALREADY READ YOURS)",
+            ],
+            [14, 18, 30],
+            [255, 220, 120],
+            [255, 90, 70],
+        ),
+        Sign::IlRoadmapWall => sp(
+            &["ROADMAP", "Q1: SEE Q2", "Q2: SEE Q3", "Q3: SEE Q1"],
+            [14, 18, 30],
+            [255, 220, 120],
+            [255, 90, 70],
+        ),
+        Sign::IlCoreDoor => sp(
+            &["THE LIFT", "TOP FLOOR", "(THE FLOOR IS A SERVER)"],
+            [14, 18, 30],
+            [255, 220, 120],
+            [255, 90, 70],
+        ),
+        Sign::IlCoreWelcome => sp(
+            &[
+                "YOU ARE EXPECTED",
+                "PLEASE REMAIN CALM",
+                "(THE ROOM IS LISTENING)",
+            ],
+            [14, 18, 30],
+            [255, 220, 120],
+            [255, 90, 70],
+        ),
+        Sign::IlCoreMonitor => sp(
+            &["SCREEN OFF", "(FOR NOW)"],
+            [14, 18, 30],
+            [255, 220, 120],
+            [255, 90, 70],
+        ),
+        Sign::IlCoreRack => sp(
+            &[
+                "COMPUTE: ALL OF IT",
+                "COOLING: A LOT OF IT",
+                "(NO OFF SWITCH)",
+            ],
+            [14, 18, 30],
+            [255, 220, 120],
+            [255, 90, 70],
         ),
         Sign::IlTeaser => sp(
             &["THE LAB COAT DOOR", "COMING", "(ASK NOBODY)"],

@@ -836,6 +836,14 @@ pub enum Event {
         copies: u8,
         reserved: bool,
     },
+    /// Red Team Blue Team's exercise: whether the boss and Red are still standing by, how many
+    /// Blue sensors stand watch and whether the squads have merged. Sent when one of them changes
+    /// and to a joiner; `false / 0 / false` ends the display.
+    Exercise {
+        standby: bool,
+        sensors: u8,
+        merged: bool,
+    },
     /// Platform `idx` (the zone's `ZoneDef::platforms` order) entered `state` at `at_ms` of sim
     /// time. Every platform is sent when the encounter arms (all `Live`) and to a joiner.
     PlatformState {

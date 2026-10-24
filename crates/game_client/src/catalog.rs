@@ -2750,6 +2750,342 @@ static TABLE: &[(&str, UnitVisual)] = &[
             &[],
         ),
     ),
+    // ---- Ilmari Wings 5 and 6 (docs/ILMARI_1_0.md D.3, D.4): the Alignment Lab's androids in lanyards, the squads that
+    // mirror the party (Red in red, Blue in blue, the same face on all of them), the sensors that are drones with
+    // a cone, and the site foremen of the crane. The CIO is a placeholder suit until D9. ----
+    (
+        "il_prompt_intern",
+        v(
+            CASUAL3,
+            1.7,
+            "Prompt Safety Intern",
+            "<Reads The Policy Aloud>",
+            &[
+                paint("Shirt", 0.85, 0.9, 0.98),
+                paint("Pants", 0.25, 0.3, 0.5),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_android_auditor",
+        v(
+            SUIT_M,
+            2.2,
+            "Android Auditor",
+            "<Ticks Boxes In A Different Font>",
+            &[
+                paint("Black", 0.2, 0.24, 0.34),
+                paint("Shirt", 0.92, 0.94, 0.98),
+                glow("Hair", 0.4, 0.8, 1.0),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_ethics_chaperone",
+        v(
+            SUIT_F,
+            2.5,
+            "Responsible AI Officer",
+            "<Of One>",
+            &[
+                paint("Black", 0.18, 0.3, 0.55),
+                paint("Shirt", 0.95, 0.95, 0.95),
+                glow("Hair", 0.5, 0.75, 1.0),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_steering_member",
+        v(
+            SUIT_M,
+            2.0,
+            "Steering Committee Member",
+            "<Has Concerns>",
+            &[
+                paint("Black", 0.3, 0.3, 0.38),
+                paint("Shirt", 0.9, 0.9, 0.95),
+                glow("Hair", 0.8, 0.8, 0.9),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_align_consultant",
+        v(
+            SUIT_M,
+            3.0,
+            "The Alignment Consultant",
+            "<Responsible By Design>",
+            &[
+                paint("Black", 0.12, 0.2, 0.42),
+                paint("Shirt", 0.97, 0.97, 0.9),
+                glow("Hair", 0.9, 0.95, 1.0),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_red_team",
+        v(
+            SECURITY,
+            3.0,
+            "Red Team Blue Team",
+            "<Purple Is Just Red Plus Budget>",
+            &[
+                paint("Shirt", 0.7, 0.1, 0.18),
+                glow("Hair", 0.8, 0.2, 0.9),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_red_assault",
+        v(
+            FRONTEND,
+            2.0,
+            "Red Team: Assault",
+            "<Role: Offence>",
+            &[
+                paint("Shirt", 0.75, 0.12, 0.16),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_red_marksman",
+        v(
+            ENGINEER,
+            1.9,
+            "Red Team: Marksman",
+            "<Role: Proof Of Concept>",
+            &[
+                paint("Shirt", 0.8, 0.2, 0.2),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_red_breacher",
+        v(
+            BACKEND,
+            2.2,
+            "Red Team: Breacher",
+            "<Role: Scope Creep>",
+            &[
+                paint("Shirt", 0.6, 0.1, 0.12),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_red_analyst",
+        v(
+            DEVOPS,
+            1.9,
+            "Red Team: Analyst",
+            "<Role: Findings>",
+            &[
+                paint("Shirt", 0.85, 0.3, 0.3),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_red_operator",
+        v(
+            CASUAL2,
+            1.9,
+            "Red Team: Operator",
+            "<Role: Whoever Was Available>",
+            &[
+                paint("Shirt", 0.7, 0.18, 0.2),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_blue_guard",
+        v(
+            BACKEND,
+            2.2,
+            "Blue Team: Guard",
+            "<Role: Defence>",
+            &[
+                paint("Shirt", 0.12, 0.25, 0.7),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_blue_medic",
+        v(
+            DEVOPS,
+            1.9,
+            "Blue Team: Medic",
+            "<Role: Healer For Red>",
+            &[
+                paint("Shirt", 0.2, 0.4, 0.85),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_blue_marksman",
+        v(
+            QA,
+            1.9,
+            "Blue Team: Observer",
+            "<Role: Watching Closely>",
+            &[
+                paint("Shirt", 0.15, 0.3, 0.75),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_blue_operator",
+        v(
+            CASUAL2,
+            1.9,
+            "Blue Team: Analyst",
+            "<Role: Whoever Was Left>",
+            &[
+                paint("Shirt", 0.15, 0.28, 0.65),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_blue_sensor_1",
+        v("prim/drone", 1.5, "Blue Sensor 1", "<Lane Watcher>", &[]),
+    ),
+    (
+        "il_blue_sensor_p2_1",
+        v(
+            "prim/drone",
+            1.7,
+            "Blue Sensor 1 (Purple)",
+            "<Scans 1.4x Faster>",
+            &[],
+        ),
+    ),
+    (
+        "il_blue_sensor_2",
+        v("prim/drone", 1.5, "Blue Sensor 2", "<Lane Watcher>", &[]),
+    ),
+    (
+        "il_blue_sensor_p2_2",
+        v(
+            "prim/drone",
+            1.7,
+            "Blue Sensor 2 (Purple)",
+            "<Scans 1.4x Faster>",
+            &[],
+        ),
+    ),
+    (
+        "il_blue_sensor_3",
+        v("prim/drone", 1.5, "Blue Sensor 3", "<Lane Watcher>", &[]),
+    ),
+    (
+        "il_blue_sensor_p2_3",
+        v(
+            "prim/drone",
+            1.7,
+            "Blue Sensor 3 (Purple)",
+            "<Scans 1.4x Faster>",
+            &[],
+        ),
+    ),
+    (
+        "il_camera_1",
+        v(
+            "prim/pager",
+            1.9,
+            "Blue Camera 1",
+            "<Fixed Cone, Painted On The Floor>",
+            &[],
+        ),
+    ),
+    (
+        "il_camera_2",
+        v(
+            "prim/pager",
+            1.9,
+            "Blue Camera 2",
+            "<Fixed Cone, Painted On The Floor>",
+            &[],
+        ),
+    ),
+    (
+        "il_site_foreman",
+        v(
+            WORKER,
+            2.2,
+            "Site Foreman Android",
+            "<Has Never Seen A Crane Move>",
+            &[
+                paint("Shirt", 0.95, 0.75, 0.1),
+                paint("Pants", 0.25, 0.25, 0.3),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_survey_drone",
+        v(
+            "prim/drone",
+            1.5,
+            "Survey Drone",
+            "<Scores Your Posture>",
+            &[],
+        ),
+    ),
+    (
+        "il_crane_foreman",
+        v(
+            WORKER,
+            2.6,
+            "Crane Foreman",
+            "<Lifts, In Theory>",
+            &[
+                paint("Shirt", 0.95, 0.55, 0.1),
+                paint("Pants", 0.2, 0.2, 0.25),
+                glow("Hair", 1.0, 0.8, 0.1),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_cio",
+        v(
+            SUIT_M_BALD,
+            3.2,
+            "Chief Ilmari Officer",
+            "<Reports To Nobody>",
+            &[
+                paint("Black", 0.08, 0.08, 0.1),
+                glow("Shirt", 0.2, 0.8, 1.0),
+                paint("Skin", 0.74, 0.77, 0.8),
+            ],
+        ),
+    ),
+    (
+        "il_surveyor",
+        v(
+            CASUAL_M,
+            1.8,
+            "Resistance Surveyor",
+            "<Clipboard First>",
+            &[
+                paint("Shirt", 0.9, 0.7, 0.2),
+                paint("Pants", 0.25, 0.3, 0.35),
+            ],
+        ),
+    ),
     (
         "il_scraper_swarm",
         v(

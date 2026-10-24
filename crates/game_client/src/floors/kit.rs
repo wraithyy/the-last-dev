@@ -823,6 +823,50 @@ pub enum Sign {
     IlNotBug,
     IlSla,
     IlTeaser,
+    // Ilmari Wings 5 and 6 and the core (`ilmari5.rs`, `ilmari6.rs`, `ilmari_core.rs`).
+    IlW5Door,
+    IlW5Back,
+    IlW5ToPolicy,
+    IlW5ToRange,
+    IlW5Out,
+    IlPrincipleA,
+    IlPrincipleB,
+    IlPrincipleC,
+    IlPrincipleD,
+    IlHiringOne,
+    IlConcerns,
+    IlKiosk,
+    IlTerms,
+    IlAlignedBanner,
+    IlSafeDefault,
+    IlRedTeam,
+    IlBlueTeam,
+    IlRange,
+    IlHoneypot,
+    IlPurpleSoon,
+    IlSensorLane,
+    IlAlignDone,
+    IlLabDark,
+    IlW6Door,
+    IlW6Back,
+    IlW6ToExec,
+    IlW6ToBoardroom,
+    IlW6Out,
+    IlJibRules,
+    IlCraneNote,
+    IlPigeon,
+    IlOpenPlanTen,
+    IlWellnessRoom,
+    IlMassage,
+    IlFruitBowl,
+    IlRunway,
+    IlCampusView,
+    IlLiftPlate,
+    IlRoadmapWall,
+    IlCoreDoor,
+    IlCoreWelcome,
+    IlCoreMonitor,
+    IlCoreRack,
 }
 
 #[derive(Clone, Debug)]
@@ -1567,6 +1611,49 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
         Sign::HackBanner | Sign::HackStage | Sign::MigrationNew | Sign::MigrationOld => (256, 96),
         Sign::VibeConBanner | Sign::VibeConKeynote | Sign::VibeConMasterclass => (256, 96),
         Sign::VibeConJudging | Sign::VibeConFireside | Sign::VibeConAfterparty => (256, 96),
+        Sign::IlW5Door
+        | Sign::IlW5Back
+        | Sign::IlW5ToPolicy
+        | Sign::IlW5ToRange
+        | Sign::IlW5Out
+        | Sign::IlPrincipleA
+        | Sign::IlPrincipleB
+        | Sign::IlPrincipleC
+        | Sign::IlPrincipleD
+        | Sign::IlHiringOne
+        | Sign::IlConcerns
+        | Sign::IlKiosk
+        | Sign::IlTerms
+        | Sign::IlAlignedBanner
+        | Sign::IlSafeDefault
+        | Sign::IlRedTeam
+        | Sign::IlBlueTeam
+        | Sign::IlRange
+        | Sign::IlHoneypot
+        | Sign::IlPurpleSoon
+        | Sign::IlSensorLane
+        | Sign::IlAlignDone
+        | Sign::IlLabDark
+        | Sign::IlW6Door
+        | Sign::IlW6Back
+        | Sign::IlW6ToExec
+        | Sign::IlW6ToBoardroom
+        | Sign::IlW6Out
+        | Sign::IlJibRules
+        | Sign::IlCraneNote
+        | Sign::IlPigeon
+        | Sign::IlOpenPlanTen
+        | Sign::IlWellnessRoom
+        | Sign::IlMassage
+        | Sign::IlFruitBowl
+        | Sign::IlRunway
+        | Sign::IlCampusView
+        | Sign::IlLiftPlate
+        | Sign::IlCoreDoor
+        | Sign::IlCoreWelcome
+        | Sign::IlCoreMonitor
+        | Sign::IlCoreRack => (256, 96),
+        Sign::IlRoadmapWall => (256, 128),
         _ => (192, 96),
     }
 }

@@ -38,6 +38,8 @@ fn offer() -> OfferDef {
         pushback_aura: Some("il_pushback".into()),
         stagger_aura: Some("il_stagger".into()),
         stagger_ms: 3000,
+        heal_tenths: 0,
+        rider_kiosk: None,
     }
 }
 

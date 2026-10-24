@@ -421,11 +421,12 @@ impl Sim {
                     count,
                     max_alive,
                     skip,
+                    idle,
                 },
                 _,
             ) => {
                 let at = self.units[ci].state.pos;
-                self.summon(ci, at, unit, *count, *max_alive, *skip);
+                self.summon_with(ci, at, unit, (*count, *max_alive, *skip), *idle);
             }
             (
                 Effect::SummonMirror {
@@ -443,9 +444,11 @@ impl Sim {
                     filler,
                     side,
                     min_bodies,
+                    idle,
                 },
                 _,
-            ) => self.summon_squad(ci, per_role, filler, *side, *min_bodies),
+            ) => self.summon_squad(ci, per_role, filler, *side, *min_bodies, *idle),
+            (Effect::ClearOffers { radius_m }, _) => self.offers_clear_near(ci, *radius_m),
             (Effect::Offer(def), _) => self.offer_wave(ci, spell.range_m, def),
             (
                 Effect::SwarmWave {
@@ -668,10 +671,16 @@ impl Sim {
         spell: Option<SpellId>,
         amount: u32,
     ) {
-        let t = &mut self.units[ti].state;
-        if !t.alive {
+        if !self.units[ti].state.alive {
             return;
         }
+        let pct = self.aura_sum(ti, |a| a.healing_taken_pct);
+        let amount = if pct == 0 {
+            amount
+        } else {
+            pct_mod(u64::from(amount), pct) as u32
+        };
+        let t = &mut self.units[ti].state;
         let amount = amount.min(t.max_hp - t.hp);
         t.hp += amount;
         self.hr_heal(source, amount);
@@ -694,6 +703,18 @@ impl Sim {
         max_alive: u8,
         skip: u8,
     ) {
+        self.summon_with(ci, at, key, (count, max_alive, skip), false);
+    }
+
+    /// `summon`, optionally idle: the adds do not inherit the summoner's target.
+    pub(crate) fn summon_with(
+        &mut self,
+        ci: usize,
+        at: Vec3,
+        key: &str,
+        (count, max_alive, skip): (u8, u8, u8),
+        idle: bool,
+    ) {
         let Ok(def) = self.def_index(key) else { return };
         let caster = Self::id_of(ci);
         let alive = self
@@ -707,7 +728,7 @@ impl Sim {
             (c.state.yaw, c.state.level, c.state.pack)
         };
         let pos = at;
-        let target = self.units[ci].state.target;
+        let target = self.units[ci].state.target.filter(|_| !idle);
         // Offset ring index 0 is the centre, which the summoner occupies.
         let skip = usize::from(skip);
         let offsets = crate::floors::pack_offsets(n + skip + 1);

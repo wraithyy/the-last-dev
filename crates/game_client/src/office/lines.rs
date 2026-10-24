@@ -478,7 +478,8 @@ pub fn mine(
         | PropKind::Draft
         | PropKind::Truth
         | PropKind::Rack
-        | PropKind::OptOut => String::new(),
+        | PropKind::OptOut
+        | PropKind::Honeypot => String::new(),
     })
 }
 
@@ -547,6 +548,9 @@ pub fn tooltip(def: &PropDef) -> (&'static str, String) {
         PropKind::Truth => "Check the real hazards (8 s, 25 s cooldown)",
         PropKind::Rack => "Reserve capacity (the cloud bill's rate is halved for 30 s)",
         PropKind::OptOut => "Opt out (cancels your pending offers)",
+        PropKind::Honeypot => {
+            "Spring the honeypot (every Blue cone looks at it for 8 s, 40 s for the group)"
+        }
     };
     let extra = match def.kind {
         PropKind::FireAlarm => "WARNING: every enemy on this floor will come for you.".to_string(),

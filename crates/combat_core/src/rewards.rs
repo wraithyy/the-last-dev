@@ -147,6 +147,13 @@ impl RewardsDef {
                         g.name, self.top_ilvl, s.role, s.set
                     ));
                 }
+                // A tier piece that drops at all drops from its own source boss.
+                if g.drops_from.as_deref().is_some_and(|b| b != p.source) {
+                    return bad(format!(
+                        "{} must drop from its source {}, not {:?}",
+                        g.name, p.source, g.drops_from
+                    ));
+                }
                 slots.push(g.slot);
             }
             // Nothing else may carry the set, or the 4-piece could be finished from elsewhere.

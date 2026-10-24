@@ -171,6 +171,9 @@ pub struct AuraDef {
     /// Per stack, on damage the bearer deals.
     #[serde(default)]
     pub damage_done_pct: i32,
+    /// Per stack, on the healing the bearer receives (-40: heals on you are 40% weaker).
+    #[serde(default)]
+    pub healing_taken_pct: i32,
     #[serde(default)]
     pub haste_pct: u32,
     #[serde(default = "one")]
@@ -378,6 +381,10 @@ pub enum Effect {
         /// fake candidates) lands beside the first and not on top of it.
         #[serde(default)]
         skip: u8,
+        /// The adds start idle instead of joining the caster's fight (Red Team Blue Team's
+        /// sensors patrol until somebody is seen).
+        #[serde(default)]
+        idle: bool,
     },
     /// Caster-centric: every threat entry of the caster and its allies in range drops to 1.
     ResetAllyThreat {
@@ -454,6 +461,15 @@ pub enum Effect {
         filler: String,
         side: crate::sight::SquadSide,
         min_bodies: u8,
+        /// The squad starts idle (Blue stands guard until the exercise starts).
+        #[serde(default)]
+        idle: bool,
+    },
+    /// Caster-centric, for a player's spell (the Security Engineer's Tailgating): every pending
+    /// offer of the living players within `radius_m` is cancelled without a refusal, so the boss
+    /// gets neither a stagger nor a `Pushback` ("the policy has a loophole").
+    ClearOffers {
+        radius_m: f32,
     },
     /// Caster-centric raid mechanic (the Alignment Consultant, `alignment.rs`): every living
     /// player in range gets a pending aura that turns into a real one unless they opt out.
@@ -531,6 +547,7 @@ impl Effect {
                 | Effect::Detonate { .. }
                 | Effect::SummonMirror { .. }
                 | Effect::SummonSquad { .. }
+                | Effect::ClearOffers { .. }
                 | Effect::Offer(_)
                 | Effect::Review { .. }
                 | Effect::SwarmWave { .. }
@@ -1265,6 +1282,8 @@ pub enum EncounterDef {
     Cloud(BillDef),
     /// The Region Outage: the zone's platforms go dark in turn (docs/ILMARI_10.md C.3.5).
     Outage(OutageDef),
+    /// Red Team Blue Team: the exercise is on standby until somebody is seen (docs/ILMARI_1_0.md D.3).
+    Squads(crate::wing5::SquadsDef),
 }
 
 /// The cloud bill: a meter of 0..=1000 points that grows with the living replicas.
@@ -2210,6 +2229,12 @@ impl Content {
                 {
                     return bad(format!(
                         "unit {} outage encounter has a zero or absurd number",
+                        u.key
+                    ));
+                }
+                Some(EncounterDef::Squads(q)) if !q.validate(self, &u.key) || !u.boss => {
+                    return bad(format!(
+                        "unit {} squads encounter needs known auras, a merge phase, times and a boss",
                         u.key
                     ));
                 }

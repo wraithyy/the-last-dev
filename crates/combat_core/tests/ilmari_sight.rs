@@ -75,6 +75,7 @@ fn sight_content(patrol: Vec<(f32, f32)>) -> Content {
         filler: "il_lobby_marshal".into(),
         side: SquadSide::Red,
         min_bodies: 3,
+        idle: false,
     };
     c.world.spells.push(s.id);
     c.spells.push(s);

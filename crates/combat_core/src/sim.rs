@@ -249,6 +249,7 @@ pub struct Sim {
     pub(crate) wing3: crate::wing3::Wing3State,
     /// The Autoscaler's split family and cloud bill, the Region Outage's platforms (`wing4.rs`).
     pub(crate) wing4: crate::wing4::Wing4State,
+    pub(crate) wing5: crate::wing5::Wing5State,
     /// True while an area spell resolves its effects: swarm clusters take a bigger share.
     pub(crate) area_hit: bool,
     /// Ground of the loaded zone, and of every zone a loader registered (`terrain.rs`).
@@ -298,6 +299,7 @@ impl Sim {
             swarm: Default::default(),
             wing3: Default::default(),
             wing4: Default::default(),
+            wing5: Default::default(),
             illusion: Default::default(),
             echo: Default::default(),
             sight: Default::default(),

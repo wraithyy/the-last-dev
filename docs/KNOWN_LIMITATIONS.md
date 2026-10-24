@@ -210,3 +210,13 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - Ground Truth sits on the Comma key because every letter is bound; rebind it under Controls.
 - The Brenda vendor page and the class props (robots.txt, Rate Limit, dashboard) are not built.
 - Companions hold position instead of re-entering a pending hazard, so melee companions lose some uptime while the Hallucination's warning runs.
+
+## Wing 5: The Alignment Lab (docs/ILMARI_1_0.md D.2, D.3, D5-D8)
+
+- The Consultant's kiosks do not relocate in phase 2, and Ethics Washing's absorb does not heal him if it is left standing. The Data Scientist dashboard prop is not built, and all five Principles pillars stay up (none disappears).
+- Guardrail costs are mapped onto existing aura fields (plus the new `healing_taken_pct`); the fine print is spelled out in the aura names on Story only.
+- Red Team Blue Team has no shared HP bar (the boss bar only), no mirrored-name plates and no "mirrored" -20 % damage aura. Story uses one Red copy, one filler and two cameras.
+- A wing-wide balance note: Red and Blue numbers were tuned with the generic bots, which wake Red at once by hitting it; a careful stealth group has an easier first minute than the gates measure.
+- Wing 6 has rooms, a placeholder boss (`il_cio`, a stub that makes `il_w6_done` reachable) and a door to the empty core zone; the real fight, the core and the ending are D9 onwards.
+- Ill Marie's desk is a prop only; Brenda's core page and the Roomba ride are deferred.
+- No client effects yet for `Event::Exercise` (no standby banner, no cone decals); kiosks and honeypots are geometry only.

@@ -226,6 +226,9 @@ struct Bot {
     repeater: Option<SpellId>,
     /// Wing 4's Server Cloud: the room is platforms over a void, so the bot stays on them.
     on_platforms: bool,
+    /// Wing 5's Alignment Consultant: walk to an opt-out kiosk whenever an offer is pending.
+    refuse: bool,
+    refuse_next: u64,
 }
 
 fn yaw_to(from: Vec3, to: Vec3) -> f32 {
@@ -288,6 +291,8 @@ impl Bot {
             draft_next: 0,
             repeater: None,
             on_platforms: false,
+            refuse: false,
+            refuse_next: 0,
         }
     }
 
@@ -780,7 +785,28 @@ impl Bot {
         self.use_prop_remotely(format!("il_draft_{}", k + 1));
     }
 
+    /// Wing 5's Consultant: a pending offer is declined at an opt-out kiosk (the Interact rides in
+    /// a tick with a move to the kiosk, like the ballots). Four kiosks, rotated.
+    fn refuse_offers(&mut self) {
+        let now = self.sim.now().0;
+        if !self.refuse || self.refuse_next > now || !self.me().alive || self.me().stunned {
+            return;
+        }
+        if !self
+            .me()
+            .auras
+            .iter()
+            .any(|a| a.key.starts_with("il_ok_") || a.key.starts_with("il_oks_"))
+        {
+            return;
+        }
+        self.refuse_next = now + ms_to_ticks(1000);
+        let k = now / 30 % 4 + 1;
+        self.use_prop_remotely(format!("il_optout_{k}"));
+    }
+
     fn act(&mut self) {
+        self.refuse_offers();
         self.label_cables();
         self.appeal();
         self.lobby();
@@ -2785,6 +2811,7 @@ const WING1: [&str; 3] = ["ilmari1/1", "ilmari1/2", "ilmari1/3"];
 const WING2: [&str; 3] = ["ilmari2/1", "ilmari2/2", "ilmari2/3"];
 const WING3: [&str; 3] = ["ilmari3/1", "ilmari3/2", "ilmari3/3"];
 const WING4: [&str; 3] = ["ilmari4/1", "ilmari4/2", "ilmari4/3"];
+const WING5: [&str; 3] = ["ilmari5/1", "ilmari5/2", "ilmari5/3"];
 
 fn boss_of(sim: &Sim, zone: &str) -> String {
     sim.content()
@@ -3208,6 +3235,7 @@ fn story_with_two_companions_clears_each_wing_and_is_not_much_easier() {
             ("Wing 2", &WING2),
             ("Wing 3", &WING3),
             ("Wing 4", &WING4),
+            ("Wing 5", &WING5),
         ] {
             let want = bosses_in(zones);
             for seed in [7, 42, 1234] {
@@ -3502,5 +3530,145 @@ fn wing_four_probe() {
     );
     if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
         let _ = std::fs::write(PathBuf::from(dir).join("probe4.log"), &b.log);
+    }
+}
+
+// ---- Ilmari Wing 5, The Alignment Lab (docs/ILMARI_1_0.md D6/D7).
+
+/// Story is the solo difficulty: every class clears the Consultant and Red Team Blue Team on three
+/// seeds (no offers to refuse on Story: the terms are in the names and the window is long).
+#[test]
+fn every_class_clears_wing_five_on_story_solo() {
+    let want = bosses_in(&WING5);
+    let mut failures = Vec::new();
+    for class in CLASSES {
+        for seed in [7, 42, 1234] {
+            let mut b = Bot::new_as(class, "campus", 10, seed);
+            b.wear_legacy_gear();
+            b.rest_alert = true;
+            let (bosses, secs, low, _) = b.wing(&WING5, true);
+            println!(
+                "{class:14} Wing 5 Story seed {seed:4}: {bosses}/{want} bosses in {secs} s, low {low}%"
+            );
+            if bosses < want {
+                failures.push(format!("{class} seed {seed}: {bosses}/{want} bosses"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Full is the group difficulty: a refusing trio clears it on three seeds; the same wing alone
+/// is meant to fail.
+#[test]
+fn a_trio_clears_wing_five_on_full_and_a_lone_player_does_not() {
+    let want = bosses_in(&WING5);
+    let mut failures = Vec::new();
+    for seed in [7, 42, 1234] {
+        let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
+        for b in &mut g.bots {
+            b.refuse = true;
+        }
+        let (bosses, secs, deaths) = g.wing(&WING5);
+        println!(
+            "trio Wing 5 Full seed {seed:4}: {bosses}/{want} bosses in {secs} s, {deaths} dead, boss fights {:?} s",
+            g.boss_secs
+        );
+        if bosses < want {
+            failures.push(format!("trio seed {seed}: {bosses}/{want} bosses"));
+        }
+    }
+    for class in CLASSES {
+        let mut b = Bot::new_as(class, "campus", 10, 7);
+        b.wear_legacy_gear();
+        b.rest_alert = true;
+        b.refuse = true;
+        let (bosses, secs, low, _) = b.wing(&WING5, false);
+        println!("{class:14} Wing 5 Full alone: {bosses}/{want} bosses in {secs} s, low {low}%");
+        if bosses >= want {
+            failures.push(format!("{class} cleared Full alone"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// The Consultant's split: a trio that declines offers at the kiosks beats him; one that clicks
+/// nothing and so accepts everything does not (Aligned stacks pile up).
+#[test]
+fn the_consultant_is_beaten_by_refusing_and_not_by_accepting() {
+    let mut failures = Vec::new();
+    for seed in [7, 42, 1234] {
+        let mut won = [0usize; 2];
+        for (k, refuse) in [true, false].into_iter().enumerate() {
+            let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
+            for b in &mut g.bots {
+                b.refuse = refuse;
+            }
+            let (bosses, secs, deaths) = g.wing(&WING5[1..2]);
+            println!(
+                "trio Consultant refuse={refuse} seed {seed:4}: {bosses}/1 in {secs} s, {deaths} dead"
+            );
+            won[k] = bosses;
+        }
+        if won[0] != 1 {
+            failures.push(format!("seed {seed}: the refusing trio lost"));
+        }
+        if won[1] != 0 {
+            failures.push(format!("seed {seed}: the accepting trio won"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// QA probe for Wing 5 balance: `W5_CLASS`, `W5_SEED`, `W5_STORY`, `W5_ROOM` (1..3), `W5_TRIO`,
+/// `W5_ACCEPT` (no refusing) and a log dump in `WOW_BOT_DUMP`. Not part of the gates.
+#[test]
+#[ignore = "balance probe: W5_CLASS=<class> W5_SEED=<n> W5_STORY=1 W5_ROOM=2"]
+fn wing_five_probe() {
+    let class = std::env::var("W5_CLASS").unwrap_or_else(|_| "fullstack".into());
+    let class: &'static str = CLASSES
+        .iter()
+        .find(|c| **c == class)
+        .copied()
+        .unwrap_or("fullstack");
+    let seed = std::env::var("W5_SEED")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(7);
+    let story = std::env::var("W5_STORY").is_ok_and(|s| s == "1");
+    let refuse = std::env::var("W5_ACCEPT").is_err();
+    let room: usize = std::env::var("W5_ROOM")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(2);
+    let zones = &WING5[room - 1..room];
+    if std::env::var("W5_TRIO").is_ok() {
+        let mut g = Group::new(&["backend", "fullstack", "frontend"], 10, seed);
+        for b in &mut g.bots {
+            b.refuse = refuse;
+        }
+        let (bosses, secs, deaths) = g.wing(zones);
+        println!(
+            "probe trio room {room} Full seed {seed}: {bosses}/1 in {secs} s, {deaths} dead, fights {:?}",
+            g.boss_secs
+        );
+        if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+            let _ = std::fs::write(PathBuf::from(dir).join("probe5.log"), &g.bots[0].log);
+        }
+        return;
+    }
+    let mut b = Bot::new_as(class, "campus", 10, seed);
+    b.wear_legacy_gear();
+    b.rest_alert = true;
+    b.refuse = refuse;
+    let (bosses, secs, low, _) = b.wing(zones, story);
+    println!(
+        "probe {class} room {room} {} seed {seed}: {bosses}/1 in {secs} s, low {low}%, died {}, boss fight {:?} s",
+        if story { "Story" } else { "Full" },
+        b.report.died,
+        b.report.after.last().map(|a| a.2)
+    );
+    if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+        let _ = std::fs::write(PathBuf::from(dir).join("probe5.log"), &b.log);
     }
 }

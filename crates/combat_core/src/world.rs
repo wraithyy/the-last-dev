@@ -100,6 +100,9 @@ pub enum PropKind {
     /// An Opt-Out Kiosk in the Alignment Lab (`Effect::Offer`): a use cancels your own pending
     /// offers (any class, a cooldown per player).
     OptOut,
+    /// A honeypot in the Red-Blue Range (`EncounterDef::Squads`): a use turns every Blue cone to
+    /// it for 8 s, on a cooldown the whole group shares.
+    Honeypot,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -596,6 +599,9 @@ impl Sim {
         }
         if def.kind == PropKind::Rack {
             return self.use_rack_prop(pi, k);
+        }
+        if def.kind == PropKind::Honeypot {
+            return self.use_honeypot_prop(pi, k, spot);
         }
         // Mirrored controls in a fight would be a griefing tool, not a joke; a shuttle would be
         // a free escape.
