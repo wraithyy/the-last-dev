@@ -412,6 +412,8 @@ pub enum Sign {
     AiCar,
     ShuttleBus,
     ScooterZone,
+    LawnKeepOff,
+    LawnAdopt,
     CampusExit,
     GraveSprint,
     SprintBoard,
@@ -825,7 +827,6 @@ pub enum Sign {
     IlMultiRegion,
     IlNotBug,
     IlSla,
-    IlTeaser,
     // Ilmari Wings 5 and 6 and the core (`ilmari5.rs`, `ilmari6.rs`, `ilmari_core.rs`).
     IlW5Door,
     IlW5Back,
@@ -1607,8 +1608,7 @@ pub fn sign_canvas(sign: Sign) -> (u32, u32) {
         | Sign::IlRegionAfSouth
         | Sign::IlStatusDegraded
         | Sign::IlStatusInvest
-        | Sign::IlStatusDark503
-        | Sign::IlTeaser => (256, 128),
+        | Sign::IlStatusDark503 => (256, 128),
         Sign::IlFacePatch => (256, 192),
         Sign::IlPatchIdle
         | Sign::IlPatchDone

@@ -189,8 +189,13 @@ impl Sim {
             return;
         };
         // The Company Calendar hands out the first quest of its chains from anywhere.
-        if self.quest_status_of(pid, id) != QuestStatus::Available
-            || !(self.near_npc(pid, &def.giver) || self.calendar_starts(id))
+        let remote = self.calendar_starts(id);
+        let status = self.quest_status_of(pid, id);
+        // The board's chains start at any level and without the giver's prerequisite: those gates
+        // only hide the giver's "!".
+        let board = remote && status == QuestStatus::Locked && self.ilmari_quest_open(id);
+        if !(status == QuestStatus::Available || board)
+            || !(remote || self.near_npc(pid, &def.giver))
         {
             return;
         }

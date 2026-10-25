@@ -37,7 +37,6 @@ impl Plugin for Wing4FxPlugin {
                     build_platforms,
                     update_platforms,
                     update_pylons,
-                    teaser,
                     update_hud,
                 )
                     .chain()
@@ -235,9 +234,6 @@ struct Assets4 {
     code: Handle<StandardMaterial>,
     labels: Vec<(String, Handle<StandardMaterial>)>,
     screens: [Handle<StandardMaterial>; 3],
-    teaser: Handle<StandardMaterial>,
-    glow: Handle<StandardMaterial>,
-    coat: Handle<StandardMaterial>,
 }
 
 fn unlit(c: Color) -> StandardMaterial {
@@ -248,10 +244,6 @@ fn unlit(c: Color) -> StandardMaterial {
         cull_mode: None,
         ..default()
     }
-}
-
-fn m_unlit(materials: &mut Assets<StandardMaterial>, c: Color) -> Handle<StandardMaterial> {
-    materials.add(unlit(c))
 }
 
 fn textured(img: Handle<Image>) -> StandardMaterial {
@@ -296,9 +288,6 @@ fn setup(
         tex(Sign::IlStatusDegraded),
         tex(Sign::IlStatusInvest),
     ];
-    let teaser = tex(Sign::IlTeaser);
-    let glow = m_unlit(&mut materials, Color::srgba(0.75, 0.45, 1.0, 0.85));
-    let coat = m_unlit(&mut materials, Color::srgba(0.97, 0.97, 1.0, 0.95));
     commands.insert_resource(Assets4 {
         disc: meshes.add(Circle::new(1.0)),
         ring: meshes.add(Annulus::new(0.93, 1.0)),
@@ -313,9 +302,6 @@ fn setup(
         code,
         labels,
         screens,
-        teaser,
-        glow,
-        coat,
     });
 }
 
@@ -514,83 +500,6 @@ fn update_pylons(
             m.0 = assets.screens[worst].clone();
         }
     }
-}
-
-// ------------------------------------------------------------------ the door on the roof
-
-/// Once the wing is done (the quest turned in, or the Region Outage down this week) a door with
-/// a lab coat on it lights up on the Cooling Deck's north rail. It says "coming" and nothing else:
-/// the 1.0 core is not in this version.
-fn teaser(
-    mut commands: Commands,
-    sim: SimView,
-    flow: Res<GameFlow>,
-    assets: Res<Assets4>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut done: Local<bool>,
-) {
-    if flow.zone != "ilmari4/1" {
-        *done = false;
-        return;
-    }
-    if *done {
-        return;
-    }
-    let view = sim.raid_view();
-    let cleared = sim.quest_status("il_w4_done") == combat_core::QuestStatus::Done
-        || view.locked.contains(&view.key(BOSS));
-    if !cleared {
-        return;
-    }
-    *done = true;
-    let (x, z) = (14.0, -23.6);
-    let quad = meshes.add(Rectangle::new(1.0, 1.0));
-    let mut bit = |m: &Handle<StandardMaterial>, p: Vec3, s: Vec3| {
-        commands.spawn((
-            Mesh3d(quad.clone()),
-            MeshMaterial3d(m.clone()),
-            Transform::from_translation(p).with_scale(s),
-            NotShadowCaster,
-            ZoneDecor,
-        ));
-    };
-    // The door: a lit frame round a violet leaf, and the sign.
-    bit(
-        &assets.glow,
-        Vec3::new(x, 1.2, z + 0.05),
-        Vec3::new(1.5, 2.5, 1.0),
-    );
-    bit(
-        &assets.clear,
-        Vec3::new(x, 1.1, z + 0.06),
-        Vec3::new(1.1, 2.2, 1.0),
-    );
-    bit(
-        &assets.teaser,
-        Vec3::new(x, 3.0, z + 0.05),
-        Vec3::new(2.6, 1.3, 1.0),
-    );
-    // The coat: a torso, two sleeves and a pale collar.
-    bit(
-        &assets.coat,
-        Vec3::new(x, 1.2, z + 0.08),
-        Vec3::new(0.55, 0.9, 1.0),
-    );
-    bit(
-        &assets.coat,
-        Vec3::new(x - 0.42, 1.2, z + 0.08),
-        Vec3::new(0.25, 0.8, 1.0),
-    );
-    bit(
-        &assets.coat,
-        Vec3::new(x + 0.42, 1.2, z + 0.08),
-        Vec3::new(0.25, 0.8, 1.0),
-    );
-    bit(
-        &assets.glow,
-        Vec3::new(x, 1.55, z + 0.09),
-        Vec3::new(0.16, 0.3, 1.0),
-    );
 }
 
 // ------------------------------------------------------------------ the HUD

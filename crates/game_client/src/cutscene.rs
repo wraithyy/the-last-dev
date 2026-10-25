@@ -858,10 +858,6 @@ pub const SCENES: &[Scene] = &[
                 "Wing Four is clear. The status page is green. For once it is right. I trust it less.",
             ),
             l(
-                "Narrator",
-                "On the Cooling Deck, a door with a lab coat on it lights up. The sign says: COMING.",
-            ),
-            l(
                 "Priya",
                 "I closed the ticket: 'Resolved by humans. Root cause: us-east-1. Action items: none.'",
             ),

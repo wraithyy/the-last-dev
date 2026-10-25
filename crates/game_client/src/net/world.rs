@@ -192,6 +192,8 @@ pub struct NetWorld {
     /// Raw link figures for the `~/perf` window.
     pub link: LinkStats,
     quests: QuestLog,
+    /// Last `Event::Clock` (unix seconds) and the server tick it came with: the dailies' date.
+    clock: Option<(u64, u64)>,
     cleared: BTreeSet<String>,
     bosses_killed: BTreeSet<String>,
     unlocked: BTreeSet<String>,
@@ -253,6 +255,7 @@ impl NetWorld {
             rtt_s: DEFAULT_RTT_S,
             link: LinkStats::default(),
             quests: QuestLog::default(),
+            clock: None,
             cleared: BTreeSet::new(),
             bosses_killed: BTreeSet::new(),
             unlocked: BTreeSet::new(),
@@ -299,6 +302,25 @@ impl NetWorld {
             self.quests.active.retain(|q| q.id != quest);
             self.quests.completed.push(quest.to_string());
         }
+    }
+
+    /// The UTC day the dailies run on, from the last server clock advanced by the server tick.
+    fn quest_day(&self) -> Option<u32> {
+        let (unix_s, tick) = self.clock?;
+        let passed = self.tick.saturating_sub(tick) / u64::from(combat_core::TICK_HZ);
+        Some(combat_core::live::day_index(unix_s + passed))
+    }
+
+    /// Mirrors `Sim::ilmari_quest_open`: the Opening waits for the AGI's fall, the ending's
+    /// marker is never offered.
+    fn ilmari_quest_open(&self, id: &str) -> bool {
+        if id == combat_core::rewards::ENDING_QUEST {
+            return false;
+        }
+        id != combat_core::ilmari::OPENING_QUEST
+            || self
+                .bosses_killed
+                .contains(combat_core::ilmari::CREDITS_BOSS)
     }
 
     pub fn apply_welcome(&mut self, quests: &QuestSnap, cleared: &[String], unlocked: &[String]) {
@@ -1095,8 +1117,14 @@ impl NetWorld {
                 self.item_cds.insert(item.clone(), (end, *ms));
             }
             Event::QuestFailed { quest } => self.quests.active.retain(|q| q.id != *quest),
+            Event::Clock { unix_s } => self.clock = Some((*unix_s, self.tick)),
             Event::QuestCompleted { quest } => {
                 self.quests.active.retain(|q| q.id != *quest);
+                if let Some(day) = self.quest_day()
+                    && content.quest(quest).is_some_and(|q| q.daily)
+                {
+                    self.quests.days.insert(quest.clone(), day);
+                }
                 if !self.quests.completed.contains(quest) {
                     self.quests.completed.push(quest.clone());
                 }
@@ -1223,7 +1251,14 @@ impl SimRead for NetWorld {
         let Some(def) = self.content.quest(quest) else {
             return QuestStatus::Locked;
         };
-        if self.quests.completed.iter().any(|c| c == quest) {
+        // Mirrors `Sim::quest_status_of`: a daily is done until the date moves on. Without a
+        // clock yet it stays done.
+        let done = self.quests.completed.iter().any(|c| c == quest)
+            && (!def.daily
+                || self
+                    .quest_day()
+                    .is_none_or(|d| self.quests.days.get(quest) == Some(&d)));
+        if done {
             return QuestStatus::Done;
         }
         if let Some(q) = self.quests.active.iter().find(|q| q.id == quest) {
@@ -1242,7 +1277,8 @@ impl SimRead for NetWorld {
         let chain = def
             .requires
             .as_ref()
-            .is_none_or(|r| self.quests.completed.contains(r));
+            .is_none_or(|r| self.quests.completed.contains(r))
+            && self.ilmari_quest_open(quest);
         if chain && level >= def.level_min {
             QuestStatus::Available
         } else {

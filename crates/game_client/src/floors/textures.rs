@@ -260,7 +260,6 @@ fn unlit(tex: Tex) -> bool {
                 | Sign::IlBillBoard
                 | Sign::IlInvoice
                 | Sign::IlDashboard
-                | Sign::IlTeaser
                 | Sign::IlHiringOne
                 | Sign::IlConcerns
                 | Sign::IlKiosk
@@ -848,6 +847,18 @@ fn sign_spec(s: Sign) -> SignSpec {
             &["SCOOTERS:", "PLEASE STEP OVER"],
             [230, 230, 235],
             [40, 40, 50],
+            [200, 60, 60],
+        ),
+        Sign::LawnKeepOff => sp(
+            &["KEEP OFF THE GRASS", "(IT IS AI-GENERATED)"],
+            [40, 90, 50],
+            [240, 248, 235],
+            [250, 230, 100],
+        ),
+        Sign::LawnAdopt => sp(
+            &["ADOPT A BENCH", "SEAT AS A SERVICE"],
+            [235, 232, 220],
+            [50, 50, 70],
             [200, 60, 60],
         ),
         Sign::CampusExit => sp(
@@ -3684,12 +3695,6 @@ fn sign_spec(s: Sign) -> SignSpec {
             [14, 18, 30],
             [255, 220, 120],
             [255, 90, 70],
-        ),
-        Sign::IlTeaser => sp(
-            &["THE LAB COAT DOOR", "COMING", "(ASK NOBODY)"],
-            [16, 12, 24],
-            [236, 226, 255],
-            [255, 200, 70],
         ),
         Sign::IlNineBox => sp(&["9-BOX"], [236, 232, 220], [40, 40, 70], [200, 60, 60]),
         Sign::IlFacePatch => sp(&["UPDATE"], [0, 70, 170], [255, 255, 255], [255, 220, 90]),

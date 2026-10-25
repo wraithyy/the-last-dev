@@ -51,7 +51,9 @@ Screens, props and jokes.
 
 ### Changed
 
-- Co-op needs this version on both sides (protocol 49).
+- The campus no longer throws about 16 tickets at you at once: a new role sees five, and the side chains (expense report, exit interview, return to office, town hall, flaky tests, the food truck) unlock one after another as you finish the nearby ones. The Company Calendar still starts its chains from anywhere.
+- Tower floors 1 to 4, the Resistance base and the campus lawns got colour zones, rugs, plants and a few benches and signs, and the Resistance base's people stand further apart.
+- Co-op needs this version on both sides (protocol 50).
 - Nameplates, speech bubbles and floating numbers no longer draw over the minimap, unit frames, action bar or log windows, and plates are hidden instead of being cut by the screen edge. Combat numbers now rise beside the target's plate instead of on its name.
 - Cutscenes and the Ilmari opening hide the whole HUD, so no keycap, frame or log window peeks out between the letterbox bars.
 - The Slack and combat-log windows fade to a faint outline after eight quiet seconds and come back when a line arrives or the pointer is over them.
@@ -69,6 +71,9 @@ Screens, props and jokes.
 
 ### Fixed
 
+- Done daily tickets now show their "!" again the next day when you play online, and the Ilmari opening ticket stays hidden online until the AGI has fallen.
+- The yellow car at the start of the car park no longer clips its warning cone or fills the camera, and the people at the arrival spot stand apart so their speech bubbles stop stacking.
+- The Cooling Deck's leftover "Lab Coat Door - COMING" sign is gone now that the Lab is open.
 - The quest tracker no longer shows an empty "Objectives (0)" box when only a countdown is running.
 - Cutscene cameras no longer end up inside a reception desk, a wardrobe or a ceiling panel when a scene starts.
 - Campus signs stay readable at night instead of going nearly black.

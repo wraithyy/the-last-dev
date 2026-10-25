@@ -37,8 +37,8 @@ const PACKS: [(f32, f32); 6] = [
 type Spot = (&'static str, (f32, f32), (f32, f32));
 const CAST: [Spot; 10] = [
     // The "First Day" corner beside your car.
-    ("npc_hr", (-3.5, 68.0), SPAWN),
-    ("npc_dummy", (2.0, 61.5), SPAWN),
+    ("npc_hr", (-6.0, 58.0), SPAWN),
+    ("npc_dummy", (9.0, 58.0), SPAWN),
     ("npc_colleague", (-2.5, 63.5), SPAWN),
     // Your onboarding buddy, by the arrival spot, with the ticket that sends you up the hill.
     ("npc_1", (5.0, 69.0), SPAWN),
@@ -200,12 +200,13 @@ fn lot(p: &mut Plan) {
     for (x, z, m) in cars {
         super::campus::car(p, x, z, false, m);
     }
-    // Your car, in bay 4,112, with a clamp on it already.
-    let (cx, cz) = (2.5, 77.0);
+    // Your car, in bay 4,112, with a clamp on it already: off the arrival line, so the camera
+    // behind the spawn is not inside it, and the cone stands beside the wheel, not in the body.
+    let (cx, cz) = (9.5, 78.0);
     super::campus::car(p, cx, cz, true, Mat::Yellow);
     p.prim(
         PrimKind::Cylinder,
-        v(cx + 1.4, 0.35, cz - 1.0),
+        v(cx + 1.4, 0.35, cz - 1.4),
         v(0.8, 0.25, 0.8),
         Mat::Hazard,
     );

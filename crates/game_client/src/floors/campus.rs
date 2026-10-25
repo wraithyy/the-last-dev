@@ -153,6 +153,7 @@ fn build_phase(occupied: bool) -> FloorLayout {
     services_street(&mut p);
     core_squares(&mut p);
     ambient_props(&mut p);
+    lawn_extras(&mut p);
     overflow_desks(&mut p);
     super::districts::build(&mut p);
 
@@ -1021,6 +1022,20 @@ fn ambient_props(p: &mut Plan) {
     p.sign(v(-21.0, 2.7, 44.4), 0.0, 1.6, Sign::ShuttleBus);
 }
 
+/// Two wide lawns that were empty grass: a bench and a sign each, nothing else (the trees are in
+/// `trees`). Sparse on purpose; the density tests count anchors, these are scenery.
+fn lawn_extras(p: &mut Plan) {
+    for (x, z, yaw, sign) in [
+        (-72.0, 22.0, -FRAC_PI_2, Sign::LawnKeepOff),
+        (32.0, 6.0, FRAC_PI_2, Sign::LawnAdopt),
+    ] {
+        bench(p, x, z, yaw);
+        let sx = x + if yaw < 0.0 { 2.4 } else { -2.4 };
+        p.boxed(v(sx, 0.6, z), v(0.1, 1.2, 0.1), Mat::Metal, false);
+        p.sign(v(sx, 1.25, z - 0.08), 0.0, 1.5, sign);
+    }
+}
+
 /// VibeCon on the east lawn: a pop-up backdrop wall with the entrance in it, a truss arch over
 /// the lanyard queue, the registration desk beside the queue and a poster easel facing the plaza.
 /// Returns the door anchor in front of the entrance (facing the plaza).
@@ -1465,6 +1480,14 @@ fn trees(p: &mut Plan, doors: &[(&'static str, (Vec3, f32))]) {
         (-60.0, -8.0, true),
         (-58.0, 20.0, false),
         (-12.0, -22.0, false),
+        // The west and east lawns beside the plaza, a clump or two each.
+        (-80.0, 10.0, false),
+        (-84.0, 38.0, true),
+        (-52.0, 40.0, false),
+        (-66.0, 4.0, true),
+        (30.0, -4.0, false),
+        (52.0, 14.0, true),
+        (44.0, 24.0, false),
     ] {
         tree(p, x, z, pine, 1.8);
     }

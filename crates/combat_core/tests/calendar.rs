@@ -254,7 +254,8 @@ fn rotation_on_lists_one_of_each_and_only_today_starts_remotely() {
         .map(|c| c.quests[0].clone())
         .unwrap_or_default();
     t.accept(&other);
-    assert_eq!(t.status(&other), QuestStatus::Available);
+    // Gated heads read Locked at the giver, but the point is that nothing was handed out.
+    assert_ne!(t.status(&other), QuestStatus::Active);
     t.accept(&today);
     assert_eq!(t.status(&today), QuestStatus::Active);
 }

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 49;
+pub const PROTOCOL_VERSION: u16 = 50;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -434,11 +434,13 @@ impl AuraSnap {
 }
 
 /// A player's quest log on the wire: (quest id, objective counts) in accept order, then the
-/// completed ids in turn-in order.
+/// completed ids in turn-in order, then the UTC day of the last turn-in of each daily.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QuestSnap {
     pub active: Vec<(String, Vec<u32>)>,
     pub completed: Vec<String>,
+    /// Dailies only (`QuestDef::daily`), so the client can offer them again once the date moves on.
+    pub days: Vec<(String, u32)>,
 }
 
 impl QuestSnap {
@@ -450,6 +452,12 @@ impl QuestSnap {
                 .map(|q| (q.id.clone(), q.counts.clone()))
                 .collect(),
             completed: log.completed.clone(),
+            days: log
+                .days
+                .iter()
+                .take(MAX_LIST_LEN)
+                .map(|(id, d)| (id.clone(), *d))
+                .collect(),
         }
     }
 
@@ -465,7 +473,7 @@ impl QuestSnap {
                 .collect(),
             completed: self.completed.clone(),
             kills: Default::default(),
-            days: Default::default(),
+            days: self.days.iter().cloned().collect(),
         }
     }
 }
@@ -800,6 +808,11 @@ impl Msg for ServerMsg {
                         .iter()
                         .all(|(q, c)| q.len() <= MAX_QUEST_ID_BYTES && c.len() <= MAX_LIST_LEN)
                     && ids(&quests.completed)
+                    && quests.days.len() <= MAX_LIST_LEN
+                    && quests
+                        .days
+                        .iter()
+                        .all(|(q, _)| q.len() <= MAX_QUEST_ID_BYTES)
                     && ids(cleared)
                     && ids(unlocked)
             }
@@ -1418,6 +1431,7 @@ mod tests {
                 quests: QuestSnap {
                     active: vec![("q_intro".into(), vec![1, 0])],
                     completed: vec!["q_first".into()],
+                    days: vec![("q_first".into(), 20_741)],
                 },
                 cleared: vec!["tower/3".into()],
                 unlocked: vec!["datacenter/1".into()],

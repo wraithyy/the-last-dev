@@ -66,15 +66,16 @@ pub fn build() -> FloorLayout {
         let a = v(x, 0.0, z);
         p.anchor(name, a, yaw_towards(a, v(look.0, 0.0, look.1)));
     };
-    // Dale at his table, Brenda behind the counter, a volunteer laminating, Tom at the rack.
-    at("npc_dale", &mut p, -5.0, 3.5, (-5.0, 0.0));
+    // Dale at his table, Brenda behind the counter, a volunteer laminating, Tom at the rack. Each
+    // stands 5 m or more from the next so nameplates and speech bubbles do not stack.
+    at("npc_dale", &mut p, -6.0, 3.8, (-5.0, 0.0));
     at("npc_brenda", &mut p, 26.0, -5.0, (26.0, 0.0));
-    at("npc_1", &mut p, 7.0, 6.0, (5.0, 2.0));
-    at("npc_2", &mut p, -10.0, -6.0, (-6.0, 0.0));
+    at("npc_1", &mut p, 11.0, 2.0, (6.0, 4.0));
+    at("npc_2", &mut p, -3.0, -6.0, (-5.0, 0.0));
     // The sign-up sheet for the companions, on the wall side of the hall where the board hangs.
     at("npc_roster", &mut p, 9.0, -6.5, (9.0, 0.0));
-    // The defecting cleaning robot waits by Dale's table (spawned after the ending, see the zone's `friendly`).
-    at("npc_clean_slate", &mut p, -2.0, 4.5, (-5.0, 3.5));
+    // The defecting cleaning robot waits at the end of Dale's table, out of his bubble's way (spawned after the ending, see the zone's `friendly`).
+    at("npc_clean_slate", &mut p, -10.5, 2.0, (-6.0, 3.8));
     assemble(ZONE, 1, "The Booth, Sub-Level", false, p, theme())
 }
 

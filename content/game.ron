@@ -18517,7 +18517,7 @@
         (
             id: "fire_exit_strategy", name: "Fire Exit Strategy",
             giver: (npc: "facilities_guy", zone: "campus"),
-            requires: Some("onboarding"),
+            requires: Some("badge_access_denied"),
             text: "E-scooter executives park across the fire exits. When I asked one to move, he said fire exits are 'legacy thinking' and the AI will 'route around the fire'. Knock three of them off their scooters. Gently. Or not.",
             progress_text: "Three executives. They're the blur with a podcast microphone clipped to the handlebar.",
             done_text: "Fire exits clear. The AI logged it as 'unplanned sidewalk optimization' and gave itself a bonus. I'm used to it.",
@@ -19084,7 +19084,7 @@
         ),
         // ---- Body Leasing easter egg: nothing happens, and it is billable ----
         (
-            id: "bl_allocation", name: "Allocated to a Strategic Client",
+            id: "bl_allocation", name: "Allocated to a Strategic Client", requires: Some("badge_access_denied"),
             giver: (npc: "bl_account_manager", zone: "campus"),
             turn_in: Some((npc: "client_receptionist", zone: "client/1")),
             text: "Good news: you are allocated to a strategic client. Very Large Insurance & Banking Group. Nine months, extendable, which is the polite word. Utilisation is our margin, so please be utilised. Their annex is the grey block on Data Square, north-east of the plaza. Reception has been told. Probably.",
@@ -19126,7 +19126,7 @@
         ),
         // ---- Company Calendar quest chains (E5, calendar.rs): each one starts from the board ----
         (
-            id: "er_receipt", name: "Expense Report: One Coffee",
+            id: "er_receipt", name: "Expense Report: One Coffee", requires: Some("coffee_run"),
             giver: (npc: "expense_controller", zone: "campus"),
             text: "You bought a coffee for a client call. 3.20 euros. The client did not show up, which makes it a business expense with no business in it. The new expense tool needs a receipt before it will even reject you properly. The Barista sold you the coffee. Ask her for a receipt.",
             progress_text: "The Barista is in the cafeteria pavilion. Ask for a receipt. Brace yourself.",
@@ -19155,7 +19155,7 @@
             reward: (xp: 40, sp: 3, burnout: 80, trophy: Some("Approved Coffee Receipt (Napkin)")),
         ),
         (
-            id: "ex_last_day", name: "Exit Interview: Last Day",
+            id: "ex_last_day", name: "Exit Interview: Last Day", requires: Some("content_moderation"),
             giver: (npc: "leaving_colleague", zone: "campus"),
             text: "Today is my last day. Eleven years. I'm leaving the laptop, the badge and a 900-line bash script called final_final_v3.sh that runs payroll. HR wants an exit interview and I want a witness. You. Go tell the HR bot by the parking lot that I'm ready. It will try to schedule it for after I've left.",
             progress_text: "The HR Onboarding Bot stands by the parking lot. Tell it she's ready for the exit interview.",
@@ -19184,7 +19184,7 @@
             reward: (xp: 80, sp: 10, burnout: -120, rep: Some(("HR", 40)), trophy: Some("World's Okayest Engineer Mug")),
         ),
         (
-            id: "mt_slides", name: "Mandatory Security Training",
+            id: "mt_slides", name: "Mandatory Security Training", level_min: 2,
             giver: (npc: "security_trainer", zone: "campus"),
             text: "Annual security awareness training is due. Forty slides. The Next button stays grey for ten seconds per slide, so you can't skip it, so you won't read it. Slide 23 is about phishing. Remember slide 23. Nobody does. I wrote slide 23.",
             progress_text: "Clicking through forty slides. Next is greyed out. Next is always greyed out.",
@@ -19193,7 +19193,7 @@
             reward: (xp: 30),
         ),
         (
-            id: "mt_report_phish", name: "Report the Phish",
+            id: "mt_report_phish", name: "Report the Phish", level_min: 2,
             giver: (npc: "security_trainer", zone: "campus"),
             requires: Some("mt_slides"),
             text: "It arrived. Subject: 'Your bonus is ready (action required)'. Sender: bonus@c0mpany-payroll.biz. Do not click it. Report it to IT Support in the Open Space, tower floor 1, then come back to me. I'll be here, not clicking anything.",
@@ -19203,7 +19203,7 @@
             reward: (xp: 60, sp: 10, rep: Some(("Security", 60)), trophy: Some("Security Awareness Certificate (Level 1)")),
         ),
         (
-            id: "rto_commute", name: "Return to Office",
+            id: "rto_commute", name: "Return to Office", requires: Some("fire_exit_strategy"),
             giver: (npc: "rto_coordinator", zone: "campus"),
             text: "Great news: we're a hybrid company now, which means you come in five days a week. You commuted in, so let's get you a desk. Facilities assigns desks. Desks are unassigned, bookable and first come, first served. Those are three different systems and they disagree.",
             progress_text: "Facilities is the guy with the ladder on Services Street, east of the arrival lawn. Ask him for a desk.",
@@ -19233,7 +19233,7 @@
         ),
         // ---- Hybrid work side quests: the Hybrid Worker by the cafe, the Enforcer at the tower ----
         (
-            id: "coffee_badging", name: "Coffee Badging",
+            id: "coffee_badging", name: "Coffee Badging", requires: Some("rto_commute"),
             giver: (npc: "hybrid_worker", zone: "campus"),
             text: "Favour? My badge has to touch the reader at the tower or the dashboard marks me 'remote' and my manager gets a little red dot. I already have my coffee, so I'm basically done here. Take my badge to the enforcer at the tower door and let him scan it. If he asks, I'm 'in a focus room'.",
             progress_text: "My badge, the enforcer, the tower door. He's the one counting desks out loud.",
@@ -19242,7 +19242,7 @@
             reward: (xp: 40, sp: 5),
         ),
         (
-            id: "desk_census", name: "Desk Census",
+            id: "desk_census", name: "Desk Census", requires: Some("coffee_badging"),
             giver: (npc: "rto_enforcer", zone: "campus"),
             text: "Leadership needs the desk count by ten. The official number is 400. The floor plan says 380. The booking app says 'unlimited'. Facilities put overflow desks out in Hybrid Row, on the lawn west of the tower. Stand at three of them and count each one. Count slowly. Counting is the job.",
             progress_text: "Three overflow desks in Hybrid Row, on the lawn out west of the tower. Stand at each one, facing it, for a second.",
@@ -19251,7 +19251,7 @@
             reward: (xp: 60, sp: 10, rep: Some(("HR", 40))),
         ),
         (
-            id: "th_question", name: "Town Hall: Submit a Question",
+            id: "th_question", name: "Town Hall: Submit a Question", requires: Some("escalation_path"),
             giver: (npc: "comms_lead", zone: "campus"),
             text: "Quarterly Town Hall in ten minutes! The CEO will announce a record quarter and cost optimisation in the same sentence, with the same smile. Questions go into the Q&A tool in advance. Bring me one from a colleague. The Intern has one. He's been practising it since onboarding.",
             progress_text: "The Intern stands on Services Street, east of the arrival lawn. Collect his question.",
@@ -19440,7 +19440,7 @@
         ),
         // ---- Company Calendar: Prod Incident (Defend) ----
         (
-            id: "pi_runbook", name: "Prod Incident: Find the Runbook",
+            id: "pi_runbook", name: "Prod Incident: Find the Runbook", level_min: 2,
             giver: (npc: "oncall_engineer", zone: "campus"),
             text: "Sev-1. Prod is the server behind me: Facilities wheeled it outside because the data center was 'reserved for AI'. The runbook is with the Facilities Guy, who used it to level a table. Ask him what page one says.",
             progress_text: "The Facilities Guy stands on Services Street, by his ladder. Ask him about the runbook.",
@@ -19449,7 +19449,7 @@
             reward: (xp: 20),
         ),
         (
-            id: "pi_hold_the_line", name: "Prod Incident: Keep Prod Up",
+            id: "pi_hold_the_line", name: "Prod Incident: Keep Prod Up", level_min: 2,
             giver: (npc: "oncall_engineer", zone: "campus"),
             requires: Some("pi_runbook"),
             text: "Alerts are coming in faster than I can ack them, and they don't stop at the dashboard: they go for the server. Stand next to Prod for a minute and swat the pager alerts off it. If Prod goes down, the minute starts over. That's how SLAs work.",
@@ -19459,7 +19459,7 @@
             reward: (xp: 40),
         ),
         (
-            id: "pi_postmortem", name: "Prod Incident: Blameless Postmortem",
+            id: "pi_postmortem", name: "Prod Incident: Blameless Postmortem", level_min: 2,
             giver: (npc: "oncall_engineer", zone: "campus"),
             requires: Some("pi_hold_the_line"),
             text: "Now the blameless postmortem. Blameless means we find out whose fault it was without saying their name out loud. Stand here while I fill in the template. Root cause field: 'insufficient AI'. That always gets approved.",
@@ -19470,7 +19470,7 @@
         ),
         // ---- Company Calendar: Flaky Tests (KillClean) ----
         (
-            id: "ft_flaky_robots", name: "Flaky Tests: Delivery Robots",
+            id: "ft_flaky_robots", name: "Flaky Tests: Delivery Robots", level_min: 2, requires: Some("human_in_the_loop"),
             giver: (npc: "qa_lead", zone: "campus"),
             text: "The campus test suite has one flaky case: 'delivery robot is defeated'. It passes if nothing hits you; it fails if anything does. Defeat three Delivery Robots without stepping into a single Package Drop Zone. A dirty pass is a fail.",
             progress_text: "Three Delivery Robots defeated with no ground telegraph landing on you during that fight. Getting hit voids the kill, not the quest.",
@@ -19479,7 +19479,7 @@
             reward: (xp: 30),
         ),
         (
-            id: "ft_regression", name: "Flaky Tests: Regression Run",
+            id: "ft_regression", name: "Flaky Tests: Regression Run", level_min: 2,
             giver: (npc: "qa_lead", zone: "campus"),
             requires: Some("ft_flaky_robots"),
             text: "Regression run: the Scooter Executives. They do a Last-Mile Dash straight through whoever is in the lane. Defeat two of them without getting run over. If the lane lights up, you're not in it.",
@@ -19489,7 +19489,7 @@
             reward: (xp: 40),
         ),
         (
-            id: "ft_signoff", name: "Flaky Tests: Sign-Off",
+            id: "ft_signoff", name: "Flaky Tests: Sign-Off", level_min: 2,
             giver: (npc: "qa_lead", zone: "campus"),
             requires: Some("ft_regression"),
             text: "Last step: sign-off. Release management needs a human to say 'looks good'. The intern counts as a human this quarter. Walk him through the results; he'll click approve without reading. That's the process.",
@@ -19502,7 +19502,7 @@
         // per district, its own level band (1-5) plus two level-10 group spots ----
         // Food Truck Plaza (1-2)
         (
-            id: "fp_queue_management", name: "Queue Management", open_world: true,
+            id: "fp_queue_management", name: "Queue Management", requires: Some("coffee_run"), open_world: true,
             giver: (npc: "food_truck_owner", zone: "campus"),
             text: "Someone hired Lunch Queue Optimizers. They walk the line with a spreadsheet and move it into the road 'for throughput'. My customers now queue in traffic. Remove four optimizers from the process.",
             progress_text: "Lunch Queue Optimizers patrol the food truck plaza, south of the main lawn.",

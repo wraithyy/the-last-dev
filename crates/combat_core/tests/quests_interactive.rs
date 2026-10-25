@@ -628,7 +628,7 @@ fn campaign_zones_mix_objective_kinds_and_keep_drop_quests_a_minority() {
 
 #[test]
 fn the_hybrid_worker_badge_goes_to_the_enforcer_who_then_counts_desks() {
-    let mut w = world("campus", 1);
+    let mut w = world("campus", 2);
     w.accept("hybrid_worker", "coffee_badging");
     w.talk("rto_enforcer");
     assert_eq!(w.sim.quest_status("coffee_badging"), QuestStatus::Ready);

@@ -208,7 +208,6 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - The first room (the Cooling Deck) has no boss. The Reserved Instance racks work for every class; there are no class props and no forecast board.
 - Full solo is blocked by a 75 s enrage on a lone player rather than by a mechanic that needs a second body.
 - A split replica that nobody kills keeps its share of the pool: a group that ignores them fights one boss spread over several bodies until the last one falls.
-- The "Lab Coat Door" teaser on the Cooling Deck still says COMING and opens onto nothing; Wings 5-6 and the core are reached from the occupied campus (ethics stairs). Kept as a gag; remove `wing4_fx::teaser` if it reads as unfinished.
 
 - Bots read hazards off the sim where a player reads the boards, so the Hallucination is balanced for reading, not for guessing; a player who ignores the boards and the shimmer takes real damage.
 - Story keeps the engine's 3 x 3 grid and three circles; the spec's smaller Story grid is not built.

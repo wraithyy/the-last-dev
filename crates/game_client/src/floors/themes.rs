@@ -231,8 +231,175 @@ pub fn build(id: u8, plan: &mut Plan) -> Theme {
         let (pos, yaw) = plan.door_near(x, z, Sign::CampusExit);
         plan.anchor("door:campus", pos, yaw);
     }
+    accents(id, plan);
     ceiling_lights(plan);
     theme(id)
+}
+
+/// A flat colour patch on the floor: it zones a pod by use without a wall or a collider.
+fn patch(p: &mut Plan, x: f32, z: f32, w: f32, d: f32, mat: Mat) {
+    p.boxed(v(x, 0.02, z), v(w, 0.04, d), mat, false);
+}
+
+/// A rug zone: a colour patch with a few Kenney props on it, all walk-through so routes and
+/// pulls keep their space. `props` are (model, dx, dz) offsets from the patch centre.
+fn zone(
+    p: &mut Plan,
+    c: (f32, f32),
+    size: (f32, f32),
+    mat: Mat,
+    props: &[(&'static Model, f32, f32)],
+) {
+    patch(p, c.0, c.1, size.0, size.1, mat);
+    for &(m, dx, dz) in props {
+        p.prop(
+            m,
+            v(c.0 + dx, 0.04, c.1 + dz),
+            (dx * 7.0 + dz * 3.0) % PI,
+            false,
+        );
+    }
+}
+
+/// Floors 1 to 4 are one wall colour and one carpet each; a few coloured zones with props break
+/// that up. Nothing here is solid and nothing sits on a route or an anchor.
+fn accents(id: u8, p: &mut Plan) {
+    match id {
+        1 => {
+            zone(
+                p,
+                (-18.0, 23.0),
+                (6.0, 3.6),
+                Mat::Yoga,
+                &[
+                    (&POTTED_PLANT, -2.4, 0.0),
+                    (&POTTED_PLANT, 2.4, 0.0),
+                    (&RUG_ROUND, 0.0, 0.0),
+                ],
+            );
+            zone(
+                p,
+                (2.0, -19.0),
+                (7.0, 4.0),
+                Mat::Fabric2,
+                &[
+                    (&COFFEE_TABLE, 0.0, 0.0),
+                    (&LAMP_ROUND_FLOOR, 3.0, 1.2),
+                    (&BOOKCASE_OPEN, -3.0, 1.0),
+                ],
+            );
+            zone(
+                p,
+                (-33.0, -7.0),
+                (5.0, 3.5),
+                Mat::BeanA,
+                &[(&RUG, 0.0, 0.0), (&LAMP_FLOOR, 2.2, 1.0)],
+            );
+        }
+        2 => {
+            zone(
+                p,
+                (-34.0, -11.0),
+                (6.0, 4.0),
+                Mat::Fabric0,
+                &[(&RUG_ROUND, 0.0, 0.0), (&POTTED_PLANT, 2.6, 1.2)],
+            );
+            zone(
+                p,
+                (8.0, 29.0),
+                (7.0, 5.0),
+                Mat::BeanB,
+                &[
+                    (&RUG, 0.0, 0.0),
+                    (&COFFEE_TABLE_GLASS, 0.0, 0.0),
+                    (&LAMP_FLOOR, 3.0, 2.0),
+                ],
+            );
+            zone(
+                p,
+                (-21.0, -16.0),
+                (6.0, 4.0),
+                Mat::Yellow,
+                &[(&COFFEE_TABLE, 0.0, 0.0), (&LAMP_ROUND_FLOOR, 3.0, 1.4)],
+            );
+            zone(
+                p,
+                (4.0, -14.0),
+                (5.0, 3.5),
+                Mat::BeanC,
+                &[(&RUG, 0.0, 0.0), (&POTTED_PLANT, 2.4, 1.0)],
+            );
+            zone(
+                p,
+                (-6.0, -31.0),
+                (6.0, 4.0),
+                Mat::Yoga,
+                &[(&POTTED_PLANT, -2.6, 1.4), (&POTTED_PLANT, 2.6, 1.4)],
+            );
+        }
+        3 => {
+            zone(
+                p,
+                (-10.0, 31.0),
+                (7.0, 4.0),
+                Mat::Fabric1,
+                &[
+                    (&RUG, 0.0, 0.0),
+                    (&POTTED_PLANT, -3.0, 1.5),
+                    (&LAMP_ROUND_FLOOR, 3.0, 1.5),
+                ],
+            );
+            zone(
+                p,
+                (24.0, -20.0),
+                (6.0, 3.0),
+                Mat::Yellow,
+                &[(&COFFEE_TABLE, 0.0, 0.0), (&POTTED_PLANT, 2.8, 1.0)],
+            );
+        }
+        4 => {
+            zone(
+                p,
+                (-45.0, 7.0),
+                (6.0, 3.5),
+                Mat::Fabric2,
+                &[(&RUG, 0.0, 0.0), (&POTTED_PLANT, 2.6, 1.0)],
+            );
+            zone(
+                p,
+                (30.0, 28.0),
+                (6.0, 4.0),
+                Mat::Yellow,
+                &[(&COFFEE_TABLE_GLASS, 0.0, 0.0), (&LAMP_FLOOR, 2.8, 1.4)],
+            );
+            zone(
+                p,
+                (-26.0, 13.0),
+                (6.0, 4.0),
+                Mat::Yoga,
+                &[
+                    (&RUG_ROUND, 0.0, 0.0),
+                    (&POTTED_PLANT, -2.8, 1.2),
+                    (&POTTED_PLANT, 2.8, 1.2),
+                ],
+            );
+            zone(
+                p,
+                (22.0, 13.0),
+                (6.0, 4.0),
+                Mat::BeanA,
+                &[(&RUG, 0.0, 0.0), (&LAMP_FLOOR, 2.8, 1.4)],
+            );
+            zone(
+                p,
+                (46.0, 7.0),
+                (5.0, 3.0),
+                Mat::Fabric0,
+                &[(&POTTED_PLANT, -2.2, 1.0), (&POTTED_PLANT, 2.2, 1.0)],
+            );
+        }
+        _ => {}
+    }
 }
 
 // ---------------------------------------------------------------- floor 1

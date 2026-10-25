@@ -131,8 +131,11 @@ impl CalendarDef {
                 let Some(q) = c.quest(id) else {
                     return bad(format!("{}: unknown quest {id}", ch.key));
                 };
-                let want = k.checked_sub(1).map(|p| &ch.quests[p]);
-                if q.requires.as_ref() != want {
+                // The head may be gated (it only hides the giver's "!": the board starts it at any
+                // time); the rest follow the quest before them.
+                if let Some(prev) = k.checked_sub(1).map(|p| &ch.quests[p])
+                    && q.requires.as_ref() != Some(prev)
+                {
                     return bad(format!("{}: {id} must require the quest before it", ch.key));
                 }
             }
