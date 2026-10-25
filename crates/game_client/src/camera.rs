@@ -36,6 +36,16 @@ impl OrbitCamera {
         self.pitch = pitch.clamp(-CAM_PITCH_LIMIT, CAM_PITCH_LIMIT);
     }
 
+    /// First view of an indoor room: a higher, shorter arm than the walking default so the room
+    /// reads instead of a tunnel. `cam_ceiling` is the highest the camera may go; the arm is
+    /// kept short enough to reach its height at this pitch, so the ceiling never squeezes it.
+    pub fn frame_arrival(&mut self, cam_ceiling: f32) {
+        self.pitch = CAM_ARRIVAL_PITCH;
+        let reach = (cam_ceiling - CAM_FOCUS_HEIGHT) / CAM_ARRIVAL_PITCH.sin();
+        self.zoom = reach.clamp(CAM_ARRIVAL_MIN_DIST, CAM_ARRIVAL_MAX_DIST);
+        self.dist = self.zoom;
+    }
+
     pub fn yaw(&self) -> f32 {
         self.yaw
     }
@@ -294,7 +304,7 @@ fn place_camera(
     }
 }
 
-fn inflate(b: &Aabb, r: f32) -> Aabb {
+pub(crate) fn inflate(b: &Aabb, r: f32) -> Aabb {
     Aabb {
         min: CVec3::new(b.min.x - r, b.min.y - r, b.min.z - r),
         max: CVec3::new(b.max.x + r, b.max.y + r, b.max.z + r),

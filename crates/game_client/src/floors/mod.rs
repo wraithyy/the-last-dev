@@ -36,6 +36,7 @@ pub use ilmari6::{DESKS as BOARD_DESKS, INBOXES as BOARD_INBOXES, POD3 as BOARD_
 mod kit;
 pub use kit::Sign;
 mod lab;
+mod landmarks;
 mod layout;
 mod marie;
 mod models;
@@ -122,7 +123,6 @@ pub fn model_size(model: &kit::Model) -> Vec3 {
 }
 
 use crate::arena::{Colliders, FlatDecor, Ground};
-use crate::config::WALL_HEIGHT;
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::VisibilityRange;
 use bevy::light::{CascadeShadowConfigBuilder, NotShadowCaster};
@@ -222,6 +222,10 @@ fn get_mat(
         .or_insert_with(|| materials.add(textures::material(mat, theme)))
         .clone()
 }
+
+const INDOOR_FILL_WHITE: f32 = 0.3;
+const INDOOR_FILL_GAIN: f32 = 1.25;
+const INDOOR_FILL_MIN: f32 = 950.0;
 
 /// Scene-wide look settings a zone load rewrites.
 #[derive(bevy::ecs::system::SystemParam)]
@@ -429,8 +433,16 @@ fn load_floor(
     let bare = bare.is_some();
 
     let t = &layout.theme;
-    look.ambient.color = t.ambient;
-    look.ambient.brightness = t.ambient_brightness;
+    // Indoors a cheap fill (no extra lights): a floor under the ambient and a pull towards white,
+    // so a room with a strongly tinted theme still reads while keeping its mood.
+    (look.ambient.color, look.ambient.brightness) = if layout.outdoor {
+        (t.ambient, t.ambient_brightness)
+    } else {
+        (
+            t.ambient.mix(&Color::WHITE, INDOOR_FILL_WHITE),
+            (t.ambient_brightness * INDOOR_FILL_GAIN).max(INDOOR_FILL_MIN),
+        )
+    };
     look.clear.0 = t.fog;
     for mut fog in &mut look.fogs {
         fog.color = t.fog;
@@ -446,7 +458,7 @@ fn load_floor(
     look.ceiling.0 = if layout.outdoor {
         60.0
     } else {
-        layout.ceiling - (WALL_HEIGHT - crate::config::CAM_MAX_HEIGHT)
+        layout.ceiling - crate::config::CAM_CEILING_GAP
     };
     colliders.0 = if bare {
         Vec::new()

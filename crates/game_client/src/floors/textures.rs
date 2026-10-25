@@ -321,7 +321,16 @@ fn unlit(tex: Tex) -> bool {
 }
 
 pub fn tex_material(tex: Tex, image: Handle<Image>) -> StandardMaterial {
+    // Sign faces glow a little through their own picture so they still read at night, where
+    // the lit albedo alone goes nearly black.
+    let (emissive, emissive_texture) = if matches!(tex, Tex::Sign(_)) && !unlit(tex) {
+        (LinearRgba::gray(0.3), Some(image.clone()))
+    } else {
+        (LinearRgba::BLACK, None)
+    };
     StandardMaterial {
+        emissive,
+        emissive_texture,
         base_color_texture: Some(image),
         perceptual_roughness: 0.6,
         unlit: unlit(tex),

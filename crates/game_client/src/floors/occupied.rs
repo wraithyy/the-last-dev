@@ -32,7 +32,7 @@ pub fn theme() -> Theme {
         floor: FloorKind::Grass,
         fog: c(0.4, 0.19, 0.19),
         ambient: c(0.85, 0.55, 0.5),
-        ambient_brightness: 640.0,
+        ambient_brightness: 900.0,
         sun: c(1.0, 0.5, 0.3),
         sun_illuminance: 7500.0,
         fog_range: (40.0, 130.0),

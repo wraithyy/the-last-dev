@@ -108,7 +108,7 @@ pub fn yaw_towards(from: Vec3, to: Vec3) -> f32 {
 }
 
 /// Blockers are every solid box and prop footprint plus the explicit `Block` pieces.
-fn blockers_of(pieces: &[Piece]) -> Vec<Aabb> {
+pub(super) fn blockers_of(pieces: &[Piece]) -> Vec<Aabb> {
     pieces
         .iter()
         .filter_map(|p| match p {
@@ -221,6 +221,7 @@ pub fn assemble(
     super::office::place(zone, &mut plan);
     super::quest_spots::place(zone, &mut plan);
     super::class_spots::place(zone, &mut plan);
+    super::landmarks::place(zone, &mut plan);
     drape(&mut plan);
     let ceiling = plan.top();
     let Plan {

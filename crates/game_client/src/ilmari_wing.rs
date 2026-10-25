@@ -69,6 +69,7 @@ fn patch_screens(
         }
         if let Some(img) = cache.get(&name) {
             mat.base_color_texture = Some(img.clone());
+            mat.emissive_texture = Some(img.clone());
         }
     };
     for CombatEvent(e) in reader.read() {
@@ -325,7 +326,9 @@ fn set_board(
         Some(l) => live_board_image(sign, l),
         None => crate::floors::sign_image(sign),
     };
-    mat.base_color_texture = Some(images.add(image));
+    let image = images.add(image);
+    mat.base_color_texture = Some(image.clone());
+    mat.emissive_texture = Some(image);
 }
 
 /// The Culture Hub's vote boards: the ballot's three slots with what each does and how many have

@@ -72,10 +72,10 @@ fn theme(level: u8) -> Theme {
             ..base
         },
         4 => Theme {
-            wall: c(0.12, 0.05, 0.16),
+            wall: c(0.24, 0.12, 0.3),
             trim: c(0.04, 0.02, 0.06),
             accent: LinearRgba::rgb(3.2, 0.6, 2.6),
-            floor: FloorKind::Gloss([0.22, 0.14, 0.3]),
+            floor: FloorKind::Gloss([0.34, 0.24, 0.44]),
             fog: c(0.06, 0.02, 0.08),
             ambient: c(1.0, 0.75, 1.0),
             ambient_brightness: 480.0,
@@ -83,10 +83,10 @@ fn theme(level: u8) -> Theme {
             ..base
         },
         _ => Theme {
-            wall: c(0.08, 0.08, 0.12),
+            wall: c(0.2, 0.22, 0.32),
             trim: c(0.02, 0.02, 0.04),
             accent: LinearRgba::rgb(0.6, 2.8, 3.4),
-            floor: FloorKind::Carpet([0.2, 0.2, 0.3]),
+            floor: FloorKind::Carpet([0.34, 0.34, 0.5]),
             fog: c(0.02, 0.02, 0.05),
             ambient_brightness: 520.0,
             sun_illuminance: 3500.0,

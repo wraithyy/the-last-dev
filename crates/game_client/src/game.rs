@@ -408,6 +408,13 @@ fn enter_zone(
     };
     body.teleport_facing(pos, yaw);
     cam.set_yaw(yaw + cam_offset);
+    // The QA zoom and pitch hooks keep their say.
+    if !layout.outdoor
+        && std::env::var_os("WOW_CAM_DIST").is_none()
+        && std::env::var_os("WOW_CAM_PITCH").is_none()
+    {
+        cam.frame_arrival(layout.ceiling - crate::config::CAM_CEILING_GAP);
+    }
     target.0 = None;
 
     let content = view.content();

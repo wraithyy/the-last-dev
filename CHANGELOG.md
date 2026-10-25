@@ -57,10 +57,15 @@ Screens, props and jokes.
 - The target frame is spaced away from the player frame, and a long cast name is shortened so it no longer runs into the cast time.
 - The gear and shop windows open below the player frame, "companions: ~/pets" is a button of its own instead of a tab beside the close box, and the career window's two header lines no longer overlap.
 - Notices such as the vendor's line show above the windows instead of across their title bars.
+- Dungeon rooms (Basement, HACK 24, VibeCon, the Ilmari wings) now greet you with a landmark near the entrance, one oversized prop and a tinted light per room, so you can tell where you are at first glance.
+- Indoor rooms are brighter and less tinted, the VibeCon Afterparty and Main Stage are readable, the occupied campus is lighter, and nights outdoors are not quite so black.
+- Entering an indoor room starts the camera higher and further back, kept under the ceiling.
 
 ### Fixed
 
 - The quest tracker no longer shows an empty "Objectives (0)" box when only a countdown is running.
+- Cutscene cameras no longer end up inside a reception desk, a wardrobe or a ceiling panel when a scene starts.
+- Campus signs stay readable at night instead of going nearly black.
 
 ## [0.10.0] - 2026-10-24
 

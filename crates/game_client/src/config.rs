@@ -53,6 +53,9 @@ pub const CAM_MAX_DIST: f32 = 20.0;
 /// WoW-like default: roughly 10 m behind, shallow pitch so the corridor stays in view.
 pub const CAM_START_DIST: f32 = 10.5;
 pub const CAM_START_PITCH: f32 = 0.22;
+pub const CAM_ARRIVAL_PITCH: f32 = 0.32;
+pub const CAM_ARRIVAL_MIN_DIST: f32 = 7.5;
+pub const CAM_ARRIVAL_MAX_DIST: f32 = 11.5;
 pub const CAM_PITCH_LIMIT: f32 = 80.0 * PI / 180.0;
 pub const CAM_ORBIT_SENS: f32 = 0.005;
 pub const CAM_ZOOM_STEP: f32 = 1.5;
@@ -64,6 +67,8 @@ pub const CAM_SNAP_BEHIND_RATE: f32 = 4.0;
 pub const CAM_MIN_HEIGHT: f32 = 0.2;
 /// Keeps the camera (and its near plane) below the ceiling slab.
 pub const CAM_MAX_HEIGHT: f32 = WALL_HEIGHT - 0.4;
+/// Indoors the camera stays this far under the ceiling, clear of the hanging light panels.
+pub const CAM_CEILING_GAP: f32 = 0.8;
 pub const CAM_FOCUS_HEIGHT: f32 = 1.5;
 /// Peak camera offset (m) of a full-trauma shake.
 pub const CAM_SHAKE_AMPLITUDE: f32 = 0.18;

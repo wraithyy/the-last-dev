@@ -47,7 +47,7 @@ pub(super) struct Look {
     lux: f32,
 }
 
-const NIGHT_AMBIENT: Color = Color::srgb(0.35, 0.42, 0.78);
+const NIGHT_AMBIENT: Color = Color::srgb(0.42, 0.5, 0.85);
 const NIGHT_SKY: Color = Color::srgb(0.035, 0.045, 0.1);
 const MOON: Color = Color::srgb(0.55, 0.62, 0.95);
 const WINDOW_GLOW: LinearRgba = LinearRgba::rgb(2.2, 1.6, 0.8);
@@ -75,7 +75,7 @@ impl Look {
         Look {
             ambient: mix(self.ambient, NIGHT_AMBIENT, d),
             // Dark enough for the lamps to matter, light enough to still see the paths.
-            brightness: self.brightness * (1.0 - 0.52 * d),
+            brightness: self.brightness * (1.0 - 0.4 * d),
             sky: mix(self.sky, NIGHT_SKY, d),
             sun: mix(self.sun, MOON, d),
             lux: self.lux * (1.0 - 0.85 * d),

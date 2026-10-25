@@ -1377,18 +1377,29 @@ fn direct_camera(
     };
     let side = Quat::from_rotation_y(drift) * p.side;
     let look = p.focus + Vec3::Y * 1.3;
-    // Shorter arm where a wall is in the way, as the gameplay camera does.
-    let mut shot = look + side * 2.0 + Vec3::Y * 1.2;
-    // The epilogue frames the open rack from further back so its occupant is not hidden by it.
+    // Shorter arm where a wall or a prop is in the way, as the gameplay camera does: the boxes are
+    // inflated by the camera radius so the near plane never ends up inside a desk or a wall.
+    // Nothing clear at any arm: straight above the boss, under the ceiling.
     let (arms, lift) = if scene.boss == EPILOGUE {
-        ([8.0, 6.0, 4.0], 2.8)
+        ([8.0, 6.0, 4.0, 3.0], 3.4)
     } else {
-        ([6.0, 4.5, 3.2], 2.3)
+        ([6.0, 4.5, 3.2, 2.4], 3.0)
     };
+    let top = ceiling.0 - 0.2;
+    let blockers: Vec<combat_core::Aabb> = colliders
+        .0
+        .iter()
+        .map(|b| crate::camera::inflate(b, crate::config::CAM_RADIUS))
+        .collect();
+    let mut shot = Vec3::new(
+        p.focus.x + side.x * 0.8,
+        top.min(look.y + 3.0),
+        p.focus.z + side.z * 0.8,
+    );
     for dist in arms {
         let pos = p.focus + side * dist + Vec3::Y * lift;
-        let pos = Vec3::new(pos.x, pos.y.min(ceiling.0 - 0.2), pos.z);
-        if line_of_sight(to_core(look), to_core(pos), &colliders.0) {
+        let pos = Vec3::new(pos.x, pos.y.min(top), pos.z);
+        if line_of_sight(to_core(look), to_core(pos), &blockers) {
             shot = pos;
             break;
         }
