@@ -232,7 +232,7 @@ Crate `crates/net_proto`, shared by the server and the client. Dependencies: `co
   have been an email`, `/take this offline`, `/no bandwidth`, `/blocked`, `/ship it`) with
   `command()`, `text()`, `text_at(name)` ("Let's sync on this, Alice.") and `from_command()`. No
   free text on the wire. An emote can carry the targeted teammate's id; the server keeps it only for
-  another member of the room. Version 36 added `ServerMsg::IlmariPending { on }` and opened `StampIlmari` and `IlmariReveal` to the wire (see "Trust model: Ilmari" below). Version 5 added `TelegraphStarted` / `TelegraphResolved` (enemy ground telegraphs); see `net_proto::PROTOCOL_VERSION` for the current one.
+  another member of the room. Version 36 added `ServerMsg::IlmariPending { on }` and opened `StampIlmari` and `IlmariReveal` to the wire (see "Trust model: Ilmari" below). Version 5 added `TelegraphStarted` / `TelegraphResolved` (enemy ground telegraphs); see `net_proto::PROTOCOL_VERSION` for the current one. The 1.0 protocol is **49** (no later bump is planned; a client and a server on different numbers refuse each other).
 
 ### Trust model: Ilmari (docs/ILMARI_09.md B16)
 

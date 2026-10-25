@@ -1,6 +1,6 @@
 # Ilmari: the endgame raid campaign
 
-Design document for the headline content of 0.9 and 1.0. Status: planned, nothing built yet.
+Design document for the headline content of 0.9 and 1.0. Status: shipped in the 1.0 line (Wings 1-6, the Core, the ending and the ladder are built; see docs/ILMARI_1_0.md for the as-built notes).
 
 ## Context
 

@@ -10,38 +10,41 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ### Added
 
+The Ilmari campaign, from the Alignment Lab to the Core.
+
 - The Alignment Lab, through the new ethics stairs on the occupied campus: three rooms and two bosses. The Alignment Consultant keeps offering you things you did not ask for (silence counts as yes, and the opt-out kiosks are real), and Red Team Blue Team hold a tabletop exercise until somebody is seen, so mind the cones. Both come with their own gear, titles and Story and Full versions.
-- The Security Engineer's Tailgating also cancels every offer around them in the Alignment Lab.
 - Three new quest chain steps, a hard-hat errand, a whitepaper to defend and a Roomba part to salvage on the occupied campus, plus new pages in the Quartermaster's stock.
 - The Boardroom in the Sky, up the hoist from the Lab's roof: the Jib Walk, the Executive Floor and the Boardroom, with new faces in every room, ending in the Chief Ilmari Officer. He is the old CEO's whole act with every buzzword now a weapon: roadmaps that stay on the floor, invoiced consultants, apples with opinions, earnings calls that retire a desk each time, a parachute whose landing takes two of you kicking within a second and a half, and an inbox that has to be cleared at a terminal. Story and Full, with his own gear and titles.
-- The Core, behind the Boardroom's private lift: six screens on one health bar with only one open at a time (the open one moves round the room, and the wall shows where to), a deck of seven reruns of old bosses every 45 seconds (Patch Tuesday, the Recruiter, the Cable Hydra, the Board, the Performance Review, a Scraper Swarm, the Autoscaler), and then Ill Marie in the middle of the floor, arguing three rounds for Ilmari while the group votes at four ballot terminals. What you choose decides what Ilmari becomes next. The rest of the fight is still to come.
-- Ill Marie's desk on the occupied campus lets you read her autonomy log (four screens) and keep it: it lights the fourth ballot option, Remember, in the Core.
+- The Core, behind the Boardroom's private lift: six screens on one health bar with only one open at a time (the open one moves round the room, and the wall shows where to), a deck of seven reruns of old bosses every 45 seconds (Patch Tuesday, the Recruiter, the Cable Hydra, the Board, the Performance Review, a Scraper Swarm, the Autoscaler), and then Ill Marie in the middle of the floor, arguing three rounds for Ilmari while the group votes at four ballot terminals. What you choose decides what Ilmari becomes next.
 - The Core now has its other half. After Ill Marie's three rounds Ilmari builds itself a body out of your furniture: two Rack Arms (kill both within eight seconds of each other for a free chunk of its health and no cable whip for a while; kill one and the other is rebuilt), a head that plans for a few seconds every minute (kick it, or the next three attacks all land at once), printer turrets to interrupt, and the stance your votes chose (helpful offers, hardened plating, hallucinated floors, a leaky token spill, or nothing at all). At 20 % the mech collapses and a COBOL mainframe rises from the hatch: keep it alive while rewritten-in-a-modern-language robots chew on it, feed it punch cards, then read the git log on the wall and revert the one commit that made Ilmari self-aware. A wrong terminal costs the group, the right one has your name on it. The Greybeard gets Patch The Mainframe (default key: comma, where the Data Scientist keeps Ground Truth) and Story, Full and Judgment Day each have their own numbers.
+- Ill Marie's desk on the occupied campus lets you read her autonomy log (four screens) and keep it: it lights the fourth ballot option, Remember, in the Core.
 - Ilmari drops the last tier piece of each set, a rare Legendary Keyboard for your role and a Legendary Fragment on Full and Judgment Day.
-- Companions now keep the mainframe up: Priya heals it, Dale takes the rewrites off it and Rupert shoots them.
-- The finale now shows its state on screen. In the Red-Blue Range a banner says the exercise is on standby, every sensor paints its sight cone on the floor and the squads' health reads as one line. In the Boardroom, every desk the earnings calls retire is gone from the room, cleared floor tiles go dark, the inbox terminals ping an envelope, the severance countdown has a bar and a failed kick says how many are still needed. In the Core the live screen glows green on the wall, a panel shows the phase, the swap timer, the votes, the stance, the planning timer and the mainframe's clock, and the git log is up on screen for the last phase. A pending offer from the Alignment Consultant has its own line with the seconds left to refuse.
+- The ending: when the Core falls, every screen on campus rewinds, the final log prints, the campus comes back and the credits roll with your own Judgment Day on them. In a co-op room the credits quote the room's own Opening time, the same for everyone. One key skips all of it at any moment and still pays out. It plays once per player; the Cinema screen in the Resistance base shows it again, for free.
+- Finishing the ending pays a handful of Ilmari Tokens and your title for the difficulty, and a cleaning robot rolls into the Resistance base with a request of its own. Dale's Roomba, once assembled, replaces the e-scooter as your ride, and the robot becomes a pet.
+- The Core has a weekly ladder. Every Full or Judgment Day kill goes on the room's board for the week (fastest first, then fewest deaths) with its crew, and a lone Full run goes on its own Async tab. Each week's seed picks one Directive, a Culture Committee policy such as Open Plan Everything or Unlimited Vacation, that the whole ranked fight wears: a cost and a perk of about the same size. The Weekly tab of the sprint planner and `~/endgame` show the Directive and the best time of each tab, and every ranked kill pays 15 Ilmari Tokens. Finishing in the top three of a group board earns the title for that place.
+- Judgment Day now has its numbers settled boss by boss: the Chief Ilmari Officer keeps his authored health and a slightly shorter enrage timer, and the Heir he brings along has less health (3,000 instead of 6,500), so five players can beat the Consultant, Red Team Blue Team, the CIO and the Core on Judgment Day.
 
+Companions, gear and quality of life.
+
+- The Security Engineer's Tailgating also cancels every offer around them in the Alignment Lab.
+- Companions now keep the mainframe up: Priya heals it, Dale takes the rewrites off it and Rupert shoots them.
+- The Quartermaster has a shelf each for Training Data, The Cloud and the Core.
+- Training Data has its class consoles: a DevOps Rate Limit rack slows the crawlers, a Security Engineer's robots.txt makes them leave the drafts alone for ten seconds, and the Data Scientist's dashboard gives the group a forecast.
+- A Judgment Day Hot Take now shows a bar above your action bar with the one spell you have left and the seconds it lasts.
+- Joining a room after its Opening played now lets you watch it too.
+
+Screens, props and jokes.
+
+- The finale now shows its state on screen. In the Red-Blue Range a banner says the exercise is on standby, every sensor paints its sight cone on the floor and the squads' health reads as one line. In the Boardroom, every desk the earnings calls retire is gone from the room, cleared floor tiles go dark, the inbox terminals ping an envelope, the severance countdown has a bar and a failed kick says how many are still needed. In the Core the live screen glows green on the wall, a panel shows the phase, the swap timer, the votes, the stance, the planning timer and the mainframe's clock, and the git log is up on screen for the last phase. A pending offer from the Alignment Consultant has its own line with the seconds left to refuse.
 - The Alignment Consultant now moves the opt-out kiosks to a new spot every time he pairs his offers, a shield he washes himself with and leaves standing heals him, and every Principles cast takes one of the three pillars away. In Red Team Blue Team the squads wear your name on glitching plates, and while a copy of you stands you hit 20 percent weaker.
 - The Boardroom has its crane: a hook block on its falls, the hoist drum and the operator's cab at the foot of the jib.
 - The Core's wall monitors show Ilmari's face: smiling and awake on the live screen, eyes shut and standing by on the others.
-- A Judgment Day Hot Take now shows a bar above your action bar with the one spell you have left and the seconds it lasts.
-- Training Data has its class consoles: a DevOps Rate Limit rack slows the crawlers, a Security Engineer's robots.txt makes them leave the drafts alone for ten seconds, and the Data Scientist's dashboard gives the group a forecast.
-- The Quartermaster has a shelf each for Training Data, The Cloud and the Core.
 - Ill Marie's badge has a grey silhouette where the photo should be, and now and then, once, the campus map gets her name wrong.
-- Joining a room after its Opening played now lets you watch it too.
-- The ending: when the Core falls, every screen on campus rewinds, the final log prints, the campus comes back and the credits roll with your own Judgment Day on them. One key skips all of it at any moment and still pays out. It plays once per player; the Cinema screen in the Resistance base shows it again, for free.
-- Finishing the ending pays a handful of Ilmari Tokens and your title for the difficulty, and a cleaning robot rolls into the Resistance base with a request of its own. Dale's Roomba, once assembled, replaces the e-scooter as your ride, and the robot becomes a pet.
-
-- The Core has a weekly ladder. Every Full or Judgment Day kill goes on the room's board for the week (fastest first, then fewest deaths) with its crew, and a lone Full run goes on its own Async tab. Each week's seed picks one Directive, a Culture Committee policy such as Open Plan Everything or Unlimited Vacation, that the whole ranked fight wears: a cost and a perk of about the same size. The Weekly tab of the sprint planner and `~/endgame` show the Directive and the best time of each tab, and every ranked kill pays 15 Ilmari Tokens. Finishing in the top three of a group board earns the title for that place.
-- Judgment Day now has its numbers settled boss by boss: the Chief Ilmari Officer keeps his authored health and a slightly shorter enrage timer, and the Heir he brings along is a smaller pool, so five players can beat the Consultant, Red Team Blue Team, the CIO and the Core on Judgment Day.
-
-- In a co-op room the credits quote the room's own Opening time, the same for everyone, instead of "a time nobody wrote down".
 - Ilmari taunts you with the time he woke up while you read the commit log, and a few of his repeated lines were rewritten so no boss says the same thing three times. The Roomba's bumper says OOPS out loud when you mount it.
 
 ### Changed
 
 - Co-op needs this version on both sides (protocol 49).
-- The Heir of the Chief Ilmari Officer has less health than before (3,000 instead of 6,500).
 
 ## [0.10.0] - 2026-10-24
 

@@ -18,6 +18,7 @@ The whole game is a long, loving roast of corporations that push AI onto every t
 - Stuns freeze movement and casting (spinning stars, grey keycaps); silence and school lockouts lock keycaps with a padlock. Knockbacks shake the camera and push you (walls clamp it), teleports land on the nearest free spot.
 - Loot is trophies: every drop is an item with a satirical description and a small permanent bonus (HP, mana, spell power, crit, haste, mana regen; up to 3 copies count). The loot window shows icon, bonus and description, the combat log says "You receive trophy: [..] (+1% crit)", and B opens `~/trophies` with every trophy, its count and the total bonus. Bonuses persist across floors and respawns; a new sprint (R) resets them.
 - Floating numbers: heals in green, DoT ticks smaller, crits and executes pop.
+- The Ilmari campaign (level 10 and up, solo on Story or 2-5 players on Full and Judgment Day): six wings from the Alignment Lab to the Boardroom in the Sky, the Core with its mech and mainframe phases, an ending with credits, and a weekly ladder. Design in [docs/ILMARI_1_0.md](docs/ILMARI_1_0.md).
 - Audio: office elevator-muzak on the floors that crossfades (1.5 s) to a boss loop while a boss fights, a faint air-con bed, keycap clacks, per-spell cast sounds, hit / miss / heal / stun sounds that fade with distance, level-up, loot and elevator cues and a victory jingle. Browsers start audio only after your first key press or click. M mutes; Esc shows master / music / effects volume. Credits in assets/CREDITS.md.
 
 See [docs/PLAN.md](docs/PLAN.md), [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md), [docs/COMBAT_API.md](docs/COMBAT_API.md), [docs/FORMULAS.md](docs/FORMULAS.md) and [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
@@ -110,7 +111,7 @@ the site, including the [changelog page](https://wraithyy.github.io/the-last-dev
 
 - Rust 1.96.1, Bevy 0.19.1 (features `3d`, `ui`), wasm-bindgen 0.2.129. Rationale in [docs/PLAN.md](docs/PLAN.md).
 - The web build is **WebGPU only**, with no WebGL2 fallback: `web/index.html` checks `navigator.gpu.requestAdapter()` first and shows a notice (without downloading the wasm or registering the service worker) when it is missing. Chrome and Edge 113+, Safari 26+ and recent Firefox on supported platforms work. Directional shadows use 1 cascade; MSAA is 4x or off.
-- The release wasm is about 38 MB without `wasm-opt`, plus about 11 MB of assets.
+- The release wasm is about 39 MB after `wasm-opt` (12.4 MB gzipped), plus about 52 MB of assets on disk; the service worker precaches only the shell, so a first visit downloads about 12 MB. See [docs/PERF.md](docs/PERF.md).
 
 ## Debug hooks (native, env-gated)
 

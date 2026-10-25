@@ -72,7 +72,7 @@ fn stage_qa(time: Res<Time>, mut sim: ResMut<crate::combat::CombatSim>, mut done
         Err(_) => match std::env::var("WOW_BENCH").as_deref() {
             Ok("ilmari5_exercise") => "il_red_team".into(),
             Ok("ilmari6_boardroom") => "il_cio".into(),
-            Ok("ilmari_core") => "il_ilmari".into(),
+            Ok("ilmari_core" | "ilmari_core_p3" | "ilmari_core_p4") => "il_ilmari".into(),
             _ => return,
         },
     };
@@ -94,9 +94,15 @@ fn stage_qa(time: Res<Time>, mut sim: ResMut<crate::combat::CombatSim>, mut done
         *done = 1;
     }
     // The boss sits at the ceiling the shot asks for, so the fight walks down to that phase.
+    let bench_pct = match std::env::var("WOW_BENCH").as_deref() {
+        Ok("ilmari_core_p3") => Some(65),
+        Ok("ilmari_core_p4") => Some(15),
+        _ => None,
+    };
     if let Some(pct) = std::env::var("WOW_ILMARI_PCT")
         .ok()
         .and_then(|v| v.parse::<u32>().ok())
+        .or(bench_pct)
         && u64::from(hp) * 100 > u64::from(max) * u64::from(pct)
     {
         sim.0.debug_set_hp(boss, max / 100 * pct);

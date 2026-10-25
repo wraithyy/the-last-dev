@@ -148,11 +148,9 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 
 - The occupied campus is the campus geometry exported in full (`zone_geometry.ron`), not as the delta
   B.2 sketched; the server needs no special loader and the file grows by one campus (about 700 lines).
-- The attunement chain ends at `il_06`; the wing doors it opens arrive with the wings (B6). Until then
-  `il_05_hr_intel` waits only for `il_04_wing1_attune`, not for the Wing 1 completion quest `il_w1_done`.
-- The three ilvl 18-20 band pieces are on Brenda's shelf (120 and 160 tokens) until the wings drop
-  their own; `GearSource::Ilmari` pieces have no perks yet, and a perk would be off outside Ilmari
-  content like the stats.
+- The attunement chain runs `il_00` to `il_06`; `il_05_hr_intel` waits for the Wing 1 completion quest `il_w1_done`.
+- The three ilvl 18-20 band pieces are on Brenda's shelf (120 and 160 tokens) as well as in the wings' drops;
+  `GearSource::Ilmari` pieces have no perks yet, and a perk would be off outside Ilmari content like the stats.
 - The weekly quartermaster rotation follows sim time (`rotate_ms` per window), not the calendar week;
   the token allowance (200) follows the ISO week of the office clock.
 - Brenda sells no cosmetics or titles yet (no shop for them exists); consumables and band pieces only.
@@ -194,10 +192,10 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 
 ## Ilmari 0.10 engine pieces (docs/ILMARI_10.md C.3)
 
-- Only the engines exist: no Wing 3 or 4 zone, boss, quest or door yet. The swarm, illusion and recorder hooks are reachable from tests, `Sim::spawn_swarm` and the `WOW_SWARM` QA hook only.
+- These engines (swarm, illusion, recorder) were built before Wings 3 and 4 and are now used by them; `Sim::spawn_swarm` and the `WOW_SWARM` QA hook still stage them outside a wing.
 - Illusions are drawn by the client from the public salt, so a modified client can draw only the real hazards. Accepted for PvE; server-generated per-recipient fakes are a later option.
 - Drones are pooled entities, not sim units: the sim never sees a drone position, and a drone killed by a hit is not individually animated. The drawn count is capped per quality preset, so a Low-quality player sees a smaller cloud than the HP pool claims.
-- The `swarm` bench stages the clusters in Car Park P3 as a stand-in for the Scrape Pit; compare its numbers with `carpark`.
+- The `swarm` bench stages the clusters in the real Scrape Pit (`ilmari3/1`).
 - Ground Truth stays Ilmari-only, ilvl 20 stays reserved for the 1.0 core.
 
 ## Wing 3: Training Data (docs/ILMARI_10.md C.4)
@@ -210,7 +208,7 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - The first room (the Cooling Deck) has no boss. The Reserved Instance racks work for every class; there are no class props and no forecast board.
 - Full solo is blocked by a 75 s enrage on a lone player rather than by a mechanic that needs a second body.
 - A split replica that nobody kills keeps its share of the pool: a group that ignores them fights one boss spread over several bodies until the last one falls.
-- The wing's teaser door on the Cooling Deck opens onto nothing yet; Wings 5-6 and the core belong to 1.0.
+- The "Lab Coat Door" teaser on the Cooling Deck still says COMING and opens onto nothing; Wings 5-6 and the core are reached from the occupied campus (ethics stairs). Kept as a gag; remove `wing4_fx::teaser` if it reads as unfinished.
 
 - Bots read hazards off the sim where a player reads the boards, so the Hallucination is balanced for reading, not for guessing; a player who ignores the boards and the shimmer takes real damage.
 - Story keeps the engine's 3 x 3 grid and three circles; the spec's smaller Story grid is not built.
@@ -279,3 +277,7 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - Pay: 15 Ilmari Tokens per member of a ranked kill (within the weekly 200), and the top three of a group board earn the title of that place once (`Exceeds Expectations`, `Meets Expectations`, `Partially Meets Expectations`). The plan's "one cosmetic per top-3 on the first week of a rank" and the Resistance base's wall board are not built; `~/endgame` and the planner's Weekly tab carry the board. The row stays hidden until the room has a ranked kill, so the Core is not spoiled by the Weekly tab.
 - A sim that was never told the date (the headless bots and tests without `set_clock`) has no week and so no Directive; the ladder rows still go on a week-0 board there.
 
+## Performance and web build (docs/PERF.md, 1.0 pass)
+
+- The core's P3 and P4 benches (`ilmari_core_p3`, `ilmari_core_p4`) read about 4,600 entities against the 4,000 planning figure; frame times are far inside the budget, so the entity cap was not enforced. There is no five-player Judgment bench: a bench is a single offline client, so the five-player fights are covered by the bot gates, not by frame times.
+- The web (WebGPU) frame times of the Ilmari scenes and WebGPU memory after a full core fight were not measured on this machine; only the build size is recorded.

@@ -975,8 +975,8 @@ order puts engine pieces first, then Wing 5, Wing 6, the core, then ladder and e
 | D18 | **Done (see as-built).** The ending: cutscene beats, scrolling credits, `ilmari_end`, Cinema prop, reward grants, the Roomba and the pet quest | D17 | ending plays once, is skippable at every beat, replays from Cinema with no rewards; the credits include the player's stamps |
 | D19 | **Done (see as-built).** Server: catch-up for every new state, room tests, `StampIlmariEnd` clock check, loot band, ladder per room, Judgment quorum | D18 | `ilmari_tests.rs` extended: a Full clear of each wing and the core (debug kills, see as-built); a late joiner mid-P4 sees the log; a two-human Judgment start is refused |
 | D20 | **Done (see as-built).** Audio and copy pass: Ilmari taunts with the stamp, yells proof-read for tone and length (no emoji, no real products), the OOPS bumper sfx | D18 | a copy test (`ilmari_copy.rs`): every yell fits its bubble, every template resolves, the hex lines decode (`ilmari_end.rs`) |
-| D21 | Perf pass: the D.13 scenarios, fix what misses | D19 | the bench table complete and within budget; web build size and load time recorded |
-| D22 | Docs and release prep: `COMBAT_API.md`, `FORMULAS.md`, `KNOWN_LIMITATIONS.md`, `WORLD_AND_MULTIPLAYER.md`, the final protocol number, CHANGELOG, README, landing page, credits, PWA; the `1.0.0` bump only when the user asks | all | docs match the code; full golden replay pass byte-identical; the checklist in D.17 is green |
+| D21 | **Done (see D.17 status).** Perf pass: the D.13 scenarios, fix what misses | D19 | the bench table complete and within budget; web build size and load time recorded |
+| D22 | **Done except the version bump and tag (see D.17 status).** Docs and release prep: `COMBAT_API.md`, `FORMULAS.md`, `KNOWN_LIMITATIONS.md`, `WORLD_AND_MULTIPLAYER.md`, the final protocol number, CHANGELOG, README, landing page, credits, PWA; the `1.0.0` bump only when the user asks | all | docs match the code; full golden replay pass byte-identical; the checklist in D.17 is green |
 
 Each task is independently verifiable; D1-D4 land with no content behind them (new fields default off).
 
@@ -1084,3 +1084,13 @@ phases of it. The bar for the tag:
 
 The `1.0.0` bump itself, the tag and the release happen only when the user asks, following the steps in
 README under "Releasing".
+
+**D.17 status (2026-10-25, D21/D22).** Done: 2 (goldens and gating tests run inside `scripts/check.sh`), 3 (protocol 49 recorded in
+`WORLD_AND_MULTIPLAYER.md` and `COMBAT_API.md`; optional save keys only; the Render redeploy and its reported version are the
+user's step), 6 (the PWA cache keys on the build id; WebGPU notice unchanged; wasm and asset sizes in `PERF.md`), 8 (docs match the
+code, `ILMARI_RAID.md` is "shipped"). Partly: 1 (the bot gates and the copy test are green; no human has read every yell), 4 (the
+Ilmari finale is on the landing page as a route row; no screenshot per wing and no "what is 1.0" paragraph yet, both wait for the
+bump), 5 (`assets/CREDITS.md` and the site list agree and every link resolves; no asset was added since 0.10, and the in-game
+credits are the authored roll in `cutscene.rs`, not generated from `CREDITS.md`), 7 (all D.13 rows benched on desktop High; the
+quality presets, mobile and WebGPU memory and web frame times were not measured), 9 (`[Unreleased]` is tidy; the `[1.0.0]` section
+is made at the bump). Not done: 10 (human playthrough on native and web), the `1.0.0` bump and tag.

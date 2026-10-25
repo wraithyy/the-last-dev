@@ -153,3 +153,26 @@ Both sit within 1 ms of the Ilmari Wing 3 scenarios above (4.06-4.38 ms avg) and
 | ilmari_core | 4.44 | 5.39 | 6.19 | 8.30 | 4,522 | 80 |
 
 All three are inside the D.13 budgets (avg <= 8 ms, p99 <= 16.7 ms) and within 1 ms of the Wing 4 scenarios; no point lights. The `ilmari5_exercise` entity count is above the doc's 4,000 for the core rows because the room's racks and sensors are baked pieces; the web (WebGPU) number is not measured yet.
+
+## 1.0 pass (2026-10-25, docs/ILMARI_1_0.md D21)
+
+New benches (`debug.rs`): `ilmari_core_p3` and `ilmari_core_p4` stage the core with the boss held under 65 and 15 percent HP
+(`ilmari_fx::stage_qa`), and `credits` runs the credits roll over the core (`WOW_CREDITS=3` starts it inside the warmup; the
+roll is static text nodes moved by `top`, so nothing is re-laid out per frame). Native release, M2 Pro, High, one run each,
+1600x900, 600 frames, load ~3.
+
+| scenario | avg ms | p95 | p99 | max | entities | meshes visible |
+|---|---|---|---|---|---|---|
+| ilmari_core_p3 | 4.66 | 5.56 | 6.20 | 8.96 | 4,613 | 78 |
+| ilmari_core_p4 | 4.37 | 4.80 | 5.15 | 6.80 | 4,618 | 78 |
+| credits (1x) | 4.28 | 4.96 | 5.31 | 5.61 | 4,597 | 78 |
+| credits (`WOW_BENCH_SCALE=2`, 3200x1800) | 4.50 | 5.31 | 5.86 | 6.38 | 4,597 | 78 |
+
+Frame times meet every D.13 budget (avg <= 8 ms, credits <= 6 ms). Entities are above the planning figure of 4,000 for P3 and
+P4 (the room itself is about 4,500 with its baked pieces, as in `ilmari_core`); no frame-time cost, so left as is. Not benched:
+a five-player Judgment fight (a bench is one offline client; the fights are covered by the bot gates) and the web (WebGPU)
+frame times and memory.
+
+Web build (`scripts/build-web.sh`, `wasm-release`, wasm-opt `-Oz` present): `game_client_bg.wasm` 39,177,617 B (37.4 MiB), gzip -9
+12,419,901 B (11.8 MiB); `web/pkg` 38 MiB, `web/assets` 52 MiB, whole `web/` 91 MiB in 589 files; the service worker precaches
+only the shell and keys its cache on the build id, so installed copies update on every build. Load time on the web was not measured.
