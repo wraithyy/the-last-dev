@@ -8,6 +8,10 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-25
+
+The Ilmari campaign is complete from the first cough to the credits, and the whole game had a polish pass. Thank you for playing.
+
 ### Added
 
 - Hovering a quest prop (a terminal, board or clickable object) now shows the same yellow quest lines as an NPC: which ticket wants it and how far along you are, and the Company Calendar lists the chains you can start.
@@ -288,7 +292,8 @@ Screens, props and jokes.
 - Download progress for the wasm in the loader.
 - Combat, a classic MMO HUD and animated models.
 
-[Unreleased]: https://github.com/wraithyy/the-last-dev/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/wraithyy/the-last-dev/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/wraithyy/the-last-dev/compare/v0.11.0...v1.0.0
 [0.11.0]: https://github.com/wraithyy/the-last-dev/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/wraithyy/the-last-dev/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/wraithyy/the-last-dev/compare/v0.8.0...v0.9.0
