@@ -8,6 +8,18 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ## [Unreleased]
 
+### Added
+
+- Hovering a quest prop (a terminal, board or clickable object) now shows the same yellow quest lines as an NPC: which ticket wants it and how far along you are, and the Company Calendar lists the chains you can start.
+
+### Changed
+
+- The first Human Resources room and the Training Data airlock are lit like the other offices, and the camera gives indoor corridors more room when you arrive.
+
+### Fixed
+
+- The "more below" hint now shows on the settings and keybindings windows when their list overflows.
+
 ## [0.11.0] - 2026-10-25
 
 ### Added

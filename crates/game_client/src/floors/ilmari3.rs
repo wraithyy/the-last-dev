@@ -62,7 +62,7 @@ fn theme(level: u8) -> Theme {
             c(0.62, 0.7, 0.68),
             c(0.12, 0.2, 0.18),
             c(0.85, 1.0, 0.92),
-            [0.62, 0.7, 0.68],
+            [0.78, 0.9, 0.86],
             LinearRgba::rgb(0.6, 2.8, 1.6),
         ),
         // Validation wing: pale, confident, slightly too bright to trust.
@@ -90,7 +90,7 @@ fn theme(level: u8) -> Theme {
         floor: FloorKind::Tile(floor),
         fog,
         ambient,
-        ambient_brightness: 820.0,
+        ambient_brightness: 1000.0,
         sun: c(0.9, 1.0, 0.95),
         sun_illuminance: 2600.0,
         fog_range: (26.0, 95.0),

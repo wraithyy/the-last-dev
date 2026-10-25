@@ -54,6 +54,7 @@ pub const CAM_MAX_DIST: f32 = 20.0;
 pub const CAM_START_DIST: f32 = 10.5;
 pub const CAM_START_PITCH: f32 = 0.22;
 pub const CAM_ARRIVAL_PITCH: f32 = 0.32;
+pub const CAM_ARRIVAL_MIN_PITCH: f32 = 0.2;
 pub const CAM_ARRIVAL_MIN_DIST: f32 = 7.5;
 pub const CAM_ARRIVAL_MAX_DIST: f32 = 11.5;
 pub const CAM_PITCH_LIMIT: f32 = 80.0 * PI / 180.0;

@@ -1,11 +1,6 @@
 # Known limitations
 
-Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) and quests, wired in sim and client. Remove an item once a test or verification covers it.
-
-## Not implemented yet (planned)
-
-- Phase 5 polish: profiling, wasm size reduction (no `wasm-opt` yet), settings menu.
-- Escape opens a minimal pause overlay only, with no real menu.
+Status of the shipped game (sim and client). Remove an item once a test or verification covers it.
 
 ## Classes
 
@@ -57,11 +52,11 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - `load_floor`, `Sim::floor()`, `Content::floor()` and the `Floor*` events are deprecated twins of the zone API; the client uses only the zone API.
 - Doors are trigger boxes, not opening doors: walking into an unlocked one starts the fade, a locked one prints its reason (at most every 3 s). Arrival is in front of the door back to the zone you came from.
 - The map draws the layout's blockers as a top-down raster; it has no fog of war, and the zone tree is a static list of the content's zones.
-- Quest markers and the ticket dialog read `Sim::quests()` every frame; there is no quest sharing, no quest item highlighting on corpses and no waypoint arrow.
+- Quest markers and the ticket dialog read `Sim::quests()` every frame; there is no quest sharing, and no quest item highlighting on corpses (the quest arrow is optional, F8).
 - Debug hooks set quest states (`WOW_QUESTS`) without giving the items or kills, so a forced `ready` ticket can be turned in for free.
 - Trash respawns zone-wide: after `TRASH_RESPAWN_MS` away every killed pack unit comes back on re-entry; there is no per-unit timer and no respawn while the player stays in the zone. Respawned trash gives XP and loot again (quest items can be farmed this way, by design).
 - Quest failures (too far from the giver, wrong status) are silent, like `Talk` and `Loot`. Abandon emits no event; the UI reads `Sim::quests()`.
-- Quest state, trophies and world progress are per `Sim` (session only). Quest logs are keyed by player id, but commands act for the single player.
+- Quest state, trophies and world progress are per `Sim`: offline they are saved locally, online they last for the room session. Quest logs are keyed by player id, but commands act for the single player.
 - Loot objectives count pickups while active plus copies carried at accept time; turned-in quest items stay in the inventory (they are ordinary trophies with small bonuses).
 - `DrainMana` emits no event; the HUD sees the mana bar drop. Spell reflect (Alignment Training) also bounces DoT ticks of the player's spells.
 
@@ -86,7 +81,7 @@ Status after Phases 0-4 plus the zone graph (campus, tower, data center, lab) an
 - Talking via right-click / F and the R restart were exercised only through debug hooks (`WOW_TALK`, a temporary auto-restart), not with real input.
 - Browser: pointer lock after a drag, context-menu/scroll suppression and WebGL2 shadow quality across browsers. See README "Verification status" for what was actually run.
 - Only macOS (Apple Silicon, Metal) has been tried natively.
-- No FPS or memory profiling yet (Phase 5).
+- Native frame times are benchmarked (`WOW_BENCH`, docs/PERF.md); there is no memory profiling, and web (WebGPU) frame times and memory are not measured.
 
 ## Combat
 

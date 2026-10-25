@@ -501,6 +501,61 @@ pub fn unit_quest_lines(sim: &dyn SimRead, npc_key: &str, zone: &str) -> Vec<Tip
     out
 }
 
+/// What a quest prop's hover tooltip says: the open quests whose objectives use this prop
+/// (by key or tag, like the waypoint arrow), and on the calendar board the chains to start.
+pub fn prop_quest_lines(sim: &dyn SimRead, prop: &combat_core::world::PropDef) -> Vec<TipQuest> {
+    let content = sim.content();
+    let mut out = Vec::new();
+    if prop.kind == combat_core::PropKind::Calendar {
+        for c in &content.calendar.chains {
+            let Some(def) = c.quests.first().and_then(|id| content.quest(id)) else {
+                continue;
+            };
+            if sim.quest_status(&def.id) == QuestStatus::Available {
+                out.push(TipQuest::Giver {
+                    glyph: "!",
+                    name: def.name.clone(),
+                    grey: false,
+                });
+            }
+        }
+    }
+    let tagged = !prop.tag.is_empty();
+    for q in &sim.quests().active {
+        let Some(def) = content.quest(&q.id) else {
+            continue;
+        };
+        let mut head = false;
+        for (k, o) in def.objectives.iter().enumerate() {
+            let uses = match o {
+                Objective::Interact(key, _) => *key == prop.key,
+                Objective::Collect(tag, _) | Objective::Inspect(tag, _) => {
+                    tagged && *tag == prop.tag
+                }
+                Objective::UseOn { target, .. } => {
+                    *target == prop.key || (tagged && *target == prop.tag)
+                }
+                Objective::Sequence { props, .. } => props.contains(&prop.key),
+                _ => false,
+            };
+            if !uses {
+                continue;
+            }
+            if !head {
+                out.push(TipQuest::Quest(def.name.clone()));
+                head = true;
+            }
+            let need = o.need();
+            let have = q.counts.get(k).copied().unwrap_or(0).min(need);
+            out.push(TipQuest::Objective {
+                text: objective_line(content, o, have, need),
+                done: have >= need,
+            });
+        }
+    }
+    out
+}
+
 /// The open quest that wants bag or loot item `item` (looted, delivered or applied), if any.
 pub fn quest_item_of(sim: &dyn SimRead, item: &str) -> Option<String> {
     let content = sim.content();

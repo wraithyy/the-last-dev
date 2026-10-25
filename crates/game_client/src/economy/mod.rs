@@ -7,6 +7,7 @@
 //! - `WOW_SP=<n>`: start with that many Kudos (`WOW_SP_GAIN=<n>@<secs>` grants more later, for the
 //!   wallet's "+N Kudos" float); `WOW_BAG=<item>|..` puts goods in the bag.
 //! - `WOW_SHEET=1`: open the character sheet; `WOW_SHOP=1`: open the nearest vendor two seconds in.
+//! - `WOW_BUY=<secs>`: buy the nearest vendor's first item then (refused-buy toast shots).
 //! - `WOW_HOVER_ITEM=<item>`: pin that item's tooltip (screenshots of comparisons);
 //!   `WOW_HOVER_BUY=1` shows it as on a vendor shelf (price, level requirement).
 //! - `WOW_DISCARD_POPUP=<item>@<secs>` opens the delete popup; `WOW_JUNK_SWEEP=<secs>` sweeps the junk.

@@ -245,7 +245,8 @@ fn scroll_lists(
                             Text::new("v more below"),
                             TextFont::from_font_size(11.0),
                             TextColor(Color::srgb(0.6, 0.66, 0.76)),
-                            GlobalZIndex(48),
+                            // Above the settings and keybindings modals (62), whose lists scroll too.
+                            GlobalZIndex(63),
                             Visibility::Hidden,
                         ))
                         .id(),

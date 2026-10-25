@@ -36,12 +36,16 @@ impl OrbitCamera {
         self.pitch = pitch.clamp(-CAM_PITCH_LIMIT, CAM_PITCH_LIMIT);
     }
 
-    /// First view of an indoor room: a higher, shorter arm than the walking default so the room
-    /// reads instead of a tunnel. `cam_ceiling` is the highest the camera may go; the arm is
-    /// kept short enough to reach its height at this pitch, so the ceiling never squeezes it.
+    /// First view of an indoor room: a higher, longer arm than the walking default so the room
+    /// reads instead of a tunnel. `cam_ceiling` is the highest the camera may go. Under a low
+    /// ceiling the arm gets its length from a shallower pitch (down to `CAM_ARRIVAL_MIN_PITCH`)
+    /// rather than being cut short, so a corridor keeps room in front of the player.
     pub fn frame_arrival(&mut self, cam_ceiling: f32) {
-        self.pitch = CAM_ARRIVAL_PITCH;
-        let reach = (cam_ceiling - CAM_FOCUS_HEIGHT) / CAM_ARRIVAL_PITCH.sin();
+        let rise = (cam_ceiling - CAM_FOCUS_HEIGHT).max(0.1);
+        self.pitch = (rise / CAM_ARRIVAL_MAX_DIST)
+            .asin()
+            .clamp(CAM_ARRIVAL_MIN_PITCH, CAM_ARRIVAL_PITCH);
+        let reach = rise / self.pitch.sin();
         self.zoom = reach.clamp(CAM_ARRIVAL_MIN_DIST, CAM_ARRIVAL_MAX_DIST);
         self.dist = self.zoom;
     }

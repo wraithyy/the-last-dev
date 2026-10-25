@@ -19,6 +19,7 @@ use crate::combat::{CombatEvent, PendingCommands, SimReady, SimUnit, SimView, Ui
 use crate::config::CLICK_DRAG_THRESHOLD;
 use crate::floors::build_zone;
 use crate::game::GameFlow;
+use crate::hud::quests::{GREY_MARK, TipQuest, prop_quest_lines};
 use crate::hud::{ACCENT, DIM, LogLineMsg, drop_shadow, label, panel_bg, set_text};
 use crate::input::{Paused, TextFocus};
 use crate::keybinds::{Action, Keybinds};
@@ -112,6 +113,8 @@ enum TipLine {
     Name,
     Action,
     Extra,
+    /// The player's quest lines for this prop (yellow, grey once done).
+    Quest,
 }
 #[derive(Resource, Default)]
 struct Toast {
@@ -707,6 +710,7 @@ fn spawn_tip(mut commands: Commands) {
             t.spawn((TipLine::Name, label("", 14.0), TextColor(GOLD)));
             t.spawn((TipLine::Action, label("", 12.0), TextColor(Color::WHITE)));
             t.spawn((TipLine::Extra, label("", 12.0), TextColor(DIM)));
+            t.spawn((TipLine::Quest, label("", 12.0), TextColor(GOLD)));
         });
 }
 
@@ -715,6 +719,7 @@ fn show_tip(
     time: Res<Time>,
     sim: SimView,
     hover: Res<PropHover>,
+    hidden: Res<crate::hud::HudHidden>,
     props: Res<Props>,
     window: Single<&Window, With<PrimaryWindow>>,
     camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
@@ -726,7 +731,7 @@ fn show_tip(
     let spot = hover
         .0
         .and_then(|i| props.list.get(i))
-        .filter(|p| p.gone_until <= now);
+        .filter(|p| p.gone_until <= now && !hidden.cutscene && !hidden.opening);
     let cursor = forced_tip_at(&props, &hover, *camera).or_else(|| window.cursor_position());
     let (Some(p), Some(cursor)) = (spot, cursor) else {
         if tip.display != Display::None {
@@ -754,6 +759,7 @@ fn show_tip(
         extra = format!("{}: {days}", def.name);
     }
     let far = p.stand.distance(player.pos) > p.reach;
+    let quest = prop_quest_text(&sim, def);
     for (line, mut text, mut color) in &mut lines_q {
         match line {
             TipLine::Name => set_text(&mut text, &def.name),
@@ -778,8 +784,33 @@ fn show_tip(
                     DIM
                 };
             }
+            TipLine::Quest => {
+                set_text(&mut text, &quest.0);
+                color.0 = if quest.1 { GREY_MARK } else { GOLD };
+            }
         }
     }
+}
+
+/// The quest lines of a prop tooltip and whether all of them are done; empty (no allocation
+/// beyond the empty list) for the many props no quest cares about.
+fn prop_quest_text(sim: &SimView, def: &combat_core::world::PropDef) -> (String, bool) {
+    let lines = prop_quest_lines(&**sim, def);
+    let done = lines.iter().all(|l| match l {
+        TipQuest::Objective { done, .. } => *done,
+        TipQuest::Giver { grey, .. } => *grey,
+        TipQuest::Quest(_) => true,
+    });
+    let text = lines
+        .into_iter()
+        .map(|l| match l {
+            TipQuest::Giver { glyph, name, .. } => format!("{glyph} {name}"),
+            TipQuest::Quest(name) => name,
+            TipQuest::Objective { text, .. } => format!("  {text}"),
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    (text, done)
 }
 
 fn spawn_toast(mut commands: Commands) {

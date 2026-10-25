@@ -53,7 +53,7 @@ fn theme(level: u8) -> Theme {
             c(0.62, 0.7, 0.72),
             c(0.2, 0.2, 0.26),
             c(1.0, 0.86, 0.8),
-            [0.62, 0.7, 0.74],
+            [1.15, 1.3, 1.38],
             LinearRgba::rgb(2.4, 1.1, 0.6),
         ),
         // Culture hub: boardroom plum, pizza-box orange.
@@ -81,7 +81,7 @@ fn theme(level: u8) -> Theme {
         floor: FloorKind::Carpet(floor),
         fog,
         ambient,
-        ambient_brightness: 780.0,
+        ambient_brightness: 1000.0,
         sun: c(1.0, 0.8, 0.7),
         sun_illuminance: 2600.0,
         fog_range: (26.0, 90.0),

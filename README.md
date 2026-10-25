@@ -77,7 +77,7 @@ Every key below is the default; **Esc menu > `~/keybindings`** rebinds any of th
 | M | Mute / unmute all audio |
 | F8 | Quest arrow on / off (off by default; also in `~/settings`): points at the tracked ticket's work, the turn-in, or the next door; pick the ticket with a tracker click or Guide in the quest log |
 | F9 | Debug overlay (range, facing, LoS) |
-| Escape | Close the window you opened last, else clear target, else toggle the pause overlay (also holds the master / music / effects volume keycaps) |
+| Escape | Close the window you opened last, else clear target, else open the Esc menu (pauses the run: `~/settings`, `~/keybindings`, Change role, Start over, master / music / effects volume) |
 
 Rotation: Code Review applies Code Smell, and Refactor consumes it for +35% damage. Interrupt the big casts with Reject PR (level 2), shield with Guardrails, keep git blame ticking, finish with Postmortem below 25%.
 
@@ -150,14 +150,13 @@ the site, including the [changelog page](https://wraithyy.github.io/the-last-dev
 
 3D models: characters by Quaternius (Ultimate Animated Character Pack, CC0); furniture by Kenney (Furniture Kit, CC0). Spell icons: Painterly Spell Icons by J. W. Bjerk (eleazzaar), CC BY 3.0. Item icons from game-icons.net by Lorc and Delapouite (CC BY 3.0). Full list: [assets/CREDITS.md](assets/CREDITS.md).
 
-## Verification status (2026-10-13)
+## Verification status (2026-10-25)
 
 Verified:
-- `./scripts/check.sh` exit 0: fmt, clippy `-D warnings` (native and wasm32), 240 tests passed, 3 ignored (186 `combat_core`, 54 `game_client`).
+- `./scripts/check.sh` exit 0: fmt, clippy `-D warnings` (native with tests, and wasm32), `cargo test --workspace` (1359 passed, 14 ignored), native build.
 - Native screenshots driven by the debug hooks (`.playwright-mcp/integration/`): campus start with quest markers, the ticket dialog and ticket list, tracker progress, the `~/jira` log, the map on campus and in the data center, a locked door, a door transition, the CEO's "New zone unlocked" banner, the AGI fight, the AGI reveal, the victory screen and a 2560x1080 campus HUD. Campus native frame time about 5 ms (WOW_FPS, Apple Silicon, debug build).
-- The browser build was not rebuilt in this pass.
+- The browser build was not rebuilt or run in a browser in this pass (only its wasm32 clippy).
 
 Not verified:
 - Manual playtest of game feel (movement, camera, combat pacing) and real mouse/keyboard input for talking and restarting.
-- The browser build was not run in a browser in this pass.
-- Pointer lock in a real headed browser, Firefox and Safari; FPS and memory profiling.
+- Pointer lock in a real headed browser, Firefox and Safari.  Memory profiling (native frame times are in docs/PERF.md).

@@ -50,7 +50,7 @@ impl Plugin for ShopPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_window).add_systems(
             Update,
-            (open_on_talk, debug_open, rebuild, clicks)
+            (open_on_talk, debug_open, debug_buy, rebuild, clicks)
                 .chain()
                 .in_set(SimReady),
         );
@@ -164,6 +164,43 @@ fn debug_open(
         *done = true;
         ui.shop = Some(v);
         ui.sheet = true;
+    }
+}
+
+/// `WOW_BUY=<secs>`: that many seconds in, buy the nearest vendor's first item (refusal toast
+/// shots: start with `WOW_SP=0`, or fill the bag with `WOW_BAG`; stand by the vendor with
+/// `WOW_PLAYER_AT`, the position is logged).
+fn debug_buy(
+    time: Res<Time>,
+    sim: SimView,
+    player: Single<&PlayerBody, With<Player>>,
+    mut pending: ResMut<PendingCommands>,
+    mut done: Local<bool>,
+) {
+    let Some(at) = std::env::var("WOW_BUY")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+    else {
+        return;
+    };
+    if *done || time.elapsed_secs() < at {
+        return;
+    }
+    let p = crate::collision::to_core(player.pos);
+    let eco = &sim.content().economy;
+    let nearest = sim
+        .units()
+        .filter(|u| eco.vendor_for(&u.key).is_some())
+        .min_by(|a, b| combat_core::distance(a.pos, p).total_cmp(&combat_core::distance(b.pos, p)));
+    if let Some(u) = nearest
+        && let Some(item) = eco.vendor_for(&u.key).and_then(|v| v.stock.first())
+    {
+        *done = true;
+        info!("WOW_BUY: {} at {:?}, buying {item}", u.key, u.pos);
+        pending.0.push(Command::Buy {
+            vendor: u.id,
+            item: item.clone(),
+        });
     }
 }
 
