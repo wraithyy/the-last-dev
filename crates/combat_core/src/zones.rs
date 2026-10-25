@@ -176,11 +176,16 @@ impl Sim {
             }
             pack_id += 1;
         }
+        let mut level_gated = Vec::new();
         for s in &z.friendly {
             let (at, yaw) = anchor(&s.anchor)?;
-            if s.requires.as_ref().is_some_and(|r| !self.unlock_met(r))
-                || s.until.as_ref().is_some_and(|u| self.unlock_met(u))
-            {
+            if s.until.as_ref().is_some_and(|u| self.unlock_met(u)) {
+                continue;
+            }
+            if s.requires.as_ref().is_some_and(|r| !self.unlock_met(r)) {
+                if let Some(Unlock::PlayerLevel(n)) = s.requires {
+                    level_gated.push((self.def_index(&s.unit)?, at, yaw, n));
+                }
                 continue;
             }
             let def = self.def_index(&s.unit)?;
@@ -252,6 +257,7 @@ impl Sim {
         self.sync_ilmari_gear();
         self.next_pack = pack_id;
         self.zone_packs = packs;
+        self.level_gated = level_gated;
         for p in plan {
             self.spawn(
                 p.def,
@@ -287,6 +293,33 @@ impl Sim {
             self.events.push(Event::FloorLoaded { floor });
         }
         Ok(())
+    }
+
+    /// Spawns the zone's level-gated friendlies the group lead has just grown into, so a giver
+    /// that appears at level N is there when the level-up lands, not after the next load.
+    pub(crate) fn spawn_level_gated(&mut self) {
+        let Some(level) = self.first_player_index().map(|i| self.units[i].state.level) else {
+            return;
+        };
+        let (ready, waiting): (Vec<_>, Vec<_>) = std::mem::take(&mut self.level_gated)
+            .into_iter()
+            .partition(|g| level >= g.3);
+        self.level_gated = waiting;
+        for (def, pos, yaw, _) in ready {
+            self.spawn(
+                def,
+                pos,
+                yaw,
+                SpawnOpts {
+                    level: None,
+                    pack: None,
+                    respawns: false,
+                    summoner: None,
+                    floor_boss: false,
+                    zone_slot: None,
+                },
+            );
+        }
     }
 
     /// Co-op pack growth: every `group_pack_growth_players` players beyond the first add one

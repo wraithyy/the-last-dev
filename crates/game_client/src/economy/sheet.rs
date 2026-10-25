@@ -92,19 +92,18 @@ fn spawn_window(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     commands
         .spawn((SheetWindow, window_node(Some(16.0), None, 600.0)))
         .with_children(|c| {
-            c.spawn(Node {
-                justify_content: JustifyContent::SpaceBetween,
-                ..default()
-            })
-            .with_children(|h| {
-                h.spawn((
+            crate::hud::window_header(
+                c,
+                "Character",
+                (
                     HeaderText,
-                    label("~/whoami", 14.0),
+                    label("~/whoami", 11.0),
                     TextLayout::no_wrap(),
                     TextColor(DIM),
-                ));
-                h.spawn((SheetClose, Button, label("[x]", 14.0)));
-            });
+                ),
+                Action::CharacterSheet,
+                SheetClose,
+            );
             c.spawn(Node {
                 column_gap: px(8),
                 ..default()

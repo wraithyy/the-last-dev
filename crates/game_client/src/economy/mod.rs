@@ -119,22 +119,13 @@ impl Plugin for EconomyPlugin {
     }
 }
 
-/// Esc closes the delete popup, then the shop, then the sheet, and is swallowed so it neither pauses nor clears the
-/// target in the same press.
+/// Esc closes the delete popup first and is swallowed so it neither pauses nor clears the target
+/// in the same press. The shop and the sheet close with the other windows (`input::WindowStack`).
 fn close_on_escape(
     mut keys: ResMut<ButtonInput<KeyCode>>,
-    mut ui: ResMut<EconomyUi>,
     mut discard: ResMut<discard::DiscardUi>,
 ) {
-    if !keys.just_pressed(KeyCode::Escape) {
-        return;
-    }
-    if discard.confirm.take().is_some() {
-        keys.clear_just_pressed(KeyCode::Escape);
-        return;
-    }
-    if ui.shop.take().is_some() || std::mem::take(&mut ui.sheet) {
-        ui.confirm = None;
+    if keys.just_pressed(KeyCode::Escape) && discard.confirm.take().is_some() {
         keys.clear_just_pressed(KeyCode::Escape);
     }
 }
@@ -331,8 +322,10 @@ fn update_tooltip(
         .unwrap_or(Vec2::new(window.width(), window.height()));
     let (w, h) = (view.x / scale.0.max(0.01), view.y / scale.0.max(0.01));
     let panel_w = TIP_W.min(w - 2.0 * TIP_EDGE);
+    let quest = crate::hud::quest_item_of(&*sim, &item);
     let key = format!(
-        "{item}|{buying}|{level}|{kudos}|{tokens}|{panel_w}|{}",
+        "{item}|{buying}|{level}|{kudos}|{tokens}|{panel_w}|{}|{}",
+        quest.as_deref().unwrap_or(""),
         equipped.join("|")
     );
     if shown.as_deref() != Some(key.as_str()) {
@@ -345,7 +338,11 @@ fn update_tooltip(
             tokens,
             buying,
         };
-        let tip = goods::tooltip(sim.content(), &item, &viewer);
+        let mut tip = goods::tooltip(sim.content(), &item, &viewer);
+        if let Some(q) = &quest {
+            tip.main
+                .push((format!("Quest item: {q}"), crate::hud::GOLD));
+        }
         for (entity, panel, mut pnode, mut border) in &mut panels {
             commands.entity(entity).despawn_related::<Children>();
             pnode.width = px(panel_w);

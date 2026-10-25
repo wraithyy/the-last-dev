@@ -144,14 +144,13 @@ fn spawn_ui(mut commands: Commands) {
             GlobalZIndex(32),
         ))
         .with_children(|c| {
-            c.spawn(Node {
-                justify_content: JustifyContent::SpaceBetween,
-                ..default()
-            })
-            .with_children(|h| {
-                h.spawn((label("~/career  (R to close)", 14.0), TextColor(DIM)));
-                h.spawn((CareerClose, Button, label("[x]", 14.0)));
-            });
+            super::window_header(
+                c,
+                "Career",
+                super::subtitle("~/career"),
+                Action::Career,
+                CareerClose,
+            );
             // Two lines, not a row: both texts are long and used to wrap into each other.
             c.spawn(Node {
                 flex_direction: FlexDirection::Column,

@@ -501,11 +501,8 @@ fn button_node() -> impl Bundle {
 fn spawn_ui(mut commands: Commands) {
     commands.spawn((
         CoopMenu,
+        crate::hud::PauseSlot(crate::hud::PauseGroup::Account, 0),
         Node {
-            position_type: PositionType::Absolute,
-            top: percent(crate::hud::PAUSE_ROW1),
-            width: percent(100),
-            justify_content: JustifyContent::Center,
             display: Display::None,
             ..default()
         },

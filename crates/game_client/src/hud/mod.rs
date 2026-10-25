@@ -22,6 +22,7 @@ pub(crate) mod quests;
 pub(crate) mod scroll;
 mod seniority;
 mod trophies;
+mod waypoint;
 
 /// The minimap's width, so the touch layout can park its buttons beside it.
 pub const MINIMAP_WIDTH: f32 = minimap::WIDTH;
@@ -37,18 +38,73 @@ pub use actionbar::CooldownMaterial;
 pub use banners::Banner;
 pub use feed::LogLineMsg;
 pub use hovertip::TipSource;
-/// Esc menu layout, percent of the screen height from the top: the volume block, the row of
-/// settings / co-op / keybindings, and the row of endgame / change role / onboarding, all
-/// inside the backdrop panel and well above the action bar.
-pub const PAUSE_AUDIO: f32 = 24.0;
-pub const PAUSE_ROW1: f32 = 46.0;
-pub const PAUSE_ROW2: f32 = 54.0;
+/// Esc menu layout, percent of the screen height from the top: the volume block, then the
+/// grouped column (Game / Account / Danger), all inside the backdrop panel and well above the
+/// action bar. Buttons are spawned by their own modules and join their group's row through a
+/// `PauseSlot`.
+pub const PAUSE_AUDIO: f32 = 22.0;
+pub const PAUSE_MENU: f32 = 42.0;
+pub const PAUSE_PANEL_BOTTOM: f32 = 68.0;
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PauseGroup {
+    Game,
+    Account,
+    Danger,
+}
+
+/// Put on the root of an Esc menu button: it is moved into its group's row, left to right by
+/// the second field. The button keeps its own show/hide logic.
+#[derive(Component, Clone, Copy)]
+pub struct PauseSlot(pub PauseGroup, pub u8);
+
+#[derive(Component)]
+struct PauseRow(PauseGroup);
+
+fn adopt_pause_slots(
+    mut commands: Commands,
+    items: Query<(Entity, &PauseSlot), Without<ChildOf>>,
+    rows: Query<(Entity, &PauseRow)>,
+) {
+    let mut items: Vec<_> = items.iter().collect();
+    items.sort_by_key(|(_, s)| (s.0 as u8, s.1));
+    for (e, s) in items {
+        if let Some((row, _)) = rows.iter().find(|(_, r)| r.0 == s.0) {
+            commands.entity(row).add_child(e);
+        }
+    }
+}
+
+fn pause_group(g: PauseGroup, title: &'static str, color: Color) -> impl Bundle {
+    (
+        Node {
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: px(5),
+            ..default()
+        },
+        children![
+            (label(title, 11.0), TextColor(color)),
+            (
+                PauseRow(g),
+                Node {
+                    column_gap: px(14),
+                    row_gap: px(6),
+                    flex_wrap: FlexWrap::Wrap,
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::FlexStart,
+                    ..default()
+                },
+            ),
+        ],
+    )
+}
 /// Top edge (HUD px) of the raid difficulty choosers: top-centre, under the career pill, clear of the hotbar and the player.
 pub const CHOOSER_TOP: f32 = 54.0;
 /// Top edge (HUD px) of the first row under the minimap: player auras, then the quest tracker.
 pub const BELOW_MINIMAP: f32 = minimap::TOP + minimap::HEIGHT + 4.0;
 pub use quests::giver_mark;
-pub use quests::{GOLD, Line, plural, unit_name};
+pub use quests::{GOLD, Line, plural, quest_item_of, unit_name};
 /// The radar's outer box, for widgets that sit on it (the office clock).
 pub const MINIMAP_BOX: (f32, f32) = (minimap::TOP, minimap::WIDTH);
 
@@ -100,13 +156,17 @@ impl Plugin for HudPlugin {
                 perf::PerfPlugin,
                 combo::ComboPlugin,
                 seniority::SeniorityPlugin,
+                waypoint::WaypointPlugin,
             ))
             .add_systems(Startup, spawn_misc)
             .add_systems(
                 Update,
                 (update_pause_overlay, toggle_dev, update_dev_overlay).in_set(SimReady),
             )
-            .add_systems(Update, update_key_hint)
+            .add_systems(
+                Update,
+                (update_key_hint, refresh_header_hints, adopt_pause_slots),
+            )
             .init_resource::<HudRects>()
             .init_resource::<HudHidden>()
             .add_systems(
@@ -466,6 +526,72 @@ impl IconCache {
 }
 
 /// Every HUD label carries a hard drop shadow: readable over both the dark panels and the bright 3D scene.
+/// Shows the key that toggles the window the header belongs to ("J to close"), read from the
+/// live bindings so a rebind shows; nothing on touch, where the [x] is the way out.
+#[derive(Component)]
+struct HeaderHint(Action);
+
+fn refresh_header_hints(
+    binds: Res<Keybinds>,
+    touch: Res<crate::touch::TouchMode>,
+    mut hints: Query<(&HeaderHint, &mut Text)>,
+) {
+    for (HeaderHint(a), mut text) in &mut hints {
+        let want = if touch.active {
+            String::new()
+        } else {
+            format!("{} to close", binds.label(*a))
+        };
+        if text.0 != want {
+            text.0 = want;
+        }
+    }
+}
+
+/// The subtitle line of a `window_header`: the joke under the functional title.
+pub fn subtitle(text: &str) -> impl Bundle {
+    (label(text, 11.0), TextColor(DIM))
+}
+
+/// The header every window shares: a functional title with the joke as a subtitle under it
+/// (pass `subtitle(..)`, plus any marker a system rewrites it by), then the closing key and an
+/// [x] carrying `close` for the window's own handler.
+pub fn window_header(
+    parent: &mut ChildSpawnerCommands,
+    title: &str,
+    sub: impl Bundle,
+    bind: Action,
+    close: impl Bundle,
+) {
+    parent
+        .spawn(Node {
+            justify_content: JustifyContent::SpaceBetween,
+            align_items: AlignItems::FlexStart,
+            column_gap: px(10),
+            ..default()
+        })
+        .with_children(|h| {
+            h.spawn(Node {
+                flex_direction: FlexDirection::Column,
+                flex_shrink: 1.0,
+                ..default()
+            })
+            .with_children(|t| {
+                t.spawn((label(title, 15.0), TextColor(Color::WHITE)));
+                t.spawn(sub);
+            });
+            h.spawn(Node {
+                column_gap: px(8),
+                flex_shrink: 0.0,
+                ..default()
+            })
+            .with_children(|r| {
+                r.spawn((HeaderHint(bind), label("", 11.0), TextColor(DIM)));
+                r.spawn((close, Button, label("[x]", 14.0)));
+            });
+        });
+}
+
 pub fn label(text: impl Into<String>, size: f32) -> impl Bundle {
     (
         Text::new(text),
@@ -677,7 +803,7 @@ fn spawn_misc(mut commands: Commands) {
                 Node {
                     position_type: PositionType::Absolute,
                     top: percent(PAUSE_AUDIO - 12.0),
-                    height: percent(PAUSE_ROW2 - PAUSE_AUDIO + 24.0),
+                    height: percent(PAUSE_PANEL_BOTTOM - PAUSE_AUDIO + 12.0),
                     width: px(780),
                     max_width: percent(96),
                     border: UiRect::all(px(1)),
@@ -697,6 +823,32 @@ fn spawn_misc(mut commands: Commands) {
                     top: percent(PAUSE_AUDIO - 7.0),
                     ..default()
                 },
+            ),
+            (
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: percent(PAUSE_MENU),
+                    width: percent(100),
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    row_gap: px(16),
+                    ..default()
+                },
+                children![
+                    pause_group(PauseGroup::Game, "GAME", DIM),
+                    pause_group(PauseGroup::Account, "ACCOUNT", DIM),
+                    pause_group(PauseGroup::Danger, "DANGER", ACCENT_WARM),
+                ],
+            ),
+            // Players quote this in bug reports; co-op also needs matching builds.
+            (
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: percent(PAUSE_PANEL_BOTTOM - 4.0),
+                    ..default()
+                },
+                label(concat!("The Last Dev v", env!("CARGO_PKG_VERSION")), 11.0),
+                TextColor(DIM),
             ),
         ],
     ));

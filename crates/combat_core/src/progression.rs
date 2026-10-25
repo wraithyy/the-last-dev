@@ -302,6 +302,7 @@ impl Sim {
                 self.units[killer].state.xp = 0;
             }
             self.events.push(Event::LevelUp { unit: id, level });
+            self.spawn_level_gated();
             let learned: Vec<SpellId> = self
                 .bar_at(killer)
                 .iter()
@@ -316,5 +317,43 @@ impl Sim {
                 self.emit_to(id, Event::SpellLearned { unit: id, spell });
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::content::Content;
+    use crate::geom::Vec3;
+
+    /// Ill Marie's queue spot opens at level 5: the level-up that gets there puts her on the
+    /// street at once, so her "!" does not wait for the next zone load.
+    #[test]
+    fn a_level_gated_friendly_steps_in_on_the_level_up() {
+        let c = Content::from_ron(include_str!("../../../content/game.ron")).expect("content");
+        let mut sim = Sim::new(c, 5);
+        sim.set_wandering(false);
+        let p = sim.spawn_player("fullstack", Vec3::new(0.0, 0.0, 0.0), 0.0);
+        sim.set_level_of(p, 4);
+        let anchors = |n: &str| {
+            let far = n.starts_with("pack_") || n.starts_with("rare_") || n == "boss";
+            let at = if far { 400.0 } else { 0.0 };
+            Some((Vec3::new(at, 0.0, at), 0.0))
+        };
+        sim.load_zone("campus", &anchors, Vec::new())
+            .expect("campus");
+        let queue = |s: &Sim| s.units().any(|u| u.key == "ill_marie_queue" && u.alive);
+        assert!(!queue(&sim));
+        let i = sim.index(p).expect("player");
+        sim.grant_xp(i, sim.content.xp_to_next(4));
+        assert_eq!(sim.unit(p).map(|u| u.level), Some(5));
+        assert!(queue(&sim));
+        // One copy only: the next level-up must not spawn her again.
+        let i = sim.index(p).expect("player");
+        sim.grant_xp(i, sim.content.xp_to_next(5));
+        assert_eq!(
+            sim.units().filter(|u| u.key == "ill_marie_queue").count(),
+            1
+        );
     }
 }

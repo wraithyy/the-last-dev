@@ -70,12 +70,14 @@ Every key below is the default; **Esc menu > `~/keybindings`** rebinds any of th
 | J | Toggle the `~/jira` quest log (abandon tickets there) |
 | N | Toggle the map (current zone + zone tree) |
 | `=` / `-` (or the `+` / `-` buttons) | Zoom the `~/radar` minimap (top right: north up, you in the middle, group blue, hostiles within 40 m red, quest givers `!` / `?`, loot gold, doors `#`; click it to open the map) |
+| Hover a character (long-press on touch) | Tooltip: name, level, title and your quest progress or the quest they give; bag and loot items say which ticket wants them |
 | Hover an aura icon or the target's cast bar | IDE-style tooltip: name, effect, time left, stacks, dispel type, interruptible |
 | Up / Down, Enter, Backspace (ticket dialog) | Pick a ticket, accept / complete it, back to the list |
 | R (victory screen) | Start a new sprint |
 | M | Mute / unmute all audio |
+| F8 | Quest arrow on / off (off by default; also in `~/settings`): points at the tracked ticket's work, the turn-in, or the next door; pick the ticket with a tracker click or Guide in the quest log |
 | F9 | Debug overlay (range, facing, LoS) |
-| Escape | Close the ticket dialog, quest log, map or trophies window, else clear target, else toggle the pause overlay (also holds the master / music / effects volume keycaps) |
+| Escape | Close the window you opened last, else clear target, else toggle the pause overlay (also holds the master / music / effects volume keycaps) |
 
 Rotation: Code Review applies Code Smell, and Refactor consumes it for +35% damage. Interrupt the big casts with Reject PR (level 2), shield with Guardrails, keep git blame ticking, finish with Postmortem below 25%.
 

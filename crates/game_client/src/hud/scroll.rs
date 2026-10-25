@@ -35,6 +35,9 @@ pub struct ScrollList {
     pub fit: Option<f32>,
     /// QA hook already fired for this list.
     qa_done: bool,
+    /// The "more below" pill while the list overflows (a root node, so it stays put while the
+    /// list scrolls under it).
+    pill: Option<Entity>,
 }
 
 impl ScrollList {
@@ -62,6 +65,10 @@ pub struct NoScrollDrag;
 /// A text node that shows "More below" while the list has content past its bottom edge.
 #[derive(Component)]
 pub struct ScrollHint(pub Entity);
+
+/// The pill every overflowing list shows along its bottom edge unless it has a `ScrollHint`.
+#[derive(Component)]
+struct MorePill;
 
 /// True while the pointer is over any open scroll list; the camera skips the wheel zoom then.
 #[derive(Resource, Default)]
@@ -93,19 +100,24 @@ fn claim_pointer(mut commands: Commands, added: Query<Entity, Added<ScrollList>>
 }
 
 fn scroll_lists(
+    mut commands: Commands,
+    mut pills: Query<(&mut Node, &mut Visibility), (With<MorePill>, Without<ScrollList>)>,
     wheel: Res<AccumulatedMouseScroll>,
     touches: Res<Touches>,
     ui_scale: Res<UiScale>,
     window: Option<Single<&Window, With<PrimaryWindow>>>,
     mut hover: ResMut<ScrollHover>,
-    mut lists: Query<(
-        Entity,
-        &mut ScrollList,
-        &mut ScrollPosition,
-        &mut Node,
-        &ComputedNode,
-        &UiGlobalTransform,
-    )>,
+    mut lists: Query<
+        (
+            Entity,
+            &mut ScrollList,
+            &mut ScrollPosition,
+            &mut Node,
+            &ComputedNode,
+            &UiGlobalTransform,
+        ),
+        Without<MorePill>,
+    >,
     mut hints: Query<(&ScrollHint, &mut Text)>,
     nodrag: Query<&Interaction, With<NoScrollDrag>>,
     cams: Query<&Camera, With<crate::camera::OrbitCamera>>,
@@ -150,6 +162,9 @@ fn scroll_lists(
         if !open {
             list.open = false;
             list.touch = None;
+            if let Some(p) = list.pill.take() {
+                commands.entity(p).despawn();
+            }
             continue;
         }
         if let Some(margin) = list.fit {
@@ -199,10 +214,57 @@ fn scroll_lists(
             pos.0.y = y;
         }
         let hint = if y + HINT_SLACK < max { HINT_TEXT } else { "" };
+        let mut own_hint = false;
         for (h, mut text) in &mut hints {
-            if h.0 == entity && text.0 != hint {
-                text.0 = hint.to_string();
+            if h.0 == entity {
+                own_hint = true;
+                if text.0 != hint {
+                    text.0 = hint.to_string();
+                }
             }
+        }
+        if own_hint {
+            continue;
+        }
+        // The pill sits on the bottom edge, centred; node units are physical px over the
+        // window factor and UiScale.
+        let more = !hint.is_empty();
+        match (more, list.pill) {
+            (true, None) => {
+                list.pill = Some(
+                    commands
+                        .spawn((
+                            MorePill,
+                            Node {
+                                position_type: PositionType::Absolute,
+                                padding: UiRect::axes(px(8), px(1)),
+                                border_radius: BorderRadius::all(px(8)),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.85)),
+                            Text::new("v more below"),
+                            TextFont::from_font_size(11.0),
+                            TextColor(Color::srgb(0.6, 0.66, 0.76)),
+                            GlobalZIndex(48),
+                            Visibility::Hidden,
+                        ))
+                        .id(),
+                );
+            }
+            (false, Some(p)) => {
+                commands.entity(p).despawn();
+                list.pill = None;
+            }
+            _ => {}
+        }
+        if let Some(p) = list.pill
+            && let Ok((mut n, mut v)) = pills.get_mut(p)
+        {
+            let k = node.inverse_scale_factor();
+            let (c, size) = (tf.translation * k, node.size() * k);
+            n.left = px(c.x - 45.0);
+            n.top = px(c.y + size.y / 2.0 - 22.0);
+            v.set_if_neq(Visibility::Inherited);
         }
     }
     if hover.0 != any_hover {

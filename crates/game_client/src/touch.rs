@@ -555,6 +555,9 @@ fn spawn_hud(mut commands: Commands) {
                         ("Pets", TouchButton::Act(Action::Pets)),
                         ("Endgame", TouchButton::Act(Action::Endgame)),
                         ("Calendar", TouchButton::Act(Action::Calendar)),
+                        ("Chat", TouchButton::Act(Action::Chat)),
+                        ("Meter", TouchButton::Act(Action::Meter)),
+                        ("Arrow", TouchButton::Act(Action::QuestArrow)),
                         ("Sound", TouchButton::Act(Action::Mute)),
                         ("Pause", TouchButton::Key(KeyCode::Escape)),
                     ] {

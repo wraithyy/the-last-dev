@@ -4,7 +4,7 @@ use crate::arena::Colliders;
 use crate::collision::to_core;
 use crate::combat::{CombatSim, SimUnit, SimView};
 use crate::config::*;
-use crate::input::{MouseState, Paused, QuestWindows, TrophiesOpen};
+use crate::input::{MouseState, Paused};
 use crate::keybinds::{Action, Keybinds};
 use crate::player::{Player, PlayerBody};
 use crate::units::Unit;
@@ -142,37 +142,23 @@ fn party_keys(
     }
 }
 
-#[allow(clippy::type_complexity)] // Bevy system parameters
+#[allow(clippy::type_complexity, clippy::too_many_arguments)] // Bevy system parameters
 fn handle_keys(
     keys: Res<ButtonInput<KeyCode>>,
     binds: Res<Keybinds>,
-    // Grouped because Esc closes these in priority order.
-    (mut paused, mut trophies, mut windows, mut sprint, mut career, mut endgame, mut minigame): (
-        ResMut<Paused>,
-        ResMut<TrophiesOpen>,
-        ResMut<QuestWindows>,
-        ResMut<crate::input::SprintWindows>,
-        ResMut<crate::input::CareerOpen>,
-        ResMut<crate::input::EndgameOpen>,
-        ResMut<crate::input::MinigameWindows>,
-    ),
+    mut paused: ResMut<Paused>,
+    mut windows: crate::input::Windows,
     mut target: ResMut<Target>,
     player: Single<&PlayerBody, With<Player>>,
     units: Query<(Entity, &Transform, &Unit, Option<&SimUnit>)>,
     (sim, mg_hud): (SimView, Res<crate::minigame::MinigameHud>),
 ) {
     if keys.just_pressed(KeyCode::Escape) {
-        if minigame.close_one()
-            || sprint.close_one()
-            || windows.close_one()
-            || std::mem::take(&mut trophies.0)
-            || std::mem::take(&mut career.0)
-            || std::mem::take(&mut endgame.0)
-        {
+        if windows.close_top() {
             // The window closes first; the next Esc clears the target or pauses.
         } else if mg_hud.active && !paused.0 {
             // Inside a minigame Esc means "get me out", with a confirm (the frame's rule).
-            minigame.leave = true;
+            windows.ask_to_leave_minigame();
         } else if target.0.take().is_none() {
             paused.0 = !paused.0;
         }

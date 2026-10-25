@@ -99,14 +99,13 @@ fn spawn_window(mut commands: Commands) {
             GlobalZIndex(30),
         ))
         .with_children(|c| {
-            c.spawn(Node {
-                justify_content: JustifyContent::SpaceBetween,
-                ..default()
-            })
-            .with_children(|h| {
-                h.spawn((label("~/trophies  (B to close)", 14.0), TextColor(DIM)));
-                h.spawn((TrophyClose, Button, label("[x]", 14.0)));
-            });
+            super::window_header(
+                c,
+                "Trophies",
+                super::subtitle("~/trophies"),
+                crate::keybinds::Action::Trophies,
+                TrophyClose,
+            );
             c.spawn(Node {
                 column_gap: px(6),
                 ..default()

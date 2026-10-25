@@ -62,6 +62,8 @@ struct PickerFooter;
 #[derive(Component)]
 struct ChangeRoleMenu;
 #[derive(Component)]
+struct DangerMenu;
+#[derive(Component)]
 struct ChangeRoleButton;
 #[derive(Component)]
 struct ChangeRoleText;
@@ -455,19 +457,26 @@ fn spawn_card(row: &mut ChildSpawnerCommands, i: usize, c: &ClassCard) {
     });
 }
 
-/// Esc menu entries under the co-op button: a role change restarts the solo run, Start over
-/// wipes the role's save (`wipe.rs`).
+/// Esc menu entries: a role change restarts the solo run (Account group), Start over wipes the
+/// role's save (Danger group, `wipe.rs`).
 fn spawn_change_role_menu(mut commands: Commands) {
     commands.spawn((
-        ChangeRoleMenu,
+        DangerMenu,
+        crate::hud::PauseSlot(crate::hud::PauseGroup::Danger, 0),
         Node {
-            position_type: PositionType::Absolute,
-            top: percent(crate::hud::PAUSE_ROW2),
-            width: percent(100),
+            display: Display::None,
+            ..default()
+        },
+        GlobalZIndex(51),
+        children![crate::wipe::start_over_button()],
+    ));
+    commands.spawn((
+        ChangeRoleMenu,
+        crate::hud::PauseSlot(crate::hud::PauseGroup::Account, 1),
+        Node {
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
-            // Wide enough that the hint line clears the buttons flanking the row above.
-            row_gap: px(10),
+            row_gap: px(4),
             display: Display::None,
             ..default()
         },
@@ -486,9 +495,16 @@ fn spawn_change_role_menu(mut commands: Commands) {
                 vgrad(KEY_TOP_HI, KEY_TOP),
                 children![label("Change role", 16.0)],
             ),
-            (ChangeRoleText, label("", 12.0), TextColor(DIM)),
-            // Its own line: the endgame and onboarding buttons flank the row above.
-            crate::wipe::start_over_button(),
+            (
+                ChangeRoleText,
+                label("", 11.0),
+                TextColor(DIM),
+                Node {
+                    max_width: px(300),
+                    ..default()
+                },
+                TextLayout::justify(Justify::Center),
+            ),
         ],
     ));
 }
@@ -502,6 +518,7 @@ fn change_role_menu(
     mut picker: ResMut<Picker>,
     stage_assets: StageAssets,
     mut menu: Single<&mut Node, With<ChangeRoleMenu>>,
+    mut danger: Single<&mut Node, (With<DangerMenu>, Without<ChangeRoleMenu>)>,
     // A Query, not Single: a Single with Changed fails while idle and skips the whole system.
     button: Query<&Interaction, (Changed<Interaction>, With<ChangeRoleButton>)>,
     mut hint: Single<&mut Text, With<ChangeRoleText>>,
@@ -510,6 +527,9 @@ fn change_role_menu(
     let want = if show { Display::Flex } else { Display::None };
     if menu.display != want {
         menu.display = want;
+    }
+    if danger.display != want {
+        danger.display = want;
     }
     let online = mode.is_online();
     let text = if online {

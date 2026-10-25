@@ -213,6 +213,10 @@ pub struct Sim {
     pub(crate) spend_bonus_pct: u64,
     /// Trash packs of the loaded zone (co-op growth on join).
     pub(crate) zone_packs: Vec<crate::zones::PackRt>,
+    /// Friendlies of the loaded zone still waiting for the group lead's level (`PlayerLevel`
+    /// spawn gate): (unit def, position, yaw, level). They step in on the level-up, not on the
+    /// next zone load.
+    pub(crate) level_gated: Vec<(usize, Vec3, f32, u8)>,
     /// Props, achievements and rides (`world.rs`).
     pub(crate) fun: crate::world::WorldRt,
     /// Sprint mode runs, keystones and records (`sprint.rs`).
@@ -287,6 +291,7 @@ impl Sim {
             next_telegraph: 1,
             spend_bonus_pct: 0,
             zone_packs: Vec::new(),
+            level_gated: Vec::new(),
             fun: crate::world::WorldRt::new(seed),
             sprint: Default::default(),
             live: Default::default(),

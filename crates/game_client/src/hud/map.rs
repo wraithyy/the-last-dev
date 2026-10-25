@@ -40,6 +40,8 @@ struct MapCanvas;
 #[derive(Component)]
 struct MapTitle;
 #[derive(Component)]
+struct MapClose;
+#[derive(Component)]
 struct MapGraph;
 #[derive(Component)]
 struct PlayerDot;
@@ -105,7 +107,13 @@ fn spawn_map(mut commands: Commands) {
                 drop_shadow(),
             ))
             .with_children(|w| {
-                w.spawn((MapTitle, label("~/map", 14.0), TextColor(DIM)));
+                super::window_header(
+                    w,
+                    "Map",
+                    (MapTitle, label("~/map", 11.0), TextColor(DIM)),
+                    crate::keybinds::Action::Map,
+                    MapClose,
+                );
                 w.spawn(Node {
                     column_gap: px(12),
                     ..default()
@@ -415,7 +423,7 @@ fn update_map(
     paused: Res<Paused>,
     sim: SimView,
     flow: Res<GameFlow>,
-    (mut windows, track, live, time, cal, assets, mut icons): (
+    (mut windows, track, live, time, cal, assets, mut icons, close): (
         ResMut<QuestWindows>,
         Res<super::quests::QuestTrack>,
         Res<crate::live::LiveState>,
@@ -423,6 +431,7 @@ fn update_map(
         Res<crate::calendar::CalendarState>,
         Res<AssetServer>,
         ResMut<super::IconCache>,
+        Query<&Interaction, (With<MapClose>, Changed<Interaction>)>,
     ),
     mut view: ResMut<MapView>,
     mut images: ResMut<Assets<Image>>,
@@ -436,6 +445,9 @@ fn update_map(
 ) {
     if !paused.0 && binds.just(&keys, crate::keybinds::Action::Map) {
         windows.map = !windows.map;
+    }
+    if close.iter().any(|i| *i == Interaction::Pressed) {
+        windows.map = false;
     }
     put!(
         root.display,

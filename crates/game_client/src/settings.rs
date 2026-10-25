@@ -242,6 +242,8 @@ pub struct Settings {
     pub view_dist: Option<f32>,
     /// A corpse loots fully on open and the loot window only appears for what did not fit.
     pub auto_loot: bool,
+    /// A floating arrow above the player points at the tracked quest's objective.
+    pub quest_arrow: bool,
 }
 
 impl Settings {
@@ -258,6 +260,7 @@ impl Settings {
             shadows: None,
             view_dist: None,
             auto_loot: mobile,
+            quest_arrow: false,
         }
     }
 
@@ -297,7 +300,7 @@ impl Settings {
     pub fn encode(&self) -> String {
         let opt = |v: Option<String>| v.unwrap_or_else(|| "auto".into());
         format!(
-            "quality={}\nfov={:.0}\nui_scale={}\ncolorblind={}\nreduce_motion={}\nperf={}\nauto_loot={}\nrender_scale={}\nmsaa={}\nshadows={}\nview_dist={}\n",
+            "quality={}\nfov={:.0}\nui_scale={}\ncolorblind={}\nreduce_motion={}\nperf={}\nauto_loot={}\nquest_arrow={}\nrender_scale={}\nmsaa={}\nshadows={}\nview_dist={}\n",
             self.quality.key(),
             self.fov_deg,
             self.ui_scale.map_or("auto".into(), |s| format!("{s:.2}")),
@@ -305,6 +308,7 @@ impl Settings {
             u8::from(self.reduce_motion),
             self.perf.key(),
             u8::from(self.auto_loot),
+            u8::from(self.quest_arrow),
             opt(self.render_scale.map(|v| format!("{v:.2}"))),
             opt(self.msaa.map(|v| u8::from(v).to_string())),
             opt(self.shadows.map(|v| u8::from(v).to_string())),
@@ -369,6 +373,7 @@ impl Settings {
                 "msaa" => s.msaa = flag(v),
                 "shadows" => s.shadows = flag(v),
                 "auto_loot" => s.auto_loot = v == "1",
+                "quest_arrow" => s.quest_arrow = v == "1",
                 _ => {}
             }
         }
@@ -453,6 +458,7 @@ enum Ctl {
     Motion,
     Perf(PerfMode),
     AutoLoot,
+    QuestArrow,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -525,6 +531,9 @@ impl Plugin for SettingsPlugin {
         }
         if let Ok(v) = std::env::var("WOW_AUTO_LOOT") {
             settings.auto_loot = v.trim() == "1";
+        }
+        if let Ok(v) = std::env::var("WOW_QUEST_ARROW") {
+            settings.quest_arrow = v.trim() == "1";
         }
         // QA: perf screenshots with the window on, without touching the stored settings.
         if std::env::var_os("WOW_SHOW_FPS").is_some() {
@@ -632,42 +641,25 @@ fn slider(kind: SliderKind) -> impl Bundle {
 fn spawn_ui(mut commands: Commands) {
     commands.spawn((
         OpenMenu,
+        crate::hud::PauseSlot(crate::hud::PauseGroup::Game, 0),
         Node {
-            position_type: PositionType::Absolute,
-            // Same row as "Co-op (beta)", to its left; "~/keybindings" sits to its right.
-            top: percent(crate::hud::PAUSE_ROW1),
-            width: percent(100),
-            justify_content: JustifyContent::Center,
             display: Display::None,
             ..default()
         },
         GlobalZIndex(51),
-        children![
-            (
-                Button,
-                ToggleText(Ctl::Open),
-                Node {
-                    margin: UiRect::right(px(320)),
-                    padding: UiRect::axes(px(14), px(5)),
-                    border: UiRect::all(px(2)),
-                    border_radius: BorderRadius::all(px(5)),
-                    ..default()
-                },
-                BorderColor::all(KEY_RIM),
-                vgrad(KEY_TOP_HI, KEY_TOP),
-                children![label("~/settings", 16.0)],
-            ),
-            // Players quote this in bug reports; co-op also needs matching builds.
-            (
-                Node {
-                    position_type: PositionType::Absolute,
-                    top: px(44),
-                    ..default()
-                },
-                label(concat!("The Last Dev v", env!("CARGO_PKG_VERSION")), 11.0),
-                TextColor(DIM),
-            ),
-        ],
+        children![(
+            Button,
+            ToggleText(Ctl::Open),
+            Node {
+                padding: UiRect::axes(px(14), px(5)),
+                border: UiRect::all(px(2)),
+                border_radius: BorderRadius::all(px(5)),
+                ..default()
+            },
+            BorderColor::all(KEY_RIM),
+            vgrad(KEY_TOP_HI, KEY_TOP),
+            children![label("~/settings", 16.0)],
+        )],
     ));
     commands
         .spawn((
@@ -845,6 +837,10 @@ fn spawn_ui(mut commands: Commands) {
                     r.spawn(row_label("auto loot"));
                     r.spawn(button(Ctl::AutoLoot, "", 13.0));
                 });
+                p.spawn(row()).with_children(|r| {
+                    r.spawn(row_label("quest arrow"));
+                    r.spawn(button(Ctl::QuestArrow, "", 13.0));
+                });
                 p.spawn(Node {
                     column_gap: px(10),
                     margin: UiRect::top(px(4)),
@@ -910,6 +906,7 @@ fn panel_input(
             Ctl::Motion => s.reduce_motion = !s.reduce_motion,
             Ctl::Perf(m) => s.perf = m,
             Ctl::AutoLoot => s.auto_loot = !s.auto_loot,
+            Ctl::QuestArrow => s.quest_arrow = !s.quest_arrow,
         }
     }
     let show_menu = if paused.0 && !lobby.open && !state.open {
@@ -1019,6 +1016,7 @@ fn panel_visuals(
             Ctl::UiAuto => Some(s.ui_scale.is_none()),
             Ctl::Motion => Some(s.reduce_motion),
             Ctl::AutoLoot => Some(s.auto_loot),
+            Ctl::QuestArrow => Some(s.quest_arrow),
             _ => None,
         };
         let c = if on == Some(true) {
@@ -1027,8 +1025,10 @@ fn panel_visuals(
             KEY_RIM
         };
         border.set_all(c);
-        if matches!(t.0, Ctl::Motion | Ctl::Msaa | Ctl::Shadows | Ctl::AutoLoot)
-            && let Some(k) = kids.first()
+        if matches!(
+            t.0,
+            Ctl::Motion | Ctl::Msaa | Ctl::Shadows | Ctl::AutoLoot | Ctl::QuestArrow
+        ) && let Some(k) = kids.first()
             && let Ok(mut text) = texts.get_mut(*k)
         {
             set_text(&mut text, if on == Some(true) { "on" } else { "off" });
@@ -1211,10 +1211,18 @@ mod tests {
             shadows: Some(true),
             view_dist: Some(1.2),
             auto_loot: true,
+            quest_arrow: true,
         };
         assert_eq!(Settings::decode(&s.encode(), false), s);
         let auto = Settings::defaults(false);
         assert_eq!(Settings::decode(&auto.encode(), true), auto);
+    }
+
+    #[test]
+    fn the_quest_arrow_is_off_unless_stored() {
+        assert!(!Settings::decode("", true).quest_arrow);
+        assert!(!Settings::defaults(false).quest_arrow);
+        assert!(Settings::decode("quest_arrow=1\n", false).quest_arrow);
     }
 
     #[test]

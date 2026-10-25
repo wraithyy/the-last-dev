@@ -35,14 +35,6 @@ pub struct SprintWindows {
     pub standup: bool,
 }
 
-impl SprintWindows {
-    pub fn close_one(&mut self) -> bool {
-        std::mem::take(&mut self.review)
-            || std::mem::take(&mut self.planner)
-            || std::mem::take(&mut self.standup)
-    }
-}
-
 /// Minigame windows (`minigame.rs`): the invite card, the leave confirm and the medal screen,
 /// plus the Company Calendar (`calendar.rs`) that starts them. Here for the same reason as
 /// `SprintWindows`: Esc closes them first.
@@ -54,15 +46,6 @@ pub struct MinigameWindows {
     pub calendar: bool,
 }
 
-impl MinigameWindows {
-    pub fn close_one(&mut self) -> bool {
-        std::mem::take(&mut self.leave)
-            || std::mem::take(&mut self.result)
-            || std::mem::take(&mut self.invite)
-            || std::mem::take(&mut self.calendar)
-    }
-}
-
 /// Quest dialog (sim id of the giver), `~/jira` log (J) and map (N). Here for the same reason as
 /// `TrophiesOpen`: Esc closes them before it clears the target or pauses.
 #[derive(Resource, Default)]
@@ -72,21 +55,171 @@ pub struct QuestWindows {
     pub map: bool,
 }
 
-impl QuestWindows {
-    /// Closes the topmost window; false when none was open.
-    pub fn close_one(&mut self) -> bool {
-        if self.dialog.take().is_some() {
-            true
-        } else if self.log {
-            self.log = false;
-            true
-        } else if self.map {
-            self.map = false;
-            true
-        } else {
-            false
+/// A closable window, for `WindowStack` (not the log panes of `hud::logs`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Pane {
+    Dialog,
+    Log,
+    Map,
+    Trophies,
+    Career,
+    Endgame,
+    Planner,
+    Review,
+    Standup,
+    Calendar,
+    Invite,
+    Leave,
+    Result,
+    Sheet,
+    Shop,
+}
+
+impl Pane {
+    /// Every window, in the order a frame that opens several at once stacks them.
+    const ALL: [Pane; 15] = [
+        Pane::Sheet,
+        Pane::Shop,
+        Pane::Trophies,
+        Pane::Log,
+        Pane::Dialog,
+        Pane::Map,
+        Pane::Career,
+        Pane::Endgame,
+        Pane::Planner,
+        Pane::Review,
+        Pane::Standup,
+        Pane::Calendar,
+        Pane::Invite,
+        Pane::Leave,
+        Pane::Result,
+    ];
+
+    /// Windows that open in the middle of the screen: two of them would sit on top of each other,
+    /// so opening one closes the other. The docked ones (left column, side panels) coexist.
+    fn centered(self) -> bool {
+        matches!(
+            self,
+            Pane::Map
+                | Pane::Career
+                | Pane::Endgame
+                | Pane::Planner
+                | Pane::Review
+                | Pane::Standup
+                | Pane::Calendar
+        )
+    }
+}
+
+/// Open windows, oldest first. Esc closes the last one before it clears the target or pauses.
+/// Kept in step by `Windows::sync` from the flags the windows already own, so no open site
+/// has to know about it.
+#[derive(Resource, Default)]
+pub struct WindowStack(Vec<Pane>);
+
+/// Every window flag in one place: what is open, closing one, and the stack that orders them.
+#[derive(bevy::ecs::system::SystemParam)]
+pub struct Windows<'w> {
+    quests: ResMut<'w, QuestWindows>,
+    trophies: ResMut<'w, TrophiesOpen>,
+    career: ResMut<'w, CareerOpen>,
+    endgame: ResMut<'w, EndgameOpen>,
+    sprint: ResMut<'w, SprintWindows>,
+    minigame: ResMut<'w, MinigameWindows>,
+    eco: ResMut<'w, crate::economy::EconomyUi>,
+    stack: ResMut<'w, WindowStack>,
+}
+
+impl Windows<'_> {
+    fn is_open(&self, w: Pane) -> bool {
+        match w {
+            Pane::Dialog => self.quests.dialog.is_some(),
+            Pane::Log => self.quests.log,
+            Pane::Map => self.quests.map,
+            Pane::Trophies => self.trophies.0,
+            Pane::Career => self.career.0,
+            Pane::Endgame => self.endgame.0,
+            Pane::Planner => self.sprint.planner,
+            Pane::Review => self.sprint.review,
+            Pane::Standup => self.sprint.standup,
+            Pane::Calendar => self.minigame.calendar,
+            Pane::Invite => self.minigame.invite,
+            Pane::Leave => self.minigame.leave,
+            Pane::Result => self.minigame.result,
+            Pane::Sheet => self.eco.sheet,
+            Pane::Shop => self.eco.shop.is_some(),
         }
     }
+
+    pub fn close(&mut self, w: Pane) {
+        match w {
+            Pane::Dialog => self.quests.dialog = None,
+            Pane::Log => self.quests.log = false,
+            Pane::Map => self.quests.map = false,
+            Pane::Trophies => self.trophies.0 = false,
+            Pane::Career => self.career.0 = false,
+            Pane::Endgame => self.endgame.0 = false,
+            Pane::Planner => self.sprint.planner = false,
+            Pane::Review => self.sprint.review = false,
+            Pane::Standup => self.sprint.standup = false,
+            Pane::Calendar => self.minigame.calendar = false,
+            Pane::Invite => self.minigame.invite = false,
+            Pane::Leave => self.minigame.leave = false,
+            Pane::Result => self.minigame.result = false,
+            Pane::Sheet => {
+                self.eco.sheet = false;
+                self.eco.confirm = None;
+            }
+            Pane::Shop => {
+                self.eco.shop = None;
+                self.eco.confirm = None;
+            }
+        }
+        self.stack.0.retain(|o| *o != w);
+    }
+
+    /// Records windows that opened and forgets the ones that closed; a centered window that just
+    /// opened closes the centered ones already up.
+    pub fn sync(&mut self) {
+        let open: Vec<Pane> = Pane::ALL.into_iter().filter(|w| self.is_open(*w)).collect();
+        self.stack.0.retain(|w| open.contains(w));
+        for w in open {
+            if self.stack.0.contains(&w) {
+                continue;
+            }
+            if w.centered() {
+                let others: Vec<Pane> = self
+                    .stack
+                    .0
+                    .iter()
+                    .copied()
+                    .filter(|o| o.centered())
+                    .collect();
+                for o in others {
+                    self.close(o);
+                }
+            }
+            self.stack.0.push(w);
+        }
+    }
+
+    pub fn ask_to_leave_minigame(&mut self) {
+        self.minigame.leave = true;
+    }
+
+    /// Closes the window opened last; false when none is open.
+    pub fn close_top(&mut self) -> bool {
+        self.sync();
+        let Some(top) = self.stack.0.last().copied() else {
+            return false;
+        };
+        self.close(top);
+        true
+    }
+}
+
+fn track_windows(mut windows: Windows) {
+    windows.sync();
 }
 
 /// Held-key state is overwritten every frame; `jump` and `mouse_yaw` are
@@ -138,6 +271,8 @@ impl Plugin for InputPlugin {
             .init_resource::<QuestWindows>()
             .init_resource::<SprintWindows>()
             .init_resource::<MinigameWindows>()
+            .init_resource::<WindowStack>()
+            .add_systems(Update, track_windows)
             .init_resource::<PlayerInput>()
             .init_resource::<MouseState>()
             .add_systems(
@@ -252,5 +387,65 @@ fn update_cursor(
     } else if cursor.grab_mode != CursorGrabMode::None || !cursor.visible {
         cursor.grab_mode = CursorGrabMode::None;
         cursor.visible = true;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::ecs::system::RunSystemOnce;
+
+    fn world() -> World {
+        let mut w = World::new();
+        w.init_resource::<QuestWindows>();
+        w.init_resource::<TrophiesOpen>();
+        w.init_resource::<CareerOpen>();
+        w.init_resource::<EndgameOpen>();
+        w.init_resource::<SprintWindows>();
+        w.init_resource::<MinigameWindows>();
+        w.init_resource::<crate::economy::EconomyUi>();
+        w.init_resource::<WindowStack>();
+        w
+    }
+
+    fn sync(w: &mut World) {
+        w.run_system_once(|mut win: Windows| win.sync())
+            .expect("sync");
+    }
+
+    fn esc(w: &mut World) -> bool {
+        w.run_system_once(|mut win: Windows| win.close_top())
+            .expect("esc")
+    }
+
+    #[test]
+    fn esc_closes_the_window_opened_last() {
+        let mut w = world();
+        w.resource_mut::<QuestWindows>().log = true;
+        sync(&mut w);
+        w.resource_mut::<TrophiesOpen>().0 = true;
+        sync(&mut w);
+        // Trophies came later than the log, so it goes first: opening order, not a fixed rank.
+        assert!(esc(&mut w));
+        assert!(!w.resource::<TrophiesOpen>().0 && w.resource::<QuestWindows>().log);
+        assert!(esc(&mut w));
+        assert!(!w.resource::<QuestWindows>().log);
+        assert!(
+            !esc(&mut w),
+            "nothing left: Esc falls through to the pause menu"
+        );
+    }
+
+    #[test]
+    fn a_centered_window_closes_the_other_centered_one() {
+        let mut w = world();
+        w.resource_mut::<CareerOpen>().0 = true;
+        w.resource_mut::<TrophiesOpen>().0 = true;
+        sync(&mut w);
+        w.resource_mut::<EndgameOpen>().0 = true;
+        sync(&mut w);
+        assert!(!w.resource::<CareerOpen>().0, "career made way for endgame");
+        assert!(w.resource::<EndgameOpen>().0);
+        assert!(w.resource::<TrophiesOpen>().0, "docked windows stay");
     }
 }

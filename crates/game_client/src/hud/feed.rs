@@ -483,6 +483,19 @@ fn collect_events(
                     reason.message().to_owned()
                 };
                 banner.left = ERROR_TEXT_SECS;
+                // The thin banner is easy to miss with a shop or the bag open: a refused buy or
+                // a full bag also gets a toast, like a pickup does.
+                if matches!(
+                    reason,
+                    ItemError::BagFull
+                        | ItemError::NotEnoughSp
+                        | ItemError::NotEnoughTokens
+                        | ItemError::LevelTooLow
+                        | ItemError::RepTooLow
+                        | ItemError::NotForSale
+                ) {
+                    toasts.write(super::loot::LootToast(banner.text.clone(), TOAST_RED));
+                }
             }
             Event::Proc { unit, item } => {
                 let whose = if Some(*unit) == me {
@@ -714,6 +727,16 @@ fn collect_events(
                     out.push(format!("You receive {sp} Kudos."), goods::SP_GOLD);
                 }
                 let left = sim.unit(*corpse).is_some_and(|u| u.lootable);
+                let bag_full = sim
+                    .player()
+                    .and_then(|p| sim.unit(p))
+                    .is_some_and(|u| u.bag.len() >= sim.content().economy.bag_size.max(1));
+                if left && bag_full {
+                    toasts.write(super::loot::LootToast(
+                        ItemError::BagFull.message().to_owned(),
+                        TOAST_RED,
+                    ));
+                }
                 match loot.on_looted(*corpse, items, *sp, left, settings.auto_loot) {
                     Shown::Nothing => out.push(
                         "You find nothing to loot. The AI already expensed it.".into(),
@@ -847,6 +870,9 @@ fn collect_events(
         }
     }
 }
+
+/// Refusal toasts (full bag, a buy that did not go through).
+const TOAST_RED: Color = Color::srgb(1.0, 0.45, 0.35);
 
 /// Reply-all mails stand out like they do in a real inbox.
 const REPLY_ALL: Color = Color::srgb(1.0, 0.78, 0.35);

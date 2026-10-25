@@ -664,12 +664,8 @@ fn spawn_ui(mut commands: Commands) {
         });
     commands.spawn((
         ReplayMenu,
+        crate::hud::PauseSlot(crate::hud::PauseGroup::Game, 3),
         Node {
-            position_type: PositionType::Absolute,
-            // Same row as "Change role", to its right (that row's hint text sits below it).
-            top: percent(crate::hud::PAUSE_ROW2),
-            width: percent(100),
-            justify_content: JustifyContent::Center,
             display: Display::None,
             ..default()
         },
@@ -678,7 +674,6 @@ fn spawn_ui(mut commands: Commands) {
             Button,
             ReplayButton,
             Node {
-                margin: UiRect::left(px(390)),
                 padding: UiRect::axes(px(14), px(5)),
                 border: UiRect::all(px(2)),
                 border_radius: BorderRadius::all(px(5)),

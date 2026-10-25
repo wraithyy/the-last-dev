@@ -43,6 +43,11 @@ Screens, props and jokes.
 - The Core's wall monitors show Ilmari's face: smiling and awake on the live screen, eyes shut and standing by on the others.
 - Ill Marie's badge has a grey silhouette where the photo should be, and now and then, once, the campus map gets her name wrong.
 - Ilmari taunts you with the time he woke up while you read the commit log, and a few of his repeated lines were rewritten so no boss says the same thing three times. The Roomba's bumper says OOPS out loud when you mount it.
+- Hover a character in the world for a tooltip: name, level, title and, in yellow, the quests you have on them with progress ("MeatProxies terminated 5/10", grey when that part is done) or the quest they hand out ("! Onboarding") or take ("? ..."). Quest items in your bag and the loot window say "Quest item:" and which ticket wants them. On touch, hold a finger on the character.
+- An optional quest arrow (Settings > quest arrow, F8, or Arrow in the touch menu; off by default) floats above you and points at the tracked ticket's work, the turn-in once it is done, or the door of the next zone on the way. Click a ticket in the tracker or press Guide in the quest log to pick which one it follows.
+- A grey "!" over a quest giver means they have a ticket for you a few levels up the ladder.
+- Windows have a common header: a plain title, the old `~/` name under it, the key that closes it and an [x]. A long list says "v more below" when there is more to scroll to. The touch menu now has Chat, Meter and the quest arrow.
+- A refused purchase or a full bag now pops up a red toast as well as the thin red line.
 
 ### Changed
 
@@ -60,12 +65,14 @@ Screens, props and jokes.
 - Dungeon rooms (Basement, HACK 24, VibeCon, the Ilmari wings) now greet you with a landmark near the entrance, one oversized prop and a tinted light per room, so you can tell where you are at first glance.
 - Indoor rooms are brighter and less tinted, the VibeCon Afterparty and Main Stage are readable, the occupied campus is lighter, and nights outdoors are not quite so black.
 - Entering an indoor room starts the camera higher and further back, kept under the ceiling.
+- Esc closes the window you opened last instead of a fixed one first, and opening a centred window (map, career, endgame, calendar, sprint windows) closes the other centred one. The pause menu groups its buttons into Game, Account and Danger, with Start over alone under Danger. "IN REVIEW" tickets are violet so they no longer look like main-quest gold.
 
 ### Fixed
 
 - The quest tracker no longer shows an empty "Objectives (0)" box when only a countdown is running.
 - Cutscene cameras no longer end up inside a reception desk, a wardrobe or a ceiling panel when a scene starts.
 - Campus signs stay readable at night instead of going nearly black.
+- Quest givers near the edge of the screen, in a crowd of colleagues or under a HUD panel could lose their "!" or "?" because the whole nameplate was culled; the marker now stays up and the plate slides back into view. Ill Marie's queue spot now appears the moment you reach level 5 instead of after the next zone load.
 
 ## [0.10.0] - 2026-10-24
 

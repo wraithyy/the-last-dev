@@ -2,8 +2,16 @@
 //! in the look of the action bar tooltip: `fn name() -> Kind`, a stats line, a `///` doc line.
 
 use super::actionbar::spell_signature;
-use super::{ACCENT, DIM, asset_key, drop_shadow, label, panel_bg, put, set_text};
-use crate::combat::{SimReady, SimView};
+use super::quests::{GREY_MARK, TipQuest, unit_quest_lines};
+use super::{
+    ACCENT, DIM, GOLD, HudHidden, HudRects, asset_key, drop_shadow, label, panel_bg, put, set_text,
+};
+use crate::arena::Colliders;
+use crate::combat::{SimReady, SimUnit, SimView};
+use crate::input::Paused;
+use crate::player::Player;
+use crate::targeting::{Pickable, pick_ray};
+use crate::units::Unit;
 use bevy::prelude::*;
 use combat_core::content::DispelType;
 use combat_core::{AuraView, CastView, Content, Effect};
@@ -36,8 +44,8 @@ pub struct HoverTipPlugin;
 
 impl Plugin for HoverTipPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_tip)
-            .add_systems(Update, update_tip.in_set(SimReady));
+        app.add_systems(Startup, (spawn_tip, spawn_world_tip))
+            .add_systems(Update, (update_tip, update_world_tip).in_set(SimReady));
     }
 }
 
@@ -367,6 +375,230 @@ fn update_tip(
     for (HoverLine(i), mut text) in &mut lines {
         set_text(&mut text, if *i == 0 { &t.stats } else { &t.doc });
     }
+}
+
+/// Reach of a finger for the long-press pick, like a tap on a unit.
+const TOUCH_SLACK_M: f32 = 0.4;
+/// A touch held this long (and not dragged) shows the tooltip, as a hover would.
+const LONG_PRESS_SECS: f32 = 0.45;
+const PRESS_SLOP_PX: f32 = 14.0;
+const WORLD_TIP_W: f32 = 240.0;
+
+/// The tooltip of the unit under the pointer: name, level, title and the player's quests.
+#[derive(Component)]
+struct WorldTip;
+
+fn spawn_world_tip(mut commands: Commands) {
+    commands.spawn((
+        WorldTip,
+        Node {
+            position_type: PositionType::Absolute,
+            max_width: px(WORLD_TIP_W),
+            padding: UiRect::axes(px(10), px(7)),
+            flex_direction: FlexDirection::Column,
+            row_gap: px(2),
+            border: UiRect::all(px(1)),
+            border_radius: BorderRadius::all(px(4)),
+            display: Display::None,
+            ..default()
+        },
+        BorderColor::all(ACCENT.with_alpha(0.7)),
+        panel_bg(),
+        drop_shadow(),
+        GlobalZIndex(44),
+    ));
+}
+
+/// The tooltip lines of a unit: (text, size, colour).
+fn world_tip_lines(
+    sim: &SimView,
+    pal: &crate::settings::Palette,
+    id: combat_core::EntityId,
+    zone: &str,
+) -> Vec<(String, f32, Color)> {
+    let Some(u) = sim.unit(id).filter(|u| u.alive) else {
+        return Vec::new();
+    };
+    let content = sim.content();
+    let party = sim.players().contains(&id);
+    let name_color = if u.hostile {
+        pal.hostile
+    } else if party {
+        crate::nameplates::PARTY_BLUE
+    } else {
+        pal.friendly
+    };
+    let mut out = vec![(u.name.clone(), 15.0, name_color)];
+    let tag = if u.boss {
+        " (Boss)"
+    } else if crate::copy::is_elite(&u.key) {
+        " (Elite)"
+    } else {
+        ""
+    };
+    out.push((format!("Level {}{tag}", u.level), 12.0, DIM));
+    let title = content
+        .title_text(&u.title)
+        .or_else(|| content.unit_def(&u.key).map(|d| d.title.as_str()))
+        .unwrap_or("");
+    if !title.is_empty() {
+        out.push((format!("<{title}>"), 12.0, Color::srgb(0.75, 0.85, 0.78)));
+    }
+    for l in unit_quest_lines(&**sim, &u.key, zone) {
+        out.push(match l {
+            TipQuest::Giver { glyph, name, grey } => (
+                format!("{glyph} {name}"),
+                12.0,
+                if grey { GREY_MARK } else { GOLD },
+            ),
+            TipQuest::Quest(name) => (name, 12.0, GOLD),
+            TipQuest::Objective { text, done } => (
+                format!("  {text}"),
+                12.0,
+                if done { GREY_MARK } else { GOLD },
+            ),
+        });
+    }
+    out
+}
+
+#[derive(Default)]
+struct TipState {
+    /// Seconds a still finger has been down.
+    held: f32,
+    /// The lines on screen, to rebuild the node only when they change.
+    shown: String,
+    forced: Option<Option<String>>,
+}
+
+/// Reasons the world tooltip stays hidden.
+#[derive(bevy::ecs::system::SystemParam)]
+struct TipGate<'w, 's> {
+    hidden: Res<'w, HudHidden>,
+    paused: Res<'w, Paused>,
+    hud: Res<'w, HudRects>,
+    buttons: Query<'w, 's, &'static Interaction>,
+}
+
+impl TipGate<'_, '_> {
+    fn blocked(&self, at: Vec2) -> bool {
+        self.hidden.cutscene
+            || self.hidden.opening
+            || self.paused.0
+            || self.hud.hits(Rect::from_center_size(at, Vec2::splat(2.0)))
+            || self.buttons.iter().any(|i| *i != Interaction::None)
+    }
+}
+
+fn update_world_tip(
+    mut commands: Commands,
+    sim: SimView,
+    pal: Res<crate::settings::Palette>,
+    flow: Res<crate::game::GameFlow>,
+    gate: TipGate,
+    colliders: Res<Colliders>,
+    touch: Res<crate::touch::TouchMode>,
+    touches: Res<Touches>,
+    time: Res<Time<Real>>,
+    ui_scale: Res<UiScale>,
+    window: Single<&Window>,
+    camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
+    units: Query<(Entity, &Transform, &Unit, &SimUnit), Without<Player>>,
+    tip: Single<(Entity, &mut Node), With<WorldTip>>,
+    mut st: Local<TipState>,
+) {
+    let TipState {
+        held,
+        shown,
+        forced,
+    } = &mut *st;
+    let (tip_e, mut node) = tip.into_inner();
+    // QA hook: `WOW_HOVER_UNIT=<unit key>` shows that unit's tooltip at the window centre.
+    let forced = forced.get_or_insert_with(|| std::env::var("WOW_HOVER_UNIT").ok());
+    let scale = ui_scale.0.max(0.01);
+    // Touch has no hover: a still finger held down stands in for the cursor.
+    let finger = touches
+        .iter()
+        .next()
+        .filter(|t| t.position().distance(t.start_position()) < PRESS_SLOP_PX);
+    *held = if finger.is_some() {
+        *held + time.delta_secs()
+    } else {
+        0.0
+    };
+    let at = if touch.active {
+        finger
+            .filter(|_| *held >= LONG_PRESS_SECS)
+            .map(|t| t.position())
+    } else {
+        window.cursor_position()
+    };
+    let slack = if touch.active { TOUCH_SLACK_M } else { 0.0 };
+    let id = at.filter(|p| !gate.blocked(*p)).and_then(|p| {
+        let (cam, cam_tf) = *camera;
+        let ray = cam.viewport_to_world(cam_tf, p).ok()?;
+        let by_entity = pick_ray(
+            (ray.origin, *ray.direction),
+            units
+                .iter()
+                .filter(|(_, _, u, _)| u.alive)
+                .map(|(e, tf, u, _)| Pickable {
+                    key: e,
+                    pos: tf.translation,
+                    unit: *u,
+                }),
+            &colliders.0,
+            slack,
+        )?;
+        units.get(by_entity).ok().map(|(.., su)| (su.0, p))
+    });
+    let id = id.or_else(|| {
+        let key = forced.as_deref()?;
+        let u = sim.units().find(|u| u.key == key && u.alive)?;
+        Some((u.id, Vec2::new(window.width(), window.height()) * 0.5))
+    });
+    let lines = id
+        .map(|(id, _)| world_tip_lines(&sim, &pal, id, &flow.zone))
+        .unwrap_or_default();
+    let (Some((_, p)), false) = (id, lines.is_empty()) else {
+        put!(node.display, Display::None);
+        return;
+    };
+    put!(node.display, Display::Flex);
+    let key = lines
+        .iter()
+        .map(|l| l.0.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    if *shown != key {
+        shown.clone_from(&key);
+        commands.entity(tip_e).despawn_related::<Children>();
+        for (text, size, color) in lines {
+            commands
+                .entity(tip_e)
+                .with_child((label(text, size), TextColor(color)));
+        }
+    }
+    // Right of and below the pointer; the node's own size is a frame late on a new tip, so
+    // flip against the right edge with the widest it can be.
+    let (view_w, view_h) = camera
+        .0
+        .logical_viewport_size()
+        .map_or((window.width(), window.height()), |v| (v.x, v.y));
+    let (px_, py_) = (p.x / scale, p.y / scale);
+    let (vw, vh) = (view_w / scale, view_h / scale);
+    let left = if px_ + 18.0 + WORLD_TIP_W > vw {
+        px_ - WORLD_TIP_W - 12.0
+    } else {
+        px_ + 18.0
+    };
+    let top = if py_ + 120.0 > vh {
+        py_ - 110.0
+    } else {
+        py_ + 16.0
+    };
+    put!(node.left, px(left.max(4.0)));
+    put!(node.top, px(top.max(4.0)));
 }
 
 #[cfg(test)]

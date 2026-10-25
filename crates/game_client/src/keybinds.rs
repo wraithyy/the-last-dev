@@ -63,6 +63,8 @@ pub enum Action {
     Perf,
     /// Accepts the "drop to a lower preset" offer the perf watchdog shows.
     QualityDown,
+    /// Shows or hides the waypoint arrow of the tracked quest (settings: quest arrow).
+    QuestArrow,
 }
 
 /// Panel column a group is drawn in.
@@ -130,6 +132,7 @@ impl Action {
             MinimapZoomOut,
             Perf,
             QualityDown,
+            QuestArrow,
         ]);
         v.extend((0..3).map(Gadget));
         v.extend((0..10).map(Slot));
@@ -177,6 +180,7 @@ impl Action {
             MinimapZoomOut => "minimap_zoom_out".into(),
             Perf => "perf".into(),
             QualityDown => "quality_down".into(),
+            QuestArrow => "quest_arrow".into(),
         }
     }
 
@@ -220,6 +224,7 @@ impl Action {
             MinimapZoomOut => "minimap zoom out".into(),
             Perf => "~/perf window".into(),
             QualityDown => "accept lower quality offer".into(),
+            QuestArrow => "quest arrow on / off".into(),
         }
     }
 
@@ -234,7 +239,7 @@ impl Action {
             NumSlot(_) => Group::Numpad,
             QuestLog | Map | Trophies | CharacterSheet | Career | Pets | Endgame | Calendar
             | Chat | CombatLog | Meter | Emotes | Mute | MinimapZoomIn | MinimapZoomOut | Perf
-            | QualityDown => Group::Windows,
+            | QualityDown | QuestArrow => Group::Windows,
         }
     }
 
@@ -289,6 +294,7 @@ impl Action {
             // Function keys are physical positions, so every layout agrees on them.
             Perf => KeyCode::F6,
             QualityDown => KeyCode::F7,
+            QuestArrow => KeyCode::F8,
         }
     }
 }

@@ -72,12 +72,8 @@ const ROW_W: f32 = 212.0;
 fn spawn_ui(mut commands: Commands) {
     commands.spawn((
         OpenMenu,
+        crate::hud::PauseSlot(crate::hud::PauseGroup::Game, 1),
         Node {
-            position_type: PositionType::Absolute,
-            // Same row as "Co-op (beta)", to its right: lower rows collide with the action bar.
-            top: percent(crate::hud::PAUSE_ROW1),
-            width: percent(100),
-            justify_content: JustifyContent::Center,
             display: Display::None,
             ..default()
         },
@@ -86,7 +82,6 @@ fn spawn_ui(mut commands: Commands) {
             Button,
             OpenButton,
             Node {
-                margin: UiRect::left(px(320)),
                 padding: UiRect::axes(px(14), px(5)),
                 border: UiRect::all(px(2)),
                 border_radius: BorderRadius::all(px(5)),

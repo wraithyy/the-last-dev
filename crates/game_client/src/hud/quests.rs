@@ -313,9 +313,30 @@ pub fn giver_mark(sim: &dyn SimRead, npc_key: &str, zone: &str) -> Option<(&'sta
         Some(("!", tint(QuestStatus::Available)))
     } else if has(QuestStatus::Active) {
         Some(("?", GREY_MARK))
+    } else if too_low_for_quest(sim, npc_key, zone) {
+        Some(("!", GREY_MARK))
     } else {
         None
     }
+}
+
+/// How many levels short of a ticket the player may be and still see its grey "!".
+const GREY_BANG_LEVELS: u8 = 3;
+
+/// The NPC gives a ticket whose only missing gate is the player's level, a few levels away.
+fn too_low_for_quest(sim: &dyn SimRead, npc_key: &str, zone: &str) -> bool {
+    let Some(level) = sim.player().and_then(|p| sim.unit(p)).map(|u| u.level) else {
+        return false;
+    };
+    let done = &sim.quests().completed;
+    sim.content().quests.iter().any(|q| {
+        q.giver.npc == npc_key
+            && q.giver.zone == zone
+            && q.level_min > level
+            && q.level_min <= level.saturating_add(GREY_BANG_LEVELS)
+            && q.requires.as_ref().is_none_or(|r| done.contains(r))
+            && sim.quest_status(&q.id) == QuestStatus::Locked
+    })
 }
 
 /// Which quests the tracker follows: auto-tracked on accept, untracked from the log (J).
@@ -325,6 +346,9 @@ pub struct QuestTrack {
     pub collapsed: bool,
     /// Quest the log (J) opens on, from a tracker title click.
     pub focus: Option<String>,
+    /// Quest the waypoint arrow follows (picked in the log or by a tracker title click);
+    /// the first tracked quest when unset or no longer open.
+    pub waypoint: Option<String>,
     /// Timed deliveries: (quest, `Time::elapsed_secs` when it runs out), started on accept so
     /// the countdown works the same offline and online.
     pub deadlines: Vec<(String, f32)>,
@@ -359,16 +383,41 @@ fn kind_tag(def: &QuestDef) -> (&'static str, Color) {
     }
 }
 
-/// Unit keys the tracked quests still need (kill targets, droppers of wanted items, bosses of
-/// zones to clear, NPCs to talk to): the minimap and map paint these in quest yellow.
+/// Unit keys one objective works on (kill targets, droppers of wanted items, the boss of a zone
+/// to clear, NPCs to talk to); none for work that happens at props.
+pub fn objective_unit_keys(content: &Content, o: &Objective) -> Vec<String> {
+    match o {
+        Objective::Kill(u, _)
+        | Objective::Talk(u)
+        | Objective::KillClean(u, _)
+        | Objective::Deliver { npc: u, .. }
+        | Objective::UseOn { target: u, .. } => vec![u.clone()],
+        Objective::Defend { unit, wave, .. } | Objective::Escort { unit, wave, .. } => {
+            vec![unit.clone(), wave.clone()]
+        }
+        Objective::Loot(it, _) => content
+            .units
+            .iter()
+            .filter(|u| u.loot.iter().any(|l| l.item == *it))
+            .map(|u| u.key.clone())
+            .collect(),
+        Objective::ClearZone(z) => content
+            .zone(z)
+            .and_then(|z| z.boss.as_ref())
+            .map(|b| vec![b.unit.clone()])
+            .unwrap_or_default(),
+        Objective::Wait { .. }
+        | Objective::Interact(..)
+        | Objective::Collect(..)
+        | Objective::Inspect(..)
+        | Objective::Sequence { .. } => Vec::new(),
+    }
+}
+
+/// Unit keys the tracked quests still need: the minimap and map paint these in quest yellow.
 pub fn objective_units(sim: &dyn SimRead, track: &QuestTrack) -> Vec<String> {
     let content = sim.content();
     let mut out: Vec<String> = Vec::new();
-    let mut add = |k: &str| {
-        if !out.iter().any(|o| o == k) {
-            out.push(k.to_string());
-        }
-    };
     for q in tracked(sim, track) {
         let Some(def) = content.quest(&q.id) else {
             continue;
@@ -377,46 +426,105 @@ pub fn objective_units(sim: &dyn SimRead, track: &QuestTrack) -> Vec<String> {
             if q.counts.get(k).copied().unwrap_or(0) >= o.need() {
                 continue;
             }
-            match o {
-                Objective::Kill(u, _)
-                | Objective::Talk(u)
-                | Objective::KillClean(u, _)
-                | Objective::Deliver { npc: u, .. }
-                | Objective::UseOn { target: u, .. } => add(u),
-                Objective::Defend { unit, wave, .. } | Objective::Escort { unit, wave, .. } => {
-                    add(unit);
-                    add(wave);
+            for key in objective_unit_keys(content, o) {
+                if !out.contains(&key) {
+                    out.push(key);
                 }
-                Objective::Loot(it, _) => {
-                    for u in content
-                        .units
-                        .iter()
-                        .filter(|u| u.loot.iter().any(|l| l.item == *it))
-                    {
-                        add(&u.key);
-                    }
-                }
-                Objective::ClearZone(z) => {
-                    if let Some(b) = content.zone(z).and_then(|z| z.boss.as_ref()) {
-                        add(&b.unit);
-                    }
-                }
-                Objective::Wait { .. }
-                | Objective::Interact(..)
-                | Objective::Collect(..)
-                | Objective::Inspect(..)
-                | Objective::Sequence { .. } => {}
             }
         }
     }
     out
 }
 
+/// One line of a unit's quest tooltip.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TipQuest {
+    /// "! Quest" to pick up or "? Quest" to hand in; `grey` for work still open elsewhere.
+    Giver {
+        glyph: &'static str,
+        name: String,
+        grey: bool,
+    },
+    /// A quest this unit counts toward, then its objective line; `done` once the count is full.
+    Quest(String),
+    Objective {
+        text: String,
+        done: bool,
+    },
+}
+
+/// What a unit's hover tooltip says about the player's quests: givers first, then every open
+/// quest the unit counts toward with the objective's progress (WoW's yellow lines).
+pub fn unit_quest_lines(sim: &dyn SimRead, npc_key: &str, zone: &str) -> Vec<TipQuest> {
+    let content = sim.content();
+    let mut out = Vec::new();
+    let chains = &content.calendar.chains;
+    for (id, status) in giver_quests(sim, npc_key, zone) {
+        let Some(def) = content.quest(&id) else {
+            continue;
+        };
+        let (glyph, grey) = match status {
+            QuestStatus::Available if chains.iter().any(|c| c.quests.first() == Some(&id)) => {
+                continue;
+            }
+            QuestStatus::Available => ("!", false),
+            QuestStatus::Ready => ("?", false),
+            _ => ("?", true),
+        };
+        out.push(TipQuest::Giver {
+            glyph,
+            name: def.name.clone(),
+            grey,
+        });
+    }
+    for q in &sim.quests().active {
+        let Some(def) = content.quest(&q.id) else {
+            continue;
+        };
+        let mut head = false;
+        for (k, o) in def.objectives.iter().enumerate() {
+            if !objective_unit_keys(content, o).iter().any(|u| u == npc_key) {
+                continue;
+            }
+            if !head {
+                out.push(TipQuest::Quest(def.name.clone()));
+                head = true;
+            }
+            let need = o.need();
+            let have = q.counts.get(k).copied().unwrap_or(0).min(need);
+            out.push(TipQuest::Objective {
+                text: objective_line(content, o, have, need),
+                done: have >= need,
+            });
+        }
+    }
+    out
+}
+
+/// The open quest that wants bag or loot item `item` (looted, delivered or applied), if any.
+pub fn quest_item_of(sim: &dyn SimRead, item: &str) -> Option<String> {
+    let content = sim.content();
+    sim.quests().active.iter().find_map(|q| {
+        let def = content.quest(&q.id)?;
+        def.objectives
+            .iter()
+            .any(|o| match o {
+                Objective::Loot(it, _) => it == item,
+                Objective::Deliver { item: it, .. } | Objective::UseOn { item: it, .. } => {
+                    it == item
+                }
+                _ => false,
+            })
+            .then(|| def.name.clone())
+    })
+}
+
 fn status_chip(s: QuestStatus) -> (&'static str, Color) {
     match s {
         QuestStatus::Available => ("TO DO", Color::srgb(0.7, 0.74, 0.82)),
         QuestStatus::Active => ("IN PROGRESS", Color::srgb(0.4, 0.65, 1.0)),
-        QuestStatus::Ready => ("IN REVIEW", GOLD),
+        // Violet: gold is the main-quest colour and a ready side quest must not borrow it.
+        QuestStatus::Ready => ("IN REVIEW", Color::srgb(0.78, 0.6, 1.0)),
         QuestStatus::Done => ("DONE", DONE_GREEN),
         QuestStatus::Locked => ("BLOCKED", Color::srgb(1.0, 0.4, 0.35)),
     }
@@ -433,6 +541,8 @@ enum Action {
     ToggleTrack(String),
     /// Tracker title: open the log on that ticket.
     Open(String),
+    /// Log row: point the quest arrow at this ticket.
+    Guide(String),
     Collapse,
     Back,
     Close,
@@ -933,7 +1043,9 @@ fn handle_actions(
                     track.untracked.retain(|u| *u != id);
                 }
             }
+            Action::Guide(id) => track.waypoint = Some(id),
             Action::Open(id) => {
+                track.waypoint = Some(id.clone());
                 track.focus = Some(id);
                 windows.log = true;
                 windows.dialog = None;
@@ -1182,8 +1294,8 @@ fn update_log(
     put!(node.display, Display::Flex);
     let log = sim.quests();
     let sig = format!(
-        "{:?}|{:?}|{:?}|{:?}",
-        log.active, log.completed, track.untracked, track.focus
+        "{:?}|{:?}|{:?}|{:?}|{:?}",
+        log.active, log.completed, track.untracked, track.focus, track.waypoint
     );
     if sig == shown.log {
         return;
@@ -1200,14 +1312,13 @@ fn update_log(
     let mut last_main = None;
     commands.entity(*root).despawn_related::<Children>();
     commands.entity(*root).with_children(|c| {
-        c.spawn(Node {
-            justify_content: JustifyContent::SpaceBetween,
-            ..default()
-        })
-        .with_children(|h| {
-            h.spawn((label("~/jira  (J to close)", 14.0), TextColor(DIM)));
-            button(h, "", "x", Action::CloseLog, false);
-        });
+        super::window_header(
+            c,
+            "Quests",
+            super::subtitle("~/jira"),
+            crate::keybinds::Action::QuestLog,
+            ActionButton(Action::CloseLog),
+        );
         let tracked_n = log
             .active
             .iter()
@@ -1296,6 +1407,13 @@ fn update_log(
                             if is_tracked { "Tracked" } else { "Track" },
                             Action::ToggleTrack(q.id.clone()),
                             is_tracked,
+                        );
+                        button(
+                            b,
+                            "",
+                            "Guide",
+                            Action::Guide(q.id.clone()),
+                            track.waypoint.as_deref() == Some(q.id.as_str()),
                         );
                         button(b, "", "Abandon", Action::Abandon(q.id.clone()), false);
                     });
@@ -1680,6 +1798,138 @@ mod tests {
         // Side quests get the other tint.
         s.debug_set_quest("onboarding", QuestStatus::Done);
         assert_eq!(giver_mark(&s, "barista", "campus"), Some(("!", SIDE_MARK)));
+    }
+
+    /// Whether the friendly `npc` stands in `zone` for a player at `level` whose log holds
+    /// `done`/`open`. World progress the quests cannot imply (boss kills, zone clears) counts as
+    /// met: the campaign got there before the quest did.
+    fn stands_in(
+        c: &Content,
+        zone: &str,
+        npc: &str,
+        level: u8,
+        done: &[String],
+        open: &[String],
+    ) -> bool {
+        use combat_core::Unlock;
+        fn met(u: &Unlock, level: u8, done: &[String], open: &[String]) -> bool {
+            match u {
+                Unlock::QuestDone(q) => done.contains(q),
+                Unlock::QuestStarted(q) => done.contains(q) || open.contains(q),
+                Unlock::PlayerLevel(n) => level >= *n,
+                Unlock::AnyOf(any) => any.iter().any(|a| met(a, level, done, open)),
+                Unlock::BossKilled(_) | Unlock::ZoneCleared(_) => true,
+            }
+        }
+        c.zone(zone).is_some_and(|z| {
+            z.friendly.iter().any(|f| {
+                f.unit == npc
+                    && f.requires
+                        .as_ref()
+                        .is_none_or(|r| met(r, level, done, open))
+                    && !f.until.as_ref().is_some_and(|u| met(u, level, done, open))
+            })
+        })
+    }
+
+    /// Every quest the content can offer has a giver on the ground and a "!" over it the moment
+    /// its gates open, and a "?" over whoever takes it once the work is done.
+    #[test]
+    fn every_quest_gets_its_marker_where_the_giver_stands() {
+        let c = sim().content().clone();
+        let mut bad = Vec::new();
+        for q in &c.quests {
+            let mut s = sim();
+            s.spawn_player("fullstack", combat_core::Vec3::new(0.0, 0.0, 0.0), 0.0);
+            s.set_player_level(q.level_min);
+            // The chain behind it, oldest first.
+            let mut done = Vec::new();
+            let mut at = q.requires.clone();
+            while let Some(id) = at {
+                at = c.quest(&id).and_then(|d| d.requires.clone());
+                done.push(id);
+            }
+            for id in &done {
+                s.debug_set_quest(id, QuestStatus::Done);
+            }
+            if q.id == "il_00_wake" {
+                s.debug_ilmari_opening();
+            }
+            // The ending's marker is written by the sim, never offered.
+            if q.id == "il_w7_done" {
+                continue;
+            }
+            if s.quest_status(&q.id) != QuestStatus::Available {
+                bad.push(format!("{}: not available at level {}", q.id, q.level_min));
+                continue;
+            }
+            let calendar_first = c
+                .calendar
+                .chains
+                .iter()
+                .any(|ch| ch.quests.first() == Some(&q.id));
+            let g = &q.giver;
+            if !stands_in(&c, &g.zone, &g.npc, q.level_min, &done, &[]) {
+                bad.push(format!(
+                    "{}: giver {} is not in {} when it opens",
+                    q.id, g.npc, g.zone
+                ));
+            } else if !calendar_first && giver_mark(&s, &g.npc, &g.zone).map(|m| m.0) != Some("!") {
+                bad.push(format!("{}: no ! over {}", q.id, g.npc));
+            }
+            s.debug_set_quest(&q.id, QuestStatus::Ready);
+            let e = q.ender();
+            let mut open = vec![q.id.clone()];
+            open.extend(done.iter().cloned());
+            if !stands_in(&c, &e.zone, &e.npc, q.level_min, &done, &open) {
+                bad.push(format!(
+                    "{}: taker {} is not in {} when it is done",
+                    q.id, e.npc, e.zone
+                ));
+            } else if giver_mark(&s, &e.npc, &e.zone).map(|m| m.0) != Some("?") {
+                bad.push(format!("{}: no ? over {}", q.id, e.npc));
+            }
+        }
+        assert!(
+            bad.is_empty(),
+            "{} problems:\n{}",
+            bad.len(),
+            bad.join("\n")
+        );
+    }
+
+    #[test]
+    fn a_giver_greys_out_a_few_levels_ahead_and_not_further() {
+        let mut s = sim();
+        s.spawn_player("fullstack", combat_core::Vec3::new(0.0, 0.0, 0.0), 0.0);
+        let c = s.content().clone();
+        let q = c
+            .quests
+            .iter()
+            .find(|q| q.requires.is_none() && q.level_min >= 3 && q.level_min <= 4)
+            .expect("an early level-gated ticket");
+        let (npc, zone) = (q.giver.npc.as_str(), q.giver.zone.as_str());
+        s.set_player_level(q.level_min - 2);
+        assert_eq!(giver_mark(&s, npc, zone), Some(("!", GREY_MARK)));
+        s.set_player_level(q.level_min);
+        assert_eq!(giver_mark(&s, npc, zone).map(|m| m.0), Some("!"));
+        assert_ne!(giver_mark(&s, npc, zone).map(|m| m.1), Some(GREY_MARK));
+        // Out of reach: no tease.
+        let far = c
+            .quests
+            .iter()
+            .find(|q| q.requires.is_none() && q.level_min > GREY_BANG_LEVELS + 1);
+        if let Some(far) = far {
+            s.set_player_level(1);
+            let lone = c
+                .quests
+                .iter()
+                .filter(|o| o.giver.npc == far.giver.npc && o.giver.zone == far.giver.zone)
+                .all(|o| o.level_min > GREY_BANG_LEVELS + 1);
+            if lone {
+                assert_eq!(giver_mark(&s, &far.giver.npc, &far.giver.zone), None);
+            }
+        }
     }
 
     #[test]

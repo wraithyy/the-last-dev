@@ -13,7 +13,7 @@ use crate::targeting::Target;
 use crate::units::Unit;
 use bevy::prelude::*;
 use combat_core::EntityId;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 const PLATE_W: f32 = 180.0;
 const PLATE_RANGE: f32 = 40.0;
@@ -39,7 +39,11 @@ struct Nameplate {
 struct PlateFill(EntityId);
 /// Quest giver marker ("!" / "?") on top of a friendly plate.
 #[derive(Component)]
-struct QuestMark(String);
+struct QuestMark(EntityId, String);
+/// Sim ids of the units whose plate shows a "!" or "?" right now: the plate solver keeps these
+/// on screen (a giver's marker is the one thing a plate must never lose to crowding or an edge).
+#[derive(Resource, Default)]
+struct Marked(HashSet<EntityId>);
 /// Name text and "LOOT" tag of a plate; `loot_fx` recolours and reveals them on lootable corpses.
 #[derive(Component)]
 pub struct PlateName(pub EntityId);
@@ -53,20 +57,22 @@ pub struct NameplatePlugin;
 
 impl Plugin for NameplatePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PlateTops>().add_systems(
-            Update,
-            (
-                spawn_plates,
-                recolor_plates,
-                place_plates.in_set(PlatePlacement),
-                // Quest state changes on accept/turn-in, not per frame; each call walks the quest
-                // list per plate, so 4 Hz keeps the markers current at a fraction of the cost.
-                update_marks.run_if(crate::hud::every(0.25)),
-                update_titles.run_if(crate::hud::every(0.25)),
-            )
-                .chain()
-                .in_set(SimReady),
-        );
+        app.init_resource::<PlateTops>()
+            .init_resource::<Marked>()
+            .add_systems(
+                Update,
+                (
+                    spawn_plates,
+                    recolor_plates,
+                    place_plates.in_set(PlatePlacement),
+                    // Quest state changes on accept/turn-in, not per frame; each call walks the quest
+                    // list per plate, so 4 Hz keeps the markers current at a fraction of the cost.
+                    update_marks.run_if(crate::hud::every(0.25)),
+                    update_titles.run_if(crate::hud::every(0.25)),
+                )
+                    .chain()
+                    .in_set(SimReady),
+            );
     }
 }
 
@@ -116,7 +122,7 @@ fn spawn_plates(
         root.with_children(|p| {
             if !u.hostile {
                 p.spawn((
-                    QuestMark(u.key.clone()),
+                    QuestMark(u.id, u.key.clone()),
                     label("", 34.0),
                     TextColor(Color::NONE),
                 ));
@@ -298,9 +304,12 @@ fn solve_stacks(boxes: &[PlateBox], gap: f32) -> Vec<f32> {
 
 /// Sort key: the target first, then nearest first in 2 m bands. Banding stops two units at
 /// almost the same distance from swapping places every frame; the entity index breaks ties.
-fn priority_key(targeted: bool, dist: f32, entity: Entity) -> (i32, u32) {
+fn priority_key(targeted: bool, marked: bool, dist: f32, entity: Entity) -> (i32, u32) {
     let band = if targeted {
         i32::MIN
+    } else if marked {
+        // Right after the target, nearest first: markers outrank every unmarked plate.
+        i32::MIN / 2 + (dist / 2.0) as i32
     } else {
         (dist / 2.0) as i32
     };
@@ -319,6 +328,8 @@ const STACK_GAP_PX: f32 = 2.0;
 /// Width used to test a plate against HUD panels and screen edges: a wrapped title can run
 /// wider than `CONTENT_W`.
 const SHOW_W: f32 = 160.0;
+/// Height of the "!" / "?" glyph row on top of a plate.
+const MARK_H: f32 = 40.0;
 
 /// Screen y (window px, downwards) of the top edge of every visible plate, by sim id. Yell
 /// bubbles read it so they sit above the plate's final position rather than the raw head point.
@@ -334,6 +345,7 @@ struct Candidate {
     key: (i32, u32),
     base_k: f32,
     targeted: bool,
+    marked: bool,
     x: f32,
     y: f32,
     w: f32,
@@ -347,6 +359,7 @@ fn place_plates(
     target: Res<Target>,
     ui_scale: Res<UiScale>,
     hud: Res<crate::hud::HudRects>,
+    marked: Res<Marked>,
     mut tops: ResMut<PlateTops>,
     window: Single<&Window>,
     camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
@@ -400,6 +413,7 @@ fn place_plates(
             continue;
         };
         let targeted = target.0 == Some(plate.anchor);
+        let marked = marked.0.contains(&plate.sim);
         // Far plates shrink so a whole pack stays readable; the target stands out.
         let base_k = (1.1 - dist / 60.0).clamp(0.6, 1.0) * if targeted { 1.15 } else { 1.0 };
         // Physical size over the window factor is window px; before the first layout pass a
@@ -411,9 +425,10 @@ fn place_plates(
         };
         cands.push(Candidate {
             entity: e,
-            key: priority_key(targeted, dist, e),
+            key: priority_key(targeted, marked, dist, e),
             base_k,
             targeted,
+            marked,
             x: screen.x,
             y: screen.y,
             w: CONTENT_W * scale * base_k,
@@ -452,12 +467,35 @@ fn place_plates(
         // A plate that would draw over a HUD panel (minimap, frames, bars, logs) or be cut by the
         // screen edge is not shown.
         let half_w = SHOW_W * scale * c.base_k / 2.0;
-        let rect = Rect {
-            min: Vec2::new(c.x - half_w, c.y - goal - c.h),
-            max: Vec2::new(c.x + half_w, c.y - goal),
+        // A marked plate slides back inside the window instead of vanishing at the edge, so a
+        // giver standing near the border keeps its "!"; only the anchor leaving the view hides it.
+        let x = if c.marked && half_w * 2.0 <= view_w {
+            c.x.clamp(half_w, view_w - half_w)
+        } else {
+            c.x
         };
-        let off_screen = rect.min.x < 0.0 || rect.max.x > view_w || rect.min.y < 0.0;
-        let want_k = if crowd > HIDE_AT || off_screen || hud.hits(rect) {
+        let rect = Rect {
+            min: Vec2::new(x - half_w, c.y - goal - c.h),
+            max: Vec2::new(x + half_w, c.y - goal),
+        };
+        let off_screen = if c.marked {
+            !(0.0..=view_w).contains(&c.x) || c.y - goal < 0.0
+        } else {
+            rect.min.x < 0.0 || rect.max.x > view_w || rect.min.y < 0.0
+        };
+        // Under a HUD panel a marked plate only needs its glyph clear of it.
+        let hit = if c.marked {
+            let glyph = MARK_H * scale * c.base_k;
+            hud.hits(Rect {
+                min: rect.min,
+                max: Vec2::new(rect.max.x, rect.min.y + glyph),
+            })
+        } else {
+            hud.hits(rect)
+        };
+        // Crowding shrinks a marked plate but never hides it.
+        let hide = if c.marked { f32::INFINITY } else { HIDE_AT };
+        let want_k = if crowd > hide || off_screen || hit {
             0.0
         } else if crowd > SHRINK_AT {
             c.base_k * 0.75
@@ -479,7 +517,7 @@ fn place_plates(
         vis.set_if_neq(Visibility::Inherited);
         // The target's plate is drawn over any plate stacked next to it.
         z.set_if_neq(GlobalZIndex(if c.targeted { 6 } else { 5 }));
-        put!(node.left, px(c.x / scale - PLATE_W / 2.0));
+        put!(node.left, px(x / scale - PLATE_W / 2.0));
         put!(node.bottom, px((view_h - c.y + plate.offset) / scale));
         put!(tf_ui.scale, Vec2::splat(plate.k));
         // Scaling is about the centre, so the visible top edge sits half the shrink lower.
@@ -501,11 +539,16 @@ fn place_plates(
 fn update_marks(
     sim: SimView,
     flow: Res<crate::game::GameFlow>,
+    mut marked: ResMut<Marked>,
     mut marks: Query<(&QuestMark, &mut Text, &mut TextColor)>,
 ) {
+    marked.0.clear();
     for (mark, mut text, mut color) in &mut marks {
         let (glyph, c) =
-            crate::hud::giver_mark(&*sim, &mark.0, &flow.zone).unwrap_or(("", Color::NONE));
+            crate::hud::giver_mark(&*sim, &mark.1, &flow.zone).unwrap_or(("", Color::NONE));
+        if !glyph.is_empty() {
+            marked.0.insert(mark.0);
+        }
         crate::hud::set_text(&mut text, glyph);
         if color.0 != c {
             color.0 = c;
@@ -570,9 +613,11 @@ mod tests {
     fn target_sorts_first_and_distance_bands_are_stable() {
         let e = Entity::from_raw_u32(9).unwrap();
         let f = Entity::from_raw_u32(3).unwrap();
-        assert!(priority_key(true, 50.0, e) < priority_key(false, 1.0, f));
+        assert!(priority_key(true, false, 50.0, e) < priority_key(false, true, 1.0, f));
         // 10.1 m and 10.9 m share a band: ordering falls to the entity index, not distance.
-        assert!(priority_key(false, 10.9, f) < priority_key(false, 10.1, e));
-        assert!(priority_key(false, 3.0, e) < priority_key(false, 12.0, f));
+        assert!(priority_key(false, false, 10.9, f) < priority_key(false, false, 10.1, e));
+        assert!(priority_key(false, false, 3.0, e) < priority_key(false, false, 12.0, f));
+        // A far marker still beats a near plain plate.
+        assert!(priority_key(false, true, 38.0, e) < priority_key(false, false, 1.0, f));
     }
 }

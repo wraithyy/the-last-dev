@@ -126,26 +126,19 @@ fn spawn_ui(mut commands: Commands) {
             GlobalZIndex(32),
         ))
         .with_children(|w| {
-            w.spawn(Node {
-                justify_content: JustifyContent::SpaceBetween,
-                ..default()
-            })
-            .with_children(|h| {
-                h.spawn((Line::Header, label("~/endgame", 14.0), TextColor(DIM)));
-                h.spawn(Node {
-                    column_gap: px(14),
-                    ..default()
-                })
-                .with_children(|b| {
-                    b.spawn((
-                        crate::calendar::OpenCalendar,
-                        Button,
-                        label("[Company Calendar]", 14.0),
-                        TextColor(ACCENT),
-                    ));
-                    b.spawn((CloseButton, Button, label("[x]", 14.0)));
-                });
-            });
+            super::window_header(
+                w,
+                "Endgame",
+                (Line::Header, label("~/endgame", 11.0), TextColor(DIM)),
+                Action::Endgame,
+                CloseButton,
+            );
+            w.spawn((
+                crate::calendar::OpenCalendar,
+                Button,
+                label("[Company Calendar]", 13.0),
+                TextColor(ACCENT),
+            ));
             w.spawn(section("PROMOTION"));
             w.spawn((Line::Rank, label("", 14.0), TextColor(GOLD)));
             w.spawn(Node {
@@ -255,14 +248,11 @@ fn spawn_ui(mut commands: Commands) {
             ));
             w.spawn((Line::Seed, label("", 11.0), TextColor(DIM)));
         });
-    // Esc menu entry, left of "Change role" (keyboard layout only; touch has the Menu drawer).
+    // Esc menu entry in the Game group (keyboard layout only; touch has the Menu drawer).
     commands.spawn((
         MenuEntry,
+        super::PauseSlot(super::PauseGroup::Game, 2),
         Node {
-            position_type: PositionType::Absolute,
-            top: percent(crate::hud::PAUSE_ROW2),
-            width: percent(100),
-            justify_content: JustifyContent::Center,
             display: Display::None,
             ..default()
         },
@@ -271,7 +261,6 @@ fn spawn_ui(mut commands: Commands) {
             Button,
             MenuButton,
             Node {
-                margin: UiRect::right(px(390)),
                 padding: UiRect::axes(px(14), px(5)),
                 border: UiRect::all(px(2)),
                 border_radius: BorderRadius::all(px(5)),
@@ -360,8 +349,6 @@ fn menu_entry(
 #[allow(clippy::too_many_arguments, clippy::type_complexity)] // Bevy system parameters
 fn update_window(
     open: Res<EndgameOpen>,
-    binds: Res<Keybinds>,
-    touch: Res<TouchMode>,
     sim: SimView,
     offline: Res<CombatSim>,
     net: Option<Res<NetWorld>>,
@@ -533,9 +520,7 @@ fn update_window(
     }
     for (line, mut text) in &mut lines {
         let s = match line {
-            // Touch has no key to name; the [x] is right there.
-            Line::Header if touch.active => "~/endgame".to_string(),
-            Line::Header => format!("~/endgame  ({} to close)", binds.label(Action::Endgame)),
+            Line::Header => "~/endgame".to_string(),
             Line::Rank => rank.clone(),
             Line::RankXp => xp.clone(),
             Line::Blurb => blurb.clone(),

@@ -318,14 +318,16 @@ fn spawn_meter(mut commands: Commands) {
                 BackgroundColor(Color::srgba(0.14, 0.15, 0.2, 0.96)),
             ))
             .with_children(|bar| {
-                bar.spawn((
-                    Node {
-                        flex_grow: 1.0,
-                        ..default()
-                    },
-                    label("~/metrics (Q3 OKR dashboard)", 10.0),
-                    TextColor(DIM),
-                ));
+                bar.spawn(Node {
+                    flex_grow: 1.0,
+                    column_gap: px(6),
+                    align_items: AlignItems::Baseline,
+                    ..default()
+                })
+                .with_children(|t| {
+                    t.spawn((label("Metrics", 12.0), TextColor(Color::WHITE)));
+                    t.spawn((label("~/Q3 OKR dashboard", 10.0), TextColor(DIM)));
+                });
                 close_button(bar, Win::Meter);
             });
             root.spawn((
