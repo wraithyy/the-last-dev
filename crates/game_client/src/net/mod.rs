@@ -20,7 +20,7 @@ mod lobby;
 mod party;
 mod session;
 #[cfg(target_arch = "wasm32")]
-mod soft_keyboard;
+pub(crate) mod soft_keyboard;
 mod store;
 pub mod transport;
 mod world;

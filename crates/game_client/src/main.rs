@@ -54,6 +54,7 @@ mod units;
 mod vfx;
 mod wing3_fx;
 mod wing4_fx;
+mod wipe;
 mod yell;
 
 use bevy::asset::AssetMetaCheck;
@@ -175,6 +176,7 @@ fn main() {
     ))
     .add_plugins(social::SocialPlugin)
     .add_plugins(roasts::RoastPlugin)
+    .add_plugins(wipe::WipePlugin)
     .add_plugins(live::LivePlugin)
     .add_plugins(legacy::LegacyPlugin)
     .add_plugins(raid::RaidPlugin)

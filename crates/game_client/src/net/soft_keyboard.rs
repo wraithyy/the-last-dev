@@ -11,7 +11,10 @@ struct Kb {
     input: HtmlInputElement,
     /// Read by the tap handler: iOS only opens the keyboard from inside a user gesture.
     want: Rc<Cell<bool>>,
+    /// Enter pressed inside the input, which winit never sees while the input has focus.
+    enter: Rc<Cell<bool>>,
     _tap: Closure<dyn FnMut(web_sys::PointerEvent)>,
+    _key: Closure<dyn FnMut(web_sys::KeyboardEvent)>,
 }
 
 thread_local! {
@@ -50,10 +53,24 @@ fn build() -> Option<Kb> {
     };
     doc.add_event_listener_with_callback("pointerup", tap.as_ref().unchecked_ref())
         .ok()?;
+    let enter = Rc::new(Cell::new(false));
+    let key = {
+        let enter = enter.clone();
+        Closure::<dyn FnMut(web_sys::KeyboardEvent)>::new(move |e: web_sys::KeyboardEvent| {
+            if e.key() == "Enter" {
+                enter.set(true);
+            }
+        })
+    };
+    input
+        .add_event_listener_with_callback("keydown", key.as_ref().unchecked_ref())
+        .ok()?;
     Some(Kb {
         input,
         want,
+        enter,
         _tap: tap,
+        _key: key,
     })
 }
 
@@ -67,6 +84,11 @@ pub fn show(value: &str) {
         k.want.set(true);
         let _ = k.input.focus();
     });
+}
+
+/// Whether Enter was pressed in the input since the last call.
+pub fn take_enter() -> bool {
+    with(|k| k.enter.replace(false)).unwrap_or(false)
 }
 
 pub fn value() -> Option<String> {

@@ -10,6 +10,8 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ### Added
 
+- Esc menu > Start over wipes the current role's save and starts it again in the car park with the tutorial. HR makes you type a farewell sentence first, so no stray click costs a character; other roles keep their saves.
+
 The Ilmari campaign, from the Alignment Lab to the Core.
 
 - The Alignment Lab, through the new ethics stairs on the occupied campus: three rooms and two bosses. The Alignment Consultant keeps offering you things you did not ask for (silence counts as yes, and the opt-out kiosks are real), and Red Team Blue Team hold a tabletop exercise until somebody is seen, so mind the cones. Both come with their own gear, titles and Story and Full versions.

@@ -19,14 +19,21 @@ struct SaveState {
     loaded: Option<(u64, String)>,
     last_written: String,
     clock: f32,
+    /// A wiped save waits for the restart: the old sim must not write itself back first.
+    wiped: bool,
 }
+
+/// Esc menu > Start over: forget the class's save; a `RestartRun` sent with it starts again at P3.
+#[derive(Message)]
+pub struct WipeSave(pub String);
 
 pub struct SavePlugin;
 
 impl Plugin for SavePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SaveState>()
-            .add_systems(Update, (load, write).chain().in_set(SimReady));
+            .add_message::<WipeSave>()
+            .add_systems(Update, (wipe, load, write).chain().in_set(SimReady));
     }
 }
 
@@ -43,6 +50,16 @@ fn disabled() -> bool {
         || crate::debug::shooting()
 }
 
+fn wipe(mut wipes: MessageReader<WipeSave>, mut state: ResMut<SaveState>) {
+    for WipeSave(class) in wipes.read() {
+        platform::delete(class);
+        state.wiped = true;
+        state.loaded = None;
+        state.last_written.clear();
+        info!("wiped the {class} save");
+    }
+}
+
 fn load(
     mut sim: ResMut<CombatSim>,
     mode: Res<GameMode>,
@@ -52,8 +69,9 @@ fn load(
 ) {
     if restarted.read().count() > 0 {
         state.loaded = None;
+        state.wiped = false;
     }
-    if mode.is_online() || disabled() {
+    if state.wiped || mode.is_online() || disabled() {
         return;
     }
     let Some(p) = sim.0.player() else { return };
@@ -211,6 +229,12 @@ mod platform {
             let _ = std::fs::rename(tmp, p);
         }
     }
+
+    pub fn delete(class: &str) {
+        if let Some(p) = path(class) {
+            let _ = std::fs::remove_file(p);
+        }
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -226,6 +250,12 @@ mod platform {
     pub fn write(class: &str, text: &str) {
         if let Some(s) = storage() {
             let _ = s.set_item(&format!("tld_save_{class}"), text);
+        }
+    }
+
+    pub fn delete(class: &str) {
+        if let Some(s) = storage() {
+            let _ = s.remove_item(&format!("tld_save_{class}"));
         }
     }
 }

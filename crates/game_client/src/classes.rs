@@ -455,7 +455,8 @@ fn spawn_card(row: &mut ChildSpawnerCommands, i: usize, c: &ClassCard) {
     });
 }
 
-/// Esc menu entry under the co-op button; a change restarts the solo run.
+/// Esc menu entries under the co-op button: a role change restarts the solo run, Start over
+/// wipes the role's save (`wipe.rs`).
 fn spawn_change_role_menu(mut commands: Commands) {
     commands.spawn((
         ChangeRoleMenu,
@@ -485,6 +486,8 @@ fn spawn_change_role_menu(mut commands: Commands) {
                 children![label("Change role", 16.0)],
             ),
             (ChangeRoleText, label("", 12.0), TextColor(DIM)),
+            // Its own line: the endgame and onboarding buttons flank the row above.
+            crate::wipe::start_over_button(),
         ],
     ));
 }
@@ -509,7 +512,7 @@ fn change_role_menu(
     }
     let online = mode.is_online();
     let text = if online {
-        "Leave the room first: roles change offline only."
+        "Leave the room first: roles change and saves wipe offline only."
     } else {
         "Each role keeps its own save. Like every reorg, nobody else's."
     };
