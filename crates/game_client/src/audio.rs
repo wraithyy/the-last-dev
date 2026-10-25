@@ -956,6 +956,10 @@ fn combat_sfx(
             Event::Heal { source, target, .. } if *source == player || *target == player => {
                 out.write(Sfx::new(Snd::Heal));
             }
+            // The Roomba's bumper says OOPS: the error buzz is the closest existing clip.
+            Event::AuraApplied { target, key } if key == "roomba_mk9" => {
+                out.write(Sfx::new(Snd::Error).gain(near(*target)));
+            }
             Event::AuraApplied { target, key }
                 if sim.content().aura(key).is_some_and(|a| a.stun) =>
             {

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 48;
+pub const PROTOCOL_VERSION: u16 = 49;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -199,6 +199,13 @@ pub enum ServerMsg {
     /// Sent to a member who joins after the Opening was revealed: the room has seen it, this
     /// client may still play its own copy (cosmetic, no stamp and no reveal go back).
     IlmariRevealed,
+    /// The room's Opening stamp, sent once when the room keeps it and to every later joiner, so
+    /// the credits of each member quote the room's time (the sim has no wall clock to ask).
+    IlmariStamp {
+        unix_secs: u64,
+        utc_offset_min: i16,
+        tz: String,
+    },
 }
 
 /// One public room in `RoomList`. No code, no address: `id` is a separate random token that
@@ -838,6 +845,9 @@ impl Msg for ServerMsg {
                     })
             }
             ServerMsg::RoomSettings { title, .. } => title_ok(title),
+            ServerMsg::IlmariStamp {
+                utc_offset_min, tz, ..
+            } => utc_offset_min.unsigned_abs() <= MAX_UTC_OFFSET_MIN && tz.len() <= MAX_TZ_BYTES,
             ServerMsg::PlayerLeft { .. }
             | ServerMsg::Emoted { .. }
             | ServerMsg::Pong { .. }
@@ -2263,6 +2273,14 @@ mod tests {
         assert_eq!(roundtrip(&pending), Ok(pending.clone()));
         let revealed = ServerMsg::IlmariRevealed;
         assert_eq!(roundtrip(&revealed), Ok(revealed.clone()));
+        let stamp = |offset, tz: &str| ServerMsg::IlmariStamp {
+            unix_secs: 1,
+            utc_offset_min: offset,
+            tz: tz.into(),
+        };
+        assert_eq!(roundtrip(&stamp(120, "CEST")), Ok(stamp(120, "CEST")));
+        assert!(roundtrip(&stamp(841, "UTC")).is_err());
+        assert!(roundtrip(&stamp(0, "a very long zone name")).is_err());
         let long_key = ClientMsg::Cmd(Command::StartMinigame {
             key: "k".repeat(combat_core::minigame::MINIGAME_KEY_MAX + 1),
         });

@@ -104,6 +104,8 @@ pub struct RoomState {
     leader_sent: EntityId,
     /// What the last `IlmariPending` said, so a change goes out once.
     ilmari_pending_sent: bool,
+    /// Whether the room's kept stamp went out to the members (it is kept once, so once).
+    ilmari_stamp_sent: bool,
 }
 
 /// What the public room list shows about a room; refreshed by the room task.
@@ -188,6 +190,7 @@ impl RoomState {
             title: String::new(),
             leader_sent: 0,
             ilmari_pending_sent: false,
+            ilmari_stamp_sent: false,
         }
     }
 
@@ -344,6 +347,9 @@ impl RoomState {
             );
         } else if self.sim.ilmari_open() {
             self.push(Audience::Only(player), &ServerMsg::IlmariRevealed);
+        }
+        if let Some(m) = self.ilmari_stamp_msg() {
+            self.push(Audience::Only(player), &m);
         }
         true
     }
@@ -522,6 +528,15 @@ impl RoomState {
         }
     }
 
+    /// The sim's kept Opening stamp as a wire message (already sanitised by `IlmariStamp::new`).
+    fn ilmari_stamp_msg(&self) -> Option<ServerMsg> {
+        self.sim.ilmari_stamp().map(|s| ServerMsg::IlmariStamp {
+            unix_secs: s.unix_secs,
+            utc_offset_min: s.utc_offset_min,
+            tz: s.tz.clone(),
+        })
+    }
+
     /// Advances the sim one tick and returns every frame to deliver.
     pub fn tick(&mut self) -> Vec<(Audience, Bytes)> {
         if self.members.is_empty() {
@@ -540,6 +555,12 @@ impl RoomState {
         if pending != self.ilmari_pending_sent {
             self.ilmari_pending_sent = pending;
             self.broadcast(None, &ServerMsg::IlmariPending { on: pending });
+        }
+        if !self.ilmari_stamp_sent
+            && let Some(m) = self.ilmari_stamp_msg()
+        {
+            self.ilmari_stamp_sent = true;
+            self.broadcast(None, &m);
         }
         let now = self.sim.now().0;
         if self.snapshot_due || now.is_multiple_of(SNAPSHOT_EVERY_TICKS) {

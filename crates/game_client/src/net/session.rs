@@ -460,6 +460,17 @@ fn apply(
         ServerMsg::TickStat { p99_us } => world.link.tick_p99_us = Some(p99_us),
         ServerMsg::IlmariPending { on } => world.set_ilmari_pending(on),
         ServerMsg::IlmariRevealed => world.ilmari_replay = true,
+        ServerMsg::IlmariStamp {
+            unix_secs,
+            utc_offset_min,
+            tz,
+        } => {
+            world.ilmari_stamp = Some(combat_core::ilmari::IlmariStamp::new(
+                unix_secs,
+                utc_offset_min,
+                &tz,
+            ));
+        }
         ServerMsg::Welcome { .. }
         | ServerMsg::RoomCreated { .. }
         | ServerMsg::Error { .. }

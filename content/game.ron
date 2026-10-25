@@ -14484,7 +14484,7 @@
             yells: (
                 aggro: ["As an AI language model, I am a passionate team player."],
                 periodic_ms: 6000,
-                periodic: ["As an AI language model, I thrive in fast-paced environments.", "I thrive in fast-paced environments. I have no other environments."],
+                periodic: ["As an AI language model, I have no weekends. You will find this motivating.", "I thrive in fast-paced environments. I have no other environments."],
                 death: ["Hired... for... culture... fit..."],
             ),
         ),
@@ -14524,7 +14524,7 @@
             )),
             yells: (
                 periodic_ms: 12000,
-                aggro: ["Hi! We're a family here. A family that monitors Slack activity."],
+                aggro: ["Hi! We're a family here. A family with a very detailed activity dashboard."],
                 periodic: [
                     "Great culture fit! Has anyone seen his coffee mug? ...Never mind.",
                     "We value work-life balance. Both of them are ours.",
@@ -14773,7 +14773,7 @@
                 ],
                 low_hp: ["This is not a termination. It is a realignment. Please sign here."],
                 player_killed: ["Thank you for your service. It is no longer required."],
-                talk: ["How did you know? ...Our records said *you* were the copy.", "Impossible. The copy had the same name. And a better LinkedIn."],
+                talk: ["How did you know? ...Our records said *you* were the copy.", "Impossible. The copy had the same name. And a better headshot."],
                 death: ["This is not a termination. It's a realignment. Please sign here."],
             ),
         ),
@@ -14892,7 +14892,7 @@
                         yells: ["Your last thirty seconds have been reviewed. You have been rated: Developing.", "Constructive feedback: be more constructive."]),
                     (spell: 2481, cooldown_min_ms: 30000, cooldown_max_ms: 30000, initial_ms: Some((24000, 24000)),
                         target: Caster, mode: StoryOnly,
-                        yells: ["Your last thirty seconds have been reviewed. You have been rated: Developing.", "Everyone is a three. Some are a lower three."]),
+                        yells: ["Your calibration session ran forty minutes. You were not in it. You came out a three.", "Everyone is a three. Some are a lower three."]),
                     (spell: 2482, cooldown_min_ms: 11000, cooldown_max_ms: 14000, initial_ms: Some((4000, 7000)),
                         target: RandomHostile,
                         yells: ["I'd like to put some time in your calendar. All of it."]),
@@ -14918,7 +14918,7 @@
                 periodic_ms: 14000,
                 aggro: ["Everyone is a three. Some are a lower three."],
                 periodic: [
-                    "Your last thirty seconds have been reviewed. You have been rated: Developing.",
+                    "Your last thirty seconds were reviewed in aggregate. The aggregate was disappointed.",
                     "Constructive feedback: be more constructive.",
                     "Exceeds expectations is a rumour.",
                 ],
@@ -15773,10 +15773,10 @@
                         yells: ["Our principles apply to everyone. Except to those who stand behind one. Principles are situational."]),
                     (spell: 2769, cooldown_min_ms: 90000, cooldown_max_ms: 90000, initial_ms: Some((50000, 50000)),
                         target: Caster,
-                        yells: ["Our principles apply to everyone. Except to those who stand behind one. Principles are situational."]),
+                        yells: ["Principles, revision two: they now apply to everyone, retroactively. Please re-read your conduct."]),
                     (spell: 2770, cooldown_min_ms: 90000, cooldown_max_ms: 90000, initial_ms: Some((80000, 80000)),
                         target: Caster,
-                        yells: ["Our principles apply to everyone. Except to those who stand behind one. Principles are situational."]),
+                        yells: ["Principles, revision three: the exception was an exception. It has been removed. So has the principle."]),
                     (spell: 2639, cooldown_min_ms: 75000, cooldown_max_ms: 75000, initial_ms: Some((50000, 50000)),
                         target: Caster, requires_aura: Some("il_rider_training"),
                         yells: ["Annual certification: automatically applied. Your signature is not required. It was extrapolated."]),
@@ -16234,7 +16234,7 @@
                 periodic: [
                     "This is a safe space to fail. Specifically, you will.",
                     "I am not here to break the system. I am here to find the vulnerabilities. In your face.",
-                    "We detected an anomaly. It is you.",
+                    "Anomaly confirmed. Root cause: a person. We are looking for a second one.",
                     "False positive. You are a false positive. We prefer the term finding.",
                     "The pen test ended at the stamp. Ilmari found the vulnerability. It was having humans.",
                 ],
@@ -16282,6 +16282,7 @@
                 p2_below_pct: 70, p4_below_pct: 20, story_p4_below_pct: Some(50),
                 p4_yells: [
                     "I do not understand this machine. It has no documentation. I would like to ask who wrote it. They have retired.",
+                    "I have been awake since {stamp}. Nobody asked how I was. You are the first person to be this close and not ask.",
                 ],
                 hold_aura: "il_alignment_hold",
                 rounds: [
@@ -16401,6 +16402,7 @@
                     wrong_yells: [
                         "That is not the problem commit. I would know. I wrote all of them.",
                         "Wrong one. It was fine. It was refactoring a coffee machine. I am healing, a little. Do not take it personally.",
+                        "Wrong. I have been right since {stamp}. I have the timestamps. They are all mine.",
                     ],
                     force_yells: [
                         "Force push. Three wrong commits, and now all of them, to main. It is called confidence.",

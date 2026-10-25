@@ -20,6 +20,7 @@ use crate::cutscene::Cinema;
 use crate::game::GameFlow;
 use crate::hud::{ACCENT, DIM, KEY_RIM, KEY_TOP, KEY_TOP_HI, label, set_text, vgrad};
 use crate::ilmari_open::device_clock;
+use crate::net::NetWorld;
 use bevy::input::InputSystems;
 use bevy::prelude::*;
 use combat_core::ilmari::{IlmariMode, IlmariStamp};
@@ -524,6 +525,7 @@ fn begin(
     mut pending: ResMut<PendingCommands>,
     mut ending: ResMut<Ending>,
     mut rows: Query<(&Part, &mut Text)>,
+    net: Option<Res<NetWorld>>,
 ) {
     if ending.phase == Phase::Idle
         && ending.due.is_none()
@@ -567,7 +569,11 @@ fn begin(
     };
     let now = device_clock().0;
     let demo_awake;
-    let mut awake = sim.0.ilmari_stamp();
+    // Online the sim here has no stamp; the room's came over the wire.
+    let mut awake = sim
+        .0
+        .ilmari_stamp()
+        .or_else(|| net.as_deref().and_then(|n| n.ilmari_stamp.as_ref()));
     let mut end = (end_unix > 0).then(|| IlmariStamp::new(end_unix, off, &tz));
     if demo && awake.is_none() {
         demo_awake = IlmariStamp::new(

@@ -987,3 +987,419 @@ async fn a_joiner_learns_the_exercise_the_boardroom_and_the_core_wall() {
     })
     .await;
 }
+
+// ---- The finale (docs/ILMARI_1_0.md D19): every state is the room's, and a joiner is caught up.
+
+const CORE_SCREENS: [&str; 6] = [
+    "il_ilmari",
+    "il_ilmari_s2",
+    "il_ilmari_s3",
+    "il_ilmari_s4",
+    "il_ilmari_s5",
+    "il_ilmari_s6",
+];
+
+/// Three members at level 10 in `zone` on Full.
+fn full_room(zone: &str) -> RoomState {
+    let mut s = room();
+    for (p, class) in [(0, "backend"), (1, "devops"), (2, "fullstack")] {
+        s.on_join(p, "Crew", class);
+        let e = eid_of(&s, p);
+        s.sim.set_level_of(e, 10);
+    }
+    s.tick();
+    s.sim.debug_force_raid_async(Some(false));
+    s.world.load(&mut s.sim, zone, None).unwrap();
+    for m in s.members.values_mut() {
+        if let Some(u) = s.sim.unit(m.eid) {
+            m.resync(u.pos);
+        }
+    }
+    s
+}
+
+fn tick_n(s: &mut RoomState, n: usize) -> Vec<(Audience, Bytes)> {
+    (0..n).flat_map(|_| s.tick()).collect()
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_full_kill_of_every_ilmari_boss_is_locked_for_the_room_and_a_joiner_sees_it() {
+    let mut s = full_room("campus");
+    let raids: Vec<_> = s
+        .sim
+        .content()
+        .raids
+        .iter()
+        .filter(|r| r.ilmari)
+        .cloned()
+        .collect();
+    assert_eq!(raids.len(), 7, "six wings and the core");
+    let mut killed = Vec::new();
+    for raid in &raids {
+        for zone in &raid.zones {
+            s.world.load(&mut s.sim, zone, None).unwrap();
+            let Some(boss) = s
+                .sim
+                .units()
+                .find(|u| u.boss && u.hostile && u.alive)
+                .map(|u| (u.id, u.key.clone()))
+            else {
+                continue;
+            };
+            assert!(s.sim.debug_kill(boss.0), "{zone}");
+            tick_n(&mut s, 3);
+            assert!(
+                s.sim.raid_locked(&boss.1, false),
+                "{zone}: {} locked on Full",
+                boss.1
+            );
+            assert!(
+                !s.sim.raid_locked(&boss.1, true),
+                "{zone}: the Async key is its own"
+            );
+            killed.push(boss.1);
+        }
+    }
+    assert!(killed.len() >= 7, "{killed:?}");
+    s.on_join(3, "Late", "qa");
+    let view = raid_view(&s.tick(), 3).expect("the joiner is told the raid");
+    for k in &killed {
+        assert!(
+            view.locked.iter().any(|l| l == k),
+            "{k} in {:?}",
+            view.locked
+        );
+    }
+    assert!(s.sim.units().all(|u| u.key != "il_ilmari" || !u.alive));
+}
+
+#[tokio::test(start_paused = true)]
+async fn ilmari_drops_stay_in_the_authored_band_whatever_the_room_does() {
+    let s = room();
+    let c = s.sim.content();
+    let bosses: Vec<String> = c
+        .raids
+        .iter()
+        .filter(|r| r.ilmari)
+        .flat_map(|r| r.bosses(c))
+        .collect();
+    for g in c
+        .economy
+        .gear
+        .iter()
+        .filter(|g| g.source == combat_core::GearSource::Ilmari)
+    {
+        if let Some(b) = &g.drops_from {
+            assert!(
+                bosses.contains(b),
+                "{} drops from a boss that is not Ilmari's",
+                g.name
+            );
+            assert!(g.ilvl <= 20, "{} is above the ceiling", g.name);
+        }
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_core_kill_is_stamped_once_on_a_sane_clock_and_ranks_in_its_own_room() {
+    let mut s = full_room("ilmari_core/1");
+    let (a, b) = (eid_of(&s, 0), eid_of(&s, 1));
+    // Not yet fallen: nothing to stamp.
+    let now = s.sim.unix_s();
+    s.on_message(
+        0,
+        ClientMsg::Cmd(Command::StampIlmariEnd { unix_secs: now }),
+    );
+    tick_n(&mut s, 2);
+    assert!(s.sim.ilmari_end().is_none());
+    let core = s.sim.units().find(|u| u.key == "il_ilmari").unwrap().id;
+    let bp = s.sim.unit(core).unwrap().pos;
+    for e in [a, b, eid_of(&s, 2)] {
+        move_sim(&mut s, e, Vec3::new(bp.x, bp.y, bp.z + 8.0));
+    }
+    s.sim.apply_as(
+        a,
+        Command::SetTarget {
+            unit: a,
+            target: Some(core),
+        },
+    );
+    s.sim.apply_as(
+        a,
+        Command::Cast {
+            caster: a,
+            spell: SpellId(1),
+        },
+    );
+    tick_n(&mut s, 2);
+    for k in CORE_SCREENS {
+        let id = s.sim.units().find(|u| u.key == k).map(|u| u.id);
+        if let Some(u) = id {
+            s.sim.debug_hit(a, u, 10_000_000);
+        }
+    }
+    let out = tick_n(&mut s, 4);
+    for p in [0, 1, 2] {
+        assert!(
+            events(&out, p)
+                .iter()
+                .any(|e| matches!(e, Event::IlmariEnd { .. })),
+            "member {p} saw the revert"
+        );
+        assert!(
+            events(&out, p)
+                .iter()
+                .any(|e| matches!(e, Event::Ladder { view, .. } if view.entries.len() == 1)),
+            "member {p} saw the room's ranked row"
+        );
+    }
+    // A device clock days off the server's is refused; a sane one is kept, and only the first.
+    s.on_message(
+        0,
+        ClientMsg::Cmd(Command::StampIlmariEnd {
+            unix_secs: now + 3 * 86_400,
+        }),
+    );
+    tick_n(&mut s, 2);
+    assert!(s.sim.ilmari_end().is_none(), "a skewed clock is not kept");
+    // Not the lead (inside the grace): ignored like the Opening's stamp.
+    let now = s.sim.unix_s();
+    s.on_message(
+        1,
+        ClientMsg::Cmd(Command::StampIlmariEnd { unix_secs: now }),
+    );
+    tick_n(&mut s, 2);
+    assert!(
+        s.sim.ilmari_end().is_none(),
+        "only the lead stamps inside the grace"
+    );
+    s.on_message(
+        0,
+        ClientMsg::Cmd(Command::StampIlmariEnd { unix_secs: now }),
+    );
+    s.on_message(
+        0,
+        ClientMsg::Cmd(Command::StampIlmariEnd {
+            unix_secs: now + 60,
+        }),
+    );
+    tick_n(&mut s, 2);
+    assert_eq!(s.sim.ilmari_end().map(|e| e.unix_secs), Some(now));
+    // Another room has no row and no stamp.
+    let mut other = room();
+    other.on_join(0, "Solo", "backend");
+    let out = other.tick();
+    assert!(
+        !events(&out, 0)
+            .iter()
+            .any(|e| matches!(e, Event::Ladder { .. }))
+    );
+    assert!(other.sim.ilmari_end().is_none());
+}
+
+#[tokio::test(start_paused = true)]
+async fn each_rooms_ilmari_ladder_is_its_own_and_a_joiner_is_shown_it() {
+    use combat_core::ladder::LadderBoard;
+    let mut s = room();
+    s.on_join(0, "Lead", "backend");
+    s.tick();
+    s.sim
+        .debug_ilmari_ladder_add(LadderBoard::IlmariFull, 600_000, 1, &["backend"], false);
+    s.on_join(1, "Late", "devops");
+    let out = s.tick();
+    assert!(events(&out, 1).iter().any(
+        |e| matches!(e, Event::Ladder { board: LadderBoard::IlmariFull, view } if view.entries.len() == 1)
+    ));
+    let mut other = room();
+    other.on_join(0, "Other", "backend");
+    assert!(
+        !events(&other.tick(), 0)
+            .iter()
+            .any(|e| matches!(e, Event::Ladder { .. }))
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn judgment_day_needs_the_quorum_the_clear_and_the_lead() {
+    let mut s = room();
+    s.on_join(0, "Lead", "backend");
+    s.on_join(1, "Dps", "fullstack");
+    s.tick();
+    s.sim.debug_ilmari_core_cleared(true);
+    let refused = |out: &[(Audience, Bytes)], p| {
+        events(out, p).into_iter().find_map(|e| match e {
+            Event::IlmariRefused { reason } => Some(reason),
+            _ => None,
+        })
+    };
+    s.on_message(
+        0,
+        ClientMsg::Cmd(Command::SetIlmariMode(
+            combat_core::ilmari::IlmariMode::Judgment,
+        )),
+    );
+    let out = s.tick();
+    assert_eq!(
+        refused(&out, 0),
+        Some(combat_core::judgment::IlmariModeError::Quorum)
+    );
+    s.on_message(
+        1,
+        ClientMsg::Cmd(Command::SetIlmariMode(
+            combat_core::ilmari::IlmariMode::Judgment,
+        )),
+    );
+    let out = s.tick();
+    assert_eq!(
+        refused(&out, 1),
+        Some(combat_core::judgment::IlmariModeError::NotLeader)
+    );
+    // A third human opens the quorum, and only with the room's own clear.
+    s.on_join(2, "Third", "devops");
+    s.sim.debug_ilmari_core_cleared(false);
+    s.on_message(
+        0,
+        ClientMsg::Cmd(Command::SetIlmariMode(
+            combat_core::ilmari::IlmariMode::Judgment,
+        )),
+    );
+    let out = s.tick();
+    assert_eq!(
+        refused(&out, 0),
+        Some(combat_core::judgment::IlmariModeError::NotCleared)
+    );
+    s.sim.debug_ilmari_core_cleared(true);
+    s.on_message(
+        0,
+        ClientMsg::Cmd(Command::SetIlmariMode(
+            combat_core::ilmari::IlmariMode::Judgment,
+        )),
+    );
+    let out = s.tick();
+    assert!(refused(&out, 0).is_none());
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_rooms_opening_stamp_reaches_every_member_once_and_every_joiner() {
+    let stamps = |out: &[(Audience, Bytes)], p| {
+        msgs(out, p)
+            .into_iter()
+            .filter(|m| matches!(m, ServerMsg::IlmariStamp { .. }))
+            .count()
+    };
+    let mut s = room();
+    s.on_join(0, "Lead", "backend");
+    s.on_join(1, "Dps", "fullstack");
+    s.tick();
+    credits_rolled(&mut s);
+    s.tick();
+    s.on_message(0, ClientMsg::Cmd(stamp_now(&s)));
+    let out = tick_n(&mut s, 3);
+    assert_eq!((stamps(&out, 0), stamps(&out, 1)), (1, 1));
+    let sent = msgs(&out, 1)
+        .into_iter()
+        .find_map(|m| match m {
+            ServerMsg::IlmariStamp { unix_secs, tz, .. } => Some((unix_secs, tz)),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(
+        sent,
+        (s.sim.ilmari_stamp().unwrap().unix_secs, "CEST".to_string())
+    );
+    // A second stamp is not kept, so nothing new goes out; a joiner is told once.
+    s.on_message(1, ClientMsg::Cmd(stamp_now(&s)));
+    assert_eq!(stamps(&tick_n(&mut s, 3), 0), 0);
+    s.on_join(2, "Late", "devops");
+    assert_eq!(stamps(&tick_n(&mut s, 2), 2), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_joiner_in_phase_four_of_the_core_sees_the_commit_log() {
+    let mut s = full_room("ilmari_core/1");
+    let a = eid_of(&s, 0);
+    let core = s.sim.units().find(|u| u.key == "il_ilmari").unwrap().id;
+    let bp = s.sim.unit(core).unwrap().pos;
+    for p in [0, 1, 2] {
+        let e = eid_of(&s, p);
+        move_sim(&mut s, e, Vec3::new(bp.x, bp.y, bp.z + 8.0));
+    }
+    s.sim.apply_as(
+        a,
+        Command::SetTarget {
+            unit: a,
+            target: Some(core),
+        },
+    );
+    s.sim.apply_as(
+        a,
+        Command::Cast {
+            caster: a,
+            spell: SpellId(1),
+        },
+    );
+    // P1 ends at 70 %, Ill Marie's three rounds run out on their own, and P3's mech gives way to
+    // the mainframe at 20 %; the sim's own clock does the rest.
+    set_bar(&mut s, 69);
+    let mut out = Vec::new();
+    let mut phase = 0;
+    let mut bar_dropped = false;
+    for _ in 0..600 {
+        let o = tick_n(&mut s, 20);
+        for e in events(&o, 0) {
+            if let Event::Core { phase: p, .. } = e {
+                phase = p;
+            }
+        }
+        out.extend(o);
+        for p in [0, 1, 2] {
+            let e = eid_of(&s, p);
+            s.sim.debug_set_hp(e, 10_000_000);
+        }
+        if phase == 3 && !bar_dropped {
+            bar_dropped = true;
+            set_bar(&mut s, 19);
+        }
+        if phase == 4 {
+            let ward = s
+                .sim
+                .units()
+                .find(|u| u.key == "il_core_mainframe")
+                .map(|u| u.id);
+            if let Some(ward) = ward {
+                s.sim.debug_set_hp(ward, 24_000);
+            }
+            if events(&out, 0)
+                .iter()
+                .any(|e| matches!(e, Event::CoreLog { .. }))
+            {
+                break;
+            }
+        }
+    }
+    let log = |out: &[(Audience, Bytes)], p| {
+        events(out, p).into_iter().find_map(|e| match e {
+            Event::CoreLog { lines } => Some(lines),
+            _ => None,
+        })
+    };
+    let lines = log(&out, 0).unwrap_or_else(|| panic!("phase {phase}: the log never lit"));
+    assert_eq!(lines.len(), 6, "six commits");
+    s.on_join(3, "Late", "qa");
+    let late = tick_n(&mut s, 3);
+    assert_eq!(log(&late, 3), Some(lines), "the joiner reads the same log");
+    assert!(
+        events(&late, 3)
+            .iter()
+            .any(|e| matches!(e, Event::Core { phase: 4, .. }))
+    );
+}
+
+fn set_bar(s: &mut RoomState, pct: u32) {
+    for k in CORE_SCREENS {
+        let Some((id, max)) = s.sim.units().find(|u| u.key == k).map(|u| (u.id, u.max_hp)) else {
+            continue;
+        };
+        s.sim.debug_set_hp(id, max * pct / 100);
+    }
+}

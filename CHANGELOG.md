@@ -35,9 +35,12 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - The Core has a weekly ladder. Every Full or Judgment Day kill goes on the room's board for the week (fastest first, then fewest deaths) with its crew, and a lone Full run goes on its own Async tab. Each week's seed picks one Directive, a Culture Committee policy such as Open Plan Everything or Unlimited Vacation, that the whole ranked fight wears: a cost and a perk of about the same size. The Weekly tab of the sprint planner and `~/endgame` show the Directive and the best time of each tab, and every ranked kill pays 15 Ilmari Tokens. Finishing in the top three of a group board earns the title for that place.
 - Judgment Day now has its numbers settled boss by boss: the Chief Ilmari Officer keeps his authored health and a slightly shorter enrage timer, and the Heir he brings along is a smaller pool, so five players can beat the Consultant, Red Team Blue Team, the CIO and the Core on Judgment Day.
 
+- In a co-op room the credits quote the room's own Opening time, the same for everyone, instead of "a time nobody wrote down".
+- Ilmari taunts you with the time he woke up while you read the commit log, and a few of his repeated lines were rewritten so no boss says the same thing three times. The Roomba's bumper says OOPS out loud when you mount it.
+
 ### Changed
 
-- Co-op needs this version on both sides (protocol 48).
+- Co-op needs this version on both sides (protocol 49).
 - The Heir of the Chief Ilmari Officer has less health than before (3,000 instead of 6,500).
 
 ## [0.10.0] - 2026-10-24

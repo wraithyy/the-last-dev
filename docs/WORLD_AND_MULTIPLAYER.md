@@ -256,6 +256,12 @@ the same rule as every other room unlock.
 - **The server tells the client when it is due.** `IlmariPending { on }` goes to a joiner while true
   and to everyone on each change. Each client plays its own Opening with its own device clock; a
   client whose offline save already watched it stamps and reveals at once, without the cutscene.
+- **The room's stamp is replicated (protocol 49).** `ServerMsg::IlmariStamp { unix_secs, utc_offset_min, tz }`
+  goes to everyone once, the tick the sim keeps the first stamp, and to every later joiner. The server only
+  reads the sim's already sanitised `IlmariStamp` (no client text is relayed); the client's `check` bounds the
+  offset and the zone name. It exists so each member's personal credits page quotes the room's Opening time.
+  `StampIlmariEnd` is checked against the server's clock like `StampIlmari` (`MAX_STAMP_SKEW_S`) and, like it,
+  only the lead may send it inside the grace.
 - **Joiners after the reveal** get `il_00_wake` in their own log (the chain after it needs it) and
   the door stays open when the member who watched has left (`Unlock::QuestDone` of the Opening quest
   reads the room's flag, not the members' logs).

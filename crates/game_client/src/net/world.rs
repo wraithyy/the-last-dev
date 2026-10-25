@@ -200,6 +200,8 @@ pub struct NetWorld {
     /// The room revealed its Opening before this client joined (`ServerMsg::IlmariRevealed`):
     /// this client may play its own copy once, for show.
     pub ilmari_replay: bool,
+    /// The room's Opening stamp (`ServerMsg::IlmariStamp`), for the credits.
+    pub ilmari_stamp: Option<combat_core::ilmari::IlmariStamp>,
     tick: u64,
     cooldowns: HashMap<SpellId, (u64, u32)>,
     gcd: (u64, u32),
@@ -256,6 +258,7 @@ impl NetWorld {
             unlocked: BTreeSet::new(),
             ilmari_pending: false,
             ilmari_replay: false,
+            ilmari_stamp: None,
             tick: 0,
             cooldowns: HashMap::new(),
             gcd: (0, 0),
