@@ -508,7 +508,7 @@ pub fn log_line(sim: &Sim, tick: u64, e: &Event) -> String {
             "raid {:?} async {} week {} locked {:?} tethers {:?}",
             view.zone, view.async_mode, view.week, view.locked, view.tethers
         ),
-        Event::Ladder { view } => format!(
+        Event::Ladder { view, .. } => format!(
             "ladder week {}: {:?}",
             view.week,
             view.entries.iter().map(|e| e.time_ms).collect::<Vec<_>>()

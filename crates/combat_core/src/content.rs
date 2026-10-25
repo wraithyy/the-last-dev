@@ -2389,6 +2389,7 @@ impl Content {
             }
         }
         self.ilmari.judgment.validate(self)?;
+        self.ilmari.ladder.validate(self)?;
         self.ilmari.rewards.validate(self)?;
         Ok(())
     }

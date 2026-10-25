@@ -521,7 +521,7 @@ fn the_weekly_sprint_is_fixed_per_week_and_its_ladder_is_kept() {
     let ladder = ev
         .iter()
         .find_map(|e| match e {
-            Event::Ladder { view } => Some(view.clone()),
+            Event::Ladder { view, .. } => Some(view.clone()),
             _ => None,
         })
         .expect("ladder event");
@@ -546,7 +546,7 @@ fn the_weekly_sprint_is_fixed_per_week_and_its_ladder_is_kept() {
     let _ = joiner;
     assert!(
         ev.iter()
-            .any(|e| matches!(e, Event::Ladder { view: v } if *v == view))
+            .any(|e| matches!(e, Event::Ladder { view: v, .. } if *v == view))
     );
     // A new week starts an empty ladder.
     fresh.set_clock(THURSDAY + 7 * DAY);

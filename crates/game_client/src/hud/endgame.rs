@@ -436,7 +436,17 @@ fn update_window(
     };
     let unix = crate::live::unix_now(&*sim, &offline, net.is_some(), &live).map(|u| u as u64);
     let seed = match unix {
-        Some(t) => weekly_line(content, &sim.ladder_view(), t),
+        Some(t) => {
+            let mut line = weekly_line(content, &sim.ladder_view(), t);
+            if let Some(row) = crate::sprint::ilmari_row(
+                &sim.ilmari_ladder_view(combat_core::LadderBoard::IlmariFull),
+                &sim.ilmari_ladder_view(combat_core::LadderBoard::IlmariJudgment),
+            ) {
+                line.push(' ');
+                line.push_str(&crate::sprint::ilmari_row_line(&row));
+            }
+            line
+        }
         None => "The weekly seed waits for the office clock.".to_string(),
     };
     // Legacy Mode: one chip per floor boss, green while its bonus loot is still open this week.
@@ -680,7 +690,9 @@ mod tests {
                 time_ms: 754_000,
                 deaths: 1,
                 crew: vec!["Ada (Fullstack Engineer)".into()],
+                is_async: false,
             }],
+            directive: String::new(),
         };
         let best = weekly_line(c, &ladder, unix);
         assert!(best.contains("12:34") && best.contains("Ada"), "{best}");

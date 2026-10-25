@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Bumped on any incompatible change to the messages or to the combat_core types they carry.
-pub const PROTOCOL_VERSION: u16 = 47;
+pub const PROTOCOL_VERSION: u16 = 48;
 /// Upper bound for one frame in either direction; a full zone snapshot is a few KiB.
 pub const MAX_FRAME_BYTES: usize = 64 * 1024;
 /// Quest ids are short content keys; anything longer is not a real quest.
@@ -997,10 +997,13 @@ fn check_event(e: &Event) -> Result<(), ProtoError> {
             }
         }
         Event::CloudBill { bill, .. } if *bill > 1000 => Err(ProtoError::BadNumber),
-        Event::Ladder { view } => {
+        Event::Ladder { view, .. } => {
             list(view.entries.len())?;
             for e in &view.entries {
                 names(&e.crew)?;
+            }
+            if view.directive.len() > MAX_ITEM_NAME_BYTES {
+                return Err(ProtoError::TooMany);
             }
             Ok(())
         }
@@ -2063,14 +2066,24 @@ mod tests {
                 time_ms: 754_000,
                 deaths: 2,
                 crew: vec!["Ada (Fullstack Engineer)".into(), "Backend Engineer".into()],
+                is_async: false,
             }],
+            directive: String::new(),
         };
         let msg = ServerMsg::Events {
             tick: 41,
             events: vec![
                 Event::Raid { view: raid.clone() },
                 Event::Ladder {
+                    board: Default::default(),
                     view: ladder.clone(),
+                },
+                Event::Ladder {
+                    board: combat_core::LadderBoard::IlmariJudgment,
+                    view: LadderView {
+                        directive: "Policy: Open Plan Everything".into(),
+                        ..ladder.clone()
+                    },
                 },
             ],
         };
@@ -2086,8 +2099,10 @@ mod tests {
         long_vote.vote = vec!["p".repeat(MAX_ITEM_NAME_BYTES + 1)];
         let mut crowd = ladder.clone();
         crowd.entries = vec![LadderEntry::default(); MAX_LIST_LEN + 1];
-        let mut long_name = ladder;
+        let mut long_name = ladder.clone();
         long_name.entries[0].crew = vec!["y".repeat(MAX_ITEM_NAME_BYTES + 1)];
+        let mut long_directive = ladder;
+        long_directive.directive = "d".repeat(MAX_ITEM_NAME_BYTES + 1);
         for e in [
             Event::Raid { view: many_ties },
             Event::Raid { view: long_lock },
@@ -2106,8 +2121,18 @@ mod tests {
                 at_ms: 0,
                 order: vec![0; MAX_LIST_LEN + 1],
             },
-            Event::Ladder { view: crowd },
-            Event::Ladder { view: long_name },
+            Event::Ladder {
+                board: Default::default(),
+                view: crowd,
+            },
+            Event::Ladder {
+                board: combat_core::LadderBoard::IlmariFull,
+                view: long_name,
+            },
+            Event::Ladder {
+                board: combat_core::LadderBoard::IlmariFull,
+                view: long_directive,
+            },
         ] {
             let bad = ServerMsg::Events {
                 tick: 41,

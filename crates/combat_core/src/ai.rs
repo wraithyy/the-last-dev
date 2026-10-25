@@ -455,7 +455,8 @@ impl Sim {
         .unwrap_or(en.after_ms);
         // Judgment Day: the soft enrage comes sooner (a boss's own `story_after_ms` is Story's).
         let after = if self.raid.mode == crate::ilmari::IlmariMode::Judgment {
-            (u64::from(after) * u64::from(self.content.ilmari.judgment.enrage_pct) / 100) as u32
+            (u64::from(after) * u64::from(self.content.ilmari.judgment.enrage_of(&u.state.key))
+                / 100) as u32
         } else {
             after
         };

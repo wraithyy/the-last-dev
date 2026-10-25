@@ -328,6 +328,9 @@ pub struct LadderEntry {
     pub deaths: u16,
     /// "Name (Class)" per member, or the class alone when the host knows no names.
     pub crew: Vec<String>,
+    /// An Ilmari Full run under the Async rule (fewer than three), kept on the Async tab.
+    #[serde(default)]
+    pub is_async: bool,
 }
 
 /// The week's ladder, fastest first (local offline, the room's online).
@@ -335,6 +338,49 @@ pub struct LadderEntry {
 pub struct LadderView {
     pub week: u32,
     pub entries: Vec<LadderEntry>,
+    /// The week's Directive (the policy every ranked core fight wears), empty on the Sprint board.
+    #[serde(default)]
+    pub directive: String,
+}
+
+/// Puts `entry` on `l`, rolling to `week` first (an older week's rows are dropped). Fastest first,
+/// ties on fewer deaths, then the earlier row (the sort is stable); the Async tab keeps its own
+/// top `LADDER_SIZE` so a solo run never pushes a group row off the board.
+pub(crate) fn ladder_insert(l: &mut LadderView, week: u32, entry: LadderEntry) {
+    if l.week != week {
+        l.week = week;
+        l.entries.clear();
+    }
+    l.entries.push(entry);
+    ladder_trim(l);
+}
+
+/// A saved board as the sim keeps it: crews clipped to the room size and sanitised, sorted, bounded.
+pub(crate) fn ladder_restored(week: u32, mut entries: Vec<LadderEntry>) -> LadderView {
+    for e in &mut entries {
+        e.crew.truncate(crate::sim::MAX_PLAYERS);
+        for c in &mut e.crew {
+            *c = ladder_label(c, LADDER_LABEL_MAX);
+        }
+    }
+    let mut l = LadderView {
+        week,
+        entries,
+        directive: String::new(),
+    };
+    ladder_trim(&mut l);
+    l
+}
+
+/// Sorted and bounded: `LADDER_SIZE` rows per tab.
+pub(crate) fn ladder_trim(l: &mut LadderView) {
+    l.entries.sort_by_key(|e| (e.time_ms, e.deaths));
+    let mut kept = [0usize; 2];
+    l.entries.retain(|e| {
+        let k = &mut kept[usize::from(e.is_async)];
+        *k += 1;
+        *k <= LADDER_SIZE
+    });
 }
 
 fn week_seed(week: u32) -> u64 {
@@ -360,7 +406,7 @@ pub fn weekly_sprint(def: &SprintDef, week: u32) -> Option<WeeklySprint> {
 }
 
 /// Ladder text field: no separators of the save format, at most `max` characters.
-fn ladder_label(s: &str, max: usize) -> String {
+pub(crate) fn ladder_label(s: &str, max: usize) -> String {
     s.chars()
         .filter(|c| !matches!(c, '|' | '~' | '+' | '*' | '\n'))
         .take(max)
@@ -981,7 +1027,7 @@ impl Sim {
             return (100, 100);
         }
         let Some(r) = self.live_run() else {
-            return self.legacy_mob_pct();
+            return self.legacy_mob_pct(&d.key);
         };
         let def = self.sprint_def();
         let lv = u32::from(r.level.saturating_sub(1));
@@ -1702,6 +1748,7 @@ impl Sim {
                     time_ms: time,
                     deaths: status.deaths,
                     crew,
+                    is_async: false,
                 },
             );
         }
@@ -1731,7 +1778,7 @@ impl Sim {
         self.burnout_on_sprint_end();
     }
 
-    fn crew_label(&self, unit: EntityId, class: &str) -> String {
+    pub(crate) fn crew_label(&self, unit: EntityId, class: &str) -> String {
         let class = self
             .content
             .class(class)
@@ -1744,16 +1791,12 @@ impl Sim {
 
     /// A delivered weekly run joins the ladder of its week (an older week's ladder is dropped).
     fn ladder_add(&mut self, week: u32, entry: LadderEntry) {
-        let l = &mut self.sprint.ladder;
-        if l.week != week {
-            l.week = week;
-            l.entries.clear();
-        }
-        l.entries.push(entry);
-        l.entries.sort_by_key(|e| (e.time_ms, e.deaths));
-        l.entries.truncate(LADDER_SIZE);
+        ladder_insert(&mut self.sprint.ladder, week, entry);
         let view = self.ladder_view();
-        self.events.push(Event::Ladder { view });
+        self.events.push(Event::Ladder {
+            board: crate::ladder::LadderBoard::Sprint,
+            view,
+        });
     }
 
     /// This week's Weekly Sprint, by the sim's clock.
@@ -1772,6 +1815,7 @@ impl Sim {
             } else {
                 Vec::new()
             },
+            directive: String::new(),
         }
     }
 
@@ -1786,21 +1830,20 @@ impl Sim {
     pub(crate) fn ladder_on_join(&mut self, player: EntityId) {
         let view = self.ladder_view();
         if !view.entries.is_empty() {
-            self.emit_to(player, Event::Ladder { view });
+            self.emit_to(
+                player,
+                Event::Ladder {
+                    board: crate::ladder::LadderBoard::Sprint,
+                    view,
+                },
+            );
         }
+        self.ilmari_ladders_on_join(player);
     }
 
     /// Restores the saved local ladder (bounded, sorted).
-    pub(crate) fn set_ladder(&mut self, week: u32, mut entries: Vec<LadderEntry>) {
-        for e in &mut entries {
-            e.crew.truncate(crate::sim::MAX_PLAYERS);
-            for c in &mut e.crew {
-                *c = ladder_label(c, LADDER_LABEL_MAX);
-            }
-        }
-        entries.sort_by_key(|e| (e.time_ms, e.deaths));
-        entries.truncate(LADDER_SIZE);
-        self.sprint.ladder = LadderView { week, entries };
+    pub(crate) fn set_ladder(&mut self, week: u32, entries: Vec<LadderEntry>) {
+        self.sprint.ladder = ladder_restored(week, entries);
     }
 
     /// The local ladder for the save.
@@ -1821,6 +1864,7 @@ impl Sim {
                 time_ms,
                 deaths,
                 crew,
+                is_async: false,
             },
         );
     }

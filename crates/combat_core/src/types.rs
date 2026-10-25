@@ -629,6 +629,7 @@ pub enum Event {
     /// The Weekly Sprint ladder of the room (offline: the local one); after a weekly delivery
     /// and to a joiner.
     Ladder {
+        board: crate::ladder::LadderBoard,
         view: crate::sprint::LadderView,
     },
     /// A minigame outing began in the loaded zone: every member has a run (`minigame.rs`).

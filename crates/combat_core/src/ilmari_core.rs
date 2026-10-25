@@ -576,6 +576,8 @@ pub(crate) struct CoreState {
     pub(crate) hot_take: Vec<(EntityId, SpellId, u64)>,
     /// Adds of the mainframe killed since the P4 clock last looked (each takes seconds off it).
     pub(crate) add_kills: u32,
+    /// Players who died in the running pull (the ladder's tie-break); a reset clears it.
+    deaths: u16,
 }
 
 /// Bytes of the wall display kept to spot a change.
@@ -685,6 +687,8 @@ impl Sim {
             self.request_yell_line(bi, YellKind::Phase, Some(line));
         }
         self.core.rt = Some(rt);
+        self.core.deaths = 0;
+        self.core_directive(boss, true);
     }
 
     pub(crate) fn core_disarm(&mut self) {
@@ -702,6 +706,7 @@ impl Sim {
         self.core.pacts.clear();
         self.core.hot_take.clear();
         self.core.add_kills = 0;
+        self.core.deaths = 0;
         if rt.sent != [0; WALL] {
             self.events.push(Event::Core {
                 phase: 0,
@@ -742,7 +747,9 @@ impl Sim {
             return;
         };
         self.core_step(&mut rt);
+        let boss = rt.boss;
         self.core.rt = Some(rt);
+        self.core_directive(boss, false);
     }
 
     /// The screens stay where they are from P2 on and while the Autoscaler's second one is open.
@@ -1408,6 +1415,9 @@ impl Sim {
         let def_i = self.units[ti].def;
         let d = &self.content.units[def_i];
         let (ward_wipes, pact) = (d.ward && d.ward_death_wipes, d.death_pact.clone());
+        if self.core.rt.is_some() && self.is_player(Self::id_of(ti)) {
+            self.core.deaths = self.core.deaths.saturating_add(1);
+        }
         let is_core = self.units[ti].floor_boss
             && matches!(d.encounter, Some(crate::content::EncounterDef::Core(_)));
         // A rewrite that fell to the party takes seconds off the clock of P4.
@@ -1442,6 +1452,7 @@ impl Sim {
                 self.mark_core_full_clear();
             }
             self.core_pay_fragments();
+            self.ladder_core_kill(self.raid.mode, ms, self.core.deaths);
             self.events.push(Event::IlmariEnd {
                 difficulty: self.raid.mode,
                 ms,

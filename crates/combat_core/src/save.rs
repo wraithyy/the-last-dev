@@ -80,6 +80,9 @@ pub struct SaveData {
     pub dungeon_locks: Vec<String>,
     /// The local Weekly Sprint ladder (optional key; older saves have none).
     pub ladder: crate::sprint::LadderView,
+    /// The local Ilmari boards (`ilmari_ladder=<week>*<difficulty>*<ms>~<deaths>~<crew+crew>[~a]|...`, one
+    /// line per board; an `a` marks an Async row). Optional: older saves have none.
+    pub ilmari_ladders: Vec<(crate::ladder::LadderBoard, crate::sprint::LadderView)>,
     /// Best medal per minigame key (optional key; older saves have none).
     pub minigames: Vec<(String, crate::minigame::Medal)>,
     /// Quest pickups and inspect spots already used up (`world.props` keys); optional key.
@@ -222,6 +225,22 @@ impl SaveData {
                 .map(|e| format!("{}~{}~{}", e.time_ms, e.deaths, e.crew.join("+")))
                 .collect();
             out.push_str(&format!("ladder={}*{}\n", self.ladder.week, rows.join("|")));
+        }
+        for (board, l) in &self.ilmari_ladders {
+            let rows: Vec<String> = l
+                .entries
+                .iter()
+                .map(|e| {
+                    let flag = if e.is_async { "~a" } else { "" };
+                    format!("{}~{}~{}{flag}", e.time_ms, e.deaths, e.crew.join("+"))
+                })
+                .collect();
+            out.push_str(&format!(
+                "ilmari_ladder={}*{}*{}\n",
+                l.week,
+                board.code(),
+                rows.join("|")
+            ));
         }
         if !self.taken_props.is_empty() {
             out.push_str(&format!("taken_props={}\n", self.taken_props.join("|")));
@@ -419,9 +438,50 @@ impl SaveData {
                                 time_ms,
                                 deaths,
                                 crew,
+                                is_async: false,
                             })
                         })
                         .collect();
+                }
+                "ilmari_ladder" => {
+                    let mut f = v.splitn(3, '*');
+                    let week = f.next().and_then(|w| w.parse().ok()).unwrap_or(0);
+                    let board = f.next().and_then(crate::ladder::LadderBoard::from_code);
+                    let rows = f.next().unwrap_or("");
+                    // One line per board; a repeated board or an unknown difficulty is dropped.
+                    if let Some(board) =
+                        board.filter(|b| s.ilmari_ladders.iter().all(|(o, _)| o != b))
+                    {
+                        let entries = list(rows)
+                            .iter()
+                            .filter_map(|r| {
+                                let mut f = r.splitn(4, '~');
+                                let time_ms = f.next()?.parse().ok()?;
+                                let deaths = f.next()?.parse().ok()?;
+                                let crew = f
+                                    .next()
+                                    .unwrap_or("")
+                                    .split('+')
+                                    .filter(|c| !c.is_empty())
+                                    .map(str::to_string)
+                                    .collect();
+                                Some(crate::sprint::LadderEntry {
+                                    time_ms,
+                                    deaths,
+                                    crew,
+                                    is_async: f.next() == Some("a"),
+                                })
+                            })
+                            .collect();
+                        s.ilmari_ladders.push((
+                            board,
+                            crate::sprint::LadderView {
+                                week,
+                                entries,
+                                directive: String::new(),
+                            },
+                        ));
+                    }
                 }
                 "raid_locks" => {
                     let (w, b) = v.split_once('*').unwrap_or(("0", ""));
@@ -575,6 +635,7 @@ impl Sim {
             dungeon_day: self.dungeon_lockout().0,
             dungeon_locks: self.dungeon_lockout().1,
             ladder: self.ladder_saved(),
+            ilmari_ladders: self.ilmari_ladders_saved(),
             minigames: self.minigame_bests(player),
             taken_props: self.taken_props(player),
             marie_met: self.marie_met(player),
@@ -715,6 +776,9 @@ impl Sim {
         self.set_raid_lockout(save.raid_week, &save.raid_locks);
         self.set_dungeon_lockout(save.dungeon_day, &save.dungeon_locks);
         self.set_ladder(save.ladder.week, save.ladder.entries.clone());
+        for (board, l) in &save.ilmari_ladders {
+            self.set_ilmari_ladder(*board, l.week, l.entries.clone());
+        }
         self.set_minigame_bests(player, &save.minigames);
         self.restore_taken_props(player, &save.taken_props);
         self.restore_marie_met(player, save.marie_met);

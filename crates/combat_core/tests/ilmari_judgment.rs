@@ -275,6 +275,96 @@ fn riders_switch_individually() {
     );
 }
 
+/// The four real riders (D15): each boss of Wings 5-6 and the core wears its own aura on Judgment Day
+/// and loses exactly that one when its switch is off, the other three unaffected.
+#[test]
+fn the_four_real_riders_switch_individually() {
+    let rooms = [
+        ("ilmari5/2", "il_align_consultant", "il_rider_training"),
+        ("ilmari5/3", "il_red_team", "il_rider_pentest"),
+        ("ilmari6/3", "il_cio", "il_rider_succession"),
+        ("ilmari_core/1", "il_ilmari", "il_rider_remix"),
+    ];
+    let listed: Vec<_> = content()
+        .ilmari
+        .judgment
+        .riders
+        .iter()
+        .map(|r| (r.boss.clone(), r.aura.clone(), r.on))
+        .collect();
+    let want: Vec<_> = rooms
+        .iter()
+        .map(|(_, b, a)| (b.to_string(), a.to_string(), true))
+        .collect();
+    assert_eq!(listed, want, "one rider per boss, all on by default");
+    for off in 0..rooms.len() {
+        for (k, (zone, boss_key, aura)) in rooms.iter().enumerate() {
+            let mut c = content();
+            c.ilmari.judgment.riders[off].on = false;
+            let (mut sim, ids) = room(3, c);
+            sim.debug_ilmari_core_cleared(true);
+            assert!(pick(&mut sim, ids[0], IlmariMode::Judgment).is_empty());
+            load(&mut sim, zone);
+            sim.tick();
+            let worn = sim
+                .units()
+                .find(|u| u.key == *boss_key && u.alive)
+                .is_some_and(|u| u.auras.iter().any(|a| a.key == *aura));
+            assert_eq!(
+                worn,
+                k != off,
+                "{boss_key} with the {} rider off",
+                rooms[off].1
+            );
+        }
+    }
+}
+
+/// Per-unit figures (D15): the CIO keeps its authored HP on Judgment Day (the Heir is the extra
+/// pool), the Consultant sits on the block's numbers, and a bad figure refuses to load.
+#[test]
+fn judgment_numbers_are_per_unit_where_the_content_says_so() {
+    let c = content();
+    let jd = &c.ilmari.judgment;
+    assert_eq!(jd.mob_pct("il_cio"), (100, 125));
+    assert_eq!(jd.enrage_of("il_cio"), 90);
+    assert_eq!(jd.mob_pct("il_align_consultant"), (130, 125));
+    assert_eq!(jd.enrage_of("il_align_consultant"), 80);
+    let hp_of = |mode: IlmariMode, zone: &str, key: &str| {
+        let (mut sim, ids) = room(3, content());
+        sim.debug_ilmari_core_cleared(true);
+        assert!(pick(&mut sim, ids[0], mode).is_empty());
+        load(&mut sim, zone);
+        sim.units()
+            .find(|u| u.key == key)
+            .map(|u| u.max_hp)
+            .expect(key)
+    };
+    let full_cio = hp_of(IlmariMode::Full, "ilmari6/3", "il_cio");
+    assert_eq!(hp_of(IlmariMode::Judgment, "ilmari6/3", "il_cio"), full_cio);
+    let full_c = hp_of(IlmariMode::Full, "ilmari5/2", "il_align_consultant");
+    let jd_c = hp_of(IlmariMode::Judgment, "ilmari5/2", "il_align_consultant");
+    assert!(jd_c.abs_diff(full_c * 130 / 100) <= 1, "{jd_c} vs {full_c}");
+    let ron = include_str!("../../../content/game.ron");
+    for (from, to) in [
+        (
+            "unit: \"il_cio\", hp_pct: Some(100)",
+            "unit: \"il_cio\", hp_pct: Some(90)",
+        ),
+        (
+            "unit: \"il_cio\", hp_pct: Some(100)",
+            "unit: \"no_such_unit\", hp_pct: Some(100)",
+        ),
+        ("enrage_pct: Some(90)", "enrage_pct: Some(0)"),
+    ] {
+        assert!(ron.contains(from), "{from}");
+        assert!(
+            Content::from_ron(&ron.replacen(from, to, 1)).is_err(),
+            "{from}"
+        );
+    }
+}
+
 #[test]
 fn judgment_has_no_companions() {
     let (mut sim, ids) = room(3, judgment_content());

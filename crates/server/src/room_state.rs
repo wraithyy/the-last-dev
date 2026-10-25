@@ -944,7 +944,7 @@ mod tests {
         let ladder = msgs(&out, 1).into_iter().any(|m| match m {
             ServerMsg::Events { events, .. } => events
                 .iter()
-                .any(|e| matches!(e, Event::Ladder { view } if view.entries.len() == 1)),
+                .any(|e| matches!(e, Event::Ladder { view, .. } if view.entries.len() == 1)),
             _ => false,
         });
         assert!(ladder, "the room's board reaches the joiner");

@@ -17,8 +17,64 @@ use std::path::PathBuf;
 
 /// The bots walk the campaign; the campus districts are optional side content on their own
 /// band (`common::without_districts`), so they stay out of these runs.
+/// QA env lists `a=1,2;b=3` as (name, numbers); a malformed part is skipped.
+fn qa_pairs(var: &str) -> Vec<(String, Vec<u32>)> {
+    let Ok(v) = std::env::var(var) else {
+        return Vec::new();
+    };
+    v.split([';', ' '])
+        .filter_map(|part| {
+            let (name, n) = part.split_once('=')?;
+            let n: Option<Vec<u32>> = n.split(',').map(|x| x.parse().ok()).collect();
+            Some((name.to_string(), n?))
+        })
+        .collect()
+}
+
 fn content() -> combat_core::Content {
-    campaign_content()
+    let mut c = campaign_content();
+    // QA: `JD_RIDERS_OFF=all` or a comma list of boss keys switches Judgment riders off per boss.
+    if let Ok(off) = std::env::var("JD_RIDERS_OFF") {
+        for r in &mut c.ilmari.judgment.riders {
+            r.on &= !(off == "all" || off.split(',').any(|b| b == r.boss));
+        }
+    }
+    // QA: `JD_DIRECTIVE=<0..3>` leaves one policy in the weekly Directive table (the pick is the week's).
+    if let Some(k) = std::env::var("JD_DIRECTIVE")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+    {
+        c.ilmari.ladder.directives = c
+            .ilmari
+            .ladder
+            .directives
+            .get(k)
+            .cloned()
+            .into_iter()
+            .collect();
+    }
+    // QA: `JD_HP=unit=hp;unit=hp` sets a unit's base HP.
+    for (unit, n) in qa_pairs("JD_HP") {
+        for u in c.units.iter_mut().filter(|u| u.key == unit) {
+            u.max_hp = n.first().copied().unwrap_or(u.max_hp);
+        }
+    }
+    // QA: `JD_TUNE=unit=hp,dmg,enrage;unit=...` sets a unit's own Judgment figures without touching content.
+    for (unit, n) in qa_pairs("JD_TUNE") {
+        if let [hp, dmg, enrage] = n[..] {
+            c.ilmari.judgment.units.retain(|u| u.unit != unit);
+            c.ilmari
+                .judgment
+                .units
+                .push(combat_core::judgment::UnitPct {
+                    unit,
+                    hp_pct: Some(hp),
+                    damage_pct: Some(dmg),
+                    enrage_pct: Some(enrage),
+                });
+        }
+    }
+    c
 }
 
 const GOLDEN: &str = "../../content/replays/floor1_seed7.log";
@@ -36,6 +92,8 @@ const ALIGNMENT: SpellId = SpellId(187);
 const PACK_SPACING: f32 = 70.0;
 /// Bot running speed while dodging or chasing.
 const RUN_MPS: f32 = 7.0;
+const SPREAD_M: f32 = 2.2;
+const SPREAD_COST: f32 = 3.0;
 const PIXEL_PUSH: SpellId = SpellId(20);
 const CSS_COMBO: SpellId = SpellId(21);
 const IMPORTANT: SpellId = SpellId(22);
@@ -232,6 +290,8 @@ struct Bot {
     repeater: Option<SpellId>,
     /// Wing 4's Server Cloud: the room is platforms over a void, so the bot stays on them.
     on_platforms: bool,
+    /// The other players of a Judgment group: the dodge keeps its distance from them.
+    mates: Vec<u64>,
     /// Wing 5's Alignment Consultant: walk to an opt-out kiosk whenever an offer is pending.
     refuse: bool,
     refuse_next: u64,
@@ -321,6 +381,7 @@ impl Bot {
             repeater: None,
             on_platforms: false,
             refuse: false,
+            mates: Vec::new(),
             refuse_next: 0,
             inbox: false,
             inbox_next: 0,
@@ -514,6 +575,24 @@ impl Bot {
                 return Some(id);
             }
         }
+        // A Judgment group kills the add that is counting down to a blast (a long cast that cannot be
+        // kicked, "kill it first") before anything else, nearest first.
+        if !self.mates.is_empty()
+            && let Some(u) = self
+                .sim
+                .units()
+                .filter(|u| u.hostile && u.alive && !u.boss && u.key != HUMAN)
+                .filter(|u| {
+                    u.cast
+                        .is_some_and(|c| !c.interruptible && c.total_ms >= 10_000)
+                })
+                .min_by(|a, b| {
+                    combat_core::distance(a.pos, self.pos)
+                        .total_cmp(&combat_core::distance(b.pos, self.pos))
+                })
+        {
+            return Some(u.id);
+        }
         // Wing 3: the swarm walks to the drafts without ever being "in combat", so it is picked
         // by what it threatens: the cluster nearest a draft that still stands.
         let drafts = self.sim.drafts();
@@ -590,6 +669,17 @@ impl Bot {
         self.moving = true;
     }
 
+    /// Mates standing within `SPREAD_M` of `p` (a five-player group spreads over the cover instead of
+    /// stacking on one spot, where one line takes everybody).
+    fn crowd(&self, p: Vec3) -> usize {
+        self.mates
+            .iter()
+            .filter(|&&m| m != self.player)
+            .filter_map(|&m| self.sim.unit(m))
+            .filter(|u| u.alive && combat_core::distance(u.pos, p) < SPREAD_M)
+            .count()
+    }
+
     /// Steps out of any telegraph that would hit where we stand (the nearest safe spot, cover
     /// included). Shared (split) telegraphs are stood in on purpose. True while walking.
     fn dodge(&mut self) -> bool {
@@ -623,6 +713,17 @@ impl Bot {
             return true;
         }
         let mut candidates: Vec<Vec3> = tgs.iter().flat_map(|t| t.cover.clone()).collect();
+        // A group shares a cover: spots inside it, not only its centre.
+        if !self.mates.is_empty() {
+            for c in candidates.clone() {
+                for r in [1.2_f32, 2.2] {
+                    for a in 0..8 {
+                        let ang = a as f32 * std::f32::consts::TAU / 8.0;
+                        candidates.push(Vec3::new(c.x + r * ang.cos(), 0.0, c.z + r * ang.sin()));
+                    }
+                }
+            }
+        }
         for k in 1..=10 {
             let r = 1.5 * k as f32;
             for a in 0..16 {
@@ -640,9 +741,26 @@ impl Bot {
             // The Server Cloud: a safe spot over the void is no spot (the platforms are the floor).
             .filter(|p| self.sim.on_platform_grid(*p) != Some(false))
             .min_by(|a, b| {
-                combat_core::distance(*a, self.pos).total_cmp(&combat_core::distance(*b, self.pos))
+                let cost = |p: &Vec3| {
+                    combat_core::distance(*p, self.pos) + SPREAD_COST * self.crowd(*p) as f32
+                };
+                cost(a).total_cmp(&cost(b))
             });
         self.dodge_goal = goal;
+        if !self.mates.is_empty() {
+            let now = self.sim.now().0;
+            let _ = writeln!(
+                self.log,
+                "[{now:05}] DODGE {} at ({:.1},{:.1}) goal {:?} covers {:?}",
+                self.class,
+                self.pos.x,
+                self.pos.z,
+                goal.map(|g| (g.x.round(), g.z.round())),
+                tgs.iter()
+                    .flat_map(|t| t.cover.iter().map(|c| (c.x.round(), c.z.round())))
+                    .collect::<Vec<_>>()
+            );
+        }
         match goal {
             Some(g) => {
                 self.walk(g);
@@ -3064,6 +3182,8 @@ struct Group {
     boss_secs: Vec<u64>,
     /// Stop the boss fight once the core reaches phase 3.
     stop_p3: bool,
+    /// QA: write the boss and team HP into the first bot's log every three seconds.
+    trace: bool,
 }
 
 impl Group {
@@ -3100,10 +3220,31 @@ impl Group {
             bots,
             boss_secs: Vec::new(),
             stop_p3: false,
+            trace: false,
         };
         for i in 0..g.bots.len() {
             g.with(i, |b| b.wear_legacy_gear());
         }
+        g
+    }
+
+    /// A Judgment Day group (tank, healer and damage dealers): the room has the Full clear, the lead
+    /// picked Judgment and nothing forces the difficulty.
+    fn judgment(classes: &[&'static str], seed: u64) -> Group {
+        let mut g = Group::new(classes, 10, seed);
+        let lead = g.bots[0].player;
+        let ids: Vec<u64> = g.bots.iter().map(|b| b.player).collect();
+        for b in &mut g.bots {
+            b.mates = ids.clone();
+        }
+        let sim = &mut g.bots[0].sim;
+        sim.debug_force_raid_async(None);
+        sim.debug_ilmari_core_cleared(true);
+        sim.apply_as(
+            lead,
+            Command::SetIlmariMode(combat_core::ilmari::IlmariMode::Judgment),
+        );
+        g.tick();
         g
     }
 
@@ -3125,6 +3266,79 @@ impl Group {
             self.with(i, |b| b.push_move());
         }
         let events = self.bots[0].sim.tick();
+        if self.trace && self.bots[0].sim.now().0.is_multiple_of(90) {
+            let s = &self.bots[0].sim;
+            let boss: Vec<String> = s
+                .units()
+                .filter(|u| {
+                    (u.boss || u.key == "il_cio_heir") && u.hostile && u.alive && u.in_combat
+                })
+                .map(|u| format!("{} {}%", u.key, u.hp * 100 / u.max_hp.max(1)))
+                .collect();
+            let team: Vec<String> = self
+                .bots
+                .iter()
+                .map(|b| {
+                    s.unit(b.player).map_or("?".into(), |u| {
+                        format!(
+                            "{}",
+                            if u.alive {
+                                u.hp * 100 / u.max_hp.max(1)
+                            } else {
+                                0
+                            }
+                        )
+                    })
+                })
+                .collect();
+            let acts: Vec<String> = self
+                .bots
+                .iter()
+                .map(|b| {
+                    let tk = b
+                        .target
+                        .and_then(|t| s.unit(t))
+                        .map_or("-".to_string(), |u| u.key.clone());
+                    format!(
+                        "{}:{}{}@({:.0},{:.0})",
+                        &b.class[..2],
+                        tk,
+                        if b.moving { "~" } else { "" },
+                        b.pos.x,
+                        b.pos.z
+                    )
+                })
+                .collect();
+            let casting: Vec<String> = s
+                .units()
+                .filter(|u| u.hostile && u.alive && u.cast.is_some())
+                .map(|u| {
+                    format!(
+                        "{}:{}%:{}/{}{}",
+                        u.key,
+                        u.hp * 100 / u.max_hp.max(1),
+                        u.cast.as_ref().map_or(0, |c| c.elapsed_ms),
+                        u.cast.as_ref().map_or(0, |c| c.total_ms),
+                        if u.cast.as_ref().is_some_and(|c| c.interruptible) {
+                            "k"
+                        } else {
+                            ""
+                        }
+                    )
+                })
+                .collect();
+            let acts = format!("{acts:?} CASTS {casting:?}");
+            if !boss.is_empty() {
+                let line = format!(
+                    "[{:05}] TRACE boss {:?} team {:?} {}\n",
+                    s.now().0,
+                    boss,
+                    team,
+                    acts
+                );
+                self.bots[0].log.push_str(&line);
+            }
+        }
         for i in 0..self.bots.len() {
             self.with(i, |b| b.observe(&events));
         }
@@ -3172,7 +3386,10 @@ impl Group {
             };
             // Three on a 9 m hub stand closer than three in a pit.
             let spread = if boss && b.on_platforms { 1.5 } else { 2.5 };
-            b.pos = Vec3::new(at.x + (k as f32 - 1.0) * spread, 0.0, at.z + gap);
+            // The telegraph covers sit in front of the boss (its facing is -z here), where the real
+            // room's door is: a Judgment group arrives from that side.
+            let side = if b.mates.is_empty() { gap } else { -gap };
+            b.pos = Vec3::new(at.x + (k as f32 - 1.0) * spread, 0.0, at.z + side);
             b.in_boss = boss;
             b.target = None;
         }
@@ -4229,5 +4446,125 @@ fn core_probe() {
     );
     if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
         let _ = std::fs::write(PathBuf::from(dir).join("probe_core.log"), &b.log);
+    }
+}
+
+// ---- Judgment Day (docs/ILMARI_1_0.md D.1, D15): five bots (tank, healer, three damage dealers)
+// against each boss of Wings 5-6 and the core, riders on.
+
+const JUDGMENT_FIVE: [&str; 5] = ["backend", "devops", "fullstack", "frontend", "qa"];
+/// The core's five swap QA for the Security Engineer: the screens' remix adds (the fused
+/// candidates) fall to a stealth opener faster than to a regression suite.
+const JUDGMENT_CORE_FIVE: [&str; 5] = ["backend", "devops", "fullstack", "frontend", "security"];
+
+/// One Judgment boss fight of the five-bot group on `seed`: (boss down, deaths).
+fn judgment_run(zones: &[&str], roster: &[&'static str], seed: u64) -> (bool, usize) {
+    let mut g = Group::judgment(roster, seed);
+    for b in &mut g.bots {
+        b.core_picks = core_picks(seed);
+        b.refuse = true;
+    }
+    g.wing(zones);
+    assert_eq!(
+        g.sim().ilmari_mode(),
+        combat_core::ilmari::IlmariMode::Judgment,
+        "the lead's pick holds in {zones:?}"
+    );
+    let boss = boss_of(g.sim(), zones[zones.len() - 1]);
+    let deaths = g.bots.iter().filter(|b| b.report.died).count();
+    (g.sim().raid_locked(&boss, false), deaths)
+}
+
+/// Judgment Day is the trophy hunt (D.1): five bots (tank, healer, three damage dealers) with every
+/// rider on beat the Consultant, Red and Blue, the Chief Ilmari Officer (Heir and all) and the core on
+/// all three seeds, with at most one death on the best of them. Trios are not a gate.
+#[test]
+fn five_bots_clear_every_judgment_boss_with_at_most_one_death_on_the_best_seed() {
+    let cases: [(&str, &[&str], &[&'static str]); 4] = [
+        ("Consultant", &WING5[1..2], &JUDGMENT_FIVE),
+        ("Red and Blue", &WING5[2..3], &JUDGMENT_FIVE),
+        ("CIO", &WING6[2..3], &JUDGMENT_FIVE),
+        ("Ilmari", &CORE, &JUDGMENT_CORE_FIVE),
+    ];
+    let mut failures = Vec::new();
+    for (name, zones, roster) in cases {
+        let mut best = usize::MAX;
+        for seed in [7, 42, 1234] {
+            let (down, deaths) = judgment_run(zones, roster, seed);
+            println!("Judgment {name:13} seed {seed:4}: down {down}, {deaths} dead");
+            if !down {
+                failures.push(format!("{name} seed {seed}: the boss lives"));
+            } else {
+                best = best.min(deaths);
+            }
+        }
+        if best > 1 {
+            failures.push(format!("{name}: best seed lost {best} players"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// QA probe for Judgment Day: `JD_WING` (5, 6 or 0 for the core), `JD_ROOM` (1..3, 0 for the wing),
+/// `JD_SEED`, `JD_RIDERS_OFF=all|<boss,boss>` to switch riders off, and a log dump in `WOW_BOT_DUMP`. Not a gate.
+#[test]
+#[ignore = "balance probe: JD_WING=6 JD_ROOM=3 JD_SEED=7"]
+fn judgment_probe() {
+    let env = |k: &str, d: usize| {
+        std::env::var(k)
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(d)
+    };
+    let seed = env("JD_SEED", 7) as u64;
+    let (wing, room) = (env("JD_WING", 6), env("JD_ROOM", 3));
+    let all: &[&str] = match wing {
+        5 => &WING5,
+        6 => &WING6,
+        _ => &CORE,
+    };
+    let zones = if room == 0 || wing == 0 {
+        all
+    } else {
+        &all[room - 1..room]
+    };
+    let dps = std::env::var("JD_DPS").unwrap_or_default();
+    let base = if wing == 0 {
+        JUDGMENT_CORE_FIVE
+    } else {
+        JUDGMENT_FIVE
+    };
+    let mut five: Vec<&'static str> = base[..2].to_vec();
+    for k in dps.split(',').filter(|k| !k.is_empty()) {
+        five.push(CLASSES.iter().find(|c| **c == k).expect("class"));
+    }
+    if five.len() < 5 {
+        five = base.to_vec();
+    }
+    let mut g = Group::judgment(&five, seed);
+    g.trace = true;
+    if std::env::var("JD_MODE").is_ok_and(|v| v == "full") {
+        let lead = g.bots[0].player;
+        g.bots[0].sim.apply_as(
+            lead,
+            Command::SetIlmariMode(combat_core::ilmari::IlmariMode::Full),
+        );
+    }
+    for b in &mut g.bots {
+        b.core_picks = core_picks(seed);
+        b.refuse = true;
+    }
+    let (bosses, secs, deaths) = g.wing(zones);
+    let killed = zones
+        .iter()
+        .filter(|z| g.sim().raid_locked(&boss_of(g.sim(), z), false))
+        .count();
+    println!(
+        "probe Judgment wing {wing} room {room} seed {seed}: killed {killed}, {bosses} bosses in {secs} s, {deaths} dead, mode {:?}, fights {:?}",
+        g.sim().ilmari_mode(),
+        g.boss_secs
+    );
+    if let Some(dir) = std::env::var_os("WOW_BOT_DUMP") {
+        let _ = std::fs::write(PathBuf::from(dir).join("probe_jd.log"), &g.bots[0].log);
     }
 }

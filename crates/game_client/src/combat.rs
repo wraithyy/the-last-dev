@@ -60,6 +60,9 @@ pub trait SimRead: Send + Sync {
     fn raid_view(&self) -> combat_core::RaidView;
     /// This week's Weekly Sprint ladder (the room's online, the local one offline).
     fn ladder_view(&self) -> combat_core::LadderView;
+    /// This week's Ilmari core board (Full or Judgment Day) with the Directive's name; the Sprint
+    /// board for `LadderBoard::Sprint`.
+    fn ilmari_ladder_view(&self, board: combat_core::LadderBoard) -> combat_core::LadderView;
     /// Quest pickups the local player already took, as far as this view knows them: the offline
     /// sim knows all of them (and saves them); online the client learns them from `Interacted`
     /// outcomes, so the default is none.
@@ -175,6 +178,9 @@ impl SimRead for Sim {
     }
     fn ladder_view(&self) -> combat_core::LadderView {
         Sim::ladder_view(self)
+    }
+    fn ilmari_ladder_view(&self, board: combat_core::LadderBoard) -> combat_core::LadderView {
+        Sim::ilmari_ladder_view(self, board)
     }
     fn taken_props(&self) -> Vec<String> {
         Sim::taken_props(self, Sim::player(self).unwrap_or(0))

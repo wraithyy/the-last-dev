@@ -227,6 +227,8 @@ pub struct NetWorld {
     raid: combat_core::RaidView,
     /// The room's Weekly Sprint ladder (`Event::Ladder`).
     ladder: combat_core::LadderView,
+    /// The room's Ilmari core boards, Full then Judgment Day (`Event::Ladder`).
+    ilmari_ladders: [combat_core::LadderView; 2],
     /// Zones cleared on Legacy floors: the server keeps them apart from the campaign's.
     legacy_cleared: BTreeSet<String>,
 }
@@ -270,6 +272,7 @@ impl NetWorld {
             legacy: Default::default(),
             raid: Default::default(),
             ladder: Default::default(),
+            ilmari_ladders: Default::default(),
             legacy_cleared: BTreeSet::new(),
         };
         for p in players {
@@ -929,7 +932,11 @@ impl NetWorld {
             }
             Event::Legacy { view } => self.legacy = view.clone(),
             Event::Raid { view } => self.raid = view.clone(),
-            Event::Ladder { view } => self.ladder = view.clone(),
+            Event::Ladder { board, view } => match board {
+                combat_core::LadderBoard::Sprint => self.ladder = view.clone(),
+                combat_core::LadderBoard::IlmariFull => self.ilmari_ladders[0] = view.clone(),
+                combat_core::LadderBoard::IlmariJudgment => self.ilmari_ladders[1] = view.clone(),
+            },
             Event::Unlocked { zone } => {
                 self.unlocked.insert(zone.clone());
             }
@@ -1325,6 +1332,13 @@ impl SimRead for NetWorld {
     }
     fn ladder_view(&self) -> combat_core::LadderView {
         self.ladder.clone()
+    }
+    fn ilmari_ladder_view(&self, board: combat_core::LadderBoard) -> combat_core::LadderView {
+        match board {
+            combat_core::LadderBoard::Sprint => self.ladder.clone(),
+            combat_core::LadderBoard::IlmariFull => self.ilmari_ladders[0].clone(),
+            combat_core::LadderBoard::IlmariJudgment => self.ilmari_ladders[1].clone(),
+        }
     }
     fn legacy_view(&self) -> combat_core::LegacyView {
         self.legacy.clone()

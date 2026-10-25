@@ -87,6 +87,21 @@ fn qa_locks(mut sim: ResMut<CombatSim>, mut done: Local<bool>) {
             sim.0.debug_ladder_add(ms, deaths, crew);
         }
     }
+    // QA: rows on the Ilmari boards for the planner's Weekly tab and `~/endgame` (screenshots).
+    if std::env::var_os("WOW_ILMARI_LADDER_DEMO").is_some() {
+        use combat_core::LadderBoard::{IlmariFull, IlmariJudgment};
+        let crew = [
+            "Ada (Backend Engineer)",
+            "Linus (Fullstack Engineer)",
+            "Grace (DevOps Engineer)",
+        ];
+        sim.0
+            .debug_ilmari_ladder_add(IlmariFull, 742_000, 1, &crew, false);
+        sim.0
+            .debug_ilmari_ladder_add(IlmariFull, 910_000, 0, &["Fullstack Engineer"], true);
+        sim.0
+            .debug_ilmari_ladder_add(IlmariJudgment, 861_500, 1, &crew, false);
+    }
 }
 
 /// Banner title and subtitle for entering the raid on a difficulty.

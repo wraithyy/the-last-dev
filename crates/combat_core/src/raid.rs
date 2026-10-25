@@ -380,7 +380,7 @@ impl Sim {
     }
 
     /// The raid of the loaded zone.
-    fn cur_raid(&self) -> Option<&RaidDef> {
+    pub(crate) fn cur_raid(&self) -> Option<&RaidDef> {
         self.zone.as_deref().and_then(|z| self.content.raid_of(z))
     }
 
@@ -624,11 +624,10 @@ impl Sim {
     }
 
     /// Async Attendance enemy (HP %, damage %) in a raid; 100/100 elsewhere.
-    pub(crate) fn raid_mob_pct(&self) -> (u32, u32) {
+    pub(crate) fn raid_mob_pct(&self, unit: &str) -> (u32, u32) {
         match self.cur_raid() {
             Some(_) if self.raid.mode == crate::ilmari::IlmariMode::Judgment => {
-                let jd = &self.content.ilmari.judgment;
-                (jd.hp_pct, jd.damage_pct)
+                self.content.ilmari.judgment.mob_pct(unit)
             }
             Some(r) if self.raid.async_mode => (r.async_hp_pct, r.async_damage_pct),
             _ => (100, 100),

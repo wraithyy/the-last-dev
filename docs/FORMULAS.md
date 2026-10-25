@@ -637,7 +637,7 @@ Recorder (`echo.rs`): entropy `H = 1000 * (n ln n - sum c ln c) / (n ln K)` per 
 
 ## Ilmari 1.0 engine pieces
 
-Judgment Day (`judgment.rs`, content block `ilmari.judgment`): enemy HP x 130 %, damage x 125 % (replacing the Async figures, on top of Full: the group scaling still applies on top), a boss's enrage timer x 80 % of what Full has, 3 pieces per member per boss (Full: the wing's 2), Legendary Fragments x 2 of Full's 1. Quorum: at least 3 connected humans. Revive: one per player per boss pull (a pull is any hostile boss in combat); the next stays down until no boss fights. Lockout `jd:<boss>`, weekly like the others.
+Judgment Day (`judgment.rs`, content block `ilmari.judgment`): enemy HP x 130 %, damage x 125 % (replacing the Async figures, on top of Full: the group scaling still applies on top), a boss's enrage timer x 80 % of what Full has, 3 pieces per member per boss (Full: the wing's 2), Legendary Fragments x 2 of Full's 1. Quorum: at least 3 connected humans. Revive: one per player per boss pull (a pull is any hostile boss in combat); the next stays down until no boss fights. Lockout `jd:<boss>`, weekly like the others. Per-unit figures (`ilmari.judgment.units`, D15): a unit with an entry takes its own HP %, damage % and enrage % instead of the block's (HP and damage 100..=1000, enrage 1..=100; unset fields keep the block's). The tuned entry is the Chief Ilmari Officer: HP 100 %, damage 125 %, enrage 90 % (162 s) because the Succession Plan's Heir (3,000 HP, adds the block's x 130 %) is already a second pool; the Consultant, Red Team Blue Team and the core sit on the block's numbers. The riders are `ilmari.judgment.riders`, one switchable aura per boss (Mandatory Training, Real Pen Test, Succession Plan, the core's remix deck). The five-bot gate (`playthrough.rs`, `five_bots_clear_every_judgment_boss...`): tank, healer and three damage dealers (QA; the core swaps QA for Security) beat each boss on seeds 7, 42 and 1234 with at most one death on the best seed.
 
 Sight (`sight.rs`, integer ticks of the 30 Hz sim, floats for the cone): per player and tick the suspicion `s` changes by `rate / 30`. Seen (inside range and half angle, a clear line from eye 1.55 m to chest 1.1 m over the blockers): `rate = (1000 / notice_ms) * (1 + 2 * (1 - d / range))`, halved at a pace of `sneak_mps` or less (default 3 m/s, speed measured over half a second). Not seen but running (`speed > noisy_mps`, default 5) within `noise_m` (default 7) with a clear line: `0.8 * 1000 / notice_ms`. The best eye wins. Nobody looking: `s` falls by 0.5 per second. A player in stealth (`stealth_aggro_pct > 0`) and a stunned eye contribute nothing. At `s >= 1`: `Detected` for `detected_ms`, `s = 0`. A patrol is `Patrol::pose(ms of sim time)` over the spawn point plus the offsets, speed `patrol_mps` (default 1.6 m/s), `pause_ms` at each corner.
 
@@ -662,6 +662,33 @@ ladder        = delivered weekly runs of the week, fastest first (ties: fewer de
                 crew labels "Name (Class)" (server names online, class alone offline)
 storage       = offline: the save's ladder key (ladder=<week>*<ms>~<deaths>~<crew+crew>|...);
                 online: the room's sim (per-room board), sent to joiners; a new week empties it
+```
+
+## Ilmari ladder (D16, `ladder.rs`)
+
+```
+boards        = Sprint, IlmariFull, IlmariJudgment (Event::Ladder { board, view }); Story has none
+row           = the core's fall on Full or Judgment: time = sim clock from the pull to the revert
+                (Event::IlmariEnd.ms), deaths = players who died in that pull (a reset clears it),
+                crew = the room's members as "Name (Class)", is_async = Full with fewer than
+                raid.normal_min_players (3) members (Judgment has a quorum, so never)
+order         = fastest first, ties on fewer deaths, then the earlier row (stable sort); top
+                LADDER_SIZE (10) per tab, the Async tab bounded on its own so a solo row never
+                pushes a group row off the board
+week          = live::week_index of the sim clock; a row of a new week replaces the old board
+directive     = ilmari.ladder.directives[Rng(0x11AA_D1EC_0000 ^ week * 0x9E3779B97F4A7C15)
+                .below(n)] (a policy aura `dir_*`), none for a sim that was never told the date;
+                worn by every living member from the pull, put back every 5 s for 12 s, on Full
+                and Judgment, not on Story. Each is a bargain: RTO stealth speed -30 %, Open Plan
+                damage taken +10 % and damage done +10 %, Efficiency Review cast time +15 % and
+                damage done +8 %, Unlimited Vacation max HP -5 % and damage done +6 %
+pay           = ilmari.ladder.entry_tokens (15) to every member of a ranked kill (inside the 200
+                weekly token cap); the top three of a group board (not the Async tab) fire
+                `ladder:rank<1..3>`, which the achievements il_ladder_1..3 turn into a title
+storage       = offline: one save line per board (ilmari_ladder=<week>*<1 Full|2 Judgment>*
+                <ms>~<deaths>~<crew+crew>[~a]|..., `a` marks an Async row, no SAVE_VERSION bump);
+                online: the room's sim, sent to joiners; restored rows are clipped to the room
+                size, sanitised and bounded
 ```
 
 ## Minigame: Teambuilding

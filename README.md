@@ -128,6 +128,7 @@ the site, including the [changelog page](https://wraithyy.github.io/the-last-dev
 | `WOW_FPS=1` | Log average frame time and drawn meshes every 3 s |
 | `WOW_MARIE_LOG=1..4` | Open Ill Marie's autonomy-log window on that screen at start (`marie_log.rs`) |
 | `WOW_ENDING=1..6\|credits\|stinger` | Play the Ilmari ending (a replay: no command, no rewards) from that beat two seconds in, with made-up stamps when the save has none (`ilmari_end.rs`) |
+| `WOW_ILMARI_LADDER_DEMO=1` | Put sample rows on the Ilmari core boards (Full, Async, Judgment) for the planner's Weekly tab and `~/endgame` shots (`raid.rs`) |
 | `WOW_MUTE=1` | Start with audio muted (on the web: `?mute=1` in the URL) |
 | `WOW_LEVEL=n` | Start level (overrides the floor minimum) |
 | `WOW_COMPANIONS=dale,priya` | Companion loadout (Dale, Priya, Rupert; two at most); they come into an Ilmari wing on Story (`WOW_RAID_ASYNC=1`) |

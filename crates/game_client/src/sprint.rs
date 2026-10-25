@@ -692,6 +692,86 @@ fn spawn_board(c: &mut ChildSpawnerCommands, rows: &[SprintRecord]) {
     }
 }
 
+/// The Ilmari row of the Weekly tab and `~/endgame` (D16): the week's Directive and the best row of
+/// each tab of the core's boards. Nothing until the room has a ranked kill, so the core stays a
+/// surprise for a campaign that has not reached it.
+pub struct IlmariRow {
+    pub week: u32,
+    pub directive: String,
+    /// "12:31, 1 dead (crew)" per tab: Full programme, Async attendance, Judgment Day.
+    pub best: [Option<String>; 3],
+}
+
+pub fn ilmari_row(
+    full: &combat_core::LadderView,
+    jd: &combat_core::LadderView,
+) -> Option<IlmariRow> {
+    let best = |l: &combat_core::LadderView, is_async: bool| {
+        l.entries.iter().find(|e| e.is_async == is_async).map(|e| {
+            format!(
+                "{}, {} dead ({})",
+                mmss(e.time_ms),
+                e.deaths,
+                e.crew.join(", ")
+            )
+        })
+    };
+    let row = IlmariRow {
+        week: full.week,
+        directive: if full.directive.is_empty() {
+            jd.directive.clone()
+        } else {
+            full.directive.clone()
+        },
+        best: [best(full, false), best(full, true), best(jd, false)],
+    };
+    (row.best.iter().any(Option::is_some) && !row.directive.is_empty()).then_some(row)
+}
+
+/// The same row as one line for the `~/endgame` window.
+pub fn ilmari_row_line(row: &IlmariRow) -> String {
+    let tab = |name: &str, b: &Option<String>| {
+        format!(
+            "{name} {}",
+            b.as_deref()
+                .map_or("-", |s| s.split(',').next().unwrap_or("-"))
+        )
+    };
+    format!(
+        "Ilmari, week {}: {}. {}, {}, {}.",
+        row.week,
+        row.directive,
+        tab("Full", &row.best[0]),
+        tab("Async", &row.best[1]),
+        tab("Judgment", &row.best[2]),
+    )
+}
+
+fn spawn_ilmari_row(c: &mut ChildSpawnerCommands, row: &IlmariRow) {
+    c.spawn((
+        label(
+            format!(
+                "Ilmari core, week {}: {} (every ranked fight wears it)",
+                row.week, row.directive
+            ),
+            13.0,
+        ),
+        TextColor(ACCENT),
+    ));
+    for (name, best) in ["Full programme", "Async attendance", "Judgment Day"]
+        .iter()
+        .zip(&row.best)
+    {
+        c.spawn((
+            label(
+                format!("  {name:<17} {}", best.as_deref().unwrap_or("nobody yet")),
+                13.0,
+            ),
+            TextColor(if best.is_some() { GOLD } else { DIM }),
+        ));
+    }
+}
+
 fn spawn_ladder(c: &mut ChildSpawnerCommands, view: &combat_core::LadderView) {
     if view.entries.is_empty() {
         c.spawn((
@@ -963,6 +1043,12 @@ fn rebuild_planner(
                 TextColor(ACCENT),
             ));
             spawn_ladder(c, &sim.ladder_view());
+            if let Some(row) = ilmari_row(
+                &sim.ilmari_ladder_view(combat_core::LadderBoard::IlmariFull),
+                &sim.ilmari_ladder_view(combat_core::LadderBoard::IlmariJudgment),
+            ) {
+                spawn_ilmari_row(c, &row);
+            }
         } else {
             c.spawn((
                 label(format!("leaderboard: {}", b.name), 13.0),
@@ -1317,4 +1403,56 @@ fn review_window(
             ));
         });
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use combat_core::{LadderEntry, LadderView};
+
+    fn view(directive: &str, rows: &[(u32, bool)]) -> LadderView {
+        LadderView {
+            week: 2964,
+            directive: directive.into(),
+            entries: rows
+                .iter()
+                .map(|&(time_ms, is_async)| LadderEntry {
+                    time_ms,
+                    deaths: 1,
+                    crew: vec!["Ada (Backend Engineer)".into()],
+                    is_async,
+                })
+                .collect(),
+        }
+    }
+
+    /// The Ilmari row stays hidden until a ranked kill exists, then names the Directive and the
+    /// best row of each tab (the Async rows never stand in for the group's).
+    #[test]
+    fn the_ilmari_row_waits_for_a_ranked_kill_and_splits_the_tabs() {
+        assert!(ilmari_row(&view("Directive: Open Plan", &[]), &view("", &[])).is_none());
+        assert!(ilmari_row(&view("", &[(60_000, false)]), &view("", &[])).is_none());
+        let row = ilmari_row(
+            &view("Directive: Open Plan", &[(730_000, false), (700_000, true)]),
+            &view("Directive: Open Plan", &[(850_000, false)]),
+        )
+        .expect("a row");
+        assert_eq!(row.week, 2964);
+        assert_eq!(
+            row.best[0].as_deref(),
+            Some("12:10, 1 dead (Ada (Backend Engineer))")
+        );
+        assert_eq!(
+            row.best[1].as_deref(),
+            Some("11:40, 1 dead (Ada (Backend Engineer))")
+        );
+        assert_eq!(
+            row.best[2].as_deref(),
+            Some("14:10, 1 dead (Ada (Backend Engineer))")
+        );
+        assert_eq!(
+            ilmari_row_line(&row),
+            "Ilmari, week 2964: Directive: Open Plan. Full 12:10, Async 11:40, Judgment 14:10."
+        );
+    }
 }

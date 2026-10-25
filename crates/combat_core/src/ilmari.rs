@@ -82,6 +82,8 @@ pub struct IlmariDef {
     pub judgment: crate::judgment::JudgmentDef,
     #[serde(default)]
     pub rewards: crate::rewards::RewardsDef,
+    #[serde(default)]
+    pub ladder: crate::ladder::LadderDef,
 }
 
 /// Whether `zone` is Ilmari content: Ilmari gear bonuses work here and nowhere else.
@@ -118,6 +120,8 @@ pub(crate) struct IlmariState {
     pub(crate) end: Option<crate::ilmari_core::IlmariEnd>,
     /// Judgment Day: players who spent their one revive in the pull that is running.
     pub(crate) jd_spent: std::collections::BTreeSet<EntityId>,
+    /// The weekly boards of the core fight on Full and Judgment Day.
+    pub(crate) ladders: crate::ladder::IlmariLadders,
 }
 
 /// How long the room waits for its lead to stamp and reveal before any member may.

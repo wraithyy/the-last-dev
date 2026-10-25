@@ -414,6 +414,12 @@
         (key: "pol_unlimited_pto", name: "Policy: Unlimited Vacation", icon: "pto", harmful: true, max_hp_pct: -20, dispel: Never),
         (key: "pol_pizza", name: "Policy: Pizza Friday", icon: "pizza", harmful: true, haste_pct: 10,
             periodic: Some((interval_ms: 2000, base: 14)), dispel: Never),
+        // The weekly Directives of the Ilmari ladder (`ladder.rs`): four committee policies, each a bargain (a cost and a
+        // perk of about the same size), worn for a whole ranked core fight instead of a 45 s vote.
+        (key: "dir_rto", name: "Directive: Return to Office, Five Days", icon: "room_booking", harmful: true, stealth_slow_pct: 30, dispel: Never),
+        (key: "dir_open_plan", name: "Directive: Open Plan Everything", icon: "poster", harmful: true, damage_taken_pct: 10, damage_done_pct: 10, dispel: Never),
+        (key: "dir_efficiency", name: "Directive: Efficiency Review", icon: "stopwatch", harmful: true, cast_time_pct: 15, damage_done_pct: 8, dispel: Never),
+        (key: "dir_unlimited_pto", name: "Directive: Unlimited Vacation", icon: "pto", harmful: true, max_hp_pct: -5, damage_done_pct: 6, dispel: Never),
         (key: "managed_out", name: "Managed Out", icon: "thumb_down", harmful: true, damage_done_pct: -25,
             expire_damage: 420, dispel: Magic),
         (key: "managed_out_story", name: "Managed Out (Story)", icon: "thumb_down", harmful: true, damage_done_pct: -15,
@@ -16843,7 +16849,7 @@
         ),
         (
             key: "il_cio_heir", name: "The Heir", title: "<Silent, Pending>", level: 17, hostile: true,
-            max_hp: 6500, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
+            max_hp: 3000, max_mana: 0, spell_power: 0, crit_pct: 0, haste_pct: 0,
             mana_regen_per_5s_combat: 0,
             xp_reward: 0, loot: [],
             ai: Some((
@@ -23750,6 +23756,19 @@
              text: "Reverted Ilmari on Story. The mainframe lives, the log is clean, the commit is yours. Nobody was fired for it.",
              hint: "The Core, Story difficulty: any class, with or without company.",
              trigger: Event("raid:story:il_ilmari"), sp: 120),
+            // The Ilmari ladder (`ladder.rs`): the top three of a group board, once per rank.
+            (key: "il_ladder_1", name: "Exceeds Expectations", title: "Exceeds Expectations",
+             text: "Reverted Ilmari faster than any other crew on the board this week, under the week's Directive. The Directive was noted. It was not minded.",
+             hint: "The Core, Full or Judgment Day: finish first on the weekly board.",
+             trigger: Event("ladder:rank1"), sp: 150),
+            (key: "il_ladder_2", name: "Meets Expectations", title: "Meets Expectations",
+             text: "Second on the weekly board. Exactly what was asked, one crew slower than what was hoped.",
+             hint: "The Core, Full or Judgment Day: finish second on the weekly board.",
+             trigger: Event("ladder:rank2"), sp: 120),
+            (key: "il_ladder_3", name: "Partially Meets Expectations", title: "Partially Meets Expectations",
+             text: "Third on the weekly board. Partially is carrying a lot of that sentence, and a podium.",
+             hint: "The Core, Full or Judgment Day: finish third on the weekly board.",
+             trigger: Event("ladder:rank3"), sp: 100),
             // Raid (`raid.rs`): `raid:<boss>` on any difficulty, `raid:<normal|async>:<boss>`.
             (key: "offsite_icebreaker", name: "Broke the Ice", title: "Volunteered Participant",
              text: "Survived the Icebreaker Facilitator. Your fun fact is now 'survived the Icebreaker Facilitator'.",
@@ -25740,6 +25759,17 @@
                 (boss: "il_cio", aura: "il_rider_succession"),
                 (boss: "il_ilmari", aura: "il_rider_remix"),
             ],
+            // Per-unit figures where the block's do not fit (D15, tuned with the five-bot Judgment clears). The CIO keeps its
+            // authored HP and a 162 s enrage: the Succession Plan already adds the Heir's pool to the fight.
+            units: [
+                (unit: "il_cio", hp_pct: Some(100), damage_pct: Some(125), enrage_pct: Some(90)),
+            ],
+        ),
+        // The ladder (D.10): the week seed picks one of four Culture Committee policies, at half strength (`dir_*` auras), as the Directive
+        // every ranked core fight wears; a ranked kill pays every member 15 tokens (inside the weekly cap).
+        ladder: (
+            directives: ["dir_rto", "dir_open_plan", "dir_efficiency", "dir_unlimited_pto"],
+            entry_tokens: 15,
         ),
         rewards: (
             top_ilvl: 20,

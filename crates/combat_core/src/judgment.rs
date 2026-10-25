@@ -41,6 +41,19 @@ pub struct RiderDef {
     pub on: bool,
 }
 
+/// One unit's own Judgment figures instead of the block's (the tuning pass per boss or add, D15).
+/// Unset fields keep the block's number.
+#[derive(Clone, Debug, Deserialize)]
+pub struct UnitPct {
+    pub unit: String,
+    #[serde(default)]
+    pub hp_pct: Option<u32>,
+    #[serde(default)]
+    pub damage_pct: Option<u32>,
+    #[serde(default)]
+    pub enrage_pct: Option<u32>,
+}
+
 /// The numbers of Judgment Day, one block (D.1): percents sit on top of Full.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default)]
@@ -56,6 +69,8 @@ pub struct JudgmentDef {
     /// Legendary Fragments per clear as a multiple of Full's.
     pub fragment_mult: u32,
     pub riders: Vec<RiderDef>,
+    /// Per-unit figures (bosses and the adds they summon) where the block's do not fit.
+    pub units: Vec<UnitPct>,
 }
 
 impl Default for JudgmentDef {
@@ -68,11 +83,30 @@ impl Default for JudgmentDef {
             boss_items: 3,
             fragment_mult: 2,
             riders: Vec::new(),
+            units: Vec::new(),
         }
     }
 }
 
 impl JudgmentDef {
+    /// (HP %, damage %) of `unit` on Judgment Day: its rider entry's own figures, else the block's.
+    pub fn mob_pct(&self, unit: &str) -> (u32, u32) {
+        let r = self.units.iter().find(|r| r.unit == unit);
+        (
+            r.and_then(|r| r.hp_pct).unwrap_or(self.hp_pct),
+            r.and_then(|r| r.damage_pct).unwrap_or(self.damage_pct),
+        )
+    }
+
+    /// Percent of `unit`'s enrage timer that is left on Judgment Day.
+    pub fn enrage_of(&self, unit: &str) -> u32 {
+        self.units
+            .iter()
+            .find(|r| r.unit == unit)
+            .and_then(|r| r.enrage_pct)
+            .unwrap_or(self.enrage_pct)
+    }
+
     pub(crate) fn validate(&self, c: &Content) -> Result<(), ContentError> {
         let bad = |m: String| Err(ContentError::Invalid(m));
         if self.hp_pct < 100 || self.damage_pct < 100 || !(1..=100).contains(&self.enrage_pct) {
@@ -93,6 +127,19 @@ impl JudgmentDef {
                 return bad(format!(
                     "judgment rider {} / {} needs a hostile boss and a known aura",
                     r.boss, r.aura
+                ));
+            }
+        }
+        for u in &self.units {
+            let ok = |n: Option<u32>, lo: u32, hi: u32| n.is_none_or(|n| (lo..=hi).contains(&n));
+            if c.unit_def(&u.unit).is_none_or(|d| !d.hostile)
+                || !ok(u.hp_pct, 100, 1000)
+                || !ok(u.damage_pct, 100, 1000)
+                || !ok(u.enrage_pct, 1, 100)
+            {
+                return bad(format!(
+                    "judgment unit {}: a hostile unit and figures on top of Full (hp and damage 100..=1000, enrage 1..=100)",
+                    u.unit
                 ));
             }
         }

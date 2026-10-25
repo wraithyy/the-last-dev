@@ -24,6 +24,7 @@ pub mod illusion;
 pub mod ilmari;
 mod ilmari_core;
 pub mod judgment;
+pub mod ladder;
 pub mod legacy;
 pub mod live;
 pub mod minigame;
@@ -83,6 +84,7 @@ pub use ilmari_core::{
     OPTIONS, PactDef, ROUNDS, RemixDef, RoundDef, Stance, commit_log, culprit_index,
     judgment_stances, round_winner, stance_for,
 };
+pub use ladder::{LadderBoard, LadderDef};
 pub use legacy::{LegacyDef, LegacyError, LegacyTwist, LegacyView, LegacyZone};
 pub use live::WorldBossState;
 pub use minigame::{

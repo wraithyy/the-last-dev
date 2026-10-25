@@ -32,9 +32,13 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 - The ending: when the Core falls, every screen on campus rewinds, the final log prints, the campus comes back and the credits roll with your own Judgment Day on them. One key skips all of it at any moment and still pays out. It plays once per player; the Cinema screen in the Resistance base shows it again, for free.
 - Finishing the ending pays a handful of Ilmari Tokens and your title for the difficulty, and a cleaning robot rolls into the Resistance base with a request of its own. Dale's Roomba, once assembled, replaces the e-scooter as your ride, and the robot becomes a pet.
 
+- The Core has a weekly ladder. Every Full or Judgment Day kill goes on the room's board for the week (fastest first, then fewest deaths) with its crew, and a lone Full run goes on its own Async tab. Each week's seed picks one Directive, a Culture Committee policy such as Open Plan Everything or Unlimited Vacation, that the whole ranked fight wears: a cost and a perk of about the same size. The Weekly tab of the sprint planner and `~/endgame` show the Directive and the best time of each tab, and every ranked kill pays 15 Ilmari Tokens. Finishing in the top three of a group board earns the title for that place.
+- Judgment Day now has its numbers settled boss by boss: the Chief Ilmari Officer keeps his authored health and a slightly shorter enrage timer, and the Heir he brings along is a smaller pool, so five players can beat the Consultant, Red Team Blue Team, the CIO and the Core on Judgment Day.
+
 ### Changed
 
-- Co-op needs this version on both sides (protocol 47).
+- Co-op needs this version on both sides (protocol 48).
+- The Heir of the Chief Ilmari Officer has less health than before (3,000 instead of 6,500).
 
 ## [0.10.0] - 2026-10-24
 

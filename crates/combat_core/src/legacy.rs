@@ -361,11 +361,11 @@ impl Sim {
 
     /// Extra enemy (HP %, damage %) of the Legacy floor or the raid's Async Attendance;
     /// 100/100 elsewhere.
-    pub(crate) fn legacy_mob_pct(&self) -> (u32, u32) {
+    pub(crate) fn legacy_mob_pct(&self, unit: &str) -> (u32, u32) {
         if self.legacy.fx.is_some() {
             self.legacy.pct
         } else {
-            self.raid_mob_pct()
+            self.raid_mob_pct(unit)
         }
     }
 

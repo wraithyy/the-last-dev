@@ -263,6 +263,12 @@ the same rule as every other room unlock.
   token stack lives in the player's bag; the weekly earning cap (200) is per player, not shared by the
   group. The item band is applied by the server's sim in Ilmari zones; the client's tooltip totals do
   not track the zone and count Ilmari pieces at the base cap.
+- **The Ilmari ladder is the room's sim output (protocol 48).** A row is written by the sim when the core
+  falls (its own clock, its own death count, the room's members), never by a command, so a client claims
+  no time and no score; the Directive is a pure function of the room's week. `Event::Ladder` goes to
+  everyone on a change and to a joiner; `check_event` bounds the rows (64), the crew labels and the
+  Directive name. Boards are per room, nothing is global, and nothing is stored beyond the room's sim
+  (offline: the save, clipped and sanitised on load).
 - **Phases and locks are per room.** The occupied campus is a different zone the group walks into,
   never a toggle on the normal campus; the two phases of two rooms never meet. Wing lockouts
   (Story and Full keys) are the room's weekly lockout and reach late joiners in `Event::Raid`, with the
