@@ -37,6 +37,14 @@ pub use actionbar::CooldownMaterial;
 pub use banners::Banner;
 pub use feed::LogLineMsg;
 pub use hovertip::TipSource;
+/// Esc menu layout, percent of the screen height from the top: the volume block, the row of
+/// settings / co-op / keybindings, and the row of endgame / change role / onboarding, all
+/// inside the backdrop panel and well above the action bar.
+pub const PAUSE_AUDIO: f32 = 24.0;
+pub const PAUSE_ROW1: f32 = 46.0;
+pub const PAUSE_ROW2: f32 = 54.0;
+/// Top edge (HUD px) of the raid difficulty choosers: top-centre, under the career pill, clear of the hotbar and the player.
+pub const CHOOSER_TOP: f32 = 54.0;
 /// Top edge (HUD px) of the first row under the minimap: player auras, then the quest tracker.
 pub const BELOW_MINIMAP: f32 = minimap::TOP + minimap::HEIGHT + 4.0;
 pub use quests::giver_mark;
@@ -98,7 +106,94 @@ impl Plugin for HudPlugin {
                 Update,
                 (update_pause_overlay, toggle_dev, update_dev_overlay).in_set(SimReady),
             )
-            .add_systems(Update, update_key_hint);
+            .add_systems(Update, update_key_hint)
+            .init_resource::<HudRects>()
+            .init_resource::<HudHidden>()
+            .add_systems(
+                PostUpdate,
+                suppress_hud
+                    .before(bevy::camera::visibility::VisibilitySystems::VisibilityPropagate),
+            )
+            .add_systems(
+                PostUpdate,
+                collect_hud_rects.after(bevy::ui::UiSystems::Layout),
+            );
+    }
+}
+
+/// Set by cutscenes and the Ilmari opening while they own the screen: the HUD (every root UI
+/// node below the overlay layers) is hidden, so no keycap or panel peeks out between the bars.
+#[derive(Resource, Default)]
+pub struct HudHidden {
+    pub cutscene: bool,
+    pub opening: bool,
+}
+
+/// Roots at or above this `GlobalZIndex` are overlays (menus, banners, cutscene bars) and stay.
+const OVERLAY_Z: i32 = 50;
+
+fn suppress_hud(
+    hidden: Res<HudHidden>,
+    mut roots: Query<
+        (Entity, &mut Visibility, Option<&GlobalZIndex>),
+        (With<Node>, Without<ChildOf>),
+    >,
+    mut saved: Local<Vec<(Entity, Visibility)>>,
+) {
+    if hidden.cutscene || hidden.opening {
+        for (e, mut vis, z) in &mut roots {
+            if z.is_some_and(|z| z.0 >= OVERLAY_Z) {
+                continue;
+            }
+            if !saved.iter().any(|(s, _)| *s == e) {
+                saved.push((e, *vis));
+            }
+            vis.set_if_neq(Visibility::Hidden);
+        }
+    } else if !saved.is_empty() {
+        for (e, prev) in saved.drain(..) {
+            if let Ok((_, mut vis, _)) = roots.get_mut(e) {
+                *vis = prev;
+            }
+        }
+    }
+}
+
+/// A HUD panel that world-space labels (plates, bubbles, floating numbers) keep clear of.
+#[derive(Component)]
+pub struct HudBlock;
+
+/// Window-logical rects of the visible `HudBlock` panels, refreshed after every layout pass.
+#[derive(Resource, Default)]
+pub struct HudRects(Vec<Rect>);
+
+impl HudRects {
+    pub fn hits(&self, r: Rect) -> bool {
+        self.0.iter().any(|h| !h.intersect(r).is_empty())
+    }
+}
+
+fn collect_hud_rects(
+    mut rects: ResMut<HudRects>,
+    panels: Query<
+        (
+            &ComputedNode,
+            &bevy::ui::UiGlobalTransform,
+            &InheritedVisibility,
+        ),
+        With<HudBlock>,
+    >,
+) {
+    rects.0.clear();
+    for (node, tf, vis) in &panels {
+        if !vis.get() || node.size().x < 1.0 {
+            continue;
+        }
+        let (half, k) = (node.size() * 0.5, node.inverse_scale_factor());
+        rects.0.push(Rect {
+            min: (tf.translation - half) * k,
+            max: (tf.translation + half) * k,
+        });
     }
 }
 
@@ -533,17 +628,21 @@ fn update_key_hint(binds: Res<Keybinds>, mut text: Single<&mut Text, With<KeyHin
 fn spawn_misc(mut commands: Commands) {
     commands.spawn((
         KeyHint,
+        HudBlock,
         Node {
             position_type: PositionType::Absolute,
-            top: px(4),
+            top: px(0),
             width: percent(100),
+            padding: UiRect::axes(px(0), px(3)),
             justify_content: JustifyContent::Center,
             ..default()
         },
+        // Readable over bright scenes too.
+        BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.55)),
         children![(
             KeyHintText,
             label("", 11.0),
-            TextColor(Color::srgba(0.8, 0.9, 1.0, 0.5)),
+            TextColor(Color::srgba(0.8, 0.9, 1.0, 0.75)),
         )],
     ));
     commands.spawn((
@@ -566,16 +665,40 @@ fn spawn_misc(mut commands: Commands) {
             width: percent(100),
             height: percent(100),
             justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
+            align_items: AlignItems::FlexStart,
             display: Display::None,
             ..default()
         },
         GlobalZIndex(50),
-        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
-        children![label(
-            "// paused: the AI is regenerating your roadmap. Esc to resume.",
-            24.0
-        )],
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.72)),
+        children![
+            // The menu's panel: every Esc menu control sits inside it.
+            (
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: percent(PAUSE_AUDIO - 12.0),
+                    height: percent(PAUSE_ROW2 - PAUSE_AUDIO + 24.0),
+                    width: px(780),
+                    max_width: percent(96),
+                    border: UiRect::all(px(1)),
+                    border_radius: BorderRadius::all(px(8)),
+                    ..default()
+                },
+                BorderColor::all(PANEL_EDGE),
+                BackgroundColor(PANEL),
+            ),
+            (
+                label(
+                    "// paused: the AI is regenerating your roadmap. Esc to resume.",
+                    24.0
+                ),
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: percent(PAUSE_AUDIO - 7.0),
+                    ..default()
+                },
+            ),
+        ],
     ));
 }
 
@@ -623,7 +746,16 @@ fn update_dev_overlay(
 
 #[cfg(test)]
 mod tests {
-    use super::ICON_FILES;
+    use super::{HudRects, ICON_FILES};
+    use bevy::prelude::*;
+
+    #[test]
+    fn labels_are_kept_off_hud_rects() {
+        let hud = HudRects(vec![Rect::new(0.0, 0.0, 100.0, 50.0)]);
+        assert!(hud.hits(Rect::new(90.0, 40.0, 150.0, 80.0)));
+        assert!(!hud.hits(Rect::new(100.0, 0.0, 150.0, 50.0)));
+        assert!(!hud.hits(Rect::new(0.0, 60.0, 100.0, 90.0)));
+    }
 
     /// Anything without a shipped file renders as a generated letter badge.
     #[test]

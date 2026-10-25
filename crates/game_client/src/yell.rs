@@ -24,7 +24,7 @@ const OFFSET_RATE: f32 = 12.0;
 /// Player and target frames (with cast bar and aura rows): bubbles are kept out of it.
 const RESERVED: Rect = Rect {
     min: Vec2::new(0.0, 0.0),
-    max: Vec2::new(520.0, 150.0),
+    max: Vec2::new(560.0, 150.0),
 };
 const BUBBLE_BG: Color = Color::srgb(0.95, 0.97, 0.99);
 const BUBBLE_TEXT: Color = Color::srgb(0.1, 0.1, 0.12);
@@ -314,6 +314,7 @@ fn place_bubbles(
     window: Single<&Window>,
     camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
     plate_tops: Res<crate::nameplates::PlateTops>,
+    hud: Res<crate::hud::HudRects>,
     transforms: Query<&Transform, Without<YellBubble>>,
     player: Query<&Transform, (With<Player>, Without<YellBubble>)>,
     sizes: Query<&ComputedNode, With<BubbleBody>>,
@@ -412,16 +413,23 @@ fn place_bubbles(
                 }
             }
         }
-        placed.push(rect_at(x, dy));
+        let rect = rect_at(x, dy);
+        // Never over a HUD panel: the line is still in the chat log.
+        if hud.hits(rect) {
+            hidden.push(s.entity);
+            continue;
+        }
+        placed.push(rect);
         targets.push((s.entity, dy));
     }
 
     let ease = 1.0 - (-OFFSET_RATE * dt).exp();
     for (entity, mut bubble, mut node, mut vis) in &mut bubbles {
+        if hidden.contains(&entity) {
+            *vis = Visibility::Hidden;
+            continue;
+        }
         let Some(slot) = slots.iter().find(|s| s.entity == entity) else {
-            if hidden.contains(&entity) {
-                *vis = Visibility::Hidden;
-            }
             continue;
         };
         let target = targets

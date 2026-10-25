@@ -75,7 +75,7 @@ fn spawn_ui(mut commands: Commands) {
         Node {
             position_type: PositionType::Absolute,
             // Same row as "Co-op (beta)", to its right: lower rows collide with the action bar.
-            top: percent(74),
+            top: percent(crate::hud::PAUSE_ROW1),
             width: percent(100),
             justify_content: JustifyContent::Center,
             display: Display::None,

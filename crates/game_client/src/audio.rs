@@ -1269,7 +1269,7 @@ fn spawn_panel(mut commands: Commands) {
             AudioPanel,
             Node {
                 position_type: PositionType::Absolute,
-                top: percent(56),
+                top: percent(crate::hud::PAUSE_AUDIO),
                 width: percent(100),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,

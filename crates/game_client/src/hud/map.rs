@@ -139,10 +139,14 @@ fn spawn_map(mut commands: Commands) {
                     ));
                     row.spawn((
                         MapGraph,
+                        super::scroll::ScrollList::default(),
                         Node {
                             width: px(330),
+                            // A long tree scrolls beside the map instead of stretching the window.
+                            max_height: px(CANVAS_H + 80.0),
                             flex_direction: FlexDirection::Column,
                             row_gap: px(3),
+                            overflow: Overflow::scroll_y(),
                             ..default()
                         },
                     ));
@@ -562,7 +566,8 @@ fn update_map(
     }
     commands.entity(canvas.0).with_children(|c| {
         // District names under everything else, so the big campus reads at a glance.
-        if flow.zone == "campus" {
+        let campus = flow.zone == "campus";
+        if campus {
             for d in &crate::floors::DISTRICTS {
                 let at = view.to_canvas(Vec3::new(d.centre.0, 0.0, d.centre.1));
                 let w = d.name.len() as f32 * 5.6;
@@ -618,6 +623,10 @@ fn update_map(
         for (at, to, open) in &doors {
             let color = if *open { OPEN } else { LOCKED };
             marker(c, *at, "#", 13.0, color);
+            // On the campus the zone ids would overprint the district names.
+            if campus {
+                continue;
+            }
             c.spawn((
                 MapMarker,
                 label(to.clone(), 10.0),
@@ -635,9 +644,23 @@ fn update_map(
     commands.entity(*graph).despawn_related::<Children>();
     commands.entity(*graph).with_children(|g| {
         g.spawn((label("$ tree ~/campus", 12.0), TextColor(ACCENT)));
+        // Open zones and the next locked step of each branch; Ilmari content only once reachable
+        // (after the reveal), so a level-1 player never reads its names.
+        let mut open_at = [false; 16];
+        let mut more = 0;
         for (depth, z) in zone_tree(&*sim) {
             let here = z == flow.zone;
             let state = zone_state(&*sim, &z, flow.unlock_all);
+            let ok = state.is_ok();
+            let ilmari = combat_core::ilmari::is_ilmari_zone(&z);
+            let parent_open = depth == 0 || open_at.get(depth - 1).copied().unwrap_or(false);
+            if let Some(o) = open_at.get_mut(depth) {
+                *o = ok;
+            }
+            if !(ok || (parent_open && !ilmari)) {
+                more += usize::from(!ilmari);
+                continue;
+            }
             let (tag, color) = if here {
                 ("you are here".to_string(), ACCENT)
             } else if sim.zone_cleared(&z) {
@@ -674,6 +697,12 @@ fn update_map(
                     indent(12.0),
                 ));
             }
+        }
+        if more > 0 {
+            g.spawn((
+                label(format!("+{more} more to unlock"), 10.0),
+                TextColor(DIM),
+            ));
         }
     });
 }

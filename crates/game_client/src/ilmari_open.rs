@@ -329,8 +329,13 @@ fn draw(
     mut nodes: Query<(&Part, &mut Node)>,
     mut texts: Query<(&Part, &mut Text, &mut TextColor)>,
     mut overlay: Single<&mut BackgroundColor, With<OverlayMark>>,
+    mut hud: ResMut<crate::hud::HudHidden>,
 ) {
     let (phase, t) = (opening.phase, opening.t);
+    let playing = phase != Phase::Idle;
+    if hud.opening != playing {
+        hud.opening = playing;
+    }
     // Black with a flicker as the screens come on, then solid under the mail.
     let flicker = ((time.elapsed_secs() * 23.0).sin() * 43_758.545)
         .fract()

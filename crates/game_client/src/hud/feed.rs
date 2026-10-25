@@ -62,11 +62,13 @@ fn spawn_feed(mut commands: Commands) {
         ErrorText,
         Node {
             position_type: PositionType::Absolute,
-            top: percent(16),
+            // Under the unit frames and above the windows, which start lower.
+            top: px(96),
             width: percent(100),
             justify_content: JustifyContent::Center,
             ..default()
         },
+        GlobalZIndex(41),
         label("", 22.0),
         TextLayout::justify(Justify::Center),
         TextColor(Color::srgba(1.0, 0.15, 0.1, 0.0)),

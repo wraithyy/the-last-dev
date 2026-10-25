@@ -43,6 +43,8 @@ fn is_execute(
 const POP_SECS: f32 = 0.22;
 const TEXT_BOX_W: f32 = 240.0;
 /// Horizontal staggering (px) so back-to-back hits do not overprint each other.
+/// Sideways distance (px) from a unit's plate centre where its numbers rise.
+const PLATE_SIDE: f32 = 140.0;
 const STAGGER: [f32; 3] = [-34.0, 0.0, 34.0];
 
 #[derive(Component)]
@@ -56,6 +58,8 @@ struct FloatText {
     /// World height of the spawn point above the unit's feet.
     anchor_y: f32,
     pop: bool,
+    sim: EntityId,
+    size: f32,
 }
 
 pub struct FloatingTextPlugin;
@@ -291,6 +295,8 @@ fn spawn_texts(
                     color: spec.color,
                     anchor_y,
                     pop: spec.pop,
+                    sim: target,
+                    size: spec.size,
                 },
                 Text::new(spec.text),
                 TextFont::from_font_size(spec.size),
@@ -307,7 +313,7 @@ fn spawn_texts(
                     ..default()
                 },
                 Visibility::Hidden,
-                GlobalZIndex(10),
+                GlobalZIndex(13),
             ));
         }
     }
@@ -318,6 +324,8 @@ fn place_texts(
     time: Res<Time>,
     camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
     ui_scale: Res<UiScale>,
+    plate_tops: Res<crate::nameplates::PlateTops>,
+    hud: Res<crate::hud::HudRects>,
     transforms: Query<&Transform, Without<FloatText>>,
     mut texts: Query<(
         Entity,
@@ -343,12 +351,29 @@ fn place_texts(
             .get(ft.anchor)
             .map_or(ft.fallback, |t| t.translation)
             + Vec3::Y * ft.anchor_y;
-        let Ok(screen) = cam.world_to_viewport(cam_tf, world) else {
+        let Ok(mut screen) = cam.world_to_viewport(cam_tf, world) else {
             vis.set_if_neq(Visibility::Hidden);
             continue;
         };
+        // Numbers rise beside the unit's plate (alternating sides), not over its name or bubble.
+        if let Some(top) = plate_tops.0.get(&ft.sim) {
+            screen.y = *top;
+            screen.x += if ft.offset.x < 0.0 {
+                -PLATE_SIDE
+            } else {
+                PLATE_SIDE
+            };
+        } else {
+            screen.x += ft.offset.x;
+        }
+        let at = Vec2::new(screen.x, screen.y - FLOAT_TEXT_RISE * k + ft.offset.y);
+        let half = Vec2::new(40.0, ft.size * 0.6);
+        if hud.hits(Rect::from_center_half_size(at, half)) {
+            vis.set_if_neq(Visibility::Hidden);
+            continue;
+        }
         vis.set_if_neq(Visibility::Inherited);
-        node.left = px(screen.x / scale - TEXT_BOX_W / 2.0 + ft.offset.x);
+        node.left = px(screen.x / scale - TEXT_BOX_W / 2.0);
         node.top = px(screen.y / scale - FLOAT_TEXT_RISE * k + ft.offset.y);
         // Hold full opacity for the first half, then fade.
         let alpha = (2.0 * (1.0 - k)).min(1.0);

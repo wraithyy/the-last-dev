@@ -97,17 +97,11 @@ fn spawn_window(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
                 ..default()
             })
             .with_children(|h| {
-                h.spawn((HeaderText, label("~/whoami", 14.0), TextColor(DIM)));
-                // Fixed width: a long header line used to squeeze this button onto two lines.
                 h.spawn((
-                    crate::social::PetsButton,
-                    Button,
-                    Node {
-                        flex_shrink: 0.0,
-                        margin: UiRect::horizontal(px(8)),
-                        ..default()
-                    },
-                    children![label("[~/pets Z]", 14.0)],
+                    HeaderText,
+                    label("~/whoami", 14.0),
+                    TextLayout::no_wrap(),
+                    TextColor(DIM),
                 ));
                 h.spawn((SheetClose, Button, label("[x]", 14.0)));
             });
@@ -160,6 +154,21 @@ fn spawn_window(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
                 .with_children(|col| {
                     col.spawn((StatsText, label("", 12.0), TextColor(Color::WHITE)));
                     col.spawn((PerkText, label("", 11.0), TextColor(goods::PERK_GOLD)));
+                    // A button of its own, not a tab squeezed in beside the close box.
+                    col.spawn((
+                        crate::social::PetsButton,
+                        Button,
+                        Node {
+                            align_self: AlignSelf::FlexStart,
+                            margin: UiRect::top(px(6)),
+                            padding: UiRect::axes(px(8), px(3)),
+                            border: UiRect::all(px(1)),
+                            border_radius: BorderRadius::all(px(4)),
+                            ..default()
+                        },
+                        BorderColor::all(PANEL_EDGE),
+                        children![label("companions: ~/pets (Z)", 12.0)],
+                    ));
                 });
             });
             super::discard::bag_header(c, "bag (click: equip / use, shift+right-click: delete)");

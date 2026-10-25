@@ -316,6 +316,9 @@ const SCALE_RATE: f32 = 10.0;
 /// Plate text is narrower than the `PLATE_W` box that holds it.
 const CONTENT_W: f32 = 130.0;
 const STACK_GAP_PX: f32 = 2.0;
+/// Width used to test a plate against HUD panels and screen edges: a wrapped title can run
+/// wider than `CONTENT_W`.
+const SHOW_W: f32 = 160.0;
 
 /// Screen y (window px, downwards) of the top edge of every visible plate, by sim id. Yell
 /// bubbles read it so they sit above the plate's final position rather than the raw head point.
@@ -343,6 +346,7 @@ fn place_plates(
     time: Res<Time>,
     target: Res<Target>,
     ui_scale: Res<UiScale>,
+    hud: Res<crate::hud::HudRects>,
     mut tops: ResMut<PlateTops>,
     window: Single<&Window>,
     camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
@@ -365,7 +369,10 @@ fn place_plates(
     let eye = cam_tf.translation();
     let forward = cam_tf.forward();
     // The camera's target, which is the offscreen image during screenshots.
-    let view_h = cam.logical_viewport_size().map_or(window.height(), |v| v.y);
+    let view = cam
+        .logical_viewport_size()
+        .unwrap_or(Vec2::new(window.width(), window.height()));
+    let (view_w, view_h) = (view.x, view.y);
     let dt = time.delta_secs();
     tops.0.clear();
     cands.clear();
@@ -442,7 +449,15 @@ fn place_plates(
         };
         // The target is placed first, so it is never pushed; everyone else may crowd out.
         let crowd = if c.targeted { 0.0 } else { goal / c.h.max(1.0) };
-        let want_k = if crowd > HIDE_AT {
+        // A plate that would draw over a HUD panel (minimap, frames, bars, logs) or be cut by the
+        // screen edge is not shown.
+        let half_w = SHOW_W * scale * c.base_k / 2.0;
+        let rect = Rect {
+            min: Vec2::new(c.x - half_w, c.y - goal - c.h),
+            max: Vec2::new(c.x + half_w, c.y - goal),
+        };
+        let off_screen = rect.min.x < 0.0 || rect.max.x > view_w || rect.min.y < 0.0;
+        let want_k = if crowd > HIDE_AT || off_screen || hud.hits(rect) {
             0.0
         } else if crowd > SHRINK_AT {
             c.base_k * 0.75

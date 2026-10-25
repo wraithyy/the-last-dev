@@ -72,7 +72,10 @@ fn stock_node(cols: u16) -> Node {
 
 fn spawn_window(mut commands: Commands) {
     commands
-        .spawn((ShopWindow, window_node(None, Some(16.0), 400.0)))
+        .spawn((
+            ShopWindow,
+            window_node(None, Some(crate::hud::MINIMAP_WIDTH + 24.0), 400.0),
+        ))
         .with_children(|c| {
             c.spawn(Node {
                 justify_content: JustifyContent::SpaceBetween,

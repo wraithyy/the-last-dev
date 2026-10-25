@@ -503,7 +503,7 @@ fn spawn_ui(mut commands: Commands) {
         CoopMenu,
         Node {
             position_type: PositionType::Absolute,
-            top: percent(74),
+            top: percent(crate::hud::PAUSE_ROW1),
             width: percent(100),
             justify_content: JustifyContent::Center,
             display: Display::None,

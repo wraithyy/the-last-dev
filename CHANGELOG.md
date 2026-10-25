@@ -47,6 +47,20 @@ Screens, props and jokes.
 ### Changed
 
 - Co-op needs this version on both sides (protocol 49).
+- Nameplates, speech bubbles and floating numbers no longer draw over the minimap, unit frames, action bar or log windows, and plates are hidden instead of being cut by the screen edge. Combat numbers now rise beside the target's plate instead of on its name.
+- Cutscenes and the Ilmari opening hide the whole HUD, so no keycap, frame or log window peeks out between the letterbox bars.
+- The Slack and combat-log windows fade to a faint outline after eight quiet seconds and come back when a line arrives or the pointer is over them.
+- The top key-hint line sits on a dark strip so it stays readable over bright scenes.
+- The Story/Full and Normal/Legacy difficulty choosers open top-centre under the career pill instead of on the hotbar.
+- The map shows only open zones and the next locked step of each branch; Ilmari zones appear only once you can reach them. The tree scrolls beside the map, and the campus map no longer prints zone ids over the district names.
+- The Esc menu has a dimmed panel behind it and its buttons sit in one block clear of the action bar.
+- The target frame is spaced away from the player frame, and a long cast name is shortened so it no longer runs into the cast time.
+- The gear and shop windows open below the player frame, "companions: ~/pets" is a button of its own instead of a tab beside the close box, and the career window's two header lines no longer overlap.
+- Notices such as the vendor's line show above the windows instead of across their title bars.
+
+### Fixed
+
+- The quest tracker no longer shows an empty "Objectives (0)" box when only a countdown is running.
 
 ## [0.10.0] - 2026-10-24
 

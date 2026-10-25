@@ -97,7 +97,7 @@ fn spawn_ui(mut commands: Commands) {
             ChoiceRoot,
             Node {
                 position_type: PositionType::Absolute,
-                bottom: px(150),
+                top: px(crate::hud::CHOOSER_TOP),
                 left: percent(50),
                 width: px(420),
                 margin: UiRect::left(px(-210)),
@@ -270,8 +270,13 @@ fn choice(
     };
     set_text(&mut caption, &caption_text);
     // Touch: just above the action bar, so the door itself stays in view.
-    let bottom = if touch.active { px(94) } else { px(150) };
+    let (top, bottom) = if touch.active {
+        (Val::Auto, px(94))
+    } else {
+        (px(crate::hud::CHOOSER_TOP), Val::Auto)
+    };
     if root.bottom != bottom {
+        root.top = top;
         root.bottom = bottom;
     }
     let pad = if touch.active { px(12) } else { px(5) };

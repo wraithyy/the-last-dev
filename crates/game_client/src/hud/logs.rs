@@ -46,9 +46,12 @@ const METER_GAP: f32 = 8.0;
 const TOUCH_PANEL_BOTTOM: f32 = 156.0;
 
 /// Idle seconds before the chat starts to fade, and the seconds the fade takes.
-const FADE_DELAY: f32 = 6.0;
+const FADE_DELAY: f32 = 8.0;
 const FADE_SECS: f32 = 2.0;
-const FADE_FLOOR: f32 = 0.35;
+/// Idle opacity of the panel chrome (background, title bar, border): near-transparent so an
+/// empty log does not sit on the screen as a dark box. The text keeps `TEXT_FLOOR`.
+const FADE_FLOOR: f32 = 0.1;
+const TEXT_FLOOR: f32 = 0.7;
 
 pub const PARTY_BLUE: Color = Color::srgb(0.45, 0.7, 1.0);
 const CHAT_WHITE: Color = Color::srgb(0.93, 0.95, 1.0);
@@ -259,8 +262,11 @@ pub fn wrap(head: &str, body: &str, cols: usize) -> Vec<(String, String)> {
 
 /// Opacity of an idle chat window: full while active, easing down to the floor once quiet.
 pub fn fade_alpha(idle: f32) -> f32 {
-    let t = ((idle - FADE_DELAY) / FADE_SECS).clamp(0.0, 1.0);
-    1.0 - t * (1.0 - FADE_FLOOR)
+    1.0 - fade_t(idle) * (1.0 - FADE_FLOOR)
+}
+
+fn fade_t(idle: f32) -> f32 {
+    ((idle - FADE_DELAY) / FADE_SECS).clamp(0.0, 1.0)
 }
 
 const fn cols_for(width: f32, font: f32) -> usize {
@@ -368,9 +374,9 @@ struct LogBody(Win);
 struct LogRow(Win, usize);
 #[derive(Component)]
 struct LogSpan(Win, usize);
-/// Idle-fade target: this node's colour at full opacity.
+/// Idle-fade target: the window it belongs to and this node's colour at full opacity.
 #[derive(Component)]
-struct Fade(Color);
+struct Fade(Win, Color);
 #[derive(Component)]
 pub struct WinToggle(pub Win);
 #[derive(Component)]
@@ -444,7 +450,7 @@ fn spawn_windows(mut commands: Commands) {
         "~/prod $ tail -f combat.log",
         COMBAT_W,
         (COMBAT_FONT, COMBAT_ROW_H, COMBAT_ROWS),
-        false,
+        true,
     );
     spawn_dock(&mut commands);
     spawn_strip(&mut commands);
@@ -463,6 +469,7 @@ fn spawn_log_window(
     let body_bg = Color::srgba(0.03, 0.04, 0.06, 0.84);
     let mut root = commands.spawn((
         win,
+        super::HudBlock,
         // Above the loot window, which a touch panel would otherwise be hidden behind.
         GlobalZIndex(31),
         Node {
@@ -478,7 +485,7 @@ fn spawn_log_window(
         drop_shadow(),
     ));
     if fades {
-        root.insert(Fade(edge));
+        root.insert(Fade(win, edge));
     }
     root.with_children(|root| {
         let mut bar = root.spawn((
@@ -492,7 +499,7 @@ fn spawn_log_window(
             BackgroundColor(bar_bg),
         ));
         if fades {
-            bar.insert(Fade(bar_bg));
+            bar.insert(Fade(win, bar_bg));
         }
         bar.with_children(|bar| {
             for c in [
@@ -535,7 +542,7 @@ fn spawn_log_window(
             BackgroundColor(body_bg),
         ));
         if fades {
-            body.insert(Fade(body_bg));
+            body.insert(Fade(win, body_bg));
         }
         body.with_children(|body| {
             for i in 0..rows {
@@ -802,7 +809,7 @@ fn apply_visibility(
 fn refresh(
     time: Res<Time>,
     mut chat: ResMut<ChatLog>,
-    combat: Res<CombatLog>,
+    mut combat: ResMut<CombatLog>,
     bodies: Query<(&LogBody, &Interaction)>,
     mut rows: Query<(&LogRow, &mut Text, &mut TextColor), Without<LogSpan>>,
     mut spans: Query<(&LogSpan, &mut TextSpan, &mut TextColor), Without<LogRow>>,
@@ -810,28 +817,34 @@ fn refresh(
         &Fade,
         Option<&mut BackgroundColor>,
         Option<&mut BorderColor>,
+        Option<&mut BoxShadow>,
     )>,
     touch: Res<TouchMode>,
     panel: Res<TouchPanel>,
     mut strip: Single<&mut Text, (With<TouchStripText>, Without<LogRow>)>,
 ) {
-    let hovered = bodies
-        .iter()
-        .any(|(b, i)| b.0 == Win::Chat && *i != Interaction::None);
-    chat.0.idle = if hovered {
-        0.0
-    } else {
-        chat.0.idle + time.delta_secs()
-    };
-    let alpha = fade_alpha(chat.0.idle);
-    for (LogRow(win, i), mut text, mut color) in &mut rows {
+    let dt = time.delta_secs();
+    let (mut chat_hot, mut combat_hot) = (false, false);
+    for (b, i) in &bodies {
+        if *i != Interaction::None {
+            match b.0 {
+                Win::Chat => chat_hot = true,
+                _ => combat_hot = true,
+            }
+        }
+    }
+    chat.0.idle = if chat_hot { 0.0 } else { chat.0.idle + dt };
+    combat.0.idle = if combat_hot { 0.0 } else { combat.0.idle + dt };
+    let chrome = [fade_alpha(chat.0.idle), fade_alpha(combat.0.idle)];
+    let text = [chat.0.idle, combat.0.idle].map(|i| 1.0 - fade_t(i) * (1.0 - TEXT_FLOOR));
+    for (LogRow(win, i), mut text_c, mut color) in &mut rows {
         let (buf, a) = match win {
-            Win::Chat => (&chat.0, alpha),
-            _ => (&combat.0, 1.0),
+            Win::Chat => (&chat.0, text[0]),
+            _ => (&combat.0, text[1]),
         };
         let row = buf.view().get(*i).copied().flatten();
         let want = row.map_or(("", Color::NONE), |r| (r.head.as_str(), r.head_color));
-        super::set_text(&mut text, want.0);
+        super::set_text(&mut text_c, want.0);
         let c = want.1.with_alpha(want.1.alpha() * a);
         if color.0 != c {
             color.0 = c;
@@ -839,8 +852,8 @@ fn refresh(
     }
     for (LogSpan(win, i), mut span, mut color) in &mut spans {
         let (buf, a) = match win {
-            Win::Chat => (&chat.0, alpha),
-            _ => (&combat.0, 1.0),
+            Win::Chat => (&chat.0, text[0]),
+            _ => (&combat.0, text[1]),
         };
         let row = buf.view().get(*i).copied().flatten();
         let (body, c) = row.map_or(("", Color::NONE), |r| (r.body.as_str(), r.body_color));
@@ -852,7 +865,12 @@ fn refresh(
             color.0 = c;
         }
     }
-    for (Fade(base), bg, border) in &mut fades {
+    for (Fade(win, base), bg, border, shadow) in &mut fades {
+        let alpha = if *win == Win::Chat {
+            chrome[0]
+        } else {
+            chrome[1]
+        };
         let c = base.with_alpha(base.alpha() * alpha);
         if let Some(mut bg) = bg
             && bg.0 != c
@@ -863,6 +881,15 @@ fn refresh(
             && border.top != c
         {
             *border = BorderColor::all(c);
+        }
+        // The drop shadow would otherwise keep the faded window as a dark box.
+        if let Some(mut shadow) = shadow {
+            let a = 0.55 * alpha;
+            for st in &mut shadow.0 {
+                if st.color.alpha() != a {
+                    st.color = st.color.with_alpha(a);
+                }
+            }
         }
     }
     if touch.active {
@@ -983,6 +1010,7 @@ mod tests {
         assert_eq!(fade_alpha(FADE_DELAY), 1.0);
         assert!(fade_alpha(FADE_DELAY + FADE_SECS / 2.0) < 1.0);
         assert!((fade_alpha(1000.0) - FADE_FLOOR).abs() < 1e-6);
+        assert!(1.0 - fade_t(1000.0) * (1.0 - TEXT_FLOOR) >= TEXT_FLOOR);
     }
 
     #[test]

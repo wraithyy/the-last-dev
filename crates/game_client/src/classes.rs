@@ -462,11 +462,12 @@ fn spawn_change_role_menu(mut commands: Commands) {
         ChangeRoleMenu,
         Node {
             position_type: PositionType::Absolute,
-            top: percent(81),
+            top: percent(crate::hud::PAUSE_ROW2),
             width: percent(100),
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
-            row_gap: px(4),
+            // Wide enough that the hint line clears the buttons flanking the row above.
+            row_gap: px(10),
             display: Display::None,
             ..default()
         },

@@ -1567,6 +1567,7 @@ fn draw(
     )>,
     ui_scale: Res<UiScale>,
     window: Single<&Window>,
+    mut hud: ResMut<crate::hud::HudHidden>,
 ) {
     let (open, line) = match cinema.playing.as_ref() {
         Some(p) => match beat(&SCENES[p.scene], p.t) {
@@ -1577,6 +1578,9 @@ fn draw(
         None => (0.0, None),
     };
     let show = cinema.playing.is_some();
+    if hud.cutscene != show {
+        hud.cutscene = show;
+    }
     let disp = if show { Display::Flex } else { Display::None };
     let fit = |node: &mut Node| {
         if node.display != disp {

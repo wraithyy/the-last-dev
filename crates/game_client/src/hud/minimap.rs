@@ -141,6 +141,7 @@ fn spawn_radar(
     let calendar = icons.get(&assets, "calendar");
     commands
         .spawn((
+            super::HudBlock,
             Node {
                 position_type: PositionType::Absolute,
                 right: px(12),

@@ -16,7 +16,7 @@ use combat_core::{AuraView, CastError, CastView, EntityId, Event};
 const FRAME_H: f32 = 64.0;
 // Leaves room for the controls hint line above the frames.
 const FRAME_TOP: f32 = 26.0;
-const FRAME_GAP: f32 = 14.0;
+const FRAME_GAP: f32 = 30.0;
 const AVATAR_RIM: Color = Color::srgb(0.55, 0.62, 0.75);
 const CASTING: Color = Color::srgb(1.0, 0.72, 0.1);
 const UNINTERRUPTIBLE: Color = Color::srgb(0.55, 0.55, 0.58);
@@ -261,6 +261,7 @@ fn spawn_frame(commands: &mut Commands, who: Who, left: f32) {
     commands
         .spawn((
             FrameRoot(who),
+            super::HudBlock,
             Node {
                 position_type: PositionType::Absolute,
                 top: px(FRAME_TOP),
@@ -402,6 +403,7 @@ fn spawn_burnout_strip(commands: &mut Commands, icons: &mut IconCache, assets: &
     commands
         .spawn((
             BurnoutStrip,
+            super::HudBlock,
             Button,
             TipSource {
                 tag: "burnout",
@@ -1266,6 +1268,8 @@ struct BarView {
 }
 
 const CAST_LABEL_MAX: usize = 24;
+/// The target's cast bar is narrower and its label shares the row with the remaining time.
+const TARGET_CAST_LABEL_MAX: usize = 18;
 
 fn cast_view(sim: &dyn SimRead, cast: CastView, remaining_only: bool) -> BarView {
     let def = sim.content().spell(cast.spell);
@@ -1279,8 +1283,13 @@ fn cast_view(sim: &dyn SimRead, cast: CastView, remaining_only: bool) -> BarView
         (name, d.icon.clone())
     });
     // One line on the narrow bars: "Have You Tried Turning It Off and On Again" would wrap.
-    let name = if name.chars().count() > CAST_LABEL_MAX {
-        let cut: String = name.chars().take(CAST_LABEL_MAX - 3).collect();
+    let max = if remaining_only {
+        TARGET_CAST_LABEL_MAX
+    } else {
+        CAST_LABEL_MAX
+    };
+    let name = if name.chars().count() > max {
+        let cut: String = name.chars().take(max - 3).collect();
         format!("{}...", cut.trim_end())
     } else {
         name

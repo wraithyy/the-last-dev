@@ -635,7 +635,7 @@ fn spawn_ui(mut commands: Commands) {
         Node {
             position_type: PositionType::Absolute,
             // Same row as "Co-op (beta)", to its left; "~/keybindings" sits to its right.
-            top: percent(74),
+            top: percent(crate::hud::PAUSE_ROW1),
             width: percent(100),
             justify_content: JustifyContent::Center,
             display: Display::None,

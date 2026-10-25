@@ -260,7 +260,7 @@ fn spawn_ui(mut commands: Commands) {
         MenuEntry,
         Node {
             position_type: PositionType::Absolute,
-            top: percent(81),
+            top: percent(crate::hud::PAUSE_ROW2),
             width: percent(100),
             justify_content: JustifyContent::Center,
             display: Display::None,

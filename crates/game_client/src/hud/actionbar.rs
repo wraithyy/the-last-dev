@@ -314,6 +314,7 @@ fn spawn_bar(mut commands: Commands, mut materials: ResMut<Assets<CooldownMateri
     commands
         .spawn((
             BarRoot,
+            super::HudBlock,
             Node {
                 position_type: PositionType::Absolute,
                 bottom: px(BAR_BOTTOM),
@@ -648,6 +649,7 @@ fn accent_key<R: Bundle, B: Bundle, I: Bundle, G: Bundle, F: Bundle>(
     let (ring_m, button_m, icon_m, glow_m, gauge_m) = markers;
     commands
         .spawn((
+            super::HudBlock,
             AccentRoot {
                 action: look.action,
                 left,

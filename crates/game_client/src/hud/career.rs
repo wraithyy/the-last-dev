@@ -152,9 +152,11 @@ fn spawn_ui(mut commands: Commands) {
                 h.spawn((label("~/career  (R to close)", 14.0), TextColor(DIM)));
                 h.spawn((CareerClose, Button, label("[x]", 14.0)));
             });
+            // Two lines, not a row: both texts are long and used to wrap into each other.
             c.spawn(Node {
-                justify_content: JustifyContent::SpaceBetween,
-                align_items: AlignItems::Center,
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::FlexStart,
+                row_gap: px(4),
                 ..default()
             })
             .with_children(|h| {

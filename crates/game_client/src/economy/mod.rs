@@ -489,7 +489,8 @@ pub fn window_node(left: Option<f32>, right: Option<f32>, width: f32) -> impl Bu
             position_type: PositionType::Absolute,
             left: left.map_or(Val::Auto, px),
             right: right.map_or(Val::Auto, px),
-            top: px(84),
+            // Below the player frame and its burnout strip.
+            top: px(132),
             width: px(width),
             padding: UiRect::all(px(8)),
             flex_direction: FlexDirection::Column,

@@ -150,7 +150,7 @@ fn spawn_ui(mut commands: Commands) {
             SwitchRoot,
             Node {
                 position_type: PositionType::Absolute,
-                bottom: px(150),
+                top: px(crate::hud::CHOOSER_TOP),
                 left: percent(50),
                 width: px(440),
                 margin: UiRect::left(px(-220)),
@@ -268,8 +268,13 @@ fn difficulty_switch(
         (false, false) => "Full. The group lead picks the difficulty.",
     };
     set_text(&mut caption, text);
-    let bottom = if touch.active { px(94) } else { px(150) };
+    let (top, bottom) = if touch.active {
+        (Val::Auto, px(94))
+    } else {
+        (px(crate::hud::CHOOSER_TOP), Val::Auto)
+    };
     if root.bottom != bottom {
+        root.top = top;
         root.bottom = bottom;
     }
     for (b, mut bg, mut border) in &mut segs {

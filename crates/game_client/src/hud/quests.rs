@@ -1422,7 +1422,11 @@ fn update_tracker(
         .with_children(|h| {
             h.spawn((
                 label(
-                    format!("~/jira  Objectives ({})", list.len() + live.entries.len()),
+                    // A footer-only tracker (a countdown) has no objectives to count.
+                    match list.len() + live.entries.len() {
+                        0 => "~/jira".to_string(),
+                        n => format!("~/jira  Objectives ({n})"),
+                    },
                     12.0,
                 ),
                 TextColor(ACCENT),
