@@ -8,6 +8,8 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-25
+
 ### Added
 
 - Esc menu > Start over wipes the current role's save and starts it again in the car park with the tutorial. HR makes you type a farewell sentence first, so no stray click costs a character; other roles keep their saves.
@@ -274,7 +276,8 @@ Screens, props and jokes.
 - Download progress for the wasm in the loader.
 - Combat, a classic MMO HUD and animated models.
 
-[Unreleased]: https://github.com/wraithyy/the-last-dev/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/wraithyy/the-last-dev/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/wraithyy/the-last-dev/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/wraithyy/the-last-dev/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/wraithyy/the-last-dev/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/wraithyy/the-last-dev/compare/v0.7.0...v0.8.0

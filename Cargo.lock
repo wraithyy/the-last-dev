@@ -2089,7 +2089,7 @@ dependencies = [
 
 [[package]]
 name = "combat_core"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "ron",
  "serde",
@@ -2777,7 +2777,7 @@ dependencies = [
 
 [[package]]
 name = "game_client"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "bevy",
  "combat_core",
@@ -3734,7 +3734,7 @@ dependencies = [
 
 [[package]]
 name = "net_proto"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "combat_core",
  "postcard",
@@ -4937,7 +4937,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "axum",
  "combat_core",
