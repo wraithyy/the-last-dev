@@ -8,6 +8,8 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-26
+
 ### Added
 
 - When Ilmari's Opening ends, Dale's ticket "He Was Right" is already in your tracker with a first step that sends you to the hatch behind the Car Park P3 attendant's booth, and Dale sends a line in chat to say so.
@@ -303,7 +305,8 @@ Screens, props and jokes.
 - Download progress for the wasm in the loader.
 - Combat, a classic MMO HUD and animated models.
 
-[Unreleased]: https://github.com/wraithyy/the-last-dev/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/wraithyy/the-last-dev/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/wraithyy/the-last-dev/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/wraithyy/the-last-dev/compare/v0.11.0...v1.0.0
 [0.11.0]: https://github.com/wraithyy/the-last-dev/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/wraithyy/the-last-dev/compare/v0.9.0...v0.10.0
