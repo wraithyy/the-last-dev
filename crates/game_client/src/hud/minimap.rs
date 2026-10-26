@@ -511,10 +511,16 @@ fn update_radar(
             let p = Vec2::new(pos.x, pos.z);
             if in_view(p) {
                 let open = l.unlocked || flow.unlock_all;
-                marks.push((
-                    p,
-                    Kind::Glyph("#", if open { DOOR_OPEN } else { DOOR_LOCKED }),
-                ));
+                // The hatch to the Resistance is not on the map until the Opening has played.
+                if !open && combat_core::ilmari::is_ilmari_zone(&l.to) {
+                    continue;
+                }
+                let glyph = if open && l.to == combat_core::ilmari::BASE_ZONE {
+                    Kind::Glyph("H", super::GOLD)
+                } else {
+                    Kind::Glyph("#", if open { DOOR_OPEN } else { DOOR_LOCKED })
+                };
+                marks.push((p, glyph));
             }
         }
         // The Board Meeting's spot while its countdown runs (the boss itself is a boss dot later).

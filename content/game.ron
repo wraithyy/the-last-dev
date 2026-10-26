@@ -19967,9 +19967,14 @@
             giver: (npc: "il_dale", zone: "resistance/1"),
             requires: Some("il_00_wake"),
             text: "Twenty-two years in this booth. I said the machines would take the parking, then the badges, then the building. Nobody listened. Now the whole company is in my basement. I'd say I told you so, but there is a queue.",
-            progress_text: "Talk to Dale. He is right there. He has been right there since 2002.",
+            progress_text: "Dale's booth is in Car Park P3, off the campus. The hatch behind it was never on any floor plan. He has been right there since 2002.",
             done_text: "There. Said it. Feels exactly as good as the twenty-two years I spent imagining it. Sit. Not that chair, that one belongs to Brenda and has three quotes on it.",
-            objectives: [Talk("il_dale")],
+            // The Opening hands this over unasked (`ilmari.rs`), so the first line is the way there:
+            // a one-second Wait in the base is "go down the hatch" for the tracker, tooltip and arrow.
+            objectives: [
+                Wait(zone: "resistance/1", label: "Find Dale's hatch behind the attendant's booth in Car Park P3", secs: 1),
+                Talk("il_dale"),
+            ],
             reward: (xp: 60, tokens: 2),
         ),
         (

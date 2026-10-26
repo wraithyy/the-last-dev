@@ -123,6 +123,7 @@ the site, including the [changelog page](https://wraithyy.github.io/the-last-dev
 | `WOW_NIGHT=1` | Hold the scene at full night (street lamps, night look) |
 | `WOW_ZONE=<id>` | Start in that zone (campus, tower/1..5, datacenter/1..2, lab/1..2), sim-backed and playable, at its minimum level; `WOW_FLOOR=n` is `WOW_ZONE=tower/n` |
 | `WOW_QUESTS=id[:active\|ready\|done],..` | Force quest states at start |
+| `WOW_ILMARI=1\|mail\|reveal\|badge\|done` | Play the Ilmari Opening on the campus from the start or from that beat; `done` starts right after it (hatch open, Dale's ticket in the log) |
 | `WOW_UNLOCK_ALL=1` | Open every door and elevator |
 | `WOW_JIRA=1`, `WOW_MAP=1` | Open the quest log or the map at start |
 | `WOW_KILL_BOSS=secs` | The zone boss dies (as a player kill) that many seconds in |

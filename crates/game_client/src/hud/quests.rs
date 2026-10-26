@@ -216,6 +216,8 @@ pub fn objective_line(content: &Content, o: &Objective, have: u32, need: u32) ->
             }
             _ => format!("{what} {have}/{need}"),
         },
+        // A one-second wait is "get to this zone": a bar for it would only flash.
+        Objective::Wait { .. } if need <= 1 => what,
         Objective::Wait { .. } | Objective::Defend { .. } | Objective::Escort { .. } => {
             format!("{what} {}", wait_bar(have, need))
         }
@@ -337,6 +339,58 @@ fn too_low_for_quest(sim: &dyn SimRead, npc_key: &str, zone: &str) -> bool {
             && q.requires.as_ref().is_none_or(|r| done.contains(r))
             && sim.quest_status(&q.id) == QuestStatus::Locked
     })
+}
+
+/// The tracker's dim "what next" line while no main quest is open: the main quest after the one
+/// closed last (else the first on offer) with its giver and zone, and the first stop of the route
+/// when that zone is not this one. A chain step still above the player's level reads as such, so a
+/// stalled campaign is never silent.
+pub fn next_step_line(sim: &dyn SimRead, zone: &str, unlock_all: bool) -> Option<String> {
+    let content = sim.content();
+    let log = sim.quests();
+    if log
+        .active
+        .iter()
+        .any(|q| content.quest(&q.id).is_some_and(|d| d.main))
+    {
+        return None;
+    }
+    let level = sim.player().and_then(|p| sim.unit(p)).map(|u| u.level)?;
+    let main = || content.quests.iter().filter(|q| q.main);
+    let offered = |q: &&QuestDef| sim.quest_status(&q.id) == QuestStatus::Available;
+    let after_last = log.completed.iter().rev().find_map(|done| {
+        main().find(|q| q.requires.as_deref() == Some(done.as_str()) && offered(q))
+    });
+    let (q, gate) = match after_last.or_else(|| main().find(offered)) {
+        Some(q) => (q, None),
+        None => {
+            let q = main().find(|q| {
+                q.level_min > level
+                    && q.requires
+                        .as_ref()
+                        .is_some_and(|r| log.completed.contains(r))
+                    && sim.quest_status(&q.id) == QuestStatus::Locked
+            })?;
+            (q, Some(q.level_min))
+        }
+    };
+    let mut line = format!(
+        "Next: {} - {} in {}",
+        q.name,
+        unit_name(content, &q.giver.npc),
+        zone_label(content, &q.giver.zone)
+    );
+    if let Some(n) = gate {
+        line.push_str(&format!(" (from level {n})"));
+    }
+    if q.giver.zone != zone
+        && let Some(door) =
+            super::waypoint::door_toward(sim, zone, &[q.giver.zone.as_str()], unlock_all)
+        && let Some(l) = sim.zone_links(zone).into_iter().find(|l| l.anchor == door)
+    {
+        line.push_str(&format!(", via {}", zone_label(content, &l.to)));
+    }
+    Some(line)
 }
 
 /// Which quests the tracker follows: auto-tracked on accept, untracked from the log (J).
@@ -629,6 +683,17 @@ struct DialogState {
     shown: String,
 }
 
+/// Once per save: a quiet toast that F8 turns the quest arrow on, after two minutes with nothing
+/// in the log. The flag is saved with the class (`economy/save.rs`).
+#[derive(Resource, Default)]
+pub struct ArrowHint {
+    pub seen: bool,
+    idle: f32,
+}
+
+/// Seconds with an empty quest log before the arrow hint shows.
+const ARROW_HINT_IDLE_SECS: f32 = 120.0;
+
 #[derive(Resource, Default)]
 struct Shown {
     tracker: String,
@@ -643,6 +708,7 @@ impl Plugin for QuestsPlugin {
         app.init_resource::<DialogState>()
             .init_resource::<Shown>()
             .init_resource::<QuestTrack>()
+            .init_resource::<ArrowHint>()
             .add_systems(Startup, spawn_quest_ui)
             .add_systems(
                 Update,
@@ -655,6 +721,7 @@ impl Plugin for QuestsPlugin {
                     // Rebuilds strings and the tree from sim state; 10 Hz is plenty.
                     update_tracker.run_if(super::every(0.1)),
                     quest_events,
+                    arrow_hint,
                     trophy_hint,
                 )
                     .chain()
@@ -1500,6 +1567,7 @@ fn update_tracker(
     live: Res<crate::live::LiveTracker>,
     sprint: Res<crate::sprint::SprintHud>,
     minigame: Res<crate::minigame::MinigameHud>,
+    flow: Res<GameFlow>,
 ) {
     let (area_node, computed) = &mut *area;
     // Touch: the right side holds the buttons, so the tracker moves under the player frame
@@ -1520,7 +1588,8 @@ fn update_tracker(
     let list = tracked(&*sim, &track);
     // A sprint's run panel or a minigame header takes the tracker's slot, as WoW's challenge
     // timer does.
-    let visible = (!list.is_empty() || !live.is_empty())
+    let next = next_step_line(&*sim, &flow.zone, flow.unlock_all);
+    let visible = (!list.is_empty() || !live.is_empty() || next.is_some())
         && !trophies.0
         && !windows.map
         && !sprint.active
@@ -1548,7 +1617,7 @@ fn update_tracker(
         .map(|(q, end)| (q.as_str(), (end - now).max(0.0).ceil() as u32))
         .collect();
     let sig = format!(
-        "{list:?}|{}|{max}|{room:.0}|{}|{clock:?}",
+        "{list:?}|{}|{max}|{room:.0}|{}|{clock:?}|{next:?}",
         track.collapsed, live.sig
     );
     if !visible || sig == shown.tracker {
@@ -1673,6 +1742,16 @@ fn update_tracker(
         if more > 0 {
             text(c, format!("  +{more} more in ~/jira (J)"), 11.0, DIM);
         }
+        if let Some(line) = &next {
+            c.spawn((
+                label(line.clone(), 11.0),
+                TextColor(DIM),
+                Node {
+                    margin: UiRect::top(px(3)),
+                    ..default()
+                },
+            ));
+        }
     });
 }
 
@@ -1795,6 +1874,47 @@ fn quest_events(
     }
 }
 
+fn arrow_hint(
+    time: Res<Time>,
+    sim: SimView,
+    settings: Res<crate::settings::Settings>,
+    binds: Res<crate::keybinds::Keybinds>,
+    hidden: Res<super::HudHidden>,
+    paused: Res<Paused>,
+    mut hint: ResMut<ArrowHint>,
+    mut shown: ResMut<Shown>,
+    mut toast: Single<&mut Text, With<ProgressToast>>,
+) {
+    // Anyone already using the arrow needs no telling.
+    if settings.quest_arrow {
+        hint.seen = true;
+    }
+    if hint.seen {
+        return;
+    }
+    if sim.player().is_none()
+        || !sim.quests().active.is_empty()
+        || hidden.cutscene
+        || hidden.opening
+        || paused.0
+    {
+        hint.idle = 0.0;
+        return;
+    }
+    hint.idle += time.delta_secs();
+    if hint.idle >= ARROW_HINT_IDLE_SECS {
+        hint.seen = true;
+        set_text(
+            &mut toast,
+            &format!(
+                "Lost? {} turns the quest arrow on.",
+                binds.label(crate::keybinds::Action::QuestArrow)
+            ),
+        );
+        shown.toast_age = 0.0;
+    }
+}
+
 fn trophy_hint(
     rows: Query<&Interaction, With<TrophyRow>>,
     mut hints: Query<&mut Node, With<TrophyHint>>,
@@ -1825,13 +1945,33 @@ fn trophy_hint(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use combat_core::Sim;
+    use combat_core::{QuestStatus, Sim};
 
     fn sim() -> Sim {
         match crate::combat::new_sim() {
             Ok(s) => s,
             Err(e) => panic!("{e:?}"),
         }
+    }
+
+    #[test]
+    fn the_next_line_names_the_main_step_and_the_way_there() {
+        let mut s = sim();
+        let p = s.spawn_player("fullstack", combat_core::Vec3::new(0.0, 0.0, 0.0), 0.0);
+        s.set_level_of(p, 10);
+        s.debug_set_quest("il_00_wake", QuestStatus::Done);
+        let line = |s: &Sim, zone| next_step_line(s, zone, false).unwrap_or_default();
+        // Dale is down the hatch: from the campus the first stop is the car park.
+        let from_campus = line(&s, "campus");
+        assert!(
+            from_campus.starts_with("Next: He Was Right - Dale, ")
+                && from_campus.ends_with(", via Car Park P3"),
+            "{from_campus}"
+        );
+        assert!(!line(&s, "resistance/1").contains("via"));
+        // An open main quest silences it.
+        s.debug_set_quest("il_01_dale", QuestStatus::Active);
+        assert!(next_step_line(&s, "campus", false).is_none());
     }
 
     #[test]

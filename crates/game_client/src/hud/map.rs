@@ -548,6 +548,10 @@ fn update_map(
         .filter_map(|l| {
             let (_, pos, _) = flow.anchors.iter().find(|a| a.0 == l.anchor)?;
             let open = l.unlocked || flow.unlock_all;
+            // The hatch to the Resistance is not on the map until the Opening has played.
+            if !open && combat_core::ilmari::is_ilmari_zone(&l.to) {
+                return None;
+            }
             Some((view.to_canvas(*pos), l.to, open))
         })
         .collect();

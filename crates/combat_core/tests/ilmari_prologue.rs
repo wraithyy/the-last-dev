@@ -198,12 +198,15 @@ fn link_open(sim: &Sim, zone: &str, to: &str) -> bool {
 #[test]
 fn the_attunement_chain_completes_solo_and_offline() {
     let mut w = W::opened();
-    assert_eq!(w.sim.quest_status("il_01_dale"), QuestStatus::Available);
+    // The Opening put Dale's ticket in the log: its first line is the way to the hatch.
+    assert_eq!(w.sim.quest_status("il_01_dale"), QuestStatus::Active);
+    assert_eq!(w.counts("il_01_dale"), [0, 0]);
     // The hatch opens with the Opening; the base is two loads away.
     w.load("parking_p3");
     assert!(link_open(&w.sim, "parking_p3", "resistance/1"));
     w.load("resistance/1");
-    w.accept("il_dale", "il_01_dale");
+    w.secs(2);
+    assert_eq!(w.counts("il_01_dale"), [1, 0]);
     w.talk("il_dale");
     w.turn_in("il_01_dale");
     assert_eq!(w.tokens(), 2);

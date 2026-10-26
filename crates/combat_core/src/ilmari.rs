@@ -15,6 +15,10 @@ use serde::{Deserialize, Serialize};
 
 /// The quest the Opening completes; its giver is the reveal Marie.
 pub const OPENING_QUEST: &str = "il_00_wake";
+/// The next main step, handed over the moment the Opening ends: its giver stands in the base
+/// behind a hatch nobody has told the player about, so it starts in the log with a first
+/// objective that leads there.
+pub const HANDOFF_QUEST: &str = "il_01_dale";
 /// The campaign's last boss: its death is what starts all of this.
 pub const CREDITS_BOSS: &str = "agi_prototype";
 /// The campus Maries the reveal retires (their spawns carry the matching `until` gate).
@@ -265,6 +269,7 @@ impl Sim {
             if !log.completed.iter().any(|c| c == OPENING_QUEST) {
                 log.completed.push(OPENING_QUEST.to_string());
             }
+            self.hand_over(pid);
         }
         // The gates only act at zone load; whoever stands on the loaded campus leaves now.
         for i in 0..self.units.len() {
@@ -284,7 +289,17 @@ impl Sim {
             let log = self.quest_logs.entry(pid).or_default();
             if !log.completed.iter().any(|c| c == OPENING_QUEST) {
                 log.completed.push(OPENING_QUEST.to_string());
+                self.hand_over(pid);
             }
+        }
+    }
+
+    /// Starts `HANDOFF_QUEST` in `pid`'s log unasked, if it is on offer to them.
+    fn hand_over(&mut self, pid: EntityId) {
+        if self.quest_status_of(pid, HANDOFF_QUEST) == crate::quests::QuestStatus::Available
+            && let Some(def) = self.content.quest(HANDOFF_QUEST).cloned()
+        {
+            self.start_quest(pid, &def);
         }
     }
 

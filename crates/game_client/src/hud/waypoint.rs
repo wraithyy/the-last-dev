@@ -134,7 +134,12 @@ fn objective_props<'a>(content: &'a Content, o: &Objective, taken: &[String]) ->
 }
 
 /// First step toward `goal` zones over open links: the door anchor of the current zone to take.
-fn door_toward(sim: &dyn SimRead, from: &str, goals: &[&str], unlock_all: bool) -> Option<String> {
+pub(super) fn door_toward(
+    sim: &dyn SimRead,
+    from: &str,
+    goals: &[&str],
+    unlock_all: bool,
+) -> Option<String> {
     // Breadth-first over the zone graph; each entry remembers the first door taken from `from`.
     let mut seen = vec![from.to_string()];
     let mut queue: Vec<(String, Option<String>)> = vec![(from.to_string(), None)];

@@ -126,6 +126,8 @@ fn the_opening_is_due_once_the_agi_is_down_and_hands_the_campus_over() {
     sim.tick();
     assert!(!sim.ilmari_pending() && sim.ilmari_open());
     assert_eq!(sim.quest_status_of(p, "il_00_wake"), QuestStatus::Done);
+    // The next main step is already in the log: nobody has to find Dale's hatch by luck.
+    assert_eq!(sim.quest_status_of(p, "il_01_dale"), QuestStatus::Active);
     assert!(keys(&sim).is_empty(), "{:?}", keys(&sim));
     // The next campus load: the desk, the bench and the reveal Marie are gone.
     sim.load_zone("campus", &anchors, Vec::new())

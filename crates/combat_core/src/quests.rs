@@ -199,6 +199,13 @@ impl Sim {
         {
             return;
         }
+        self.start_quest(pid, &def);
+    }
+
+    /// Puts `def` in `pid`'s log without the giver checks: accepting, and quests the story hands
+    /// over itself (`ilmari.rs`: the hatch breadcrumb).
+    pub(crate) fn start_quest(&mut self, pid: EntityId, def: &QuestDef) {
+        let id = def.id.as_str();
         // Work done before accepting counts at once: a cleared zone (a dead boss stays dead),
         // items carried and earlier kills.
         let log = self.quests_of(pid);
@@ -221,9 +228,9 @@ impl Sim {
             id: id.to_string(),
             counts: counts.clone(),
         };
-        let ready = is_ready(&def, &q);
+        let ready = is_ready(def, &q);
         self.quest_logs.entry(pid).or_default().active.push(q);
-        self.quest_accept_rt(pid, &def);
+        self.quest_accept_rt(pid, def);
         self.emit_to(
             pid,
             Event::QuestAccepted {

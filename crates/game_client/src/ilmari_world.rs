@@ -17,7 +17,7 @@ impl Plugin for IlmariWorldPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (mark_hatch, pulse)
+            (mark_hatch, pulse, place_label)
                 .chain()
                 .after(FloorSwap)
                 .in_set(SimReady),
@@ -27,6 +27,14 @@ impl Plugin for IlmariWorldPlugin {
 
 #[derive(Component)]
 struct HatchGlow(f32);
+
+/// The sign over the hatch: a UI label pinned to it, like a nameplate.
+#[derive(Component)]
+struct HatchLabel;
+
+/// The sign shows this close to the hatch, so it reads from the row of cars but not the lot's end.
+const LABEL_RANGE_M: f32 = 45.0;
+const LABEL_HEIGHT_M: f32 = 4.0;
 
 fn mark_hatch(
     mut commands: Commands,
@@ -63,6 +71,18 @@ fn mark_hatch(
     let ring = meshes.add(Annulus::new(0.9, 1.15));
     commands.spawn((
         ZoneDecor,
+        HatchLabel,
+        crate::hud::label("DEFINITELY NOT A RESISTANCE BASE", 14.0),
+        TextColor(Color::srgb(0.55, 1.0, 0.7)),
+        Node {
+            position_type: PositionType::Absolute,
+            ..default()
+        },
+        Visibility::Hidden,
+        GlobalZIndex(4),
+    ));
+    commands.spawn((
+        ZoneDecor,
         HatchGlow(0.0),
         Mesh3d(ring),
         MeshMaterial3d(glow.clone()),
@@ -87,5 +107,38 @@ fn pulse(time: Res<Time>, mut glows: Query<(&HatchGlow, &mut Transform)>) {
     for (g, mut tf) in &mut glows {
         let k = 1.0 + 0.08 * (t * 2.4 + g.0).sin();
         tf.scale = Vec3::new(k, 1.0, k);
+    }
+}
+
+fn place_label(
+    hidden: Res<crate::hud::HudHidden>,
+    paused: Res<crate::input::Paused>,
+    ui_scale: Res<UiScale>,
+    player: Query<&Transform, With<crate::player::Player>>,
+    camera: Single<(&Camera, &GlobalTransform), With<crate::camera::OrbitCamera>>,
+    mut label: Query<(&mut Node, &mut Visibility, &ComputedNode), With<HatchLabel>>,
+) {
+    let (x, z) = carpark::HATCH;
+    let at = Vec3::new(x, LABEL_HEIGHT_M, z);
+    let near = player.single().is_ok_and(|p| {
+        Vec2::new(p.translation.x - x, p.translation.z - z).length() <= LABEL_RANGE_M
+    });
+    let (cam, cam_tf) = *camera;
+    let on_screen = if near && !hidden.cutscene && !hidden.opening && !paused.0 {
+        cam.world_to_viewport(cam_tf, at).ok()
+    } else {
+        None
+    };
+    let scale = ui_scale.0.max(0.01);
+    for (mut node, mut vis, size) in &mut label {
+        let Some(p) = on_screen else {
+            vis.set_if_neq(Visibility::Hidden);
+            continue;
+        };
+        // Centred on the hatch; the first frame has no size yet and sits half a label off.
+        let half = size.size().x * size.inverse_scale_factor() / 2.0;
+        node.left = px(p.x / scale - half);
+        node.top = px(p.y / scale);
+        vis.set_if_neq(Visibility::Inherited);
     }
 }

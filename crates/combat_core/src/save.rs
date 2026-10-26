@@ -52,6 +52,8 @@ pub struct SaveData {
     /// The "First Day" onboarding is still to be finished (client-owned: the sim exports
     /// false and the client sets it). Optional key: older saves are past onboarding.
     pub onboarding_pending: bool,
+    /// The one-time "F8 turns on the quest arrow" hint was shown (client-owned, optional key).
+    pub arrow_hint_seen: bool,
     /// Owned pets, the one following ("" for none) and the duel win streak. Optional keys:
     /// older saves simply have none.
     pub pets: Vec<String>,
@@ -291,6 +293,9 @@ impl SaveData {
         if self.onboarding_pending {
             out.push_str("onboarding=pending\n");
         }
+        if self.arrow_hint_seen {
+            out.push_str("arrowhint=seen\n");
+        }
         let tasks: Vec<String> = self
             .tasks
             .iter()
@@ -371,6 +376,7 @@ impl SaveData {
                 }
                 "tasks" => s.tasks = list(v).iter().filter_map(|t| saved_task(t)).collect(),
                 "onboarding" => s.onboarding_pending = v == "pending",
+                "arrowhint" => s.arrow_hint_seen = v == "seen",
                 "achievements" => s.achievements = list(v),
                 "pets" => s.pets = list(v),
                 "pet" => s.pet = v.chars().take(crate::world::WORLD_KEY_MAX).collect(),
@@ -599,6 +605,7 @@ impl Sim {
             tasks_week,
             tasks,
             onboarding_pending: false,
+            arrow_hint_seen: false,
             pets: s.pets.clone(),
             pet: s.pet.clone(),
             duel_streak: s.duel_streak,
@@ -883,6 +890,25 @@ fn saved_task(t: &str) -> Option<crate::dailies::SavedTask> {
 #[cfg(test)]
 mod onboarding_tests {
     use super::SaveData;
+
+    #[test]
+    fn arrow_hint_flag_round_trips_and_old_saves_have_not_seen_it() {
+        let seen = SaveData {
+            class: "devops".into(),
+            level: 1,
+            arrow_hint_seen: true,
+            ..SaveData::default()
+        };
+        assert_eq!(
+            SaveData::decode(&seen.encode()).map(|s| s.arrow_hint_seen),
+            Some(true)
+        );
+        let old = "the-last-dev save\nversion=3\nclass=devops\nlevel=4\n";
+        assert_eq!(
+            SaveData::decode(old).map(|s| s.arrow_hint_seen),
+            Some(false)
+        );
+    }
 
     #[test]
     fn onboarding_flag_round_trips_and_old_saves_count_as_onboarded() {

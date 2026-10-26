@@ -66,6 +66,7 @@ fn load(
     mut state: ResMut<SaveState>,
     mut restarted: MessageReader<GameRestarted>,
     mut onboarding: ResMut<crate::onboarding::Onboarding>,
+    mut hint: ResMut<crate::hud::quests::ArrowHint>,
 ) {
     if restarted.read().count() > 0 {
         state.loaded = None;
@@ -90,6 +91,7 @@ fn load(
     match SaveData::decode(&text) {
         Some(save) if save.class == class => {
             onboarding.class_loaded(save.onboarding_pending);
+            hint.seen = save.arrow_hint_seen;
             sim.0.import_save(p, &save);
             state.last_written = text;
             info!(
@@ -110,6 +112,7 @@ fn write(
     mode: Res<GameMode>,
     flow: Res<GameFlow>,
     onboarding: Res<crate::onboarding::Onboarding>,
+    hint: Res<crate::hud::quests::ArrowHint>,
     mut state: ResMut<SaveState>,
 ) {
     if mode.is_online() || disabled() || state.loaded.is_none() {
@@ -124,6 +127,7 @@ fn write(
         return;
     };
     save.onboarding_pending = onboarding.pending;
+    save.arrow_hint_seen = hint.seen;
     if flow.victory {
         save.cleared.clear();
         save.bosses.clear();

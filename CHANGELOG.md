@@ -8,6 +8,17 @@ Versions before 0.6.0 were tagged after the fact, one per day of development.
 
 ## [Unreleased]
 
+### Added
+
+- When Ilmari's Opening ends, Dale's ticket "He Was Right" is already in your tracker with a first step that sends you to the hatch behind the Car Park P3 attendant's booth, and Dale sends a line in chat to say so.
+- The Resistance hatch now has a glowing sign, "DEFINITELY NOT A RESISTANCE BASE", and an "H" on the minimap once it is open.
+- With no main quest open, the tracker shows a dim "Next:" line with the next main quest, who gives it, where, and which door to take to get there (or the level it needs).
+- If you have had no quests for two minutes, a one-time hint tells you which key turns on the quest arrow.
+
+### Fixed
+
+- The hatch to the Resistance no longer shows on the minimap or world map before the Opening has played.
+
 ## [1.0.0] - 2026-10-25
 
 The Ilmari campaign is complete from the first cough to the credits, and the whole game had a polish pass. Thank you for playing.

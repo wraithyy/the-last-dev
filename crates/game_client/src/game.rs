@@ -312,8 +312,13 @@ pub(crate) fn start_game(
         sim.0.debug_mark_boss(boss.trim());
     }
     // QA: `WOW_ILMARI=1` plays the Opening on the campus (`mail`, `reveal` or `badge` start there).
-    if std::env::var_os("WOW_ILMARI").is_some() {
+    // `WOW_ILMARI=done` starts right after it: the hatch is open and Dale's ticket is in the log.
+    if let Some(mode) = std::env::var_os("WOW_ILMARI") {
         sim.0.debug_ilmari_opening();
+        if mode == "done" {
+            sim.0.stamp_ilmari(1_792_598_843, 120, "CEST");
+            sim.0.reveal_ilmari();
+        }
     }
     for (id, status, counts) in debug_quests() {
         if !sim.0.debug_set_quest(&id, status) {

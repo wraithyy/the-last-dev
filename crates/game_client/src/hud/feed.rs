@@ -642,10 +642,21 @@ fn collect_events(
                 ),
                 Color::srgb(1.0, 0.82, 0.3),
             ),
-            Event::QuestAccepted { quest } => out.push(
-                format!("Ticket assigned to you: {}.", quest_name(&*sim, quest)),
-                QUEST_YELLOW,
-            ),
+            Event::QuestAccepted { quest } => {
+                out.push(
+                    format!("Ticket assigned to you: {}.", quest_name(&*sim, quest)),
+                    QUEST_YELLOW,
+                );
+                // The Opening hands this one over unasked: Dale reaches out so the ticket is not
+                // a surprise (and the tracker line under it says where to go).
+                if quest == combat_core::ilmari::HANDOFF_QUEST {
+                    out.say(
+                        ChatKind::Say,
+                        "Dale",
+                        "Told you so. Since 2002. Booth in Car Park P3, hatch behind it. Don't ask what hatch.",
+                    );
+                }
+            }
             Event::QuestReady { quest } => out.push(
                 format!("{}: ready for review.", quest_name(&*sim, quest)),
                 QUEST_YELLOW,
